@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ancestry_global_q.schema.json",
+  "title": "Global per-sample Q matrix (NGSadmix)",
+  "description": "NGSadmix .qopt output, one row per sample, K columns each in [0,1] summing to 1. Sample order matches the run's samples.txt. The atlas reads this through a custom file format: the .qopt is whitespace-separated with NO header, so the layer entry uses format='tsv' and the consumer wraps each row's K values into a Q array.",
+  "version": "v1_2026-05-06",
+
+  "_format": "tsv-noheader",
+  "_layer_doc": "The .qopt is space- or tab-separated with K float columns and no header. The current layer_router parses with header=true; for this layer, the analysis module that consumes it must use the path to read the file fresh, OR we add a 'header: false' flag to the layer entry (~5 LOC change to layer_router.parseDelimited). Either approach. Default schema validates the post-processed shape: array of {sample_id, Q[]}.",
+
+  "_post_processed_shape": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "required": ["sample_id", "Q"],
+      "properties": {
+        "sample_id": { "type": "string", "minLength": 1 },
+        "Q": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0, "maximum": 1 },
+          "minItems": 2,
+          "maxItems": 50,
+          "description": "Per-cluster ancestry proportion. Length = K. Sum should be ~1.0."
+        }
+      }
+    }
+  }
+}

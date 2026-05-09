@@ -1,0 +1,19 @@
+// pages/review/page_sv_evidence/_state.js
+//
+// State module for the page_sv_evidence SV-evidence view (chat 39
+// round 5 step 19, 2026-05-07). Mirrors page7/_state.js +
+// page6/_state.js — same shape, distinct module, distinct
+// _pageState reference.
+//
+// page_sv_evidence's chat-33 exports (showSvEvidencePage,
+// hideSvEvidencePage) are thin loader stubs that delegate to a
+// window.AtlasSVEvidence object (with .init / .loadCandidate /
+// .destroy methods) defined in the external js/atlas_sv_evidence.js
+// bundle. _pageState exists for the canonical state-aware wrapper
+// pattern + future-proofing.
+//
+// page_sv_evidence has its OWN _pageState (separate from page6,
+// page7, and other review pages).
+
+export let _pageState = null;
+export function _setActiveState(s) { _pageState = s; }

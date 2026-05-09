@@ -1,0 +1,121 @@
+{
+  "$schema": "../../../../core/registry_core.schema.json",
+  "_doc": "Static file inventory. Distinct from layers because some files back multiple layer views (e.g. <chrom>.json backs ~50 logical layers). The shell uses this for: precaching, integrity checks, packaging (build/package_workflow.py), and dev-tools file listings.",
+
+  "files": {
+
+    "chrom_main": {
+      "path_template": "data/precomp/{chrom}.json",
+      "scope": "per_chrom",
+      "tier": "hot",
+      "preload_on": "chrom_change",
+      "estimated_size_mb": 8,
+      "workflow": "core",
+      "_doc": "The big per-chromosome JSON. Backs the scrubber_main layer."
+    },
+
+    "chrom_repeat_density": {
+      "path_template": "data/precomp/{chrom}/repeat_density.scrubber_windows.json",
+      "scope": "per_chrom",
+      "tier": "hot",
+      "preload_on": "chrom_change",
+      "workflow": "core"
+    },
+
+    "chrom_band_pipeline_outputs": {
+      "path_pattern": "data/precomp/{chrom}/{band_node|band_edges|transition_events|band_trajectories|het_band_backbones|candidate_track_proposals|candidate_tracks|manual_review_queue}.{tsv|json}",
+      "scope": "per_chrom",
+      "tier": "hot",
+      "preload_on": "chrom_change",
+      "workflow": "inversion",
+      "_doc": "SPEC BLOCK 1 R-module outputs. Lazy-loaded via state_io.loadPrecompTsv() in legacy."
+    },
+
+    "cohort_files": {
+      "scope": "global",
+      "tier": "warm",
+      "preload_on": "page_mount",
+      "workflow": "core",
+      "list": [
+        "data/cohort/relatedness.json",
+        "data/cohort/cohort_diversity_v1.json",
+        "data/cohort/sample_froh.json",
+        "data/cohort/sample_manifest.tsv",
+        "data/cohort/sample_groups.tsv",
+        "data/cohort/natora_pruned.tsv"
+      ]
+    },
+
+    "candidate_dir": {
+      "path_template": "data/candidates/{candidate_id}/",
+      "scope": "per_candidate",
+      "tier": "warm",
+      "preload_on": "candidate_change",
+      "writable": true,
+      "workflow": "inversion",
+      "_layout": "data/candidates/{candidate_id}/lineage.json (the version index, one per candidate) + data/candidates/{candidate_id}/{version_id}/<aspect>.json (one folder per version, containing all version-scoped aspects).",
+      "expected_files_per_candidate": [
+        "lineage.json"
+      ],
+      "expected_files_per_version": [
+        "boundaries_refined.json",
+        "sv_genotype_counts.json",
+        "gene_cargo.json",
+        "marker_primers.json",
+        "breeding_readiness_card.json",
+        "final_classification.json"
+      ],
+      "_doc": "writable: true \u2014 browser-side analysis modules write per-candidate JSONs via Registry.write. HPC-side producers also write here directly. Server path allowlist requires data/candidates/{cid}/lineage.json OR data/candidates/{cid}/{version_id}/<aspect>.json."
+    },
+
+    "comparative_files": {
+      "scope": "global",
+      "tier": "cold",
+      "workflow": "inversion",
+      "list": [
+        "data/comparative/cs_breakpoints_v1.json",
+        "data/comparative/synteny_multispecies_v1.json",
+        "data/comparative/phylo_tree_v1.json",
+        "data/comparative/te_fragility_v1.json"
+      ]
+    },
+
+    "review_session_writes": {
+      "path_template": "data/review/inversion/sessions/{session_id}/{filename}",
+      "scope": "per_session",
+      "tier": "warm",
+      "writable": true,
+      "workflow": "inversion",
+      "expected_files": [
+        "manual_overrides.json",
+        "candidate_review_decisions.json",
+        "locked_karyotype_groups.json",
+        "confirmed_candidates.json"
+      ],
+      "_doc": "WRITE set for the inversion review workflow. Browser cannot write filesystem directly — these are JSON-blob downloads the user re-uploads."
+    },
+
+    "arrangement_calls_session": {
+      "path_template": "data/arrangement_calls/{candidate_id}/{version_id}/",
+      "scope": "per_candidate",
+      "tier": "warm",
+      "writable": true,
+      "workflow": "inversion",
+      "expected_files": [
+        "arrangement_calls.json"
+      ],
+      "_doc": "Output of the band_tracking arrangement-call pipeline. Per SPEC_arrangement_color_mode_and_arrangement_calls_v1.md. version_id required \u2014 arrangement is tied to which boundary version it was derived against. writable: true \u2014 browser-side band_tracking can write here via Registry.write."
+    },
+
+    "server_results_cache": {
+      "path_template": "_cache/server_results/{op_id}/{hash}.json",
+      "scope": "global",
+      "tier": "warm",
+      "writable": true,
+      "workflow": "core",
+      "_doc": "Server compute results, cached to disk via the persist hook. When a layer entry has persist: true, every successful operation result is written here under op_id/hash(args).json. The actual disk root is configured via popstats_server.config.yaml > server_results_cache_root (default /mnt/e/inversion-atlas-cache/server_results/). The path template here is the LOGICAL path used by the registry; the server rewrites the _cache/server_results/ prefix to the configured filesystem root.",
+      "_excluded_from_tarballs": "By convention this directory is excluded from project tarballs and gitignored. Sits on the user's big disk so test runs don't bloat the source tree.",
+      "_default_root_on_disk": "/mnt/e/inversion-atlas-cache/server_results/"
+    }
+  }
+}

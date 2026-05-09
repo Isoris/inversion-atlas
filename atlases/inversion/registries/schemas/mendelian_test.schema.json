@@ -1,0 +1,6 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "_doc": "PLACEHOLDER schema. Accepts any object. Replace with the real schema when the data shape stabilizes. Referenced from registries/data/layers.registry.json with schema_status: pending.",
+  "_status": "pending",
+  "type": "object"
+}

@@ -1,0 +1,481 @@
+{
+  "$schema": "../../../../core/registry_core.schema.json",
+  "_doc": "Layer inventory for the inversion atlas. Derived from the legacy state_io.js KNOWN_LAYERS table. Each layer declares its tier (hot/warm/cold), source (file/operation), pre-warm trigger, and optional chunking strategy for v2 large-track support. Path templating uses {slot} substitution from AtlasState.shared.* and resolve() args.",
+  "_v2_changes_2026-05-06": "Three additions: (1) per-candidate paths now include {version_id} and resolve() throws if version_id is missing for those layers (no fallback default \u2014 versioning is mandatory); (2) candidate_lineage layer added \u2014 the version index for each candidate; (3) writable: true marks layers that Registry.write() may write to (per-candidate JSONs and lineage). Server-compute layers gain persist: true \u2014 every operation result is also written to the server results cache (configured at popstats_server.config.yaml > server_results_cache_root, default /mnt/e/inversion-atlas-cache/server_results/).",
+  "_tier_legend": {
+    "hot": "RAM-pinned at trigger event; pages read state directly; <1ms",
+    "warm": "IndexedDB-cached at trigger event; first read async ~50ms; subsequent ~10ms",
+    "cold": "Fetched on demand; spinner allowed"
+  },
+  "layers": {
+    "_section_1": "==== HOT layers (pre-warmed to RAM at chrom_change) ====",
+    "scrubber_main": {
+      "tier": "hot",
+      "preload_on": "chrom_change",
+      "source": "file",
+      "path": "data/precomp/{chrom}.json",
+      "schema": "schemas/scrubber_main.schema.json",
+      "chunked": false,
+      "_v2_chunked_plan": "When whole-genome support arrives, set chunked: true and split <chrom>.json into <chrom>_<window_block>.json shards.",
+      "pin_to": "AtlasState.inversion.tracks.{chrom}",
+      "fields": [
+        "windows",
+        "envelopes",
+        "tracks",
+        "samples",
+        "candidate_proposals",
+        "cluster_labels_ghsl",
+        "cusum_ghsl",
+        "ghsl_karyotype_runs",
+        "ghsl_heatmap",
+        "ghsl_panel",
+        "ghsl_kstripes",
+        "ancestry_window",
+        "ancestry_sample",
+        "ancestry_q_means",
+        "ancestry_q_global",
+        "ancestry_q_chrom",
+        "snp_q_support",
+        "cluster_labels_theta",
+        "cusum_theta",
+        "dosage_dip",
+        "dosage_chunks",
+        "concordance_tables",
+        "cusum_concordance",
+        "subcandidates_emitted",
+        "candidates_registry",
+        "sv_evidence",
+        "bnd_rescue",
+        "boundaries_refined",
+        "qc_flags",
+        "groups_validated",
+        "classification",
+        "gene_cargo",
+        "marker_panel_summary",
+        "marker_catalogue",
+        "marker_primers",
+        "theta_pi_panel",
+        "roh_intervals",
+        "sample_froh",
+        "candidate_sample_coherence",
+        "candidate_marker_polarity",
+        "per_sample_theta_pi",
+        "final_classification",
+        "theta_pi_per_window",
+        "theta_pi_local_pca",
+        "theta_pi_envelopes",
+        "relatedness"
+      ]
+    },
+    "repeat_density": {
+      "tier": "hot",
+      "preload_on": "chrom_change",
+      "source": "file",
+      "path": "data/precomp/{chrom}/repeat_density.scrubber_windows.json",
+      "schema": "schemas/repeat_density.schema.json",
+      "pin_to": "AtlasState.inversion.tracks.{chrom}.repeat_density"
+    },
+    "_section_2": "==== HOT band_tracking layers (R-pipeline outputs, TSV) ====",
+    "band_nodes": {
+      "tier": "hot",
+      "preload_on": "chrom_change",
+      "source": "file",
+      "path": "data/precomp/{chrom}/band_nodes.tsv",
+      "format": "tsv"
+    },
+    "band_edges": {
+      "tier": "hot",
+      "preload_on": "chrom_change",
+      "source": "file",
+      "path": "data/precomp/{chrom}/band_edges.tsv",
+      "format": "tsv"
+    },
+    "transition_events": {
+      "tier": "hot",
+      "preload_on": "chrom_change",
+      "source": "file",
+      "path": "data/precomp/{chrom}/transition_events.tsv",
+      "format": "tsv"
+    },
+    "band_trajectories": {
+      "tier": "hot",
+      "preload_on": "chrom_change",
+      "source": "file",
+      "path": "data/precomp/{chrom}/band_trajectories.tsv",
+      "format": "tsv"
+    },
+    "het_band_backbones": {
+      "tier": "hot",
+      "preload_on": "chrom_change",
+      "source": "file",
+      "path": "data/precomp/{chrom}/het_band_backbones.tsv",
+      "format": "tsv"
+    },
+    "candidate_track_proposals": {
+      "tier": "hot",
+      "preload_on": "chrom_change",
+      "source": "file",
+      "path": "data/precomp/{chrom}/candidate_track_proposals.tsv",
+      "format": "tsv"
+    },
+    "candidate_tracks": {
+      "tier": "hot",
+      "preload_on": "chrom_change",
+      "source": "file",
+      "path": "data/precomp/{chrom}/candidate_tracks.json"
+    },
+    "manual_review_queue": {
+      "tier": "warm",
+      "preload_on": "chrom_change",
+      "source": "file",
+      "path": "data/precomp/{chrom}/manual_review_queue.tsv",
+      "format": "tsv"
+    },
+    "_section_3": "==== WARM cohort-level layers (loaded once at app start) ====",
+    "_succession_note_3": "These layers are PROVISIONAL in inversion-atlas. They semantically belong to a future population-atlas. When that atlas lands and declares these same keys, the registry's succession rule lets population take over silently. See SPEC_registry_v1.md \u00a77 and README_PAIRING.md \u00a711.",
+    "cohort_relatedness": {
+      "tier": "warm",
+      "preload_on": "page_mount",
+      "source": "file",
+      "path": "data/cohort/relatedness.json",
+      "schema": "schemas/relatedness.schema.json",
+      "schema_status": "pending",
+      "provisional": true,
+      "owned_by": "population"
+    },
+    "cohort_diversity": {
+      "tier": "warm",
+      "preload_on": "page_mount",
+      "source": "file",
+      "path": "data/cohort/cohort_diversity_v1.json",
+      "schema": "schemas/cohort_diversity.schema.json",
+      "schema_status": "pending",
+      "provisional": true,
+      "owned_by": "diversity"
+    },
+    "cohort_sample_froh": {
+      "tier": "warm",
+      "preload_on": "page_mount",
+      "source": "file",
+      "path": "data/cohort/sample_froh.json",
+      "schema": "schemas/sample_froh.schema.json",
+      "schema_status": "pending",
+      "provisional": true,
+      "owned_by": "diversity"
+    },
+    "cohort_sample_manifest": {
+      "tier": "warm",
+      "preload_on": "page_mount",
+      "source": "file",
+      "path": "data/cohort/sample_manifest.tsv",
+      "format": "tsv",
+      "provisional": true,
+      "owned_by": "population"
+    },
+    "cohort_sample_groups": {
+      "tier": "warm",
+      "preload_on": "page_mount",
+      "source": "file",
+      "path": "data/cohort/sample_groups.tsv",
+      "format": "tsv",
+      "provisional": true,
+      "owned_by": "population"
+    },
+    "cohort_natora_pruned": {
+      "tier": "warm",
+      "preload_on": "page_mount",
+      "source": "file",
+      "path": "data/cohort/natora_pruned.tsv",
+      "format": "tsv",
+      "provisional": true,
+      "owned_by": "population"
+    },
+    "_section_4": "==== WARM per-candidate layers (preloaded on candidate_change) ====",
+    "_section_4_versioning_note": "All per-candidate layers below template on BOTH {candidate_id} AND {version_id}. version_id is required at call time \u2014 there is no fallback default. The active version_id for a given candidate lives in candidate_lineage.active_version_id (the lineage layer below). Pages typically resolve lineage first, then resolve other per-candidate layers with that version_id.",
+    "candidate_lineage": {
+      "tier": "warm",
+      "preload_on": "candidate_change",
+      "source": "file",
+      "path": "data/candidates/{candidate_id}/lineage.json",
+      "schema": "schemas/candidate_lineage.schema.json",
+      "schema_status": "validated",
+      "writable": true,
+      "_doc": "The version index for a candidate. Names all versions ever computed and which is active. Boundaries, K, locked_labels are NOT here \u2014 those live per-version under data/candidates/{candidate_id}/{version_id}/. lineage.json is the index, not the data. NOT version-scoped (one per candidate, regardless of how many versions). writable: true \u2014 browser refinement workflows append new version entries via Registry.write."
+    },
+    "candidate_sv_counts": {
+      "tier": "warm",
+      "preload_on": "candidate_change",
+      "source": "file",
+      "path": "data/candidates/{candidate_id}/{version_id}/sv_genotype_counts.json",
+      "writable": true,
+      "_doc": "Producer: SV pipeline on LANTA (HPC-side write). Browser: read-only by default. version_id required."
+    },
+    "candidate_boundaries": {
+      "tier": "warm",
+      "preload_on": "candidate_change",
+      "source": "file",
+      "path": "data/candidates/{candidate_id}/{version_id}/boundaries_refined.json",
+      "schema": "../../../../toolkit_registries/schemas/structured_block_schemas/boundary_refined.schema.json",
+      "schema_status": "validated",
+      "writable": true,
+      "_schema_origin": "toolkit_registries/schemas/structured_block_schemas/boundary_refined.schema.json \u2014 the manuscript pipeline's evidence-block schema, written by 03_consensus_merge.R. This is the same schema reg$evidence$write_block validates against on the server side.",
+      "_doc": "version_id required. A boundary refinement creates a new version_id; old boundaries remain readable under their old version_id."
+    },
+    "candidate_gene_cargo": {
+      "tier": "warm",
+      "preload_on": "candidate_change",
+      "source": "file",
+      "path": "data/candidates/{candidate_id}/{version_id}/gene_cargo.json",
+      "writable": true,
+      "_doc": "version_id required. Gene cargo depends on boundaries, so each version has its own gene_cargo."
+    },
+    "candidate_marker_primers": {
+      "tier": "warm",
+      "preload_on": "candidate_change",
+      "source": "file",
+      "path": "data/candidates/{candidate_id}/{version_id}/marker_primers.json",
+      "schema": "schemas/marker_panel.schema.json",
+      "writable": true,
+      "_doc": "version_id required. Primers are version-specific (different boundaries -> different breakpoint regions -> different primers)."
+    },
+    "candidate_breeding_card": {
+      "tier": "warm",
+      "preload_on": "candidate_change",
+      "source": "file",
+      "path": "data/candidates/{candidate_id}/{version_id}/breeding_readiness_card.json",
+      "writable": true,
+      "_doc": "version_id required. Browser-side analysis output (per DATA_LIFECYCLE Category 3 browser-side producer)."
+    },
+    "candidate_final_class": {
+      "tier": "warm",
+      "preload_on": "candidate_change",
+      "source": "file",
+      "path": "data/candidates/{candidate_id}/{version_id}/final_classification.json",
+      "writable": true,
+      "_doc": "version_id required."
+    },
+    "_section_5": "==== COLD comparative layers (loaded only when a comparative page mounts) ====",
+    "_succession_note_5": "Synteny + phylogeny are genome-level concepts. These layers will move to a future genome-atlas. te_fragility stays in inversion (it's specifically about TE-driven inversion-formation).",
+    "cs_breakpoints": {
+      "tier": "cold",
+      "source": "file",
+      "path": "data/comparative/cs_breakpoints_v1.json",
+      "provisional": true,
+      "owned_by": "genome"
+    },
+    "synteny_multispecies": {
+      "tier": "cold",
+      "source": "file",
+      "path": "data/comparative/synteny_multispecies_v1.json",
+      "provisional": true,
+      "owned_by": "genome"
+    },
+    "phylo_tree": {
+      "tier": "cold",
+      "source": "file",
+      "path": "data/comparative/phylo_tree_v1.json",
+      "provisional": true,
+      "owned_by": "genome"
+    },
+    "te_fragility": {
+      "tier": "cold",
+      "source": "file",
+      "path": "data/comparative/te_fragility_v1.json",
+      "_doc": "STAYS in inversion-atlas \u2014 TE fragility specifically explains why inversions form, not a generic genome layer."
+    },
+    "_section_6": "==== COLD operation-backed layers (compute via popstats_server.py) ====",
+    "_section_6_audit": "Operations match popstats_server.py routes verified 2026-05-06 against Atlas_turn166_round2_2026-05-05. The legacy registry had invented endpoints (fst_hom1_hom2, theta_pi_by_invgt etc.) that don't exist in the server. The real server has FOUR compute endpoints: popstats_groupwise (FST+dXY+theta_pi together), popstats_hobs_groupwise (HoverE), ancestry_groupwise_q, ld_split_heatmap. Plus dosage and shelf-LD.",
+    "fst_dxy_thetapi_groupwise": {
+      "tier": "cold",
+      "source": "operation",
+      "operation": "popstats_groupwise",
+      "persist": true,
+      "_doc": "Note: FST, dXY, theta_pi all come back from ONE call to popstats_groupwise \u2014 they're three metrics in the response, not three separate operations. The page picks which to display. Cache key includes the metric set so requesting only fst doesn't pollute a request for all three. persist: true \u2014 ANGSD over 226 samples is heavy; result is written to the server results cache and a re-call hits cached JSON instead of recomputing."
+    },
+    "hobs_groupwise": {
+      "tier": "cold",
+      "source": "operation",
+      "operation": "popstats_hobs_groupwise",
+      "persist": true,
+      "_doc": "persist: true \u2014 hobs over the cohort at multiple scales is heavy; cache the result."
+    },
+    "ancestry_q_groupwise": {
+      "tier": "cold",
+      "source": "operation",
+      "operation": "ancestry_groupwise_q",
+      "persist": true,
+      "_doc": "persist: true \u2014 NGSadmix-equivalent groupwise Q is heavy."
+    },
+    "ld_split_heatmap_layer": {
+      "tier": "cold",
+      "source": "operation",
+      "operation": "ld_split_heatmap",
+      "persist": true,
+      "_doc": "persist: true \u2014 split-heatmap LD over a region is moderately heavy and re-asked frequently when comparing candidates."
+    },
+    "shelf_ld_test_layer": {
+      "tier": "cold",
+      "source": "operation",
+      "operation": "shelf_ld_test",
+      "persist": true,
+      "_doc": "persist: true \u2014 small but called per-candidate; cache to avoid recompute on revisit."
+    },
+    "dosage_chunk_layer": {
+      "tier": "warm",
+      "preload_on": "candidate_change",
+      "source": "operation",
+      "operation": "dosage_chunk",
+      "_doc": "Used by per-sample lines panel. Preloaded when candidate changes since dosage view is a primary visualization."
+    },
+    "dosage_manifest_layer": {
+      "tier": "warm",
+      "preload_on": "page_mount",
+      "source": "operation",
+      "operation": "dosage_manifest"
+    },
+    "_dropped_layers_doc": "REMOVED from this registry: lof_burden, pseudogenisation_scan, coverage_extract, beagle_uncertainty, split_read_aggregate, permutation_test. These were invented in the previous round; their endpoints do NOT exist in popstats_server.py. If any of these are needed in the future, the corresponding endpoint must be added to popstats_server.py first, THEN registered here. Don't add layer entries pointing at non-existent endpoints.",
+    "_section_7": "==== Arrangement-mode layer (per yesterday's spec) ====",
+    "arrangement_calls": {
+      "tier": "warm",
+      "preload_on": "candidate_change",
+      "source": "file",
+      "path": "data/arrangement_calls/{candidate_id}/{version_id}/arrangement_calls.json",
+      "schema": "schemas/arrangement_calls.schema.json",
+      "writable": true,
+      "_doc": "Per SPEC_arrangement_color_mode_and_arrangement_calls_v1.md. Wire format defined there. Used by per-sample-lines panel as 9th color mode. version_id required \u2014 arrangement calls depend on which boundary version they were derived against."
+    },
+    "_section_8": "==== Browser-side ANALYSIS results (computed on demand by analysis/*.js modules; cached at warm tier) ====",
+    "candidate_karyotype_per_sample": {
+      "tier": "warm",
+      "preload_on": "candidate_change",
+      "source": "analysis",
+      "analysis": "analysis/karyotype_assignment.js#assignKaryotypes",
+      "schema": "schemas/karyotype_assignment.schema.json",
+      "cache_key": "kar:{candidate_id}",
+      "_doc": "Per-sample HOM_REF/HET/HOM_INV assignment derived from local PCA on dosage. Browser-side compute (k-means + Hungarian + purity threshold). Cached because used by mendelian, by per-sample lines panel, by marker assay design. NOT the file-cached candidate_final_class \u2014 that's the manuscript-frozen version; this is the live per-session compute."
+    },
+    "mendelian_test": {
+      "tier": "warm",
+      "source": "analysis",
+      "analysis": "analysis/mendelian.js#runMendelianTest",
+      "schema": "schemas/mendelian_test.schema.json",
+      "cache_key": "mendelian:{candidate_id}",
+      "_doc": "Mendelian inheritance test for the candidate inversion across cohort trios. Inputs: candidate_karyotype_per_sample, cohort_relatedness. Browser-side; results cached so flipping pages doesn't recompute. See analysis/mendelian.js."
+    },
+    "trio_inventory": {
+      "tier": "warm",
+      "preload_on": "page_mount",
+      "source": "analysis",
+      "analysis": "analysis/trio_finder.js#findTrios",
+      "cache_key": "trios:1st_degree",
+      "_doc": "List of (father, mother, offspring) trios in the cohort, derived from cohort_relatedness. Cached once at startup; reused by mendelian, by linkage analysis, by inheritance-pattern visualizations."
+    },
+    "_doc_relatedness_block": "==== Relatedness domain (Mode B \u2014 raw folder interface) \u2014 see data/relatedness/README.md ====",
+    "relatedness_ngsrelate": {
+      "tier": "warm",
+      "preload_on": "explicit",
+      "source": "file",
+      "path": "data/cohort/relatedness/ngsrelate/{run_id}/relatedness.tsv",
+      "format": "tsv",
+      "schema": "schemas/relatedness_ngsrelate.schema.json",
+      "schema_status": "pending",
+      "fields": null,
+      "provisional": true,
+      "owned_by": "population",
+      "_doc": "Per-pair ngsRelate output. Path templates on {run_id}. Default ngsRelate column set, see schema. The optional `fields:` filter (declared at layer level OR overridden per-call) lets analysis modules pull only needed columns. schema_status='pending' until a real run lands; flip to 'validated' then. Provisional/owned_by 'population' so the future population atlas can take over without conflict.",
+      "_run_id_examples": [
+        "broodstock_qc_pass_v1",
+        "natora_pruned_81_v1"
+      ]
+    },
+    "relatedness_samples_order": {
+      "tier": "warm",
+      "preload_on": "explicit",
+      "source": "file",
+      "path": "data/cohort/relatedness/ngsrelate/{run_id}/samples.txt",
+      "format": "tsv",
+      "schema": "schemas/relatedness_samples_order.schema.json",
+      "schema_status": "pending",
+      "provisional": true,
+      "owned_by": "population",
+      "_doc": "Sidecar to the ngsRelate run. Single-column samples-in-order file. Used by analysis modules that need to map a/b indices back to canonical sample IDs."
+    },
+    "_doc_ancestry_block": "==== Ancestry domain (Mode B static + operation-backed runtime) \u2014 see data/ancestry/README.md ====",
+    "ancestry_global_q": {
+      "tier": "warm",
+      "preload_on": "explicit",
+      "source": "analysis",
+      "analysis": "shared/loaders/qopt_loader.js#registryAdapter",
+      "schema": "schemas/ancestry_global_q_v1.schema.json",
+      "schema_status": "validated",
+      "cache_key": "ancestry_global_q:K{K}:{run_id}",
+      "provisional": false,
+      "owned_by": "population",
+      "_doc": "Per-sample ancestry Q matrix from NGSadmix. Wired 2026-05-07 (post-step22) to use the registryAdapter export of shared/loaders/qopt_loader.js, which reads the headerless whitespace-separated .qopt + sidecar samples.txt and emits a self-describing ancestry_global_q_v1 artifact. The loader handles NGSadmix conventions (no header, mixed-whitespace separators, sample order from samples.txt). Default paths derived from {K} + optional {run_id}; callers can override via args.qopt_path / args.samples_path. This is the FIRST WORKED EXAMPLE of the activate-schema + extract-schema pattern (Quentin's design directive 2026-05-07): the activate-schema for this producer lives at registries/producers/load_ngsadmix_qopt.activate.json. A sibling producer (registries/data/operations.registry.json: ancestry_groupwise_q) emits the SAME extract-schema via a server-side run on a sample subset \u2014 conditional ancestry (band-1 vs band-2). Both are interchangeable downstream because they share the extract-schema. Replaces the prior file-source entry which was blocked on a 5-LOC parseDelimited extension; that extension landed alongside this wiring (hasHeader: false + 'whitespace' sentinel sep).",
+      "_legacy_v0": {
+        "_doc": "Pre-2026-05-07 entry, kept for traceability. Was blocked on parseDelimited needing header=false support. Resolved by the loader pattern above.",
+        "tier": "warm",
+        "source": "file",
+        "path": "data/cohort/ancestry/global/K{K}/ngsadmix.qopt",
+        "format": "tsv",
+        "schema": "schemas/ancestry_global_q.schema.json",
+        "schema_status": "pending"
+      }
+    },
+    "ancestry_global_q_samples": {
+      "tier": "warm",
+      "preload_on": "explicit",
+      "source": "file",
+      "path": "data/cohort/ancestry/global/K{K}/samples.txt",
+      "format": "tsv",
+      "schema": "schemas/relatedness_samples_order.schema.json",
+      "schema_status": "pending",
+      "provisional": true,
+      "owned_by": "population",
+      "_doc": "Sample-order sidecar for the global Q file. Reuses the relatedness samples-order schema (same shape: one column, sample_id)."
+    },
+    "ancestry_local_q_windows": {
+      "tier": "warm",
+      "preload_on": "chrom_change",
+      "source": "file",
+      "path": "data/cohort/ancestry/windows/{chrom}_K{K}.tsv",
+      "format": "tsv",
+      "schema": "schemas/ancestry_local_q_windows.schema.json",
+      "schema_status": "pending",
+      "fields": null,
+      "provisional": true,
+      "owned_by": "population",
+      "_doc": "Long-format ancestry-by-window for one chrom. Pre-aggregated by the pipeline from instant_q outputs. Tier=warm; preload on chrom_change because the local-ancestry scrubber wants this immediately when the user picks a chrom."
+    },
+    "_doc_cross_species_block": "==== Cross-species domain (Mode B raw + Mode A curated) \u2014 see data/cross_species/README.md ====",
+    "cross_species_synteny_blocks": {
+      "tier": "cold",
+      "preload_on": "explicit",
+      "source": "file",
+      "path": "data/comparative/cross_species/synteny/{pair}/synteny_blocks.tsv",
+      "format": "tsv",
+      "schema": "schemas/cross_species_synteny_blocks.schema.json",
+      "schema_status": "pending",
+      "fields": null,
+      "provisional": true,
+      "owned_by": "genome",
+      "_doc": "Aggregated synteny blocks for one genome pair. Pair convention: '<ref>__vs__<query>'. Owned by future genome atlas.",
+      "_pair_examples": [
+        "C_gar_v1__vs__C_mac_v1"
+      ]
+    },
+    "cross_species_breakpoint_reuse": {
+      "tier": "cold",
+      "preload_on": "explicit",
+      "source": "file",
+      "path": "data/comparative/cross_species/breakpoints/{pair}/breakpoint_reuse.tsv",
+      "format": "tsv",
+      "schema": "schemas/cross_species_breakpoint_reuse.schema.json",
+      "schema_status": "pending",
+      "fields": null,
+      "provisional": true,
+      "owned_by": "genome",
+      "_doc": "Shared/reused breakpoints between two genomes. Joined from synteny edges + SV evidence. Owned by future genome atlas."
+    }
+  }
+}

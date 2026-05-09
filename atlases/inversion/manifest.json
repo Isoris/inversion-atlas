@@ -1,0 +1,226 @@
+{
+  "atlas_id": "inversion",
+  "atlas_name": "Inversion Detection Atlas",
+  "atlas_version": "2026-05-06-evening",
+  "atlas_description": "Population-genomic inversion detection, karyotyping, and follow-up for the 226-sample pure C. gariepinus hatchery cohort.",
+  "pages": [
+    {
+      "id": "page1",
+      "label": "local PCA |z|",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page1.html",
+      "module": "atlases/inversion/pages/discovery/page1.js",
+      "tooltip": "Local PCA on dosage. Sim_mat heatmap, robust |Z|, per-sample lines, K-means PCA, L3 contingency. THE big page."
+    },
+    {
+      "id": "page2",
+      "label": "candidate focus",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page2.html",
+      "module": "atlases/inversion/pages/discovery/page2.js"
+    },
+    {
+      "id": "page8",
+      "label": "per-window summary table",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page8.html",
+      "module": "atlases/inversion/pages/discovery/page8.js"
+    },
+    {
+      "id": "page12",
+      "label": "local PCA θπ",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page12.html",
+      "module": "atlases/inversion/pages/discovery/page12.js"
+    },
+    {
+      "id": "page15",
+      "label": "GHSL haplotype divergence",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page15.html",
+      "module": "atlases/inversion/pages/discovery/page15.js"
+    },
+    {
+      "id": "page19",
+      "label": "negative regions catalogue",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page19.html",
+      "module": "atlases/inversion/pages/discovery/page19.js"
+    },
+    {
+      "id": "page22",
+      "label": "haplotype regimes",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page22.html",
+      "module": "atlases/inversion/pages/discovery/page22.js",
+      "tooltip": "Long-range haplotype regimes (Stage 4 bruteforce projection). Run runBandingPipeline on the active chromosome and explore where each seed-band voter lands across target windows. Export the result as a regime catalogue JSON."
+    },
+    {
+      "id": "page4",
+      "label": "karyotype / tier",
+      "stage": "review",
+      "fragment": "atlases/inversion/pages/review/page4.html",
+      "module": "atlases/inversion/pages/review/page4.js"
+    },
+    {
+      "id": "page6",
+      "label": "popstats",
+      "stage": "review",
+      "fragment": "atlases/inversion/pages/review/page6.html",
+      "module": "atlases/inversion/pages/review/page6.js"
+    },
+    {
+      "id": "page7",
+      "label": "ancestry",
+      "stage": "review",
+      "fragment": "atlases/inversion/pages/review/page7.html",
+      "module": "atlases/inversion/pages/review/page7.js"
+    },
+    {
+      "id": "page11",
+      "label": "boundaries",
+      "stage": "review",
+      "fragment": "atlases/inversion/pages/review/page11.html",
+      "module": "atlases/inversion/pages/review/page11.js"
+    },
+    {
+      "id": "page_sv_evidence",
+      "label": "SV evidence",
+      "stage": "review",
+      "fragment": "atlases/inversion/pages/review/page_sv_evidence.html",
+      "module": "atlases/inversion/pages/review/page_sv_evidence.js"
+    },
+    {
+      "id": "page3",
+      "label": "catalogue",
+      "stage": "catalogue",
+      "fragment": "atlases/inversion/pages/catalogue/page3.html",
+      "module": "atlases/inversion/pages/catalogue/page3.js"
+    },
+    {
+      "id": "page9",
+      "label": "confirmed carousel",
+      "stage": "catalogue",
+      "fragment": "atlases/inversion/pages/catalogue/page9.html",
+      "module": "atlases/inversion/pages/catalogue/page9.js"
+    },
+    {
+      "id": "page10",
+      "label": "marker panels",
+      "stage": "catalogue",
+      "fragment": "atlases/inversion/pages/catalogue/page10.html",
+      "module": "atlases/inversion/pages/catalogue/page10.js"
+    },
+    {
+      "id": "page17",
+      "label": "stats profile",
+      "stage": "synthesis",
+      "fragment": "atlases/inversion/pages/catalogue/page17.html",
+      "module": "atlases/inversion/pages/catalogue/page17.js"
+    },
+    {
+      "id": "page18",
+      "label": "marker panel",
+      "stage": "synthesis",
+      "fragment": "atlases/inversion/pages/catalogue/page18.html",
+      "module": "atlases/inversion/pages/catalogue/page18.js"
+    },
+    {
+      "id": "page21",
+      "label": "annotation cockpit",
+      "stage": "catalogue",
+      "fragment": "atlases/inversion/pages/catalogue/page21.html",
+      "module": "atlases/inversion/pages/catalogue/page21.js"
+    },
+    {
+      "id": "page_overview",
+      "label": "overview",
+      "stage": "synthesis",
+      "fragment": "atlases/inversion/pages/catalogue/page_overview.html",
+      "module": "atlases/inversion/pages/catalogue/page_overview.js"
+    },
+    {
+      "id": "page5",
+      "label": "help",
+      "stage": "comparative",
+      "fragment": "atlases/inversion/pages/comparative/page5.html",
+      "module": "atlases/inversion/pages/comparative/page5.js",
+      "tooltip": "Quick-reference / help page (static HTML, no JS render). NB: legacy 'page5' is the help page, NOT multi-species — the multi-species cockpit is page16b."
+    },
+    {
+      "id": "page16",
+      "label": "cross-species breakpoints",
+      "stage": "comparative",
+      "fragment": "atlases/inversion/pages/comparative/page16.html",
+      "module": "atlases/inversion/pages/comparative/page16.js"
+    },
+    {
+      "id": "page16b",
+      "label": "multi-species",
+      "stage": "comparative",
+      "fragment": "atlases/inversion/pages/comparative/page16b.html",
+      "module": "atlases/inversion/pages/comparative/page16b.js",
+      "tooltip": "Multi-species comparative atlas page (per HANDOFF_SUPPLEMENT)."
+    }
+  ],
+  "registries": {
+    "layers": "atlases/inversion/registries/data/layers.registry.json",
+    "files": "atlases/inversion/registries/data/files.registry.json",
+    "operations": "atlases/inversion/registries/data/operations.registry.json",
+    "pages": "atlases/inversion/registries/data/pages.registry.json",
+    "slots": "atlases/inversion/registries/data/slots.registry.json"
+  },
+  "shared_modules": {
+    "kmeans": "atlases/inversion/shared/kmeans.js",
+    "hungarian": "atlases/inversion/shared/hungarian.js",
+    "contingency": "atlases/inversion/shared/contingency.js",
+    "het_rate": "atlases/inversion/shared/het_rate.js",
+    "per_l2_cluster": "atlases/inversion/shared/per_l2_cluster.js",
+    "band_tracking": "atlases/inversion/shared/band_tracking/index.js"
+  },
+  "server": {
+    "_doc": "Server moved to atlas-core/server/ (turn 'core-server-unify'). Every endpoint here (popstats / LD / dosage / file / compute) is generic plumbing — the inversion atlas reaches it the same way every other atlas will. See atlas-core/server/SERVER_README.md.",
+    "entry": "server/atlas_server.py",
+    "config_example": "server/atlas_server.config.example.yaml",
+    "default_url": "http://localhost:8000",
+    "requirements": "server/requirements.txt"
+  },
+  "engines_dir": "atlases/inversion/engines/",
+  "analysis_dir": "atlases/inversion/analysis/",
+  "css_dir": "atlases/inversion/css/",
+  "stylesheets": [
+    "atlases/inversion/css/inversion.css"
+  ],
+  "_stylesheets_doc": "Atlas-wide stylesheets, loaded by the shell at atlas-register time. Currently one big bundle (extracted verbatim from the legacy monolith). Future work: split into per-page stylesheets (atlases/inversion/css/pages/page1.css etc.) and reference them from each page entry's `stylesheet` field below — the router loads page-stylesheet on mount.",
+  "scope_pickers": [
+    {
+      "slot": "activeChrom",
+      "label": "chromosome",
+      "options": ["LG28"],
+      "shared": true
+    }
+  ],
+  "_scope_pickers_doc": "Pickers rendered in the shell's #scopebar (sticky strip below the topbar). Each picker drives an AtlasState slot via setActiveChrom / setActiveCandidate / generic emit. The `options` array lists the values currently shipped with this atlas package; in the demo build only LG28 precomp is included. When data for additional chromosomes is staged into atlases/inversion/data/precomp/, extend this list. Future work: replace the static list with a discovery file (e.g. data/precomp/_index.json) so the shell can populate it dynamically.",
+  "stages": [
+    {
+      "id": "discovery",
+      "label": "discovery",
+      "order": 1
+    },
+    {
+      "id": "review",
+      "label": "review",
+      "order": 2
+    },
+    {
+      "id": "catalogue",
+      "label": "catalogue",
+      "order": 3
+    },
+    {
+      "id": "comparative",
+      "label": "comparative",
+      "order": 4
+    }
+  ]
+}

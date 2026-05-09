@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cross_species_breakpoint_reuse.schema.json",
+  "title": "Shared breakpoints between a reference and a query genome",
+  "description": "One row per shared/reused breakpoint between two genomes. Joins synteny block edges with SV-derived BND/INV evidence. Used by future analysis/cross_species_support.js to score breakpoint-reuse evidence for an inversion candidate.",
+  "version": "v1_2026-05-06",
+
+  "_format": "tsv",
+
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["ref_chrom", "ref_bp", "query_chrom", "query_bp", "support_class"],
+    "properties": {
+      "ref_chrom":      { "type": "string", "minLength": 1 },
+      "ref_bp":         { "type": "integer", "minimum": 0, "description": "Breakpoint position in reference coordinates." },
+      "query_chrom":    { "type": "string", "minLength": 1 },
+      "query_bp":       { "type": "integer", "minimum": 0, "description": "Breakpoint position in query coordinates." },
+      "support_class":  { "type": "string", "enum": ["strong", "moderate", "weak"], "description": "Composite support classification from joined evidence." },
+      "evidence_types": { "type": "string", "description": "Comma-separated list of supporting evidence kinds (e.g., 'wfmash,manta_bnd,delly_inv')." },
+      "notes":          { "type": "string", "description": "Free-text annotations (optional)." }
+    },
+    "additionalProperties": true
+  }
+}

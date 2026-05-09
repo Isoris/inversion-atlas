@@ -1,0 +1,161 @@
+{
+  "$schema": "../../../../core/registry_core.schema.json",
+  "_doc": "Backend operations exposed by atlases/inversion/server/popstats_server.py. ENDPOINTS AND REQUEST SHAPES ARE THE REAL ONES \u2014 derived from the FastAPI route definitions in the server source. Do NOT invent endpoints; if a layer needs server compute, the endpoint must already exist in popstats_server.py.",
+
+  "_persist_contract_v2": "Layer entries with source: operation may set persist: true. When set, every successful operation result is written to disk via Registry.write under _cache/server_results/{op_id}/{hash}.json (the logical path; the server rewrites _cache/server_results/ to the configured filesystem root, default /mnt/e/inversion-atlas-cache/server_results/). The persist hook is registry-side, fire-and-forget after the result is returned to the caller. Operations without persist: true behave exactly as before (in-memory cache only, no disk write).",
+
+  "_server_audit_origin": {
+    "source_file": "atlases/inversion/server/popstats_server.py",
+    "audited_at": "2026-05-06",
+    "audited_against": "Atlas_turn166_round2_2026-05-05",
+    "endpoint_count": 12,
+    "_note": "If you add a new operation here, the corresponding @app.post or @app.get must already exist in popstats_server.py, or you must add it as a separate task."
+  },
+
+  "_server_url_default": "http://localhost:8765",
+  "_server_connection_doc": "The server runs on LANTA. Reach it via SSH tunnel: 'ssh -L 8765:127.0.0.1:8765 lanta'. See atlases/inversion/server/SERVER_README.md.",
+
+  "operations": {
+
+    "popstats_groupwise": {
+      "_endpoint_origin": "popstats_server.py:1455 @app.post('/api/popstats/groupwise')",
+      "_wraps": "region_popstats (Engine F)",
+      "endpoint": "/api/popstats/groupwise",
+      "method": "POST",
+      "request_shape": {
+        "chrom": "string (e.g. 'C_gar_LG28')",
+        "region": { "start_bp": "int", "end_bp": "int", "_optional": true },
+        "groups": { "<group_name>": ["<sample_id>", "..."] },
+        "metrics": "list of strings, default ['fst', 'dxy', 'theta_pi']",
+        "win_bp": "int, default 50000",
+        "step_bp": "int, default 10000",
+        "win_type": "int, default 2",
+        "downsample": "int, default 1",
+        "ncores": "int, default 4"
+      },
+      "inputs": ["activeChrom", "activeRegion", "groupComposition"],
+      "output_schema": "schemas/popstats_groupwise.schema.json",
+      "cache_key": "popstats_groupwise:{chrom}:{groups_hash}:{metrics_hash}:{win_bp}:{step_bp}",
+      "cache_tier": "warm",
+      "estimated_latency_ms": 2000,
+      "_doc": "FST + dXY + theta_pi for arbitrary group compositions. Server computes content-addressable hash internally (sha256 of chrom+region+sorted-groups+metrics+win+step+binary_hash); we mirror that for client-side cache key. Up to 10 groups per request. Group names match [A-Za-z0-9_]+. Members validated against canonical sample list."
+    },
+
+    "popstats_hobs_groupwise": {
+      "_endpoint_origin": "popstats_server.py:1609 @app.post('/api/popstats/hobs_groupwise')",
+      "_wraps": "angsd_fixed_HWE -doHWE + hobs_windower",
+      "endpoint": "/api/popstats/hobs_groupwise",
+      "method": "POST",
+      "request_shape": {
+        "chrom": "string",
+        "region": { "_optional": true },
+        "groups": { "<group_name>": ["<sample_id>"] },
+        "scales": "list of strings, default ['10kb']"
+      },
+      "inputs": ["activeChrom", "activeRegion", "groupComposition"],
+      "output_schema": "schemas/hobs_groupwise.schema.json",
+      "cache_key": "hobs:{chrom}:{groups_hash}:{scales}",
+      "cache_tier": "warm",
+      "estimated_latency_ms": 15000,
+      "_doc": "Per-group HoverE via Mérot-patched ANGSD. First request for a novel group composition triggers ANGSD run (~5–15s per group). Subsequent same-composition requests <100ms server-side."
+    },
+
+    "ancestry_groupwise_q": {
+      "_endpoint_origin": "popstats_server.py:1735 @app.post('/api/ancestry/groupwise_q')",
+      "_wraps": "instant_q local_Q_samples cache",
+      "endpoint": "/api/ancestry/groupwise_q",
+      "method": "POST",
+      "request_shape": {
+        "chrom": "string",
+        "region": { "_optional": true },
+        "groups": { "<group_name>": ["<sample_id>"] },
+        "K": "int, default 8",
+        "scale": "string, default 'dense'"
+      },
+      "inputs": ["activeChrom", "activeRegion", "groupComposition"],
+      "output_schema": "schemas/ancestry_groupwise_q.schema.json",
+      "cache_key": "ancestry_q:{chrom}:{groups_hash}:{K}:{scale}",
+      "cache_tier": "warm",
+      "estimated_latency_ms": 50,
+      "_doc": "Reads precomputed instant_q Q-matrix and aggregates per group. Pure file I/O + pandas group-by; ~50ms uncached, <10ms cached. K=8 is the canonical value per memory."
+    },
+
+    "ld_split_heatmap": {
+      "_endpoint_origin": "popstats_server.py:1823 @app.post('/api/ld/split_heatmap')",
+      "_wraps": "fast_ld engine (engines/fast_ld/fast_ld.c)",
+      "endpoint": "/api/ld/split_heatmap",
+      "method": "POST",
+      "inputs": ["activeChrom", "activeRegion", "groupComposition"],
+      "output_schema": "schemas/ld_split_heatmap.schema.json",
+      "cache_key": "ld_split:{chrom}:{region_hash}:{groups_hash}",
+      "cache_tier": "warm",
+      "estimated_latency_ms": 3000,
+      "_doc": "Pearson r-squared across BEAGLE-imputed dosages, computed by the C engine. Used by page 3 LD panel. See engines/fast_ld/README.md."
+    },
+
+    "shelf_ld_test": {
+      "_endpoint_origin": "popstats_server.py:1799 @app.post('/api/shelf_ld_test')",
+      "endpoint": "/api/shelf_ld_test",
+      "method": "POST",
+      "inputs": ["activeCandidate", "groupComposition"],
+      "output_schema": "schemas/shelf_ld_test.schema.json",
+      "cache_key": "shelf_ld:{candidate_id}:{groups_hash}",
+      "cache_tier": "warm",
+      "estimated_latency_ms": 1000,
+      "_doc": "Server-side shelf LD test. Note: server returns 501 in early builds — atlas does this in JS preferentially. Check current behavior before relying on this endpoint."
+    },
+
+    "dosage_chunk": {
+      "_endpoint_origin": "popstats_server.py:1880 @app.get('/api/dosage/chunk')",
+      "endpoint": "/api/dosage/chunk",
+      "method": "GET",
+      "query_params": {
+        "chrom": "string",
+        "start": "int (bp)",
+        "end": "int (bp)",
+        "cap": "int, optional",
+        "mode": "string, optional"
+      },
+      "inputs": ["activeChrom", "activeRegion"],
+      "output_schema": "schemas/dosage_chunk.schema.json",
+      "cache_key": "dosage:{chrom}:{start}:{end}:{cap}:{mode}",
+      "cache_tier": "warm",
+      "estimated_latency_ms": 500,
+      "_doc": "Chromosome-wide dosage chunk for a region. Used by per-sample lines panel and by the local PCA pipeline. Reads from dosage_dir (configured in popstats_server.config.yaml)."
+    },
+
+    "dosage_manifest": {
+      "_endpoint_origin": "popstats_server.py:1914 @app.get('/api/dosage/manifest')",
+      "endpoint": "/api/dosage/manifest",
+      "method": "GET",
+      "inputs": [],
+      "output_schema": "schemas/dosage_manifest.schema.json",
+      "cache_key": "dosage_manifest:global",
+      "cache_tier": "warm",
+      "estimated_latency_ms": 100,
+      "_doc": "Lists all available dosage chunks by chromosome. Loaded once at app start."
+    },
+
+    "health": {
+      "_endpoint_origin": "popstats_server.py:1280 @app.get('/api/health')",
+      "endpoint": "/api/health",
+      "method": "GET",
+      "inputs": [],
+      "output_schema": "schemas/health.schema.json",
+      "cache_tier": "cold",
+      "estimated_latency_ms": 50,
+      "_doc": "Reports engine versions + cache stats. Used by atlas's status badge in the toolbar (the green/red dot). Polled every 30s."
+    },
+
+    "_debug_endpoints_doc": "The following are debug-only endpoints, exposed via /api/cache/* and /api/jobs/*. They are not registered as registry operations because pages don't consume them — they're for the developer console only. See popstats_server.py lines 1423-1452.",
+
+    "_engines_referenced": {
+      "region_popstats":   "{base}/unified_ancestry/engines/fst_dxy/region_popstats",
+      "hobs_windower":     "{base}/unified_ancestry/engines/hobs_hwe/scripts/hobs_windower",
+      "angsd_patched":     "{base}/angsd_fixed_HWE/angsd",
+      "instant_q":         "{base}/unified_ancestry/src/instant_q",
+      "fast_ld":           "atlases/inversion/engines/fast_ld/fast_ld (compile via Makefile)",
+      "_doc": "These are the C/C++ engines the server invokes. Most live OUTSIDE the atlas package (in the toolkit's unified_ancestry/ tree on the LANTA cluster). Only fast_ld ships inside the atlas because it's small and inversion-specific. See atlases/inversion/server/popstats_server.config.example.yaml for path configuration."
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "relatedness_ngsrelate.schema.json",
+  "title": "ngsRelate per-pair relatedness output",
+  "description": "One row per sample pair from ngsRelate (ANGSD-Korneliussen). The atlas reads this file as Mode B (raw-folder interface): the resolver-registry parses the TSV, applies optional column filtering via the layer entry's `fields:` field, and returns an array of row objects with numeric coercion. See data/relatedness/README.md for the canonical column set and run-folder convention.",
+  "version": "v1_2026-05-06",
+
+  "_format": "tsv",
+  "_layer_status": "scaffolded",
+  "_layer_doc": "This schema describes the row shape. It is registered against layer 'relatedness_ngsrelate' in inversion-atlas/atlases/inversion/registries/data/layers.registry.json. Until a real <run_id>/relatedness.tsv lands in data/relatedness/ngsrelate/, the layer's schema_status is 'pending' and any row shape is accepted (per registry_core.schema.json convention). When real data lands, flip schema_status to 'validated' and the resolver will reject malformed rows.",
+
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["a", "b", "nSites", "theta", "IBS0", "IBS1", "IBS2"],
+    "properties": {
+      "a":          { "type": "integer", "minimum": 0, "description": "First sample index, 0-based, into the run's samples.txt." },
+      "b":          { "type": "integer", "minimum": 0, "description": "Second sample index. Convention: a < b." },
+      "nSites":     { "type": "integer", "minimum": 0, "description": "Number of sites compared for this pair." },
+      "J7":         { "type": "number", "description": "Jacquard 7 IBD-component probability." },
+      "J8":         { "type": "number", "description": "Jacquard 8 IBD-component probability." },
+      "J9":         { "type": "number", "description": "Jacquard 9 IBD-component probability." },
+      "rab":        { "type": "number", "description": "Relatedness coefficient." },
+      "Fa":         { "type": "number", "description": "Inbreeding coefficient of sample a." },
+      "Fb":         { "type": "number", "description": "Inbreeding coefficient of sample b." },
+      "theta":      { "type": "number", "description": "Kinship coefficient." },
+      "inbreed_a":  { "type": "number", "description": "Alternate inbreeding estimate for a." },
+      "inbreed_b":  { "type": "number", "description": "Alternate inbreeding estimate for b." },
+      "2of3_IDB":   { "type": "number", "description": "2-of-3 IBD probability." },
+      "FDiff":      { "type": "number", "description": "F differential between Fa and Fb." },
+      "loglh":      { "type": "number", "description": "Optimised log-likelihood for this pair's IBD model." },
+      "nIter":      { "type": "integer", "minimum": 0, "description": "EM iterations to convergence." },
+      "coverage":   { "type": "number", "minimum": 0, "description": "Mean per-site coverage across the pair's sites." },
+      "IBS0":       { "type": "number", "minimum": 0, "maximum": 1, "description": "Proportion of sites IBS=0." },
+      "IBS1":       { "type": "number", "minimum": 0, "maximum": 1, "description": "Proportion of sites IBS=1." },
+      "IBS2":       { "type": "number", "minimum": 0, "maximum": 1, "description": "Proportion of sites IBS=2." },
+      "R0":         { "type": "number", "description": "IBS-derived ratio used for PO/FS discrimination." },
+      "R1":         { "type": "number", "description": "IBS-derived ratio used for PO/FS discrimination." },
+      "KING":       { "type": "number", "description": "KING-robust kinship estimator. Useful threshold cuts: PO/FS ≥ 0.177, 2nd ≥ 0.0884, 3rd ≥ 0.0442 (Manichaikul et al. 2010)." }
+    },
+    "additionalProperties": true
+  }
+}

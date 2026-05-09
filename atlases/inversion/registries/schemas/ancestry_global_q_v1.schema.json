@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ancestry_global_q_v1.schema.json",
+  "title": "Per-sample ancestry Q matrix (extract-schema, self-describing)",
+  "version": "v1_2026-05-07",
+  "_kind": "extract",
+  "_doc": "Self-describing artifact for per-sample ancestry. The wrapped envelope (schema/produced_by/inputs/samples/Q) lets the artifact survive being moved, archived, or shared without losing its meaning. Multiple producers can emit artifacts conforming to this schema: load_ngsadmix_qopt (loader for static .qopt outputs), ancestry_groupwise_q (server-side run on a sample subset), and any future ancestry tool that outputs the same shape. Downstream consumers don't know which producer emitted the artifact — they just consume the envelope. This is the 'one extract-schema, many activate-schemas' pattern (chat 39 cont., post-step22 design conversation, 2026-05-07).",
+
+  "type": "object",
+  "required": ["schema", "produced_by", "samples", "Q"],
+  "additionalProperties": true,
+  "properties": {
+
+    "schema": {
+      "type": "string",
+      "const": "ancestry_global_q_v1",
+      "description": "Self-identification. Tools route on this field."
+    },
+
+    "produced_by": {
+      "type": "object",
+      "required": ["tool"],
+      "additionalProperties": true,
+      "description": "Provenance: who made this artifact and with what parameters. The tool field is canonical (ngsadmix / popgen_server / future). Params is freeform — different producers carry different metadata (K, run_id, seed, chrom, snp_set, samples_subset, ...).",
+      "properties": {
+        "tool": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the producing tool / endpoint / loader."
+        },
+        "version": {
+          "type": "string",
+          "description": "Tool version, when known. Optional but encouraged."
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Producer-specific parameters. At minimum K is expected; everything else is producer-discretion (run_id, seed, chrom, scope, samples_subset, ...).",
+          "properties": {
+            "K": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 50,
+              "description": "Number of ancestry components. Same K as the producing tool used."
+            }
+          }
+        }
+      }
+    },
+
+    "inputs": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "What went IN to produce this artifact. For loaders: file paths. For server-side runs: input artifact references and parameter snapshots. Freeform on purpose; the activate-schema for each producer pins the exact shape."
+    },
+
+    "samples": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Sample IDs, in the same order as Q rows. The artifact's ground truth for sample identity — never trust upstream samples.txt sidecars after this point; trust this array."
+    },
+
+    "Q": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "maxItems": 50,
+        "items": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "description": "Per-sample ancestry proportions. Q[i] is a length-K array for samples[i], values in [0,1], summing to ~1.0 (NGSadmix may drift to 0.999/1.001 due to optimisation tolerance — this is acceptable; downstream consumers normalise if they need exact-1)."
+    }
+  },
+
+  "_invariants": [
+    "samples.length === Q.length",
+    "Q[i].length === produced_by.params.K for all i",
+    "samples are unique (no duplicates)"
+  ],
+
+  "_replaces": "ancestry_global_q.schema.json (v1_2026-05-06) — that schema described the post-processed shape in a `_post_processed_shape` field but did not have the canonical envelope. Migration: layer entries pointing at the old schema can either point at this v1 instead, or layer entries that emit the old un-wrapped shape can be promoted via the loader (preferred — see shared/loaders/qopt_loader.js).",
+
+  "_first_producers": [
+    "load_ngsadmix_qopt (loader; activate-schema: producers/load_ngsadmix_qopt.activate.json)"
+  ]
+}

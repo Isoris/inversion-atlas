@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cross_species_synteny_blocks.schema.json",
+  "title": "Aggregated synteny blocks for one genome pair",
+  "description": "One row per syntenic block between a reference and a query genome. Aggregated from raw wfmash PAF alignments by a pipeline-side script. The atlas reads this through Mode B (raw-folder interface). See data/cross_species/README.md for the pair-naming convention (`<ref>__vs__<query>`).",
+  "version": "v1_2026-05-06",
+
+  "_format": "tsv",
+
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["ref_chrom", "ref_start", "ref_end", "query_chrom", "query_start", "query_end", "strand"],
+    "properties": {
+      "ref_chrom":     { "type": "string", "minLength": 1 },
+      "ref_start":     { "type": "integer", "minimum": 0 },
+      "ref_end":       { "type": "integer", "minimum": 0 },
+      "query_chrom":   { "type": "string", "minLength": 1 },
+      "query_start":   { "type": "integer", "minimum": 0 },
+      "query_end":     { "type": "integer", "minimum": 0 },
+      "strand":        { "type": "string", "enum": ["+", "-"] },
+      "identity":      { "type": "number", "minimum": 0, "maximum": 1, "description": "Mean per-base identity within the block." },
+      "n_alignments":  { "type": "integer", "minimum": 1, "description": "Number of underlying wfmash alignments aggregated into this block." }
+    },
+    "additionalProperties": true
+  }
+}

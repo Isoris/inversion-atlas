@@ -1,0 +1,140 @@
+/* atlases/inversion/css/_legacy_tabbar.css
+ * =====================================================================
+ * The legacy #tabBar styling, preserved verbatim from
+ * legacy/Inversion_atlas.html lines 301-415.
+ *
+ * The new shell uses #topbar (styled in atlas-core/css/shell.css), not
+ * #tabBar. This file is INERT under the new shell — no element has
+ * id="tabBar" in any new-shell page.
+ *
+ * It's kept here as a reference for:
+ *   1. Visual parity. shell.css was written from a sketch of how the
+ *      new topbar should look; if it diverges from the legacy feel,
+ *      this file is the ground truth to compare against.
+ *   2. Stage colors. The legacy tabBar had colored bottom-borders per
+ *      stage (discovery=blue, refinement=cyan, classification=green,
+ *      compare=orange, synthesis=yellow, help=grey). When we want
+ *      stage-colored topbar buttons, the rgba values are here.
+ *   3. Folder grouping. Legacy turn 127 introduced colored-folder
+ *      grouping (blue/green/yellow). Rules are at the bottom of this file.
+ *
+ * To use this file: change references from #tabBar to #topbar (or add
+ * .legacy-tabbar wrapper class) and link it from manifest.stylesheets.
+ * =====================================================================
+ */
+
+#tabBar { display: flex; gap: 0; height: 32px; padding: 0 22px;
+          background: var(--panel); border-bottom: 1px solid var(--rule);
+          align-items: stretch;
+          /* v4 turn 73b: prevent wrap of buttons themselves AND prevent
+             vertical squish by giving the bar a stable height. */
+          flex-wrap: nowrap; }
+/* v4 turn 73b: aggressive single-line enforcement on tab buttons. The
+   bug Quentin hit at 133% zoom was the page number and label rendering
+   on separate lines (e.g. "2" then "local PCA θπ" below). Multiple
+   defenses needed because flex children in a row don't honor
+   white-space alone unless min-width: 0 is also set. */
+#tabBar button { background: none; border: none; color: var(--ink-dim);
+                 font-family: var(--mono); font-size: 11px; padding: 0 16px;
+                 cursor: pointer; letter-spacing: 0.04em;
+                 border-bottom: 2px solid transparent;
+                 white-space: nowrap !important;
+                 word-break: keep-all;
+                 overflow: hidden; text-overflow: ellipsis;
+                 max-width: 220px; min-width: 0;
+                 /* Vertically center the (now single-line) text */
+                 display: inline-flex; align-items: center;
+                 line-height: 1;
+                 transition: color 0.1s, border-color 0.1s; }
+/* v4 turn 73b: descendants of tab button MUST also be inline-flow.
+   The .num span was wrapping to its own row in some browsers when the
+   button had insufficient width. Force inline rendering. */
+#tabBar button > * { white-space: nowrap !important; display: inline; }
+/* v4 turn 73 / 73b: at progressively narrower viewports, font shrinks
+   so labels stay legible without truncation. The active label gets
+   priority — keep it readable at the cost of others getting ellipsis. */
+@media (max-width: 1700px) {
+  #tabBar button { font-size: 10.5px; padding: 0 13px; max-width: 200px; }
+  #tabBar button .num { font-size: 9px; }
+}
+@media (max-width: 1500px) {
+  #tabBar button { font-size: 10px; padding: 0 11px; max-width: 180px;
+                   letter-spacing: 0.02em; }
+  #tabBar button .num { font-size: 8.5px; }
+}
+@media (max-width: 1300px) {
+  #tabBar button { font-size: 9.5px; padding: 0 9px; max-width: 160px;
+                   letter-spacing: 0.01em; }
+  #tabBar button .num { font-size: 8px; margin-right: 3px; }
+}
+@media (max-width: 1100px) {
+  #tabBar button { font-size: 9px; padding: 0 7px; max-width: 140px;
+                   letter-spacing: 0; }
+  #tabBar button .num { font-size: 7.5px; margin-right: 2px; }
+}
+#tabBar button:hover { color: var(--ink); }
+/* v3.99 turn 6: active tab gets a soft vertical alpha-gradient background
+   (accent at top, transparent at bottom) so the active state is visible
+   across the full tab height, not just the underline. The underline stays
+   so the visual idiom is unchanged for users. The gradient max alpha is
+   ~22% so it sits behind the text without competing for attention. */
+#tabBar button.active { color: var(--ink); border-bottom-color: var(--accent);
+  background: linear-gradient(to bottom,
+    rgba(245, 165, 36, 0.22) 0%,
+    rgba(245, 165, 36, 0.08) 50%,
+    rgba(245, 165, 36, 0.00) 100%); }
+/* Light-theme variant for the same gradient — slightly less alpha because
+   the panel background is brighter. */
+body.light-theme #tabBar button.active {
+  background: linear-gradient(to bottom,
+    rgba(245, 165, 36, 0.18) 0%,
+    rgba(245, 165, 36, 0.06) 50%,
+    rgba(245, 165, 36, 0.00) 100%); }
+#tabBar button .num { font-family: var(--mono); color: var(--ink-dimmer);
+                      font-size: 9px; margin-right: 4px; }
+
+/* v4 turn 80: workflow-stage grouping bands. Very subtle 2px top border on
+   each tab, color-coded by stage: discovery (cool blue) → refinement (cyan)
+   → classification (green) → synthesis (amber) → help (grey). When a tab
+   is active inside a stage, the existing alpha-gradient overlay still
+   dominates; the band sits above and stays visible across the whole stage,
+   making the grouping legible at a glance. Alpha is intentionally low
+   (~28%) so the bar doesn't compete with content. */
+/* turn 128: 5+1 workflow stages. Each stage has a distinct hue; the band
+   above each tab tells you which stage you're in. When tab pills are
+   introduced (turn 128 cont), each pill carries the same hue.
+   Stage colours:
+     discovery      = blue        (find inversions)
+     refinement     = cyan        (sharpen each candidate)
+     classification = green       (popgen interpretation)
+     compare        = orange      (cross + multi species)  -- NEW turn 128
+     synthesis      = yellow      (confirmed, markers, output)
+     help           = grey
+   Refer to /* tab-group pill colours */ block below for the matching
+   pill hex/rgb tuples. */
+#tabBar button[data-stage="discovery"]     { box-shadow: inset 0 2px 0 0 rgba(79, 163, 255, 0.28); }
+#tabBar button[data-stage="refinement"]    { box-shadow: inset 0 2px 0 0 rgba(122, 211, 219, 0.28); }
+#tabBar button[data-stage="classification"] { box-shadow: inset 0 2px 0 0 rgba(60, 192, 138, 0.28); }
+#tabBar button[data-stage="compare"]       { box-shadow: inset 0 2px 0 0 rgba(228, 138, 60, 0.28); }
+#tabBar button[data-stage="synthesis"]     { box-shadow: inset 0 2px 0 0 rgba(232, 196, 76, 0.28); }
+#tabBar button[data-stage="help"]          { box-shadow: inset 0 2px 0 0 rgba(138, 148, 163, 0.20); }
+/* On hover, the band brightens slightly so the grouping is felt without
+   drawing attention away from the content. */
+#tabBar button[data-stage="discovery"]:hover     { box-shadow: inset 0 2px 0 0 rgba(79, 163, 255, 0.55); }
+#tabBar button[data-stage="refinement"]:hover    { box-shadow: inset 0 2px 0 0 rgba(122, 211, 219, 0.55); }
+#tabBar button[data-stage="classification"]:hover { box-shadow: inset 0 2px 0 0 rgba(60, 192, 138, 0.55); }
+#tabBar button[data-stage="compare"]:hover       { box-shadow: inset 0 2px 0 0 rgba(228, 138, 60, 0.55); }
+#tabBar button[data-stage="synthesis"]:hover     { box-shadow: inset 0 2px 0 0 rgba(232, 196, 76, 0.55); }
+#tabBar button[data-stage="help"]:hover          { box-shadow: inset 0 2px 0 0 rgba(138, 148, 163, 0.45); }
+/* When active, a slightly stronger band so the user knows which stage they
+   are in (the band stays the same color, just more saturated). */
+#tabBar button[data-stage="discovery"].active     { box-shadow: inset 0 2px 0 0 rgba(79, 163, 255, 0.75); }
+#tabBar button[data-stage="refinement"].active    { box-shadow: inset 0 2px 0 0 rgba(122, 211, 219, 0.75); }
+#tabBar button[data-stage="classification"].active { box-shadow: inset 0 2px 0 0 rgba(60, 192, 138, 0.75); }
+#tabBar button[data-stage="compare"].active       { box-shadow: inset 0 2px 0 0 rgba(228, 138, 60, 0.75); }
+#tabBar button[data-stage="synthesis"].active     { box-shadow: inset 0 2px 0 0 rgba(232, 196, 76, 0.75); }
+#tabBar button[data-stage="help"].active          { box-shadow: inset 0 2px 0 0 rgba(138, 148, 163, 0.55); }
+
+/* turn 128: tab-group pills. The tab bar carries data-active-stage="X"
+   declaring which stage is currently unfolded. All other stages are
+   collapsed — their tabs hide via the [data-stage] selector below.

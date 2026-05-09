@@ -1,0 +1,45 @@
+{
+  "$schema": "../../../../core/registry_core.schema.json",
+  "_doc": "Inversion-private state slots. The legacy atlas declares 84 slots in atlases/inversion/shared/state.js (the `SLOT_REGISTRY` constant). Rather than duplicating that table here, v1 keeps state.js as the source of truth and this file just declares the SUBSET that the new shell needs to know about (cross-atlas + persistence-relevant).",
+
+  "_TODO_for_next_chat": "Replace this file with a complete extraction of the SLOT_REGISTRY constant from atlases/inversion/shared/state.js. ~84 slots. The state.js file already tags each slot with persist/cross_atlas/transient/derived, so the extraction is mechanical. The reason to extract: keeping JS as source-of-truth means the shell has to import JS to read slots, breaking the 'declarative configs only' contract. This is acceptable for v1 (state.js is a known shared module), needs cleanup for v2.",
+
+  "slots": {
+
+    "_section_1": "==== CROSS-ATLAS slots (visible to other atlases via shared.*) ====",
+    "_note_1": "These are PROMOTED to AtlasState.shared by the shell, not kept in AtlasState.inversion. Listed here only for documentation; the shell discovers them via the cross_atlas tag in state.js.",
+
+    "candidate":                  { "type": "object",  "default": null, "persist": false, "scope": "shared", "_legacy_tag": "cross_atlas" },
+    "candidateList":              { "type": "array",   "default": [],   "persist": false, "scope": "shared", "_legacy_tag": "cross_atlas" },
+    "activeSampleSet":            { "type": "Set",     "default": null, "persist": false, "scope": "shared", "_legacy_tag": "cross_atlas" },
+    "candidate_review_decisions": { "type": "object",  "default": {},   "persist": false, "scope": "shared", "_legacy_tag": "cross_atlas" },
+    "locked_karyotype_groups":    { "type": "object",  "default": {},   "persist": false, "scope": "shared", "_legacy_tag": "cross_atlas" },
+
+    "_section_2": "==== INVERSION-PRIVATE persisted slots (round-trip via localStorage) ====",
+
+    "k":                       { "type": "int",    "default": 3,    "persist": true },
+    "kMode":                   { "type": "string", "default": "fixed", "persist": true },
+    "kRange":                  { "type": "array",  "default": [2, 5], "persist": true },
+    "silThreshold":            { "type": "float",  "default": 0.45, "persist": true },
+    "mergeThr":                { "type": "float",  "default": 0.85, "persist": true, "_doc": "Persisted constant from manuscript v19 vocabulary." },
+    "alpha":                   { "type": "float",  "default": 0.001, "persist": true, "_doc": "Per memory: alpha 0.001 is canonical, NOT 0.05 (legacy default is stale)." },
+    "minNGroup":               { "type": "int",    "default": 5,    "persist": true },
+    "minNWin":                 { "type": "int",    "default": 5,    "persist": true, "_doc": "Per memory: minNWin 5 is canonical." },
+    "linesColorMode":          { "type": "string", "default": "kmeans", "persist": true },
+    "purity_threshold":        { "type": "float",  "default": 0.80, "persist": true, "_doc": "Per memory canonical." },
+    "ambiguous_threshold":     { "type": "float",  "default": 0.5,  "persist": true, "_doc": "Per memory canonical." },
+
+    "_section_3": "==== INVERSION-PRIVATE transient slots (in-memory only) ====",
+
+    "data":              { "type": "object",  "default": null, "persist": false },
+    "cur":               { "type": "int",     "default": 0,    "persist": false },
+    "playing":           { "type": "bool",    "default": false,"persist": false },
+    "lockedBands":       { "type": "array",   "default": null, "persist": false },
+    "arrangementCalls":  { "type": "object",  "default": null, "persist": false, "_doc": "Per SPEC_arrangement_color_mode_and_arrangement_calls_v1.md." },
+    "cachedTracks":      { "type": "object",  "default": null, "persist": false }
+  },
+
+  "_legacy_state_js_path": "atlases/inversion/shared/state.js",
+  "_legacy_slot_count": 84,
+  "_extraction_complete": false
+}

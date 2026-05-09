@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "candidate_lineage.schema.json",
+  "title": "candidate_lineage v1",
+  "description": "The version index for a single inversion candidate. Lives at data/candidates/{candidate_id}/lineage.json. Lists all versions ever computed for this candidate (active, deprecated, and split-parent), names the active one, and back-links to a parent candidate when this candidate was created by a split. Boundaries, K, locked_labels are NOT in here — those live per-version under data/candidates/{candidate_id}/{version_id}/. This file is the index, not the data.",
+
+  "type": "object",
+  "required": ["candidate_id", "active_version_id", "status", "versions"],
+
+  "properties": {
+
+    "candidate_id": {
+      "type": "string",
+      "description": "Stable lineage ID for this candidate. Timestamp-based, never changes (a refinement creates a new version inside this candidate; a split creates new candidates with new ids).",
+      "pattern": "^[0-9]+_[a-z0-9]+$"
+    },
+
+    "active_version_id": {
+      "type": "string",
+      "description": "Which version_id is currently the canonical view. Pages and analysis modules default to this when no explicit version is requested. Changing this rewrites lineage.json but does not touch any per-version subfolder.",
+      "minLength": 1
+    },
+
+    "status": {
+      "type": "string",
+      "enum": ["active", "split", "merged_into", "abandoned"],
+      "description": "Top-level lifecycle of the candidate. 'active' = current normal state. 'split' = this candidate was decomposed into multiple new candidates; see split_into. 'merged_into' = this candidate was absorbed into another; see merged_into_candidate_id. 'abandoned' = no longer pursued (e.g. shown to be artifact)."
+    },
+
+    "parent_candidate_id": {
+      "type": ["string", "null"],
+      "description": "If this candidate was born from a split or other restructuring of an earlier candidate, the candidate_id of that parent. null otherwise.",
+      "default": null
+    },
+
+    "split_into": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "When status='split', the candidate_ids of the children. Empty otherwise.",
+      "default": []
+    },
+
+    "merged_into_candidate_id": {
+      "type": ["string", "null"],
+      "description": "When status='merged_into', the candidate_id this was merged into. null otherwise.",
+      "default": null
+    },
+
+    "versions": {
+      "type": "object",
+      "description": "Map of version_id -> version metadata. At least one version must exist (the version_id named in active_version_id).",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["version_id", "status", "created_at"],
+        "properties": {
+
+          "version_id": {
+            "type": "string",
+            "description": "Unique within this candidate. Convention: 'v<n>_<method>_<note>', e.g. 'v1_localPCA_initial', 'v2_theta_refined', 'v3_manual'. Must match the parent map key.",
+            "minLength": 1
+          },
+
+          "parent_version_id": {
+            "type": ["string", "null"],
+            "description": "Which version this one was derived from. null for the original v1.",
+            "default": null
+          },
+
+          "source_methods": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Methods that contributed to this version's boundaries / labels. Examples: 'localPCA', 'thetaPi', 'shelfLD', 'manual_review', 'breakpoint_dosage', 'arrangement_consensus'.",
+            "minItems": 1
+          },
+
+          "callset_id": {
+            "type": ["string", "null"],
+            "description": "Identifier of the karyotype callset associated with this version. Used by analysis modules to fetch the right per-sample assignments. null if not yet called.",
+            "default": null
+          },
+
+          "status": {
+            "type": "string",
+            "enum": ["active", "deprecated", "experimental"],
+            "description": "Per-version status. Exactly one version per candidate should have status='active' and that version_id must equal candidate_lineage.active_version_id. 'deprecated' = older versions kept for audit trail; readable but not the default. 'experimental' = work in progress, not yet promoted to active."
+          },
+
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp when this version was first written."
+          },
+
+          "created_by": {
+            "type": ["string", "null"],
+            "description": "User identifier or process name that wrote this version. e.g. 'qa', 'auto_thetapi_refinement_v1', 'pipeline_localPCA_K3_v1'. Free-form, not enforced.",
+            "default": null
+          },
+
+          "dependency_hash": {
+            "type": ["string", "null"],
+            "description": "Hash of the inputs that determined this version (parent boundaries, dosage version, callset config). Used to detect when a re-run with different inputs would produce a different result. Not enforced by the engine; producers compute and store it.",
+            "default": null
+          },
+
+          "notes": {
+            "type": "string",
+            "description": "Free-form human-readable notes for this version: what changed vs the parent, why it was created, known caveats.",
+            "default": ""
+          }
+        }
+      }
+    }
+  },
+
+  "_examples": {
+    "minimal": {
+      "candidate_id": "1715000000000_a4b",
+      "active_version_id": "v1_localPCA_initial",
+      "status": "active",
+      "versions": {
+        "v1_localPCA_initial": {
+          "version_id":        "v1_localPCA_initial",
+          "parent_version_id": null,
+          "source_methods":    ["localPCA"],
+          "callset_id":        "localPCA_K3_v1",
+          "status":            "active",
+          "created_at":        "2026-05-06T08:30:00Z",
+          "notes":             "Initial localPCA K=3 call from chrom-wide scrubber"
+        }
+      }
+    },
+
+    "after_refinement": {
+      "candidate_id": "1715000000000_a4b",
+      "active_version_id": "v2_theta_refined",
+      "status": "active",
+      "versions": {
+        "v1_localPCA_initial": {
+          "version_id":        "v1_localPCA_initial",
+          "parent_version_id": null,
+          "source_methods":    ["localPCA"],
+          "callset_id":        "localPCA_K3_v1",
+          "status":            "deprecated",
+          "created_at":        "2026-05-06T08:30:00Z"
+        },
+        "v2_theta_refined": {
+          "version_id":        "v2_theta_refined",
+          "parent_version_id": "v1_localPCA_initial",
+          "source_methods":    ["localPCA", "thetaPi"],
+          "callset_id":        "thetaRefined_K3_v2",
+          "status":            "active",
+          "created_at":        "2026-05-06T11:15:00Z",
+          "notes":             "Theta-pi refined; narrowed to high-Fst shelf 15.115-18.005 Mb"
+        }
+      }
+    }
+  }
+}

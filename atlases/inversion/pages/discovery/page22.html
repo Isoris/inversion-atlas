@@ -1,0 +1,155 @@
+  <div id="page22" class="page">
+    <div class="rg-content" style="display: flex; flex-direction: column; height: 100%; min-height: 0;">
+
+      <!-- Header bar: focal voter info + mode toggles + compute genome button -->
+      <div id="regimesPageHeader" class="rg-header" style="
+        flex: 0 0 auto;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--rule, #2a3242);
+        background: var(--panel-2, #181d27);
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        color: var(--ink, #e6edf6);
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      ">
+        <!-- Auto-populated by _renderHeader() in regimes_page.js -->
+        <span style="color: var(--ink-dim, #8895a8);">Long-range haplotype regimes — load a chromosome and run the pipeline.</span>
+      </div>
+
+      <!-- Caution banner explaining what this page shows -->
+      <div class="caution-banner" role="note" style="margin: 8px 12px;">
+        <div class="caution-banner-icon" aria-hidden="true">&#9888;</div>
+        <div class="caution-banner-body">
+          <div class="caution-banner-title">Stage 4 bruteforce projection &mdash; per-band voters across the genome</div>
+          <div>
+            Each panel below shows where one <b>focal voter</b> (a stable
+            band of a seed locus) lands across target windows. Use the
+            arrow keys to navigate seeds (<code>&larr;/&rarr;</code>),
+            band combos (<code>&uarr;/&darr;</code>), and chromosomes
+            (<code>c</code>). Press <code>g</code> to enable the
+            genome-scope panels (right column). The "you are here" rectangle
+            tints by macro-band dosage class when a dosage source is wired.
+          </div>
+        </div>
+      </div>
+
+      <!-- 2x2 panel grid -->
+      <div class="regimes-grid" style="
+        flex: 1 1 0;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: 1px;
+        background: var(--rule, #2a3242);
+        margin: 0 12px 12px 12px;
+        border: 1px solid var(--rule, #2a3242);
+      ">
+        <!-- Top-left: chrom-scope target-band lanes (always visible) -->
+        <div id="regimesPanel" style="
+          background: var(--panel-1, #0f141d);
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        ">
+          <div class="rg-panel-title" style="
+            flex: 0 0 auto; padding: 4px 8px;
+            font: 10px ui-monospace, monospace;
+            color: var(--ink-dim, #8895a8);
+            border-bottom: 1px solid var(--rule, #2a3242);
+          ">chrom &middot; target-band lanes</div>
+          <div id="regimesCanvasContainer" style="flex: 1 1 0; min-height: 0; position: relative;"></div>
+        </div>
+
+        <!-- Top-right: genome-scope target-band lanes (opt-in via 'g' key) -->
+        <div id="regimesGenomePanel" style="
+          background: var(--panel-1, #0f141d);
+          display: none;
+          flex-direction: column;
+          min-height: 0;
+        ">
+          <div class="rg-panel-title" style="
+            flex: 0 0 auto; padding: 4px 8px;
+            font: 10px ui-monospace, monospace;
+            color: var(--ink-dim, #8895a8);
+            border-bottom: 1px solid var(--rule, #2a3242);
+          ">genome &middot; target-band lanes</div>
+          <div id="regimesGenomeCanvasContainer" style="flex: 1 1 0; min-height: 0; position: relative;"></div>
+        </div>
+
+        <!-- Bottom-left: chrom-scope PC1 lines (always visible) -->
+        <div id="regimesPC1Panel" style="
+          background: var(--panel-1, #0f141d);
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        ">
+          <div class="rg-panel-title" style="
+            flex: 0 0 auto; padding: 4px 8px;
+            font: 10px ui-monospace, monospace;
+            color: var(--ink-dim, #8895a8);
+            border-bottom: 1px solid var(--rule, #2a3242);
+          ">chrom &middot; PC1 lines</div>
+          <div id="regimesPC1CanvasContainer" style="flex: 1 1 0; min-height: 0; position: relative;"></div>
+        </div>
+
+        <!-- Bottom-right: genome-scope PC1 lines (opt-in) -->
+        <div id="regimesPC1GenomePanel" style="
+          background: var(--panel-1, #0f141d);
+          display: none;
+          flex-direction: column;
+          min-height: 0;
+        ">
+          <div class="rg-panel-title" style="
+            flex: 0 0 auto; padding: 4px 8px;
+            font: 10px ui-monospace, monospace;
+            color: var(--ink-dim, #8895a8);
+            border-bottom: 1px solid var(--rule, #2a3242);
+          ">genome &middot; PC1 lines</div>
+          <div id="regimesPC1GenomeCanvasContainer" style="flex: 1 1 0; min-height: 0; position: relative;"></div>
+        </div>
+      </div>
+
+      <!-- Bottom action bar: catalogue export + status -->
+      <div class="rg-actionbar" style="
+        flex: 0 0 auto;
+        padding: 8px 12px;
+        border-top: 1px solid var(--rule, #2a3242);
+        background: var(--panel-2, #181d27);
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        color: var(--ink-dim, #8895a8);
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      ">
+        <button id="rgExportCatalogueBtn" class="rg-tb-btn" disabled
+          title="Serialize the in-memory pipeline result to a regime catalogue JSON. Disabled until the pipeline has run."
+          style="
+            background: var(--panel-3, #232a36);
+            color: var(--ink, #e6edf6);
+            border: 1px solid var(--rule, #2a3242);
+            padding: 4px 10px;
+            font: inherit;
+            cursor: pointer;
+          ">export catalogue&hellip;</button>
+        <button id="rgRunPipelineBtn" class="rg-tb-btn"
+          title="Run runBandingPipeline against the active chromosome's per-window labels."
+          style="
+            background: var(--panel-3, #232a36);
+            color: var(--ink, #e6edf6);
+            border: 1px solid var(--rule, #2a3242);
+            padding: 4px 10px;
+            font: inherit;
+            cursor: pointer;
+          ">run pipeline</button>
+        <span id="rgStatus" style="margin-left: auto; color: var(--ink-dim, #8895a8);">
+          idle &middot; pipeline not yet run
+        </span>
+      </div>
+
+    </div>
+  </div>

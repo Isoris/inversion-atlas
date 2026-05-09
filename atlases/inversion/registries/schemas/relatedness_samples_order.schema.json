@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "relatedness_samples_order.schema.json",
+  "title": "ngsRelate run sample-order sidecar",
+  "description": "One sample ID per line, in the order ngsRelate's `a` and `b` indices reference. Lives next to relatedness.tsv as samples.txt. The atlas reads this when an analysis module needs to map a/b indices back to canonical sample IDs.",
+  "version": "v1_2026-05-06",
+
+  "_format": "tsv",
+  "_layer_doc": "Single-column TSV. The resolver-registry's tsv parser will return [{ sample_id: 'X' }, ...]. To get a flat array, analysis modules can .map(r => r.sample_id).",
+
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["sample_id"],
+    "properties": {
+      "sample_id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Canonical sample identifier (CGA-format or Ind-format, must match cohort_sample_manifest)."
+      }
+    }
+  }
+}

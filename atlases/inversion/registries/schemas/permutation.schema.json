@@ -1,0 +1,6 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "_doc": "PLACEHOLDER operation output schema. Accepts any object. Replace when the operation's output shape stabilizes.",
+  "_status": "pending",
+  "type": "object"
+}

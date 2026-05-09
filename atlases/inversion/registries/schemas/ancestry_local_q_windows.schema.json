@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ancestry_local_q_windows.schema.json",
+  "title": "Per-window local-ancestry Q matrix",
+  "description": "Long-format ancestry-by-window table. One row per (chrom, window, sample, cluster) quadruple. Used by the local-ancestry scrubber and any analysis module that needs ancestry conditional on genomic position.",
+  "version": "v1_2026-05-06",
+
+  "_format": "tsv",
+
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["chrom", "window_idx", "start_bp", "end_bp", "sample_id", "cluster", "q"],
+    "properties": {
+      "chrom":      { "type": "string", "minLength": 1, "description": "LG name, e.g. 'C_gar_LG28'." },
+      "window_idx": { "type": "integer", "minimum": 0, "description": "0-based window index along the chromosome." },
+      "start_bp":   { "type": "integer", "minimum": 0 },
+      "end_bp":     { "type": "integer", "minimum": 0 },
+      "sample_id":  { "type": "string", "minLength": 1 },
+      "cluster":    { "type": "integer", "minimum": 0, "maximum": 49, "description": "Cluster index, 0..K-1. K is run-level metadata." },
+      "q":          { "type": "number", "minimum": 0, "maximum": 1, "description": "Ancestry proportion for this cluster in this window for this sample." }
+    },
+    "additionalProperties": true
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "load_ngsadmix_qopt.activate.json",
+  "title": "Activator for the NGSadmix .qopt loader",
+  "version": "v1_2026-05-07",
+  "_kind": "activate",
+
+  "_doc": "Activate-schema for the loader at shared/loaders/qopt_loader.js. Describes the inputs needed to invoke the loader: paths to the headerless whitespace-separated .qopt and the sidecar samples.txt, plus producer params (at minimum K) for provenance. This is the FIRST WORKED EXAMPLE of the activate-schema pattern from the chat 39 cont. post-step22 design discussion. The pair (this activate-schema + ancestry_global_q_v1 extract-schema) is the template every future tool wiring should follow: one schema describing what the producer needs, one schema describing what it emits.",
+
+  "producer": {
+    "name": "load_ngsadmix_qopt",
+    "kind": "loader",
+    "module": "shared/loaders/qopt_loader.js",
+    "function": "loadQopt",
+    "emits": "ancestry_global_q_v1",
+    "_doc": "Reads .qopt + samples.txt and emits a self-describing ancestry_global_q_v1 artifact. Local-only: no HTTP across networks; the fetcher just wraps fetch() against the dev server serving the data folder. Sibling producer 'ancestry_groupwise_q' (in operations.registry.json) emits the SAME extract-schema via a server-side run on a sample subset — that's the conditional-ancestry path Quentin raised (post-step22). Both producers' artifacts are interchangeable downstream because they share the extract-schema."
+  },
+
+  "type": "object",
+  "required": ["qopt_path", "samples_path", "params"],
+  "additionalProperties": false,
+  "properties": {
+
+    "qopt_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Filesystem path to the headerless whitespace-separated .qopt file. NGSadmix's native output. Typically templated as 'data/cohort/ancestry/global/K{K}/ngsadmix.qopt' or similar. Absolute or relative-to-data-root, both fine; the dev server resolves it.",
+      "examples": [
+        "data/cohort/ancestry/global/K6/ngsadmix.qopt",
+        "data/cohort/ancestry/per_chrom/LG28/K8/ngsadmix.qopt"
+      ]
+    },
+
+    "samples_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Filesystem path to the sidecar samples.txt — one sample_id per line, blank/comment lines skipped. Must have exactly N entries where N matches the number of rows in the .qopt; the loader cross-checks and throws on mismatch. Convention: lives next to the .qopt in the same K{K} folder.",
+      "examples": [
+        "data/cohort/ancestry/global/K6/samples.txt",
+        "data/cohort/ancestry/per_chrom/LG28/K8/samples.txt"
+      ]
+    },
+
+    "params": {
+      "type": "object",
+      "required": ["K"],
+      "additionalProperties": true,
+      "description": "Producer params for provenance. K is required (the loader cross-checks against .qopt column count). Other fields are optional but encouraged — they're stuffed into produced_by.params on the emitted artifact, where they survive forever as metadata.",
+      "properties": {
+        "K": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 50,
+          "description": "Number of ancestry components NGSadmix was run with. Cross-checked against the .qopt column count; mismatch throws."
+        },
+        "run_id": {
+          "type": "string",
+          "description": "Human-readable run identifier (e.g. 'broodstock_qc_pass_v1', 'natora_pruned_81_v1'). Optional but strongly encouraged — distinguishes parallel runs with the same K."
+        },
+        "seed": {
+          "type": "integer",
+          "description": "Random seed NGSadmix was invoked with. Optional. Only knowable by reading the slurm log or the producer's invocation script."
+        },
+        "snp_set": {
+          "type": "string",
+          "description": "Identifier for the SNP set used (e.g. 'pruned_r2_0.1_LD500kb'). Optional but useful when comparing runs across different upstream filters."
+        },
+        "samples_subset": {
+          "type": "string",
+          "description": "Identifier for the sample subset used (e.g. 'all_226', 'natora_81', 'F12_only'). For genome-wide / per-chrom global runs this is typically the full cohort or NAToRA-pruned set. For conditional ancestry (band-1 vs band-2) this names the karyotype-derived subset."
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["genome_wide", "per_chrom", "per_band"],
+          "description": "What scope this ancestry run covers. genome_wide: full genome aggregate; per_chrom: one chromosome only; per_band: a karyotype-band-conditional subset (typically calls the popgen_server, NOT this loader)."
+        },
+        "chrom": {
+          "type": "string",
+          "description": "When scope=per_chrom, which chromosome (e.g. 'LG28'). Required if scope is per_chrom; ignored otherwise."
+        }
+      }
+    }
+  },
+
+  "_examples": [
+    {
+      "_label": "Genome-wide K=6 on the full 226-sample cohort",
+      "qopt_path":    "data/cohort/ancestry/global/K6/ngsadmix.qopt",
+      "samples_path": "data/cohort/ancestry/global/K6/samples.txt",
+      "params": {
+        "K": 6,
+        "run_id": "cohort_226_genome_wide_v1",
+        "seed": 42,
+        "snp_set": "pruned_r2_0.1_LD500kb",
+        "samples_subset": "all_226",
+        "scope": "genome_wide"
+      }
+    },
+    {
+      "_label": "Per-chromosome K=8 on LG28 (NAToRA-pruned 81)",
+      "qopt_path":    "data/cohort/ancestry/per_chrom/LG28/K8/ngsadmix.qopt",
+      "samples_path": "data/cohort/ancestry/per_chrom/LG28/K8/samples.txt",
+      "params": {
+        "K": 8,
+        "run_id": "natora_81_LG28_K8_v1",
+        "seed": 42,
+        "snp_set": "pruned_r2_0.1_LD500kb",
+        "samples_subset": "natora_81",
+        "scope": "per_chrom",
+        "chrom": "LG28"
+      }
+    }
+  ],
+
+  "_sibling_producers": [
+    {
+      "name": "ancestry_groupwise_q",
+      "kind": "operation",
+      "_doc": "Server-side run via popgen_server. Emits the SAME extract-schema (ancestry_global_q_v1) but takes a sample-subset artifact and a beagle path as inputs, runs NGSadmix on the cluster, returns the result. Used for conditional-ancestry (band-1 vs band-2) where the .qopt does not exist on disk yet.",
+      "registered_in": "operations.registry.json"
+    }
+  ],
+
+  "_design_provenance": "First-class activate-schema; created during chat 39 cont. (round 5 step 22+) as the worked example of the 'each tool gets one extract-schema and at minimum one activate-schema' rule (Quentin's design directive 2026-05-07). All future tool wirings (.res / ngsRelate, .beagle.gz, KING, pyrho, ...) follow this template."
+}
