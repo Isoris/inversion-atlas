@@ -729,6 +729,47 @@ export function isInCandidateList(id) {
   return state.candidateList.some(c => c.id === id);
 }
 
+// --- loadCandidateList — legacy lines 57345-57392 ---
+// Restore state.candidateList from localStorage for the active chrom.
+// Also restores state.candidate from the active-candidate ID so reloads
+// preserve focus.
+export function loadCandidateList(state) {
+  state = state || _pageState;
+  _setActiveState(state);
+  if (!state || !state.data) { if (state) state.candidateList = []; return; }
+  try {
+    const key = _candStorageKey(state.data.chrom);
+    const raw = localStorage.getItem(key);
+    if (!raw) { state.candidateList = []; return; }
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) { state.candidateList = []; return; }
+    state.candidateList = arr.map(candidateFromJSON).filter(Boolean);
+  } catch (e) {
+    console.warn('[candidate] load failed:', e.message);
+    state.candidateList = [];
+  }
+  // v4 turn 56: restore the active candidate from localStorage if its ID
+  // matches an entry we just loaded.
+  if (state.candidateList.length > 0) {
+    try {
+      const savedId = localStorage.getItem('pca_scrubber_v3.activeCandidateId');
+      if (savedId) {
+        const hit = state.candidateList.find(c => c && c.id === savedId);
+        if (hit) {
+          // Deep clone via JSON round-trip so the saved-list entry stays
+          // separate from the active candidate.
+          state.candidate = candidateFromJSON(candidateToJSON(hit));
+        }
+      }
+    } catch (_) { /* fail-soft */ }
+  }
+  // turn 129: F5/cold-start path doesn't go through persistCandidateList(),
+  // so the registry bridge has to be called explicitly here.
+  if (typeof _rebuildCandidateRegistries === 'function') {
+    try { _rebuildCandidateRegistries(); } catch (_) {}
+  }
+}
+
 // --- candidateToJSON / candidateFromJSON ---
 // Minimal JSON roundtrip — locked_labels needs to survive as Int8Array,
 // everything else is plain serializable.

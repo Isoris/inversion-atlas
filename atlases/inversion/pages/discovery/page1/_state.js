@@ -25,6 +25,13 @@
 // step 4, eighth pass). See that file's git history for legacy line
 // numbers per function.
 
+// manualGroupForSample is used by manualGroupColor below. Lives in
+// manual_groups.js (which imports drawPCA/renderL3Panel — a mutual
+// cycle with _state via getSampleColor). Both modules only reference
+// each other from function bodies, so live-binding resolves them
+// correctly at call time.
+import { manualGroupForSample } from './manual_groups.js';
+
 // _pageState: the module-level state reference. Every entry-point in
 // every panel module sets this on entry via _setActiveState(state) so
 // that helper bodies (which use `const state = _pageState;` injection)

@@ -577,6 +577,22 @@ function saveViewControls(state) {
   }
 }
 
+// --- setPcaXY(state, axisX, axisY) — legacy lines 10062-10069 ---
+export function setPcaXY(state, axisX, axisY) {
+  if (axisX === axisY) return;
+  state.viewControls.pcaXY = [axisX, axisY];
+  if (state.viewControls.linked) {
+    state.viewControls.linesYsources = [axisX, axisY];
+  }
+  saveViewControls(state);
+}
+
+// --- setViewControlsLinked(state, b) — legacy lines 10082-10085 ---
+export function setViewControlsLinked(state, b) {
+  state.viewControls.linked = !!b;
+  saveViewControls(state);
+}
+
 // --- reconcileViewControlsForData(state) — legacy lines 10043-10059 ---
 export function reconcileViewControlsForData(state) {
   if (!state.viewControls) state.viewControls = { pcaXY: ['pc1', 'pc2'], linesYsources: ['pc1'], linked: true };

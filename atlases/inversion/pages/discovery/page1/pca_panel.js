@@ -18,7 +18,8 @@ import { escapeHtml, fitCanvas, themeColor, withAlpha } from '../../../shared/pa
 import { contextFromState, sampleSpreadL2 } from '../../../shared/per_l2_cluster.js';
 
 import { _pageState, _setActiveState, _vColor, getSampleColor, trackedColor } from './_state.js';
-import { allSampleIdx, getL2Cluster, getPC, getPCRender } from './_data.js';
+import { allSampleIdx, availablePCs, getL2Cluster, getPC, getPCRender, setPcaXY, setViewControlsLinked } from './_data.js';
+import { buildLinesPanel, buildLinesPanelCheckboxes } from './lines_panel.js';
 import { drawLinesPanel } from './lines_panel.js';
 import { renderL3Panel } from './l3_panel.js';
 import { refreshBandPickBar } from './candidates.js';
@@ -944,5 +945,142 @@ export function attachPcaLasso(state) {
   // Hint the user that Shift activates lasso — title attribute on the canvas
   if (!canvas.title) {
     canvas.title = 'Click to track a sample · Shift+drag to lasso into a new manual group · checkbox in tracked-samples panel = lasso into tracked';
+  }
+}
+
+// =============================================================================
+// refreshPcaAxisBar — legacy lines 66680-66767
+// =============================================================================
+// Populates the scatter-axes X/Y selectors from availablePCs(state) and wires
+// change handlers (idempotent via .dataset.wired). Also updates the axis
+// readout below the canvas and the "X PCs available" tooltip.
+export function refreshPcaAxisBar(state) {
+  _setActiveState(state);
+  if (!state || !state.viewControls) return;
+  const avail = availablePCs(state);
+  const [curX, curY] = state.viewControls.pcaXY;
+
+  const fillSelect = (id, currentVal) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = '';
+    for (const pc of avail) {
+      const opt = document.createElement('option');
+      opt.value = pc;
+      opt.textContent = pc.toUpperCase();
+      if (pc === currentVal) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    if (!sel.dataset.wired) {
+      sel.addEventListener('change', () => {
+        const newX = document.getElementById('pcaXSelect').value;
+        const newY = document.getElementById('pcaYSelect').value;
+        if (newX === newY) {
+          const which = sel.dataset.axis;
+          const other = avail.find(pc => pc !== (which === 'X' ? newY : newX));
+          if (other) {
+            if (which === 'X') document.getElementById('pcaXSelect').value = other;
+            else                document.getElementById('pcaYSelect').value = other;
+          }
+        }
+        const finalX = document.getElementById('pcaXSelect').value;
+        const finalY = document.getElementById('pcaYSelect').value;
+        setPcaXY(state, finalX, finalY);
+        const lab = document.getElementById('pcaPanelLabelAxes');
+        if (lab) lab.textContent = `${finalX.toUpperCase()} × ${finalY.toUpperCase()}`;
+        try { drawPCA(state); } catch (_) {}
+        if (state.viewControls.linked) {
+          try { buildLinesPanelCheckboxes(state); } catch (_) {}
+          try { buildLinesPanel(state); } catch (_) {}
+          try { drawLinesPanel(state); } catch (_) {}
+        }
+      });
+      sel.dataset.wired = '1';
+    }
+  };
+
+  fillSelect('pcaXSelect', curX);
+  fillSelect('pcaYSelect', curY);
+
+  const linkChk = document.getElementById('viewControlsLinked');
+  if (linkChk) {
+    linkChk.checked = !!state.viewControls.linked;
+    if (!linkChk.dataset.wired) {
+      linkChk.addEventListener('change', e => {
+        setViewControlsLinked(state, e.target.checked);
+      });
+      linkChk.dataset.wired = '1';
+    }
+  }
+
+  const xSel = document.getElementById('pcaXSelect');
+  const ySel = document.getElementById('pcaYSelect');
+  const tooltip = (avail.length <= 2)
+    ? `${avail.length} PCs in this dataset (run with --npc 4 for more)`
+    : `${avail.length} PCs available`;
+  if (xSel) xSel.title = tooltip;
+  if (ySel) ySel.title = tooltip;
+
+  const note = document.getElementById('pcaAxisAvailNote');
+  if (note) { note.textContent = ''; note.style.display = 'none'; }
+
+  const lab = document.getElementById('pcaPanelLabelAxes');
+  if (lab) lab.textContent = `${curX.toUpperCase()} × ${curY.toUpperCase()}`;
+}
+
+// =============================================================================
+// refreshColorModeBar — legacy lines 66769-66800
+// =============================================================================
+// Enables/disables color-mode buttons based on whether the data supports each
+// mode (family requires family_source, ancestry requires ≥2 distinct values).
+export function refreshColorModeBar(state) {
+  _setActiveState(state);
+  const famBtn = document.querySelector('#colorModeBar button[data-mode="family"]');
+  if (famBtn) {
+    const ok = state.data && state.data.family_source && state.data.family_source !== 'none';
+    famBtn.disabled = !ok;
+  }
+  const ancBtn = document.querySelector('#colorModeBar button[data-mode="ancestry"]');
+  if (ancBtn) {
+    const set = new Set();
+    if (state.data && Array.isArray(state.data.samples)) {
+      for (const s of state.data.samples) set.add(s && s.ancestry ? s.ancestry : 'unknown');
+    }
+    ancBtn.disabled = set.size < 2;
+  }
+  const manBtn = document.querySelector('#colorModeBar button[data-mode="manual"]');
+  if (manBtn) manBtn.disabled = false;   // always available — user creates groups manually
+}
+
+// =============================================================================
+// refreshLockBtn — legacy lines 56695-56711
+// =============================================================================
+// Updates the 🔒 lock-colors button's label + accent styling based on
+// whether state.lockedLabels is set.
+export function refreshLockBtn(state) {
+  _setActiveState(state);
+  const btn = document.getElementById('lockColorsBtn');
+  if (!btn) return;
+  if (state && state.lockedLabels) {
+    const refL2 = state.lockedRefL2;
+    const env = refL2 != null && state.data ? state.data.l2_envelopes[refL2] : null;
+    // shortId import is in events.js; we inline a minimal version here to
+    // avoid circular events↔pca dependency. Same regex / fallback rules.
+    const idRaw = env ? env.candidate_id : null;
+    let id = '?';
+    if (idRaw) {
+      const m = String(idRaw).match(/d17L2_(\d+)_(\d+)$/);
+      const m2 = String(idRaw).match(/d17L1_(\d+)$/);
+      id = m ? `L2 ${m[1]}/${m[2]}` : (m2 ? `L1 ${m2[1]}` : idRaw);
+    }
+    btn.innerHTML = `🔓 unlock (frozen to ${id})`;
+    btn.style.background = 'var(--accent)';
+    btn.style.color = '#0e1116';
+    btn.style.borderColor = 'var(--accent)';
+  } else {
+    btn.innerHTML = '🔒 lock colors to current L2';
+    btn.style.background = '';
+    btn.style.color = '';
+    btn.style.borderColor = '';
   }
 }

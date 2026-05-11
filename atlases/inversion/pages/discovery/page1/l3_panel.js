@@ -15,6 +15,44 @@ import { fmt, shortId } from '../../../shared/page1_utils.js';
 import { _setActiveState } from './_state.js';
 import { getL2Cluster, getL2ClusterAt } from './_data.js';
 
+// =============================================================================
+// refreshPinUI(state) — legacy lines 70130-70161
+// =============================================================================
+// Updates the 📌 pin-2nd-L2 button label + accent + enables/disables the
+// "Dual" layout option based on whether state.secondaryL2 is set.
+export function refreshPinUI(state) {
+  _setActiveState(state);
+  const btn = document.getElementById('pinL2Btn');
+  const dualBtn = document.querySelector('#l3Layout button[data-layout="dual"]');
+  if (!btn) return;
+  if (state && state.secondaryL2 != null && state.data && state.data.l2_envelopes[state.secondaryL2]) {
+    const env = state.data.l2_envelopes[state.secondaryL2];
+    btn.innerHTML = `📌 unpin ${shortId(env.candidate_id)}`;
+    btn.style.background = 'var(--accent)';
+    btn.style.color = '#0e1116';
+    btn.style.borderColor = 'var(--accent)';
+    if (dualBtn) {
+      dualBtn.disabled = false;
+      dualBtn.title = `Dual: focal vs ${shortId(env.candidate_id)}`;
+    }
+  } else {
+    btn.innerHTML = '📌 pin 2nd';
+    btn.style.background = 'var(--panel-2)';
+    btn.style.color = 'var(--ink-dim)';
+    btn.style.borderColor = 'var(--rule)';
+    if (dualBtn) {
+      dualBtn.disabled = true;
+      dualBtn.title = 'Pin a 2nd L2 first';
+      if (state && state.l3Layout === 'dual') {
+        state.l3Layout = 'focal';
+        document.querySelectorAll('#l3Layout button').forEach(b => b.classList.remove('active'));
+        const fb = document.querySelector('#l3Layout button[data-layout="focal"]');
+        if (fb) fb.classList.add('active');
+      }
+    }
+  }
+}
+
 // --- renderL3Panel(state) — legacy lines 48685-49193 ---
 export function renderL3Panel(state) {
   _setActiveState(state);

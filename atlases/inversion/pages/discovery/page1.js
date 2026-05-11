@@ -33,13 +33,14 @@ import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayer
 import { drawSim, drawSimMini } from './page1/sim_panel.js';
 import { drawZ } from './page1/z_panel.js';
 import { buildLinesPanel, buildLinesPanelCheckboxes, drawLinesPanel, refreshLinesColorMode, setLinesPanelCandidateBands } from './page1/lines_panel.js';
-import { autoPickRadial, cycleKAside, drawAnchorStrip, drawPCA, renderManualGroupsList, renderTrackedList, togglePlay } from './page1/pca_panel.js';
-import { renderL3Panel, renderL3PanelScaleStability, renderL3PanelSlab } from './page1/l3_panel.js';
-import { refreshBandPickBar, refreshCandidateUI } from './page1/candidates.js';
+import { autoPickRadial, cycleKAside, drawAnchorStrip, drawPCA, refreshColorModeBar, refreshLockBtn, refreshPcaAxisBar, renderManualGroupsList, renderTrackedList, togglePlay } from './page1/pca_panel.js';
+import { refreshPinUI, renderL3Panel, renderL3PanelScaleStability, renderL3PanelSlab } from './page1/l3_panel.js';
+import { loadCandidateList, refreshBandPickBar, refreshCandidateUI } from './page1/candidates.js';
 import { buildTrackPanels, drawTracks, onPCAClick, onSimClick, onZClick, setCur, updateWinLabel } from './page1/events.js';
 import { attachSidebarHandlers } from './page1/sidebar.js';
 import { attachHotkeys } from './page1/hotkeys.js';
 import { attachPcaLasso } from './page1/pca_panel.js';
+import { _mgRefreshOnDataLoad } from './page1/manual_groups.js';
 
 // Re-export public entry points so the manifest's `module:` contract
 // (atlas_router imports drawSim, applyData, etc. from this file) is
@@ -136,7 +137,7 @@ export function applyData(state, data) {
   }
   // Load saved candidate list for this chromosome from localStorage.
   // Each chromosome has its own list (cross-chrom labels are meaningless).
-  if (typeof loadCandidateList === 'function') loadCandidateList();
+  try { loadCandidateList(state); } catch (_) {}
   // turn 133 Slice 1 follow-up: chrom-load hook for L2-sweep.
   // Cache key is chrom-prefixed so the previous chrom's result wouldn't
   // re-serve, but explicit invalidation is cleaner. Then if the toggle
@@ -193,11 +194,11 @@ export function applyData(state, data) {
   if (typeof computePC1Signs === 'function')      computePC1Signs(state);
   if (typeof populateSimScales === 'function')    populateSimScales(state);
   if (typeof buildFamilyPalette === 'function')   buildFamilyPalette(state);
-  if (typeof refreshColorModeBar === 'function')  refreshColorModeBar();
+  try { refreshColorModeBar(state); } catch (_) {}
   if (typeof refreshBandPickBar === 'function')   refreshBandPickBar(state);
-  if (typeof refreshPcaAxisBar === 'function')    refreshPcaAxisBar();
+  try { refreshPcaAxisBar(state); } catch (_) {}
   // Manual groups: reload from localStorage now that we know the chrom
-  if (typeof _mgRefreshOnDataLoad === 'function') _mgRefreshOnDataLoad();
+  try { _mgRefreshOnDataLoad(); } catch (_) {}
   // v4 turn 128 (AS1): active samples — restore the saved CGA list for
   // this cohort and refresh the badge text. AS1 is purely scaffolding;
   // no other atlas function reads state.activeSampleSet yet.
@@ -211,10 +212,10 @@ export function applyData(state, data) {
   // doesn't, the picker falls back to 'kmeans' silently.
   if (typeof refreshLinesColorMode === 'function') refreshLinesColorMode(state);
   state.secondaryL2 = null;
-  if (typeof refreshPinUI === 'function')         refreshPinUI();
+  try { refreshPinUI(state); } catch (_) {}
   state.lockedLabels = null;
   state.lockedRefL2 = null;
-  if (typeof refreshLockBtn === 'function') refreshLockBtn();
+  try { refreshLockBtn(state); } catch (_) {}
   if (typeof buildTrackPanels === 'function')     buildTrackPanels(state);
   const _scrubEl = document.getElementById('scrubber');
   if (_scrubEl) {

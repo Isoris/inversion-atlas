@@ -54,8 +54,15 @@ import {
   renderTrackedList,
 } from './pca_panel.js';
 import { renderL3Panel } from './l3_panel.js';
-import { refreshBandPickBar, refreshCandidateUI } from './candidates.js';
 import {
+  exportKLabelsTSV,
+  makeCandidateFromLock,
+  refreshBandPickBar,
+  refreshCandidateUI,
+  setCandidate,
+} from './candidates.js';
+import {
+  _updateConcordBadge,
   clearPicks,
   drawTracks,
   jumpL1,
@@ -74,12 +81,6 @@ import {
   renameManualGroup,
   toggleManualGroupScope,
 } from './manual_groups.js';
-import {
-  buildKLabelsTSV,
-  exportKLabelsTSV,
-  makeCandidateFromLock,
-  setCandidate,
-} from './candidates.js';
 
 // =============================================================================
 // Public entry point
@@ -302,17 +303,11 @@ function _wireL3Clustering(state) {
       // v3.52: K changed → anchor labels are stale (different cluster
       // assignments). Re-anchor at current scrubber position with new K labels
       if (state.trackingAnchor) state.trackingAnchor = null;
-      if (typeof recomputeAnchorConcord === 'function') {
-        try { recomputeAnchorConcord(); } catch (_) {}
-      }
+      try { recomputeAnchorConcord(); } catch (_) {}
       drawPCA(state); renderZoneBlock(state); renderL3Panel(state);
-      if (typeof drawAnchorStrip === 'function') {
-        try { drawAnchorStrip(state); } catch (_) {}
-      }
+      try { drawAnchorStrip(state); } catch (_) {}
       // v3.71: K change → anchor reset → badge needs refresh
-      if (typeof _updateConcordBadge === 'function') {
-        try { _updateConcordBadge(); } catch (_) {}
-      }
+      try { _updateConcordBadge(state); } catch (_) {}
     });
   }
 

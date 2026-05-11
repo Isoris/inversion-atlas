@@ -29,6 +29,8 @@ export {
   buildFamilyPalette,
   loadViewControls,
   reconcileViewControlsForData,
+  setPcaXY,
+  setViewControlsLinked,
   getL2Cluster,
   getL2ClusterAt,
   getLinesValuesAt,
