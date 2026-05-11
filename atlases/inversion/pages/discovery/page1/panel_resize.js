@@ -63,9 +63,23 @@ function _redrawAllPanels(state) {
 
 // Build the grid-template-rows for main#page1 from current state. Only
 // applies in fixed mode — compact / free have their own CSS-driven rules.
-// Matches legacy 8-row template: ctrlBar / sim / Z / tracks / spacer /
-// anchorStrip / pca(1fr) / l3. linesPanel defaults to display:none and
-// doesn't get a row; if visible it slots in via grid auto-placement.
+//
+// CSS Grid auto-placement assigns ONLY visible elements (display:none
+// items are skipped entirely). So the row template must match the
+// number of visible items in document order or rows will line up
+// wrong — e.g. anchorStripPanel landing in the 0px linesPanel slot,
+// or pcaPanel inheriting the 28px anchor slot after sim moves to
+// minimap. Build the template dynamically from visibility.
+//
+// Visible elements in document order (children of main#page1):
+//   1. ctrlBar              (always)             40px
+//   2. simPanel             (hidden in minimap)  state.simPanelH
+//   3. zPanel               (always)             state.zPanelH (or 50 collapsed)
+//   4. tracksContainer      (always)             auto
+//   5. linesPanel           (display:none by default) state.linesPanelH when visible
+//   6. anchorStripPanel     (always)             28px
+//   7. pcaPanel             (via compactLeftStack display:contents) 1fr or fixed
+//   8. l3Panel              (always)             360px or user-resized
 function applyMainGrid(state) {
   const main = document.getElementById('page1');
   if (!main) return;
@@ -74,17 +88,6 @@ function applyMainGrid(state) {
     main.style.gridTemplateRows = '';
     return;
   }
-  // Row sizes:
-  //   sim  : 0 when in minimap; else state.simPanelH
-  //   z    : 50 when collapsed; else state.zPanelH
-  //   tracks: auto (empty by default → 0)
-  //   spacer: 0 (compactColumnResize handle, fixed-mode invisible)
-  //   anchor: 28 (state.anchorStripH)
-  //   pca  : 1fr by default; fixed px iff user resized away from default
-  //   l3   : default fixed 360, or user-resized
-  const simH = (document.body && document.body.dataset.simInMinimap === '1')
-               ? 0
-               : Math.max(60, state.simPanelH | 0 || DEFAULTS.simPanelH);
   const zH   = state.zCollapsed
                ? 50
                : Math.max(40, state.zPanelH | 0 || DEFAULTS.zPanelH);
@@ -94,8 +97,22 @@ function applyMainGrid(state) {
   const l3Row  = (state._l3PanelResized && state.l3PanelH)
                  ? `${Math.max(60, state.l3PanelH | 0)}px`
                  : `${DEFAULTS.l3PanelH}px`;
-  main.style.gridTemplateRows =
-    `40px ${simH}px ${zH}px auto 0px 28px ${pcaRow} ${l3Row}`;
+
+  const simInMini  = document.body && document.body.dataset.simInMinimap === '1';
+  const simEl      = main.querySelector('#simPanel');
+  const linesEl    = main.querySelector('#linesPanel');
+  const simVisible = simEl && !simInMini && getComputedStyle(simEl).display !== 'none';
+  const linesVisible = linesEl && getComputedStyle(linesEl).display !== 'none';
+
+  const rows = ['40px'];                                         // ctrlBar
+  if (simVisible) rows.push(`${Math.max(60, state.simPanelH | 0 || DEFAULTS.simPanelH)}px`);
+  rows.push(`${zH}px`);                                          // zPanel
+  rows.push('auto');                                             // tracksContainer
+  if (linesVisible) rows.push(`${Math.max(60, state.linesPanelH | 0 || DEFAULTS.linesPanelH)}px`);
+  rows.push('28px');                                             // anchorStripPanel
+  rows.push(pcaRow);                                             // pcaPanel
+  rows.push(l3Row);                                              // l3Panel
+  main.style.gridTemplateRows = rows.join(' ');
 }
 
 function _wireOne(state, handleId, stateKey, defaultH, minH) {
