@@ -56,6 +56,21 @@
     padding-right: 14px;
   }
   main#page1 #ctrlBar #scrubber { flex: 1; min-width: 0; }
+
+  /* Legacy header badges, re-hosted in ctrlBar. Styled compactly so they
+     don't dominate the row. Visibility flipped via inline style by JS. */
+  main#page1 #ctrlBar #schemaBadge,
+  main#page1 #ctrlBar #jsScriptsBadge {
+    align-self: center;
+    background: var(--panel-2); border: 1px solid var(--rule);
+    color: var(--ink-dim);
+    padding: 3px 8px; font-family: var(--mono); font-size: 10px;
+    border-radius: 3px; line-height: 1.4;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  main#page1 #ctrlBar #schemaBadge.v2,
+  main#page1 #ctrlBar #jsScriptsBadge.v2      { color: var(--good); border-color: var(--good); }
+  main#page1 #ctrlBar #jsScriptsBadge.partial { color: var(--accent); border-color: var(--accent); }
 </style>
 <div class="wrap">
   <aside>
@@ -425,6 +440,12 @@
       <div id="winLabel"><span class="dim">window</span>
         <span class="big" id="winIdx">—</span>
         <span class="dim" id="winBp"></span></div>
+      <!-- Schema + JS scripts badges (legacy header chrome ported into the
+           ctrlBar — the new atlas-core shell has no <header> element). The
+           page1 applyData/JS-detect paths still write to these IDs; without
+           them the writes silently no-op. -->
+      <span id="schemaBadge" style="display: none;"></span>
+      <span id="jsScriptsBadge" style="display: none;"></span>
     </div>
 
     <div class="panel" id="simPanel">
