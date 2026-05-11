@@ -13,20 +13,6 @@
       "tooltip": "Local PCA on dosage. Sim_mat heatmap, robust |Z|, per-sample lines, K-means PCA, L3 contingency. THE big page."
     },
     {
-      "id": "page2",
-      "label": "candidate focus",
-      "stage": "discovery",
-      "fragment": "atlases/inversion/pages/discovery/page2.html",
-      "module": "atlases/inversion/pages/discovery/page2.js"
-    },
-    {
-      "id": "page8",
-      "label": "per-window summary table",
-      "stage": "discovery",
-      "fragment": "atlases/inversion/pages/discovery/page8.html",
-      "module": "atlases/inversion/pages/discovery/page8.js"
-    },
-    {
       "id": "page12",
       "label": "local PCA θπ",
       "stage": "discovery",
@@ -39,6 +25,20 @@
       "stage": "discovery",
       "fragment": "atlases/inversion/pages/discovery/page15.html",
       "module": "atlases/inversion/pages/discovery/page15.js"
+    },
+    {
+      "id": "page2",
+      "label": "candidate focus",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page2.html",
+      "module": "atlases/inversion/pages/discovery/page2.js"
+    },
+    {
+      "id": "page8",
+      "label": "per-window summary table",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page8.html",
+      "module": "atlases/inversion/pages/discovery/page8.js"
     },
     {
       "id": "page19",

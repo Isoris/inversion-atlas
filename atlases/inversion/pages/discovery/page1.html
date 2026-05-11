@@ -18,7 +18,8 @@
      Replicate the visual style here so they don't render as default browser
      buttons. */
   #ctrlBar #layoutModeBtn,
-  #ctrlBar #resetLayoutBtn {
+  #ctrlBar #resetLayoutBtn,
+  #ctrlBar #candidateModeBtn {
     align-self: center;
     background: var(--panel-2); border: 1px solid var(--rule); color: var(--ink);
     padding: 4px 12px; font-family: var(--mono); font-size: 11px;
@@ -28,8 +29,15 @@
     margin-left: 6px;
   }
   #ctrlBar #layoutModeBtn:hover,
-  #ctrlBar #resetLayoutBtn:hover {
+  #ctrlBar #resetLayoutBtn:hover,
+  #ctrlBar #candidateModeBtn:hover {
     background: var(--panel-3); border-color: var(--accent);
+  }
+  /* Candidate mode active state — solid accent fill, matches legacy v3.99 turn 5
+     `header #candidateModeBtn[data-active="1"]` (base.css line 54). */
+  #ctrlBar #candidateModeBtn[data-active="1"] {
+    background: var(--accent); color: #0e1116; border-color: var(--accent);
+    font-weight: 600;
   }
 
   /* The legacy permanently hides #sidebarToggleBtn (inversion.css line 469
@@ -366,6 +374,12 @@
     <div id="ctrlBar">
       <button class="play" id="playBtn">▶ Play</button>
       <input type="range" id="scrubber" min="0" max="0" value="0" step="1" disabled />
+      <!-- v3.66: candidate-mode toggle. When ON, arrow-up extends the focal
+           L2's in-progress candidate to include the next neighbor (right).
+           Ported from legacy line 4819. -->
+      <button id="candidateModeBtn"
+              title="Toggle interval-drafting mode. When ON: arrow-up extends the draft interval to include the next L2 (right); arrow-down shrinks. Use ⬆ promote to candidate to lock the draft into the candidate list. Confirmed candidates appear as gold zones in the Z-panel candidate strip."
+              data-active="0">🏗 candidate mode</button>
       <!-- v3.62: layout-mode toggle. "fixed" = grid template with explicit row
            heights (current behavior); "free" = main becomes scrollable;
            "compact" = 2×2 upper grid + L3 below. Ported from legacy line 4801. -->

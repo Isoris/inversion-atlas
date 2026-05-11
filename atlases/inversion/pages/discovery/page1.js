@@ -41,6 +41,7 @@ import { attachSidebarHandlers } from './page1/sidebar.js';
 import { attachHotkeys } from './page1/hotkeys.js';
 import { attachPcaLasso } from './page1/pca_panel.js';
 import { _mgRefreshOnDataLoad } from './page1/manual_groups.js';
+import { attachPanelResize } from './page1/panel_resize.js';
 
 // Re-export public entry points so the manifest's `module:` contract
 // (atlas_router imports drawSim, applyData, etc. from this file) is
@@ -391,6 +392,29 @@ export async function mount(root, atlasState, registry) {
   try { attachPcaLasso(legacyState); }
   catch (e) { console.warn('page1.mount: attachPcaLasso threw — continuing.', e); }
 
+  // Panel resize handles: drag the bottom edge of sim / Z / lines / PCA / L3
+  // to resize. Reads persisted heights from localStorage and applies the
+  // grid template inline on main#page1.
+  try { attachPanelResize(legacyState); }
+  catch (e) { console.warn('page1.mount: attachPanelResize threw — continuing.', e); }
+
+  // Defer a follow-up redraw by two rAFs so the CSS grid (display: grid +
+  // grid-template-rows) has time to resolve panel heights before fitCanvas
+  // re-measures. Without this, sim_mat / Z / lines / PCA / L3 all paint
+  // into 0×0 canvases on first mount in fixed mode (canvases stay blank
+  // until a subsequent user gesture triggers a redraw). The compact-mode
+  // path doesn't hit this because its grid resolves synchronously inside
+  // the same task.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    try { drawSim(legacyState); }        catch (_) {}
+    try { drawSimMini(legacyState); }    catch (_) {}
+    try { drawZ(legacyState); }          catch (_) {}
+    try { drawLinesPanel(legacyState); } catch (_) {}
+    try { drawPCA(legacyState); }        catch (_) {}
+    try { drawTracks(legacyState); }     catch (_) {}
+    try { renderL3Panel(legacyState); }  catch (_) {}
+  }));
+
   // Populate #chromSelect with the loaded chrom and enable it so the user
   // sees a real option instead of "— none loaded —". The full multi-chrom
   // cache lives in the atlas-core shell now; this is a minimal stand-in.
@@ -507,6 +531,16 @@ function _buildLegacyState(atlasState) {
     smallFamilyIds: new Set(),
     singletonFamilyIds: new Set(),
     crossSpecies: null,
+    // Panel heights (fixed-mode grid). Mutated by panel_resize.js drag
+    // handles. Defaults match legacy v3.59 (sim 520 / Z 100 / lines 200
+    // / PCA 280 / L3 360).
+    simPanelH: 520,
+    zPanelH: 100,
+    linesPanelH: 200,
+    pcaPanelH: 280,
+    l3PanelH: 360,
+    zCollapsed: false,
+    simInMinimap: false,
   };
 
   const legacy = Object.assign(defaults, inv);

@@ -24,9 +24,10 @@
  * =====================================================================
  */
 
-   collapsed — their tabs hide via the [data-stage] selector below.
-   Each pill itself stays visible at all times so the user can click
-   to switch which stage is expanded. */
+/* Tab-group pills (legacy tabBar). When a pill is collapsed, its tabs
+   hide via the [data-stage] selector below. Each pill itself stays
+   visible at all times so the user can click to switch which stage is
+   expanded. */
 /* Pill base style — looks like a folder button with hue accents */
 #tabBar .tab-stage-pill {
   background: var(--panel-2); color: var(--ink-dim);
@@ -1402,7 +1403,7 @@ html[data-theme="light"] .cli-subband[data-verdict="CROSS_CUTTING"] { color: #b9
                       color: var(--ink-dim); font-family: var(--mono); }
 #page11 .bnd-empty-h { font-size: 14px; color: var(--ink); margin-bottom: 6px; }
 
-                padding-top: 10px; border-top: 1px solid var(--rule); }
+.cand-list-actions { padding-top: 10px; border-top: 1px solid var(--rule); }
 .cand-list-actions button { background: var(--panel-2);
                 border: 1px solid var(--rule); color: var(--ink); padding: 5px 9px;
                 font-family: var(--mono); font-size: 10px; border-radius: 3px;
@@ -2296,16 +2297,20 @@ body[data-layout-mode="free"] main#page1 #pcaAsideResize { display: none; }
    !important on background/color/border because both promote buttons
    have inline styles that would otherwise win the cascade. */
 @keyframes promoteFlashGreen {
-  0%   { background: var(--good, #3cc08a) !important;
-         color: #0e1116 !important;
+  /* Note: !important is invalid inside @keyframes per CSS spec — Firefox
+     drops it with a warning. The inline-style override that motivated the
+     !important is handled by adding an `.is-flashing` class to the button
+     in JS; that class's CSS rules (not these keyframes) win via specificity. */
+  0%   { background: var(--good, #3cc08a);
+         color: #0e1116;
          box-shadow: 0 0 0 0 rgba(60,192,138,0.7);
          transform: scale(1); }
-  30%  { background: rgba(60,192,138,1) !important;
-         color: #0e1116 !important;
+  30%  { background: rgba(60,192,138,1);
+         color: #0e1116;
          box-shadow: 0 0 0 6px rgba(60,192,138,0.35);
          transform: scale(1.05); }
-  100% { background: rgba(60,192,138,0.85) !important;
-         color: #0e1116 !important;
+  100% { background: rgba(60,192,138,0.85);
+         color: #0e1116;
          box-shadow: 0 0 0 0 rgba(60,192,138,0);
          transform: scale(1); }
 }

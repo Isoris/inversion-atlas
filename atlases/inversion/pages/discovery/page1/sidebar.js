@@ -97,6 +97,106 @@ export function attachSidebarHandlers(state) {
   _wireJump(state);
   _wireSidebarToggle(state);
   _wireLayoutMode(state);
+  _wireViewMode(state);
+}
+
+// =============================================================================
+// View mode (ctrlBar) — legacy lines 67755-67791
+// =============================================================================
+// Genome / L1 zoom / L2 zoom buttons mutate state.viewMode + persist + redraw.
+// jumpToWindowsBtn cycles arrow-key step size through win1 → win5 → win10.
+
+const _VIEWMODE_STORAGE_KEY = 'pca_scrubber_v3.viewmode';
+const _STEP_CYCLE_ORDER     = ['win1', 'win5', 'win10'];
+
+function _applyViewMode(state, mode) {
+  if (mode !== 'genome' && mode !== 'l1' && mode !== 'l2') mode = 'genome';
+  state.viewMode = mode;
+  document.querySelectorAll('#viewModeBar button[data-viewmode]').forEach(b => {
+    b.classList.toggle('active', b.dataset.viewmode === mode);
+  });
+  if (state.data) {
+    requestAnimationFrame(() => {
+      try { drawZ(state); }          catch (_) {}
+      try { drawTracks(state); }     catch (_) {}
+      try { drawLinesPanel(state); } catch (_) {}
+    });
+  }
+}
+
+function _stepSizeForMode(m) {
+  if (m === 'win5')  return 5;
+  if (m === 'win10') return 10;
+  return 1;
+}
+
+function _refreshStepSizeBtn(state) {
+  const btn = $('jumpToWindowsBtn');
+  if (!btn) return;
+  const m = state.stepMode;
+  let label, lit, title;
+  if (m === 'l2' || m == null) {
+    label = '📊 Windows (—)';
+    lit   = false;
+    title = 'Arrow-step cycler. Currently inactive — arrow keys jump between L2 envelopes. '
+          + 'Click to switch to 1-window steps; click again to cycle 1 → 5 → 10 → 1.';
+  } else if (m === 'winN') {
+    const n = Math.max(1, (state.stepModeN | 0) || 1);
+    label = `📊 Windows (${n})`;
+    lit   = true;
+    title = `Arrow-step cycler. Currently ${n} windows per step (custom from sidebar).`;
+  } else {
+    const n = _stepSizeForMode(m);
+    label = `📊 Windows (${n})`;
+    lit   = true;
+    title = `Arrow-step cycler. Currently ${n} window${n === 1 ? '' : 's'} per step. `
+          + 'Click to advance (1 → 5 → 10 → 1).';
+  }
+  btn.textContent = label;
+  btn.classList.toggle('is-active-step', lit);
+  btn.title = title;
+}
+
+function _cycleStepSize(state) {
+  const cur = state.stepMode;
+  const i = _STEP_CYCLE_ORDER.indexOf(cur);
+  const next = (i < 0)
+    ? _STEP_CYCLE_ORDER[0]
+    : _STEP_CYCLE_ORDER[(i + 1) % _STEP_CYCLE_ORDER.length];
+  state.stepMode = next;
+  // Mirror to sidebar #stepModeBar
+  document.querySelectorAll('#stepModeBar button').forEach(b => {
+    b.classList.toggle('active', b.dataset.step === next);
+  });
+  try { localStorage.setItem('pca_scrubber_v3.stepmode', next); } catch (_) {}
+  _refreshStepSizeBtn(state);
+}
+
+function _wireViewMode(state) {
+  document.querySelectorAll('#viewModeBar button[data-viewmode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = btn.dataset.viewmode;
+      if (m && m !== state.viewMode) {
+        try { localStorage.setItem(_VIEWMODE_STORAGE_KEY, m); } catch (_) {}
+        _applyViewMode(state, m);
+      }
+    });
+  });
+  // Restore persisted viewMode
+  try {
+    const v = localStorage.getItem(_VIEWMODE_STORAGE_KEY);
+    if (v === 'l1' || v === 'l2' || v === 'genome') _applyViewMode(state, v);
+    else _applyViewMode(state, state.viewMode || 'genome');
+  } catch (_) {
+    _applyViewMode(state, state.viewMode || 'genome');
+  }
+
+  // jumpToWindowsBtn (📊 Windows) — cycles arrow-key step size
+  const stepBtn = $('jumpToWindowsBtn');
+  if (stepBtn) {
+    stepBtn.addEventListener('click', () => _cycleStepSize(state));
+    _refreshStepSizeBtn(state);
+  }
 }
 
 // =============================================================================
@@ -138,6 +238,38 @@ function _applyLayoutMode(state, mode) {
   });
 }
 
+// --- setCandidateMode — legacy lines 67915-67956 ---
+// Toggles state.candidateMode + updates button + persists + re-renders.
+// Drops the in-progress draft when toggling off so stale state doesn't
+// surface on next toggle-on. _refreshCmActionButtons and renderL3Panel
+// re-renders are guarded with typeof since the former is still stubbed.
+const _CANDIDATE_MODE_KEY = 'pca_scrubber_v3.candidatemode';
+function _setCandidateMode(state, b) {
+  state.candidateMode = !!b;
+  const btn = $('candidateModeBtn');
+  if (btn) {
+    btn.dataset.active = b ? '1' : '0';
+    btn.title = b
+      ? 'Candidate mode ON. Arrow-up extends focal L2 to include next neighbor (right). Arrow-down shrinks. Enter commits to candidate list. Esc cancels.'
+      : 'Toggle candidate mode. When ON: arrow-up merges focal L2 with the next neighbor (right) into a draft candidate; arrow-down shrinks.';
+  }
+  const editTools = document.getElementById('candidateEditRow');
+  if (editTools) editTools.style.display = b ? 'flex' : 'none';
+  if (typeof _refreshCmActionButtons === 'function') {
+    try { _refreshCmActionButtons(); } catch (_) {}
+  }
+  if (!b) {
+    state.l3Draft = null;
+    state.activeTrackIdx = 0;
+  }
+  try { localStorage.setItem(_CANDIDATE_MODE_KEY, b ? '1' : '0'); } catch (_) {}
+  if (typeof refreshL3BcScopeButtons === 'function') refreshL3BcScopeButtons();
+  try { renderL3Panel(state); } catch (_) {}
+  if (state.data) {
+    try { drawZ(state); } catch (_) {}
+  }
+}
+
 function _wireLayoutMode(state) {
   const btn = $('layoutModeBtn');
   if (btn) {
@@ -148,6 +280,19 @@ function _wireLayoutMode(state) {
     });
     // Sync button label to whatever mode mount() set on body
     _applyLayoutMode(state, state.layoutMode || 'fixed');
+  }
+  // --- #candidateModeBtn click — legacy line 4819 / 67915-67956 ---
+  const candBtn = $('candidateModeBtn');
+  if (candBtn) {
+    candBtn.addEventListener('click', () => {
+      _setCandidateMode(state, !state.candidateMode);
+    });
+    // Restore persisted state at first wire-up.
+    try {
+      if (localStorage.getItem(_CANDIDATE_MODE_KEY) === '1') {
+        _setCandidateMode(state, true);
+      }
+    } catch (_) {}
   }
   const resetBtn = $('resetLayoutBtn');
   if (resetBtn) {
