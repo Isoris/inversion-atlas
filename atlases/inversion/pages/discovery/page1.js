@@ -34,7 +34,7 @@ import { drawSim, drawSimMini } from './page1/sim_panel.js';
 import { drawZ } from './page1/z_panel.js';
 import { buildLinesPanel, buildLinesPanelCheckboxes, drawLinesPanel, refreshLinesColorMode, setLinesPanelCandidateBands } from './page1/lines_panel.js';
 import { autoPickRadial, cycleKAside, drawAnchorStrip, drawPCA, refreshColorModeBar, refreshLockBtn, refreshPcaAxisBar, renderManualGroupsList, renderTrackedList, togglePlay } from './page1/pca_panel.js';
-import { refreshPinUI, renderL3Panel, renderL3PanelScaleStability, renderL3PanelSlab } from './page1/l3_panel.js';
+import { _l3CacheInvalidate, refreshPinUI, renderL3Panel, renderL3PanelScaleStability, renderL3PanelSlab } from './page1/l3_panel.js';
 import { loadCandidateList, refreshBandPickBar, refreshCandidateUI } from './page1/candidates.js';
 import { buildTrackPanels, drawTracks, onPCAClick, onSimClick, onZClick, setCur, updateWinLabel } from './page1/events.js';
 import { attachSidebarHandlers } from './page1/sidebar.js';
@@ -182,7 +182,7 @@ export function applyData(state, data) {
   state.l2GroupCache = null;
   state.cacheKey = null;
   // v3.99 turn 7 perf: clear render caches whenever a new dataset loads
-  if (typeof _l3CacheInvalidate === 'function') _l3CacheInvalidate();
+  _l3CacheInvalidate();
   if (typeof _linesCacheInvalidate === 'function') _linesCacheInvalidate();
   // 2026-05-06 round 3: most of these helpers were extracted in step 3
   // (buildIndexes, computePC1Signs, populateSimScales, buildFamilyPalette,
