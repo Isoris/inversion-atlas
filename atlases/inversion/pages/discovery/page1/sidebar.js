@@ -369,8 +369,9 @@ function _wireDataSection(state) {
   // --- #simMinimapRestoreBtn + #simMoveMinimapBtn — legacy lines 67611-67619 ---
   // Minimal port of setSimInMinimap: toggles state.simInMinimap, the body
   // data-sim-in-minimap attribute, the .active class on #simMinimap, and
-  // persists. Drops the slide animation and the applyMainGrid call (the
-  // body attribute is sufficient to drive the CSS in the new shell).
+  // persists. Re-runs applyMainGrid so the main#page1 grid template
+  // drops the simPanel row — without that, panels stay locked in their
+  // original grid rows and an empty band appears above zPanel.
   const moveBtn    = $('simMoveMinimapBtn');
   const restoreBtn = $('simMinimapRestoreBtn');
   const _setSimInMinimap = (on) => {
@@ -384,6 +385,7 @@ function _wireDataSection(state) {
       else mini.classList.toggle('active', !!on);
     }
     try { localStorage.setItem('pca_scrubber_v3.siminminimap', on ? '1' : '0'); } catch (_) {}
+    try { applyMainGrid(state); } catch (_) {}
     // Redraw the panels whose canvas sizes changed. Defer one frame so the
     // CSS reflow (display:none / .active toggle) settles before fitCanvas
     // re-measures the heights; otherwise minimap renders at 0×0 on the
