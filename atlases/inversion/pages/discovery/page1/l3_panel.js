@@ -10,10 +10,24 @@
 // Bodies extracted verbatim from the pre-split page1.js (eighth pass).
 
 import { alignLabels } from '../../../shared/hungarian.js';
-import { fmt, shortId } from '../../../shared/page1_utils.js';
+import {
+  escapeHtml,
+  fitCanvas,
+  fmt,
+  shortId,
+  themeColor,
+  withAlpha,
+} from '../../../shared/page1_utils.js';
 
-import { _setActiveState } from './_state.js';
-import { getL2Cluster, getL2ClusterAt } from './_data.js';
+import { _pageState, _setActiveState, getSampleColor, trackedColor } from './_state.js';
+import {
+  _fmtP,
+  getL2Cluster,
+  getL2ClusterAt,
+  getPC,
+  groupColor,
+} from './_data.js';
+import { manualGroupForSample } from './manual_groups.js';
 
 // =============================================================================
 // refreshPinUI(state) — legacy lines 70130-70161

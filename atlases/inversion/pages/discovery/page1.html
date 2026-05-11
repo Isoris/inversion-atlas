@@ -11,6 +11,43 @@
   #app-root > .wrap > #pagesArea { height: 100%; min-width: 0; min-height: 0;
                                    overflow: hidden; }
   #app-root > .wrap > #pagesArea > main#page1.active { height: 100%; min-height: 0; }
+
+  /* The legacy header hosted #layoutModeBtn and #resetLayoutBtn with rules
+     scoped to `header #layoutModeBtn`. In the new shell these buttons live
+     inside #ctrlBar at the top of page1, so the legacy rules don't apply.
+     Replicate the visual style here so they don't render as default browser
+     buttons. */
+  #ctrlBar #layoutModeBtn,
+  #ctrlBar #resetLayoutBtn {
+    align-self: center;
+    background: var(--panel-2); border: 1px solid var(--rule); color: var(--ink);
+    padding: 4px 12px; font-family: var(--mono); font-size: 11px;
+    border-radius: 3px; cursor: pointer; line-height: 1;
+    white-space: nowrap; flex-shrink: 0;
+    display: inline-flex; align-items: center;
+    margin-left: 6px;
+  }
+  #ctrlBar #layoutModeBtn:hover,
+  #ctrlBar #resetLayoutBtn:hover {
+    background: var(--panel-3); border-color: var(--accent);
+  }
+
+  /* The legacy permanently hides #sidebarToggleBtn (inversion.css line 469
+     "display: none !important") because its job was taken over by a header
+     gear button. The new atlas-core shell doesn't have that gear, so we
+     un-hide the original ‹ button as the user's sidebar-collapse control.
+     Higher-specificity selector wins over the legacy rule. */
+  aside > #sidebarToggleBtn { display: inline-flex !important; }
+
+  /* The legacy #ctrlBar grid was 4 columns (play | scrubber | viewMode | winLabel).
+     The new ctrlBar adds layoutModeBtn + resetLayoutBtn, exceeding the grid's
+     4-column template and forcing items to wrap to a second row. Convert to
+     a flex row so all items flow horizontally in their declared order. */
+  main#page1 #ctrlBar {
+    display: flex; flex-direction: row; align-items: center; gap: 14px;
+    padding-right: 14px;
+  }
+  main#page1 #ctrlBar #scrubber { flex: 1; min-width: 0; }
 </style>
 <div class="wrap">
   <aside>

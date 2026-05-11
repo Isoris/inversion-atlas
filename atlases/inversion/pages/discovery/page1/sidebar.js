@@ -43,7 +43,7 @@ import { shortId } from '../../../shared/page1_utils.js';
 
 import { _setActiveState } from './_state.js';
 import { getL2Cluster } from './_data.js';
-import { drawSim } from './sim_panel.js';
+import { drawSim, drawSimMini } from './sim_panel.js';
 import { drawZ } from './z_panel.js';
 import { drawLinesPanel } from './lines_panel.js';
 import {
@@ -239,12 +239,22 @@ function _wireDataSection(state) {
       else mini.classList.toggle('active', !!on);
     }
     try { localStorage.setItem('pca_scrubber_v3.siminminimap', on ? '1' : '0'); } catch (_) {}
-    // Redraw the panels whose canvas sizes changed.
-    try { drawSim(state); }   catch (_) {}
-    try { drawZ(state); }     catch (_) {}
-    try { drawLinesPanel(state); } catch (_) {}
-    try { drawPCA(state); }   catch (_) {}
-    try { renderL3Panel(state); }  catch (_) {}
+    // Redraw the panels whose canvas sizes changed. Defer one frame so the
+    // CSS reflow (display:none / .active toggle) settles before fitCanvas
+    // re-measures the heights; otherwise minimap renders at 0×0 on the
+    // first paint and stays empty until something else triggers a redraw.
+    requestAnimationFrame(() => {
+      try { drawSim(state); }        catch (_) {}
+      try { drawZ(state); }          catch (_) {}
+      try { drawLinesPanel(state); } catch (_) {}
+      try { drawPCA(state); }        catch (_) {}
+      try { renderL3Panel(state); }  catch (_) {}
+      // When sim is in the minimap, draw THERE; the main #simCanvas is
+      // hidden by CSS but drawSim above still touched it harmlessly.
+      if (state.simInMinimap && state.data) {
+        try { drawSimMini(state); } catch (_) {}
+      }
+    });
   };
   if (moveBtn)    moveBtn.addEventListener('click', () => _setSimInMinimap(true));
   if (restoreBtn) restoreBtn.addEventListener('click', () => _setSimInMinimap(false));
