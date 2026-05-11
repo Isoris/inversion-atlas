@@ -91,12 +91,21 @@ function applyMainGrid(state) {
   const zH   = state.zCollapsed
                ? 50
                : Math.max(40, state.zPanelH | 0 || DEFAULTS.zPanelH);
-  const pcaRow = (state._pcaPanelResized && state.pcaPanelH)
-                 ? `${Math.max(60, state.pcaPanelH | 0)}px`
-                 : '1fr';
-  const l3Row  = (state._l3PanelResized && state.l3PanelH)
-                 ? `${Math.max(60, state.l3PanelH | 0)}px`
-                 : `${DEFAULTS.l3PanelH}px`;
+  // Collapsed PCA = just the axis bar + a thin canvas (~32px). When the
+  // user double-clicks the seam or clicks the ▼ button, l3 can grow to
+  // fill the freed space.
+  const pcaRow = state.pcaCollapsed
+                 ? '32px'
+                 : ((state._pcaPanelResized && state.pcaPanelH)
+                    ? `${Math.max(60, state.pcaPanelH | 0)}px`
+                    : '1fr');
+  // Collapsed L3 = just the toolbar (~32px). PCA's 1fr grows into the
+  // freed vertical space.
+  const l3Row  = state.l3Collapsed
+                 ? '32px'
+                 : ((state._l3PanelResized && state.l3PanelH)
+                    ? `${Math.max(60, state.l3PanelH | 0)}px`
+                    : `${DEFAULTS.l3PanelH}px`);
 
   const simInMini  = document.body && document.body.dataset.simInMinimap === '1';
   const simEl      = main.querySelector('#simPanel');

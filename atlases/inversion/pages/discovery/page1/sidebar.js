@@ -46,6 +46,12 @@ import { getL2Cluster } from './_data.js';
 import { drawSim, drawSimMini } from './sim_panel.js';
 import { drawZ } from './z_panel.js';
 import { drawLinesPanel } from './lines_panel.js';
+// applyMainGrid recomputes main#page1's grid-template-rows from the
+// current state + visible panels. Called from _setSimInMinimap (sim
+// toggle changes which rows are present) and _applyLayoutMode (so the
+// inline gridTemplateRows from fixed mode is cleared when switching
+// to compact/free, letting their CSS-driven templates take over).
+import { applyMainGrid } from './panel_resize.js';
 import {
   autoPickRadial as _autoPickRadialBridge,
   drawAnchorStrip,
@@ -98,6 +104,51 @@ export function attachSidebarHandlers(state) {
   _wireSidebarToggle(state);
   _wireLayoutMode(state);
   _wireViewMode(state);
+  _wirePanelCollapseButtons(state);
+}
+
+// =============================================================================
+// Panel collapse buttons — pcaCollapseBtn / l3CollapseBtn / zCollapseBtn
+// =============================================================================
+// Each panel's header has a ▼ button. Clicking it flips state.<panel>Collapsed
+// and re-runs applyMainGrid; the collapsed panel shrinks to a thin strip
+// (~32px) showing just its toolbar / axis bar, and the adjacent 1fr panel
+// grows into the freed space. State is persisted to localStorage.
+function _wirePanelCollapseButtons(state) {
+  const SPECS = [
+    { btn: 'pcaCollapseBtn', slot: 'pcaCollapsed', lsKey: 'pca_scrubber_v3.pcacollapsed' },
+    { btn: 'l3CollapseBtn',  slot: 'l3Collapsed',  lsKey: 'pca_scrubber_v3.l3collapsed' },
+    { btn: 'zCollapseBtn',   slot: 'zCollapsed',   lsKey: 'pca_scrubber_v3.zcollapsed' },
+  ];
+  for (const s of SPECS) {
+    const btn = $(s.btn);
+    if (!btn) continue;
+    // Restore persisted state
+    try {
+      if (localStorage.getItem(s.lsKey) === '1') state[s.slot] = true;
+    } catch (_) {}
+    // Reflect initial state in the arrow
+    btn.textContent = state[s.slot] ? '▶' : '▼';
+    btn.addEventListener('click', () => {
+      state[s.slot] = !state[s.slot];
+      btn.textContent = state[s.slot] ? '▶' : '▼';
+      try { localStorage.setItem(s.lsKey, state[s.slot] ? '1' : '0'); } catch (_) {}
+      try { applyMainGrid(state); } catch (_) {}
+      // Re-fit canvases after the row resize.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        try { drawSim(state); }        catch (_) {}
+        try { drawZ(state); }          catch (_) {}
+        try { drawLinesPanel(state); } catch (_) {}
+        try { drawPCA(state); }        catch (_) {}
+        try { drawTracks(state); }     catch (_) {}
+        try { renderL3Panel(state); }  catch (_) {}
+      }));
+    });
+  }
+  // Apply the restored state on first mount so the grid reflects it.
+  if (state.pcaCollapsed || state.l3Collapsed || state.zCollapsed) {
+    try { applyMainGrid(state); } catch (_) {}
+  }
 }
 
 // =============================================================================
@@ -115,6 +166,17 @@ function _applyViewMode(state, mode) {
   document.querySelectorAll('#viewModeBar button[data-viewmode]').forEach(b => {
     b.classList.toggle('active', b.dataset.viewmode === mode);
   });
+  // Auto-move sim_mat into the minimap when zooming to L1/L2 — the
+  // heatmap shows the WHOLE chromosome so its scale stops matching the
+  // zoomed Z panel below it. Move back to the main panel when returning
+  // to genome scope. The user can still toggle manually via the panel
+  // buttons; this just runs the natural default per viewMode.
+  if (typeof state._setSimInMinimap === 'function') {
+    const wantInMinimap = (mode === 'l1' || mode === 'l2');
+    if (!!state.simInMinimap !== wantInMinimap) {
+      try { state._setSimInMinimap(wantInMinimap); } catch (_) {}
+    }
+  }
   if (state.data) {
     requestAnimationFrame(() => {
       try { drawZ(state); }          catch (_) {}
@@ -227,15 +289,22 @@ function _applyLayoutMode(state, mode) {
       : 'Layout: FIXED — single-column grid, fits one screen. Click for free.';
   }
   try { localStorage.setItem(_LAYOUT_MODE_KEY, mode); } catch (_) {}
-  // Redraw — fitCanvas re-measures the new heights.
-  requestAnimationFrame(() => {
+  // Recompute the inline grid template. In compact/free mode the
+  // function clears `main.style.gridTemplateRows = ''` so the CSS-driven
+  // template for those modes takes over. Without this, the inline rows
+  // baked in by fixed mode persist and the compact mode panels end up
+  // sized wrong (L3 / Z / anchor strip squashed or missing).
+  try { applyMainGrid(state); } catch (_) {}
+  // Redraw — fitCanvas re-measures the new heights. Defer two rAFs so
+  // the new grid resolves before canvases re-measure.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
     try { drawSim(state); }        catch (_) {}
     try { drawZ(state); }          catch (_) {}
     try { drawLinesPanel(state); } catch (_) {}
     try { drawPCA(state); }        catch (_) {}
     try { drawTracks(state); }     catch (_) {}
     try { renderL3Panel(state); }  catch (_) {}
-  });
+  }));
 }
 
 // --- setCandidateMode — legacy lines 67915-67956 ---
@@ -405,6 +474,9 @@ function _wireDataSection(state) {
   };
   if (moveBtn)    moveBtn.addEventListener('click', () => _setSimInMinimap(true));
   if (restoreBtn) restoreBtn.addEventListener('click', () => _setSimInMinimap(false));
+  // Expose the setter on state so non-sidebar code (e.g. _applyViewMode)
+  // can move sim to/from the minimap without re-implementing the logic.
+  state._setSimInMinimap = _setSimInMinimap;
   // Restore persisted state on first wire-up.
   try {
     if (localStorage.getItem('pca_scrubber_v3.siminminimap') === '1') {
@@ -1122,7 +1194,7 @@ function _wireJump(state) {
 const _SIDEBAR_STORAGE_KEY = 'pca_scrubber_v3.sidebar_collapsed';
 
 function _applySidebarState(state, collapsed) {
-  const wrap = (typeof document !== 'undefined') ? document.getElementById('appWrap') : null;
+  const wrap = (typeof document !== 'undefined') ? document.querySelector('.wrap') : null;
   const btn = (typeof document !== 'undefined') ? document.getElementById('sidebarToggleBtn') : null;
   if (wrap && typeof wrap.setAttribute === 'function') {
     if (collapsed) wrap.setAttribute('data-sidebar', 'collapsed');
@@ -1160,7 +1232,7 @@ function _wireSidebarToggle(state) {
   const btn = $('sidebarToggleBtn');
   if (btn) {
     btn.addEventListener('click', () => {
-      const wrap = document.getElementById('appWrap');
+      const wrap = document.querySelector('.wrap');
       const isCollapsed = wrap && wrap.getAttribute('data-sidebar') === 'collapsed';
       const next = !isCollapsed;
       try { localStorage.setItem(_SIDEBAR_STORAGE_KEY, String(next)); } catch (e) {}

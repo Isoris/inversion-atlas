@@ -28,6 +28,10 @@ import {
   groupColor,
 } from './_data.js';
 import { manualGroupForSample } from './manual_groups.js';
+// Live-binding import: setCur is called from click handlers (function bodies),
+// never at module-load time, so the events.js ↔ l3_panel.js cycle resolves
+// fine. Used to make neighbor panes clickable (jump cursor to that L2).
+import { setCur } from './events.js';
 
 // =============================================================================
 // refreshPinUI(state) — legacy lines 70130-70161
@@ -335,6 +339,27 @@ export function renderL3Panel(state) {
       else if (dStatus === 'in-warn') col.classList.add('in-candidate-warn');
     }
 
+    // Click-to-jump on neighbor panes: clicking the ← / → pane jumps the
+    // scrubber cursor to that L2's anchor window. Focal pane (◆) is the
+    // current L2 — clicking it is a no-op so we don't bind the handler.
+    // The handler is bound on the column itself (so the entire pane is a
+    // hit target) but excludes the per-pane toolbar (`.l3-pane-tools`)
+    // so its embedded buttons keep their own click semantics.
+    if (!isFocal && l2idx != null) {
+      col.classList.add('l3-col-clickable');
+      col.title = 'Click to jump the scrubber to this L2';
+      col.addEventListener('click', (ev) => {
+        // Don't steal clicks from the per-pane tool buttons.
+        if (ev.target.closest('.l3-pane-tools')) return;
+        const env = d.l2_envelopes[l2idx];
+        if (!env) return;
+        const s0 = (env._s0 != null) ? env._s0 : (env.start_w - 1);
+        const e0 = (env._e0 != null) ? env._e0 : (env.end_w   - 1);
+        const center = Math.max(0, Math.floor((s0 + e0) / 2));
+        try { setCur(_pageState || state, center); } catch (_) {}
+      });
+    }
+
     const h3 = document.createElement('h3');
     if (isFocal) h3.classList.add('focal');
     let titlePrefix = '';
@@ -638,6 +663,20 @@ export function renderL3PanelSlab(state) {
                         ' display: flex; gap: 8px; align-items: center;' +
                         ' border-bottom: 1px solid var(--rule);';
     let offsetSlab = null;
+    // Click-to-jump: in slab mode, clicking a neighbor pane jumps the cursor
+    // to the center of that offset slab. Bound on the column itself; the
+    // .l3-pane-tools buttons inside keep their own click semantics. Bound
+    // before we know offsetSlab so the closure captures the live value.
+    if (!isFocal) {
+      col.classList.add('l3-col-clickable');
+      col.title = 'Click to jump the scrubber to this slab';
+      col.addEventListener('click', (ev) => {
+        if (ev.target.closest('.l3-pane-tools')) return;
+        if (!offsetSlab) return;
+        const center = Math.max(0, Math.floor((offsetSlab[0] + offsetSlab[1]) / 2));
+        try { setCur(_pageState || state, center); } catch (_) {}
+      });
+    }
     // turn 148: per-pane toolbar mirrors of the global L3 controls (parity
     // with L2 mode line 44592). Sits to the right of the title text via
     // margin-left:auto inside the existing .l3-pane-tools span. Renders even
