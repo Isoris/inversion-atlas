@@ -90,12 +90,13 @@
     <div class="ctl">
       <input type="file" id="fileInput" accept=".json,application/json" multiple />
     </div>
-    <div class="ctl">
-      <label style="font-size: 11px; color: var(--ink-dim); margin-bottom: 3px;">chromosome (loaded this session)</label>
-      <select id="chromSelect" disabled>
-        <option value="">— none loaded —</option>
-      </select>
-    </div>
+    <!-- Sidebar #chromSelect retired: the shell's scopebar provides the
+         canonical chromosome picker. Keep the element in the DOM (hidden)
+         so the page1 JS that probes #chromSelect to set state on first
+         data load doesn't NPE. -->
+    <select id="chromSelect" disabled hidden style="display: none;">
+      <option value="">— none loaded —</option>
+    </select>
     <div class="ctl num dim" id="dataStatus">No data loaded</div>
     <!-- v4 turn 73f: IndexedDB-backed JSON cache. Drag-dropped JSONs are
          auto-persisted between sessions; click here to wipe the cache.
@@ -445,7 +446,7 @@
            page1 applyData/JS-detect paths still write to these IDs; without
            them the writes silently no-op. -->
       <span id="schemaBadge" style="display: none;"></span>
-      <span id="jsScriptsBadge" style="display: none;"></span>
+      <span id="jsScriptsBadge" title="Loaded JavaScript modules registered as window globals.">JS · 0 scripts</span>
     </div>
 
     <div class="panel" id="simPanel">

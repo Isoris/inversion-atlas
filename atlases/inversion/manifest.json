@@ -142,7 +142,7 @@
     {
       "id": "page5",
       "label": "help",
-      "stage": "comparative",
+      "stage": "help",
       "fragment": "atlases/inversion/pages/comparative/page5.html",
       "module": "atlases/inversion/pages/comparative/page5.js",
       "tooltip": "Quick-reference / help page (static HTML, no JS render). NB: legacy 'page5' is the help page, NOT multi-species — the multi-species cockpit is page16b."
@@ -221,6 +221,11 @@
       "id": "comparative",
       "label": "comparative",
       "order": 4
+    },
+    {
+      "id": "help",
+      "label": "help",
+      "order": 5
     }
   ]
 }

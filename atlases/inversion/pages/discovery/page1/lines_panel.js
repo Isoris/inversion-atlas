@@ -1302,3 +1302,90 @@ export function setLinesPanelCandidateBands(state, b) {
   try { localStorage.setItem(_LINES_PANEL_CAND_BANDS_KEY, b ? '1' : '0'); } catch (_) {}
   if (typeof drawLinesPanel === 'function') drawLinesPanel(state);
 }
+
+// --- lasso wiring — legacy lines 33752-33782 + 34011-34014 + 34229-34262 ---
+// Verbatim port of:
+//   _updateLinesLassoUI()       — refresh badge / confirm / clear visibility
+//   setLinesLassoActive(b)      — toggle state.linesLassoActive + clear state
+//   attachLinesLasso(state)     — wire the checkbox + confirm + clear handlers
+// Called once from page1.js mount() so the lasso checkbox actually toggles.
+function _updateLinesLassoUI(state) {
+  if (typeof document === 'undefined') return;
+  const cb = document.getElementById('linesLassoToggle');
+  if (cb) cb.checked = !!state.linesLassoActive;
+  const badge   = document.getElementById('linesLassoBadge');
+  const confirm = document.getElementById('linesLassoConfirmBtn');
+  const clear   = document.getElementById('linesLassoClearBtn');
+  const n = (state.linesLassoSelected || []).length;
+  const showCommitted = !!state.linesLassoActive && n > 0;
+  if (badge) {
+    if (badge.style) badge.style.display = state.linesLassoActive ? '' : 'none';
+    badge.textContent = `${n} selected`;
+  }
+  if (confirm && confirm.style) confirm.style.display = showCommitted ? '' : 'none';
+  if (clear && clear.style) clear.style.display = showCommitted ? '' : 'none';
+}
+
+function setLinesLassoActive(state, b) {
+  state.linesLassoActive = !!b;
+  if (!b) {
+    state.linesLassoRect = null;
+    state.linesLassoCommitted = null;
+    state.linesLassoSelected = [];
+  }
+  _updateLinesLassoUI(state);
+  drawLinesPanel(state);
+}
+
+export function attachLinesLasso(state) {
+  _setActiveState(state);
+  if (typeof document === 'undefined') return;
+  // Expose the UI updater on window so the pointer handlers above (which
+  // call `_updateLinesLassoUI()` via runtime guard) find it. Cheap bridge
+  // until those guards are promoted to imports across the lines panel.
+  if (typeof window !== 'undefined') {
+    window._updateLinesLassoUI = () => _updateLinesLassoUI(state);
+  }
+  const cb = document.getElementById('linesLassoToggle');
+  if (cb && !cb.__wired) {
+    cb.__wired = true;
+    cb.addEventListener('change', e => setLinesLassoActive(state, !!e.target.checked));
+  }
+  const confirmBtn = document.getElementById('linesLassoConfirmBtn');
+  if (confirmBtn && !confirmBtn.__wired) {
+    confirmBtn.__wired = true;
+    confirmBtn.addEventListener('click', () => {
+      const sel = (state.linesLassoSelected || []).slice();
+      if (sel.length === 0) return;
+      const cap = Math.max(1, state.trackedN | 0);
+      state.tracked = sel.slice(0, cap);
+      if (sel.length > cap) state.trackedN = Math.min(50, sel.length);
+      state.linesLassoRect = null;
+      state.linesLassoCommitted = null;
+      state.linesLassoSelected = [];
+      state.linesLassoActive = false;
+      if (cb) cb.checked = false;
+      _updateLinesLassoUI(state);
+      // Trigger downstream redraws via window-mounted helpers (still guarded
+      // until they're all converted to ES imports).
+      if (typeof window !== 'undefined') {
+        try { window.renderTrackedList && window.renderTrackedList(); } catch (_) {}
+        try { window._syncTrackedCompactUI && window._syncTrackedCompactUI(); } catch (_) {}
+        try { window.drawPCA && window.drawPCA(state); } catch (_) {}
+        try { window.renderL3Panel && window.renderL3Panel(state); } catch (_) {}
+      }
+      drawLinesPanel(state);
+    });
+  }
+  const clearBtn = document.getElementById('linesLassoClearBtn');
+  if (clearBtn && !clearBtn.__wired) {
+    clearBtn.__wired = true;
+    clearBtn.addEventListener('click', () => {
+      state.linesLassoRect = null;
+      state.linesLassoCommitted = null;
+      state.linesLassoSelected = [];
+      _updateLinesLassoUI(state);
+      drawLinesPanel(state);
+    });
+  }
+}

@@ -2017,6 +2017,10 @@ body.resizing-z, body.resizing-z * { cursor: ns-resize !important; user-select: 
   margin-left: -1px;
 }
 /* L3 panel resize handle (top edge — drag UP grows L3 down into PCA, drag DOWN shrinks L3) */
+/* PCA panel's bottom-edge resize sits at the same seam, so hide it
+ * in fixed mode — having both stack on top of each other read as
+ * a too-thick handle. l3Resize alone is the canonical control here. */
+main#page1 #pcaResize { display: none; }
 #l3Resize {
   position: absolute; left: 0; right: 0; top: -4px; height: 8px;
   cursor: ns-resize; z-index: 10;

@@ -32,7 +32,7 @@ import { _setActiveState } from './page1/_state.js';
 import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayers, listLayers, loadViewControls, populateSimScales, reconcileViewControlsForData } from './page1/_data.js';
 import { drawSim, drawSimMini } from './page1/sim_panel.js';
 import { drawZ } from './page1/z_panel.js';
-import { buildLinesPanel, buildLinesPanelCheckboxes, drawLinesPanel, refreshLinesColorMode, setLinesPanelCandidateBands } from './page1/lines_panel.js';
+import { attachLinesLasso, buildLinesPanel, buildLinesPanelCheckboxes, drawLinesPanel, refreshLinesColorMode, setLinesPanelCandidateBands } from './page1/lines_panel.js';
 import { autoPickRadial, cycleKAside, drawAnchorStrip, drawPCA, refreshColorModeBar, refreshLockBtn, refreshPcaAxisBar, renderManualGroupsList, renderTrackedList, togglePlay } from './page1/pca_panel.js';
 import { _l3CacheInvalidate, refreshPinUI, renderL3Panel, renderL3PanelScaleStability, renderL3PanelSlab } from './page1/l3_panel.js';
 import { loadCandidateList, refreshBandPickBar, refreshCandidateUI } from './page1/candidates.js';
@@ -397,6 +397,12 @@ export async function mount(root, atlasState, registry) {
   // grid template inline on main#page1.
   try { attachPanelResize(legacyState); }
   catch (e) { console.warn('page1.mount: attachPanelResize threw — continuing.', e); }
+
+  // Per-sample lines lasso: wires the checkbox + Confirm/Clear buttons in
+  // the lines panel header bar. Without this, the lasso checkbox toggle
+  // had no effect (state.linesLassoActive never flipped).
+  try { attachLinesLasso(legacyState); }
+  catch (e) { console.warn('page1.mount: attachLinesLasso threw — continuing.', e); }
 
   // Defer a follow-up redraw by two rAFs so the CSS grid (display: grid +
   // grid-template-rows) has time to resolve panel heights before fitCanvas
