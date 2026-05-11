@@ -22,12 +22,175 @@ import { allSampleIdx, getL2Cluster, getPC, getPCRender } from './_data.js';
 import { drawLinesPanel } from './lines_panel.js';
 import { renderL3Panel } from './l3_panel.js';
 import { refreshBandPickBar } from './candidates.js';
-import { onPCAClick, setCur } from './events.js';
+import { _updateConcordBadge, onPCAClick, renderZoneBlock, setCur } from './events.js';
+import { addToManualGroup } from './manual_groups.js';
+
+// --- _K_CYCLE_ORDER — legacy line 56536 ---
+// K-cycle button cycles state.k through this sequence.
+const _K_CYCLE_ORDER = [3, 4, 5, 6, 2];
+
+// --- _cramersV — legacy lines 36046-36077 ---
+// Compute Cramér's V from a K_a × K_c contingency table (already counts).
+// Returns NaN if the table is degenerate.
+function _cramersV(table, K_a, K_c) {
+  let n = 0;
+  const rowSums = new Array(K_a).fill(0);
+  const colSums = new Array(K_c).fill(0);
+  for (let i = 0; i < K_a; i++) {
+    for (let j = 0; j < K_c; j++) {
+      const v = table[i * K_c + j];
+      n += v; rowSums[i] += v; colSums[j] += v;
+    }
+  }
+  if (n < 2) return NaN;
+  let nzR = 0, nzC = 0;
+  for (let i = 0; i < K_a; i++) if (rowSums[i] > 0) nzR++;
+  for (let j = 0; j < K_c; j++) if (colSums[j] > 0) nzC++;
+  if (nzR < 2 || nzC < 2) return 0;
+  let chi2 = 0;
+  for (let i = 0; i < K_a; i++) {
+    for (let j = 0; j < K_c; j++) {
+      const exp = (rowSums[i] * colSums[j]) / n;
+      if (exp > 0) {
+        const o = table[i * K_c + j];
+        const d = o - exp;
+        chi2 += d * d / exp;
+      }
+    }
+  }
+  const minDim = Math.min(nzR, nzC) - 1;
+  if (minDim < 1) return 0;
+  const v = Math.sqrt(chi2 / (n * minDim));
+  return Math.max(0, Math.min(1, v));
+}
+
+// --- _ensureAnchor — legacy lines 35979-36040 ---
+// Set anchor if tracked is non-empty AND no anchor exists yet. Extend
+// anchor if tracked has new samples not yet in anchor.labels. v3.58: if
+// the anchor window is OUTSIDE any L2 envelope, fall back to the NEAREST.
+function _ensureAnchor() {
+  const state = _pageState;
+  if (!state || !state.data) return;
+  if (state.tracked.length === 0) {
+    state.trackingAnchor = null;
+    state.anchorConcord = null;
+    return;
+  }
+  const curWin = state.cur | 0;
+  if (!state.trackingAnchor) {
+    state.trackingAnchor = {
+      winIdx: curWin,
+      labels: new Map(),  // sampleIdx -> int label (or -1 if no L2 at anchor)
+      K: state.k,
+    };
+  }
+  const anchor = state.trackingAnchor;
+  // If state.k changed since anchor was set, re-anchor with new K
+  if (anchor.K !== state.k) {
+    anchor.labels = new Map();
+    anchor.K = state.k;
+  }
+  // v3.58: if the anchor window is OUTSIDE any L2 envelope, fall back to
+  // the NEAREST L2 envelope by window distance.
+  let anchorL2 = (state.windowToL2 && anchor.winIdx >= 0)
+    ? state.windowToL2[anchor.winIdx] : -1;
+  if (anchorL2 < 0 && Array.isArray(state.data.l2_envelopes) &&
+      state.data.l2_envelopes.length > 0) {
+    let bestL2 = -1, bestD = Infinity;
+    for (let l2i = 0; l2i < state.data.l2_envelopes.length; l2i++) {
+      const env = state.data.l2_envelopes[l2i];
+      if (!env || env._s0 == null) continue;
+      const d = (anchor.winIdx < env._s0)
+        ? (env._s0 - anchor.winIdx)
+        : (anchor.winIdx > env._e0 ? anchor.winIdx - env._e0 : 0);
+      if (d < bestD) { bestD = d; bestL2 = l2i; }
+    }
+    anchorL2 = bestL2;
+  }
+  let anchorLabels = null;
+  if (anchorL2 >= 0) {
+    const cl = getL2Cluster(state, anchorL2);
+    if (cl && cl.labels) anchorLabels = cl.labels;
+  }
+  for (const si of state.tracked) {
+    if (anchor.labels.has(si)) continue;
+    const lbl = (anchorLabels && si < anchorLabels.length) ? anchorLabels[si] : -1;
+    anchor.labels.set(si, lbl);
+  }
+  // Drop entries for samples that are no longer tracked
+  const trackedSet = new Set(state.tracked);
+  for (const si of [...anchor.labels.keys()]) {
+    if (!trackedSet.has(si)) anchor.labels.delete(si);
+  }
+}
+
+// --- _renderScreeInsetHTML — legacy lines 56422-56493 ---
+// Pure SVG string renderer. Returns the inset's innerHTML or '' when the
+// inset shouldn't render. Reads state.cur and state.data.windows[].
+const _SCREE_BAR_COLORS = ['#4fa3ff', '#f5a524', '#3cc08a', '#e0555c', '#b07cf7', '#5dc4d6', '#888'];
+function _renderScreeInsetHTML() {
+  const state = _pageState;
+  if (!state || !state.screePlotEnabled) return '';
+  if (!state.data || !Array.isArray(state.data.windows)) return '';
+  if (state.cur == null || state.cur < 0 || state.cur >= state.data.windows.length) return '';
+  const w = state.data.windows[state.cur];
+  if (!w) return '';
+  let spectrum = null;
+  let isFallback = false;
+  if (Array.isArray(w.lam_top_k) && w.lam_top_k.length >= 2) {
+    spectrum = w.lam_top_k.filter(v => Number.isFinite(v) && v > 0);
+  } else if (Number.isFinite(w.lam1) && Number.isFinite(w.lam2)) {
+    spectrum = [w.lam1, w.lam2].filter(v => Number.isFinite(v) && v > 0);
+    isFallback = true;
+  }
+  if (!spectrum || spectrum.length < 2) return '';
+  spectrum = spectrum.slice(0, 7);
+  spectrum = spectrum.slice().sort((a, b) => b - a);
+  const svgW = 100, svgH = 38;
+  const padL = 2, padR = 2, padTop = 2, padBot = 2;
+  const plotW = svgW - padL - padR;
+  const plotH = svgH - padTop - padBot;
+  const nBars = spectrum.length;
+  const barW = plotW / nBars - 1.5;
+  const lamMax = spectrum[0];
+  const bars = [];
+  for (let i = 0; i < nBars; i++) {
+    const lam = spectrum[i];
+    const hFrac = lamMax > 0 ? (lam / lamMax) : 0;
+    const barH = Math.max(1, hFrac * plotH);
+    const barX = padL + i * (plotW / nBars);
+    const barY = padTop + (plotH - barH);
+    const color = _SCREE_BAR_COLORS[i] || _SCREE_BAR_COLORS[_SCREE_BAR_COLORS.length - 1];
+    bars.push(
+      '<rect class="scree-inset-bar" x="' + barX.toFixed(1) + '" y="' + barY.toFixed(1) +
+      '" width="' + barW.toFixed(1) + '" height="' + barH.toFixed(1) +
+      '" fill="' + color + '"></rect>'
+    );
+  }
+  const svg = '<svg class="scree-inset-svg" viewBox="0 0 ' + svgW + ' ' + svgH +
+              '" preserveAspectRatio="none">' + bars.join('') + '</svg>';
+  let ratioStr = '';
+  if (spectrum.length >= 2 && spectrum[1] > 0) {
+    const r = spectrum[0] / spectrum[1];
+    ratioStr = 'λ₁/λ₂ = ' + r.toFixed(1);
+  }
+  const hint = isFallback
+    ? '<div class="scree-inset-fallback-hint">k≥3 needs precomp ≥2.16</div>'
+    : '';
+  return (
+    '<div class="scree-inset-label">PC eigenvalues · w' + state.cur + '</div>' +
+    svg +
+    '<div class="scree-inset-ratio">' + ratioStr + '</div>' +
+    hint
+  );
+}
 
 // --- recomputeAnchorConcord — legacy lines 36081-36122 ---
-function recomputeAnchorConcord() {
+// Compute per-window Cramér's V between anchor labels and current labels.
+// Stores in state.anchorConcord (Float32Array of length n_windows).
+export function recomputeAnchorConcord() {
   const state = _pageState;
-  if (!state.data) { state.anchorConcord = null; return; }
+  if (!state || !state.data) { if (state) state.anchorConcord = null; return; }
   _ensureAnchor();
   const N = state.data.n_windows;
   if (!state.trackingAnchor || state.tracked.length === 0) {
@@ -46,7 +209,7 @@ function recomputeAnchorConcord() {
   for (let l2i = 0; l2i < state.data.l2_envelopes.length; l2i++) {
     const env = state.data.l2_envelopes[l2i];
     if (!env || env._s0 == null) continue;
-    const cl = getL2Cluster(l2i);
+    const cl = getL2Cluster(state, l2i);
     const labels = cl && cl.labels ? cl.labels : null;
     let v = NaN;
     if (labels) {
@@ -489,6 +652,9 @@ export function togglePlay(state) {
 }
 
 // --- cycleKAside() — legacy lines 56537-56565 ---
+// v4 turn 3: K-cycle button on the tracked-samples aside. Click cycles
+// state.k through 3 → 4 → 5 → 6 → 2 → 3, recoloring the PCA scatter,
+// per-sample lines, band-pick buttons, and L3 contingency.
 export function cycleKAside(state) {
   _setActiveState(state);
   const cur = state.k;
@@ -502,21 +668,15 @@ export function cycleKAside(state) {
   // Mirror to sidebar kSelect so both UIs stay aligned
   const _kSel = document.getElementById('kSelect');
   if (_kSel) _kSel.value = String(next);
-  if (typeof refreshBandPickBar === 'function') refreshBandPickBar(state);
+  try { refreshBandPickBar(state); } catch (_) {}
   if (state.trackingAnchor) state.trackingAnchor = null;
-  if (typeof recomputeAnchorConcord === 'function') {
-    try { recomputeAnchorConcord(); } catch (_) {}
-  }
-  if (typeof drawPCA === 'function')        { try { drawPCA(state); }        catch (_) {} }
-  if (typeof drawLinesPanel === 'function') { try { drawLinesPanel(state); } catch (_) {} }
-  if (typeof renderZoneBlock === 'function'){ try { renderZoneBlock(state); }catch (_) {} }
-  if (typeof renderL3Panel === 'function')  { try { renderL3Panel(state); }  catch (_) {} }
-  if (typeof drawAnchorStrip === 'function') {
-    try { drawAnchorStrip(state); } catch (_) {}
-  }
-  if (typeof _updateConcordBadge === 'function') {
-    try { _updateConcordBadge(); } catch (_) {}
-  }
+  try { recomputeAnchorConcord(); } catch (_) {}
+  try { drawPCA(state); }        catch (_) {}
+  try { drawLinesPanel(state); } catch (_) {}
+  try { renderZoneBlock(state); }catch (_) {}
+  try { renderL3Panel(state); }  catch (_) {}
+  try { drawAnchorStrip(state); } catch (_) {}
+  try { _updateConcordBadge(state); } catch (_) {}
   if (typeof _syncTrackedCompactUI === 'function') _syncTrackedCompactUI();
 }
 
@@ -542,16 +702,10 @@ export function renderTrackedList(state) {
   // v3.71: refresh the concord badge after recomputeAnchorConcord runs below
   // (we call it after the recompute so the badge reflects the freshest data)
   // v3.52: tracked set changed — refresh anchor + recompute concord
-  if (typeof recomputeAnchorConcord === 'function') {
-    try { recomputeAnchorConcord(); } catch (e) {}
-  }
-  if (typeof drawAnchorStrip === 'function') {
-    try { drawAnchorStrip(state); } catch (e) {}
-  }
+  try { recomputeAnchorConcord(); } catch (e) {}
+  try { drawAnchorStrip(state); } catch (e) {}
   // v3.71: badge update after the recompute
-  if (typeof _updateConcordBadge === 'function') {
-    try { _updateConcordBadge(); } catch (e) {}
-  }
+  try { _updateConcordBadge(state); } catch (e) {}
   if (!state.data) return;
   // Pre-compute per-sample spread for the current L2 once.
   const curL2 = state.windowToL2 ? state.windowToL2[state.cur] : -1;
@@ -623,4 +777,172 @@ export function renderManualGroupsList(state) {
       `</div>`;
   }
   for (const box of containers) box.innerHTML = html;
+}
+
+// =============================================================================
+// PCA lasso — legacy lines 52260-52398 (IIFE)
+// =============================================================================
+// Shift+drag (or plain drag with #pcaLassoToggle on) → draws a rectangle
+// over #pcaCanvas; on release, creates a new manual group from the enclosed
+// samples (or replaces state.tracked when in tracked-lasso mode).
+//
+// Idempotent: stores the bound state on canvas.__pcaLassoBound so a
+// re-mount doesn't double-attach.
+export function attachPcaLasso(state) {
+  _setActiveState(state);
+  const canvas = document.getElementById('pcaCanvas');
+  if (!canvas) return;
+  if (canvas.__pcaLassoBound) return;  // already attached
+  canvas.__pcaLassoBound = true;
+
+  let lassoEl = null;       // overlay div (created lazily)
+  let dragging = false;
+  let startX = 0, startY = 0;     // canvas-local coords
+  let startClientX = 0, startClientY = 0;
+  let canvasRect = null;
+
+  function ensureOverlay() {
+    if (lassoEl) return lassoEl;
+    // Prefer the page1.html-baked #pcaLassoOverlay div if present; fall
+    // back to a body-injected div otherwise.
+    const existing = document.getElementById('pcaLassoOverlay');
+    if (existing) {
+      lassoEl = existing;
+      lassoEl.style.position = 'fixed';
+      lassoEl.style.pointerEvents = 'none';
+      lassoEl.style.zIndex = '100';
+      lassoEl.style.border = '1px dashed var(--accent, #f5a524)';
+      lassoEl.style.background = 'rgba(245,165,36,0.08)';
+      lassoEl.style.display = 'none';
+      return lassoEl;
+    }
+    lassoEl = document.createElement('div');
+    lassoEl.id = 'pcaLassoOverlay';
+    lassoEl.style.cssText = [
+      'position: fixed',
+      'pointer-events: none',
+      'z-index: 100',
+      'border: 1px dashed var(--accent, #f5a524)',
+      'background: rgba(245,165,36,0.08)',
+      'display: none',
+    ].join(';');
+    document.body.appendChild(lassoEl);
+    return lassoEl;
+  }
+
+  function updateOverlay(curClientX, curClientY) {
+    const el = ensureOverlay();
+    const x0 = Math.min(startClientX, curClientX);
+    const y0 = Math.min(startClientY, curClientY);
+    const x1 = Math.max(startClientX, curClientX);
+    const y1 = Math.max(startClientY, curClientY);
+    el.style.left   = x0 + 'px';
+    el.style.top    = y0 + 'px';
+    el.style.width  = (x1 - x0) + 'px';
+    el.style.height = (y1 - y0) + 'px';
+    el.style.display = '';
+  }
+
+  function hideOverlay() {
+    if (lassoEl) lassoEl.style.display = 'none';
+  }
+
+  function _samplesInBox(x0, y0, x1, y1) {
+    const st = _pageState;
+    if (!st || !st.data || !st.__pcaScreenXY) return [];
+    const xy = st.__pcaScreenXY;
+    const out = [];
+    const lo_x = Math.min(x0, x1), hi_x = Math.max(x0, x1);
+    const lo_y = Math.min(y0, y1), hi_y = Math.max(y0, y1);
+    const N = st.data.n_samples;
+    for (let si = 0; si < N; si++) {
+      const sx = xy[si * 2], sy = xy[si * 2 + 1];
+      if (sx >= lo_x && sx <= hi_x && sy >= lo_y && sy <= hi_y) out.push(si);
+    }
+    return out;
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    // Two activation paths:
+    //   (1) Shift+left-click → manual-group lasso (existing v3.39 behavior).
+    //   (2) state.pcaLassoActive (from lasso checkbox in tracked-samples
+    //       aside) + plain left-click → tracked-samples lasso. v4 turn 4.
+    if (e.button !== 0) return;
+    const st = _pageState;
+    if (!st || !st.data) return;
+    const isShift = !!e.shiftKey;
+    const isTrackedLasso = !isShift && !!st.pcaLassoActive;
+    if (!isShift && !isTrackedLasso) return;
+    e.preventDefault();
+    canvasRect = canvas.getBoundingClientRect();
+    startX = e.clientX - canvasRect.left;
+    startY = e.clientY - canvasRect.top;
+    startClientX = e.clientX;
+    startClientY = e.clientY;
+    dragging = true;
+    canvas.__pcaLassoMode = isTrackedLasso ? 'tracked' : 'manual';
+    try { canvas.setPointerCapture(e.pointerId); } catch(_) {}
+    updateOverlay(e.clientX, e.clientY);
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    updateOverlay(e.clientX, e.clientY);
+  });
+
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    try { canvas.releasePointerCapture(e.pointerId); } catch(_) {}
+    hideOverlay();
+    if (!canvasRect) return;
+    const endX = e.clientX - canvasRect.left;
+    const endY = e.clientY - canvasRect.top;
+    // Reject tiny drags (treat as click). Threshold = 4px.
+    const dx = Math.abs(endX - startX), dy = Math.abs(endY - startY);
+    if (dx < 4 && dy < 4) return;
+    const samples = _samplesInBox(startX, startY, endX, endY);
+    if (samples.length === 0) return;
+    const st = _pageState;
+    const mode = canvas.__pcaLassoMode || 'manual';
+    if (mode === 'tracked') {
+      // v4 turn 4: tracked-samples lasso. Replace state.tracked with the
+      // lassoed set, capped at trackedN.
+      const cap = Math.max(1, st.trackedN | 0);
+      st.tracked = samples.slice(0, cap);
+      if (samples.length > cap) st.trackedN = Math.min(50, samples.length);
+      // Auto-deactivate lasso (one-shot, like the lines lasso).
+      st.pcaLassoActive = false;
+      const cb = document.getElementById('pcaLassoToggle');
+      if (cb) cb.checked = false;
+      if (typeof _updatePcaLassoUI === 'function') _updatePcaLassoUI();
+      renderTrackedList(st);
+      if (typeof _syncTrackedCompactUI === 'function') _syncTrackedCompactUI();
+      try { drawLinesPanel(st); } catch (_) {}
+      drawPCA(st);
+      try { renderL3Panel(st); } catch (_) {}
+      return;
+    }
+    // mode === 'manual': existing v3.39 manual-group lasso.
+    // Auto-name lasso_<N> avoiding collisions
+    const groups = st.manualGroups || [];
+    let n = 1, name;
+    do { name = 'lasso_' + n++; } while (groups.some(g => g.name === name) && n < 1000);
+    const g = addToManualGroup(name, samples);
+    if (g && st.colorMode !== 'manual') {
+      // Flip to manual mode so user immediately sees the result of the lasso
+      st.colorMode = 'manual';
+      const bar = document.querySelectorAll('#colorModeBar button');
+      bar.forEach(b => b.classList.toggle('active', b.dataset.mode === 'manual'));
+      drawPCA(st);
+      try { renderL3Panel(st); } catch (_) {}
+      try { drawLinesPanel(st); } catch (_) {}
+    }
+  }
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  // Hint the user that Shift activates lasso — title attribute on the canvas
+  if (!canvas.title) {
+    canvas.title = 'Click to track a sample · Shift+drag to lasso into a new manual group · checkbox in tracked-samples panel = lasso into tracked';
+  }
 }

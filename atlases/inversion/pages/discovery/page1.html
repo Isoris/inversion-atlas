@@ -1,7 +1,342 @@
+<style>
+  /* Height-chain fix for the new atlas-core shell. The legacy CSS assumes
+     .wrap is a flex-child of <body> (legacy was body.flex-column → .wrap.flex:1).
+     The new shell injects this fragment into #app-root, which is the flex:1
+     child of body (block by default). Make #app-root a flex column so .wrap
+     can fill it via flex:1, then height:100% cascades through #pagesArea
+     to main#page1, giving its grid-template-rows a definite height to
+     resolve against. */
+  #app-root { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  #app-root > .wrap { flex: 1; min-height: 0; }
+  #app-root > .wrap > #pagesArea { height: 100%; min-width: 0; min-height: 0;
+                                   overflow: hidden; }
+  #app-root > .wrap > #pagesArea > main#page1.active { height: 100%; min-height: 0; }
+</style>
+<div class="wrap">
+  <aside>
+    <button id="sidebarToggleBtn" title="Collapse / expand the parameters pane">‹</button>
+    <!-- v3.51: sim minimap — sticky panel at top of sidebar, hidden by default.
+         When user clicks "Move to minimap" on the sim panel, this becomes
+         visible and the main sim panel hides. -->
+    <div id="simMinimap" class="sim-minimap">
+      <div class="sim-minimap-header">
+        <span><b>sim_mat</b> · minimap</span>
+        <button id="simMinimapRestoreBtn" class="sim-minimap-restore"
+                title="Restore the sim panel to the main panel area">restore ↗</button>
+      </div>
+      <canvas id="simMinimapCanvas" title="click to jump"></canvas>
+    </div>
+    <h2>Data</h2>
+    <div class="ctl">
+      <input type="file" id="fileInput" accept=".json,application/json" multiple />
+    </div>
+    <div class="ctl">
+      <label style="font-size: 11px; color: var(--ink-dim); margin-bottom: 3px;">chromosome (loaded this session)</label>
+      <select id="chromSelect" disabled>
+        <option value="">— none loaded —</option>
+      </select>
+    </div>
+    <div class="ctl num dim" id="dataStatus">No data loaded</div>
+    <!-- v4 turn 73f: IndexedDB-backed JSON cache. Drag-dropped JSONs are
+         auto-persisted between sessions; click here to wipe the cache.
+         Doesn't affect the currently-loaded view until you refresh. -->
+    <div class="ctl">
+      <button id="clearJsonCacheBtn"
+              title="Clear cached JSONs from IndexedDB. Does not affect the currently-displayed atlas until refresh. Useful if a saved JSON is bad or quota is exceeded."
+              style="font-size: 10px; padding: 3px 8px;">🗑 clear cached JSONs</button>
+    </div>
+
+    <h2>Sim_mat smoothing</h2>
+    <div class="ctl">
+      <select id="simScaleSelect" disabled>
+        <option value="">— no scales loaded —</option>
+      </select>
+    </div>
+    <div class="ctl">
+      <label><input type="checkbox" id="pdfStyle" checked /> PDF-style (sim ↙ / Z ↗ split)</label>
+    </div>
+
+    <h2>Where am I</h2>
+    <div class="ctl zone-block" id="zoneBlock">—</div>
+
+    <h2>L3 clustering</h2>
+    <div class="ctl">
+      <label>K (clusters per L2)</label>
+      <select id="kSelect">
+        <option value="3" selected>K = 3 (hom1 / het / hom2)</option>
+        <option value="2">K = 2 (hom1 / hom2)</option>
+        <option value="adaptive">adaptive (silhouette K=2..5)</option>
+      </select>
+    </div>
+    <div class="ctl">
+      <label>Aggregation across L2 windows</label>
+      <select id="aggMethod">
+        <option value="mean_pc1" selected>mean PC1</option>
+        <option value="median_pc1">median PC1</option>
+        <option value="mean_pc12">mean PC1 + PC2 (2-D K-means)</option>
+      </select>
+    </div>
+    <div class="ctl hrange">
+      <label class="inline">merge τ</label>
+      <input type="range" id="mergeThr" min="0.50" max="0.99" step="0.01" value="0.85" />
+      <span class="val" id="mergeThrVal">0.85</span>
+    </div>
+    <div class="ctl hrange">
+      <label class="inline">α (Fisher)</label>
+      <input type="range" id="alphaThr" min="0.001" max="0.20" step="0.001" value="0.050" />
+      <span class="val" id="alphaThrVal">0.050</span>
+    </div>
+    <div class="ctl hrange">
+      <label class="inline">min n/group</label>
+      <input type="range" id="minNGroup" min="2" max="20" step="1" value="5" />
+      <span class="val" id="minNGroupVal">5</span>
+    </div>
+    <div class="ctl hrange">
+      <label class="inline">min n_wins</label>
+      <input type="range" id="minNWin" min="1" max="10" step="1" value="3" />
+      <span class="val" id="minNWinVal">3</span>
+    </div>
+
+    <h2>Display</h2>
+    <div class="ctl">
+      <label style="font-size: 11px; color: var(--ink-dim); margin-bottom: 3px;">color samples by</label>
+      <div class="color-mode-row" id="colorModeBar">
+        <button data-mode="cluster"  class="active">cluster</button>
+        <button data-mode="family">family</button>
+        <button data-mode="ancestry">ancestry</button>
+        <button data-mode="manual" title="Manually-curated groups (set in 'Manual groups' below)">manual</button>
+        <button data-mode="residual" title="v4 turn 83 — Diagnostic mode. Recolors PCA scatter + per-sample lines + L3 strip by per-fish residual_z from band centroid in (PC1, PC2) space. Cool blue = clean homozygote sitting deep in band; amber = intermediate; red = suspicious carrier (>=2.5σ from centroid, possible rare arrangement / recombinant / mapping artifact). Scope: current window. Use the karyotype/tier page for the per-candidate suspicion summary.">⚡ residual</button>
+        <button data-mode="cluster_dosage"   title="v4 turn 84 — Color samples by the page-1 (dosage) K-means clusters for the active candidate. Useful when looking at page 2 (θπ) or page 3 (GHSL): tests whether the orthogonal evidence layers agree on karyotype assignment.">dosage K</button>
+        <button data-mode="cluster_theta_pi" title="v4 turn 84 — Color samples by the page-2 (θπ MDS) clusters for the active candidate. Useful when looking at page 1 or page 3: tests whether θπ diversity-profile clustering agrees with dosage / GHSL karyotype assignment. Greys out until page 2 ships its clusters (day 3+).">θπ K</button>
+        <button data-mode="cluster_ghsl"     title="v4 turn 84 — Color samples by the page-3 (GHSL) clusters for the active candidate. Useful when looking at page 1 or page 2: tests whether haplotype-divergence clustering agrees with dosage / θπ karyotype assignment. Greys out until page 3 ships its clusters.">GHSL K</button>
+        <button data-mode="q_ancestry" title="v4 turn 86 — Q-association ancestry mode. Color each fish by its NGSadmix Q-vector at the chosen K. Hard sub-mode: full color of dominant Q group, grey for admixed (max_Q < 0.7). Blend sub-mode: color blended from full Q-vector. The K dropdown picks which K=2..20 to use. The legend on the PCA scatter swaps to Q-proportion bars (per K-means cluster by default — reveals whether karyotype clusters split on ancestry like the figure-style 'AA/Q1 vs Q2/BB' panels). Greys out until precomp ships Q-vectors.">Q ancestry</button>
+        <button data-mode="none">none</button>
+      </div>
+      <!-- v4 turn 86: Q-ancestry sub-controls. Hidden by default; shown when
+           color mode is q_ancestry. K dropdown is populated from
+           state._qAncestry.available_K (whichever K values precomp shipped).
+           Hard / Blend toggle picks dominant-color vs Q-vector-blend. Legend
+           toggle picks per-cluster bars (figure-style) vs cohort-wide bars. -->
+      <div class="color-mode-row" id="qAncestrySubControls"
+           style="display: none; gap: 6px; flex-wrap: wrap; margin-top: 4px; padding: 3px 0;">
+        <label style="font-size: 9.5px; color: var(--ink-dim); display: flex; align-items: center; gap: 4px;">
+          K:
+          <select id="qAncestryKSelect" style="font-size: 9px; padding: 1px 3px;"
+                  title="Pick which K (number of ancestry groups) to use. Populated from precomp's NGSadmix sweep — typically K=2..20 in steps of 2."></select>
+        </label>
+        <span style="display: flex; gap: 2px;">
+          <button data-q-display="hard" class="active"
+                  style="font-size: 9px; padding: 2px 6px;"
+                  title="Hard-call: each fish painted in the full color of its dominant Q group. Admixed fish (max_Q < 0.7) shown grey.">hard</button>
+          <button data-q-display="blend"
+                  style="font-size: 9px; padding: 2px 6px;"
+                  title="Soft blend: each fish gets a color blended from its full Q-vector. A fish with 60% Q1 + 40% Q2 looks halfway between the two group colors.">blend</button>
+        </span>
+        <span style="display: flex; gap: 2px;">
+          <button data-q-legend="per_cluster" class="active"
+                  style="font-size: 9px; padding: 2px 6px;"
+                  title="Legend shows one bar group per K-means karyotype cluster (g0 / g1 / g2). Reveals whether karyotype clusters split on ancestry — the figure-style answer to 'AA cluster has Q1=85%'.">per cluster</button>
+          <button data-q-legend="cohort"
+                  style="font-size: 9px; padding: 2px 6px;"
+                  title="Legend shows a single bar of cohort-wide Q-proportions. Simpler view, no karyotype context.">cohort</button>
+        </span>
+      </div>
+      <div class="dim" id="colorModeInfo" style="font-size: 10px; margin-top: 3px;">live K-means group, Hungarian-aligned to focal</div>
+      <!-- v4 turn 87: karyotype label vocabulary toggle. Default 'legacy'
+           keeps the existing UI labels (band 1 (lo) / band 2 (mid) /
+           band 3 (hi) for K=3 buttons; "g0 (n=N)" in the legend; "band 0"
+           in the karyotype page pills). 'detailed' switches to the
+           operational H-system: H1/H1 / H1/H2 / H2/H2 for K=3, extending
+           through H3/H3 for K up to 6. The detailed labels carry a
+           tooltip caveat ("operational, ordered by median PC1, not a
+           confirmed biological assignment"). Persists in localStorage. -->
+      <div style="display: flex; gap: 4px; align-items: center; margin-top: 4px; font-size: 10px;">
+        <span style="color: var(--ink-dim);">labels:</span>
+        <span id="labelVocabBar" style="display: flex; gap: 2px;">
+          <button data-vocab="legacy" class="active"
+                  style="font-size: 9.5px; padding: 2px 6px;"
+                  title="Legacy labels: 'band 1 (lo)' / 'band 2 (mid)' / 'band 3 (hi)' for K=3 buttons; 'g0' / 'g1' / 'g2' in the legend. Default behavior — neutral, no biological claim.">legacy</button>
+          <button data-vocab="detailed"
+                  style="font-size: 9.5px; padding: 2px 6px;"
+                  title="Detailed H-system: H1/H1 / H1/H2 / H2/H2 for K=3 (extending to H1/H3, H2/H3, H3/H3 for K up to 6). Operational labels — ordered by median PC1, NOT a confirmed biological assignment. Confirm with heterozygosity / haplotype-divergence evidence before claiming homozygote-like or heterozygote-like state. See about page for the manuscript-safe wording.">detailed</button>
+        </span>
+      </div>
+      <!-- v4 turn 91: candidate-system mode toggle. Switches between the
+           default candidate registry (K-means bands of local PCA) and the
+           parallel detailed-mode registry (heterozygosity-derived classes).
+           SEPARATE from the labels toggle above — labels is cosmetic, mode
+           switches data sets. Persists in localStorage. -->
+      <div style="display: flex; gap: 4px; align-items: center; margin-top: 4px; font-size: 10px;">
+        <span style="color: var(--ink-dim);">system:</span>
+        <span id="activeModeBar" style="display: flex; gap: 2px;">
+          <button data-mode="default" class="active"
+                  style="font-size: 9.5px; padding: 2px 6px;"
+                  title="Default system: K-means bands of local PCA. Standard merge logic. This is the operational view used by the rest of the atlas.">default</button>
+          <button data-mode="detailed"
+                  style="font-size: 9.5px; padding: 2px 6px;"
+                  title="Detailed system: parallel candidate registry where bands are derived (or will be derived) from heterozygosity + dosage. Bands may merge or split relative to the K-means bands. Useful for multi-haplotype regions where K-means bands don't reflect real karyotype classes. Switching mode does NOT affect default-system candidates — both registries coexist.">detailed</button>
+        </span>
+      </div>
+      <!-- Banner under the system toggle — visible only when in detailed mode,
+           reminds the user the detailed-system view is operational and that
+           the labels need to be confirmed against het evidence. -->
+      <div id="detailedModeBanner"
+           style="display: none; margin-top: 4px; padding: 4px 6px; font-size: 9.5px;
+                  background: rgba(60, 223, 255, 0.08); border-left: 2px solid #3cdfff;
+                  color: var(--ink); border-radius: 2px; line-height: 1.35;">
+        <b style="color: #3cdfff;">DETAILED MODE</b> — bands are interpreted via heterozygosity. Confirm with operational caveat in help page.
+      </div>
+    </div>
+    <div class="ctl">
+      <button id="lockColorsBtn" title="Freeze cluster colors using current L2's labels — stay stable as you scrub">🔒 lock colors to current L2</button>
+    </div>
+    <div class="ctl">
+      <button id="promoteCandidateBtn" disabled title="Lock colors on an L2 first (🔒 button above)">⬆ promote to candidate</button>
+    </div>
+    <div class="ctl">
+      <button id="exportKLabelsBtn" title="Download per-(L2, sample) K-means labels as TSV — feed into C++ pop-stats engine">⬇️ export K labels TSV</button>
+    </div>
+    <div class="ctl">
+      <label><input type="checkbox" id="trailOn" checked /> show trails (within L2)</label>
+    </div>
+    <div class="ctl">
+      <label><input type="checkbox" id="flipPC1" checked /> sign-align PC1 across windows</label>
+    </div>
+    <div class="ctl hrange">
+      <label class="inline">trail back</label>
+      <input type="range" id="trailN" min="0" max="80" value="15" step="1" />
+      <span class="val" id="trailNVal">15</span>
+    </div>
+
+    <h2>Tracked samples</h2>
+    <div class="ctl hrange">
+      <label class="inline">N</label>
+      <input type="range" id="trackedN" min="0" max="30" step="1" value="10" />
+      <span class="val" id="trackedNVal">10</span>
+    </div>
+    <div class="ctl">
+      <label style="font-size: 11px; color: var(--ink-dim); margin-bottom: 3px;">pick N from focal L2</label>
+      <div class="color-mode-row" id="bandPickBar">
+        <button data-band="all"   class="active">all bands</button>
+        <button data-band="0" data-vocab-band-k3="0">band 1 (lo)</button>
+        <button data-band="1" data-vocab-band-k3="1">band 2 (mid)</button>
+        <button data-band="2" data-vocab-band-k3="2">band 3 (hi)</button>
+      </div>
+    </div>
+    <div class="ctl"><button id="autoPickRadial">Auto-pick: radial (any window)</button></div>
+    <div class="ctl"><button id="clearPicks">Clear all</button></div>
+    <div class="ctl" id="trackedList"></div>
+    <div class="ctl"><label style="font-size:10px; color: var(--ink-dimmer); line-height:1.4;">
+      Same samples persist as you scrub across L2 boundaries — watch where they land in each
+      envelope's K-means split. Click any dot in the PCA to add/remove. The "pick from focal L2"
+      buttons sample N from a specific K-means band of the current L2 envelope (or spread N across
+      all K bands). Currently
+      <span id="trackedCountInfo">0</span>/<span id="trackedNInfo">10</span>.
+    </label></div>
+
+    <h2 title="Manually-curated sample groups — overrides K-means coloring when 'manual' color mode is active. Saved per-chromosome by default; pin to cohort to share across LGs.">Manual groups</h2>
+    <div class="ctl">
+      <div id="manualGroupsList" style="display: flex; flex-direction: column; gap: 4px;"></div>
+    </div>
+    <div class="ctl">
+      <button id="mgAddBtn" style="font-size: 11px;">+ new group from tracked</button>
+    </div>
+    <div class="ctl">
+      <label style="font-size: 11px; color: var(--ink-dim); margin-bottom: 3px;">
+        or grab a K-means band from current focal L2:
+      </label>
+      <div class="color-mode-row" id="mgBandPickBar">
+        <button data-mgband="0" title="All samples in focal L2 cluster k0 → new group">→ k0</button>
+        <button data-mgband="1" title="All samples in focal L2 cluster k1 → new group">→ k1</button>
+        <button data-mgband="2" title="All samples in focal L2 cluster k2 → new group">→ k2</button>
+        <button data-mgband="3" title="All samples in focal L2 cluster k3 → new group (only if K≥4)">→ k3</button>
+        <button data-mgband="4" title="All samples in focal L2 cluster k4 → new group (only if K≥5)">→ k4</button>
+        <button data-mgband="5" title="All samples in focal L2 cluster k5 → new group (only if K=6)">→ k5</button>
+      </div>
+    </div>
+    <div class="ctl row" style="gap: 6px;">
+      <button id="mgExportBtn" title="Export all manual groups as TSV (cga, group_name, scope)" style="flex: 1;">⬇ export TSV</button>
+      <button id="mgImportBtn" title="Import manual groups from a previously-exported TSV" style="flex: 1;">⬆ import</button>
+      <input type="file" id="mgImportFile" accept=".tsv,.txt,text/tab-separated-values" style="display:none;">
+    </div>
+    <div class="ctl">
+      <button id="mgClearAllBtn" style="font-size: 11px; color: var(--bad);">× clear all groups</button>
+    </div>
+    <div class="ctl"><label style="font-size:10px; color: var(--ink-dimmer); line-height:1.4;">
+      Groups are exclusive (a sample can be in only one). Per-chromosome by default — flip the 📌
+      to pin a group cohort-wide so it follows you across LGs. Storage is browser localStorage;
+      use Export TSV to share with colleagues or save to your project folder.
+    </label></div>
+
+    <h2>Jump</h2>
+    <div class="ctl row">
+      <select id="jumpUnit" style="flex: 0 0 70px;">
+        <option value="mb">Mb</option>
+        <option value="win">window</option>
+        <option value="bp">bp</option>
+      </select>
+      <input type="number" id="jumpVal" placeholder="value" step="0.1" />
+      <button id="jumpBtn" style="flex: 0 0 50px;">Go</button>
+    </div>
+    <div class="ctl">
+      <label style="font-size: 11px; color: var(--ink-dim); margin-bottom: 3px;">travel resolution (n/p keys)</label>
+      <div class="color-mode-row" id="travelModeBar">
+        <button data-mode="L2" class="active">L2 (default)</button>
+        <button data-mode="L1">L1 (zones)</button>
+      </div>
+      <div class="dim" style="font-size: 10px; margin-top: 3px;" id="travelModeInfo">n/p jump between L2 envelopes</div>
+    </div>
+    <div class="ctl">
+      <label style="font-size: 11px; color: var(--ink-dim); margin-bottom: 3px;"
+             title="Per-window stepping mode for ←/→ arrow keys. L2 jumps between L2 envelopes (n/p behavior). win1/5/10/N step by exact number of windows. Shift+arrow always does a 20-window quick-skip regardless of mode.">
+        arrow-key step size (← / →)
+      </label>
+      <div class="color-mode-row" id="stepModeBar">
+        <button data-step="l2"    class="active" title="←/→ jumps to prev/next L2 envelope (matches n/p)">L2</button>
+        <button data-step="win1"  title="←/→ moves 1 window">1w</button>
+        <button data-step="win5"  title="←/→ moves 5 windows (default for refine page)">5w</button>
+        <button data-step="win10" title="←/→ moves 10 windows">10w</button>
+        <button data-step="winN"  title="←/→ moves N windows (uses the L3 'N w' value when sync is on, or the input on the right)">N w</button>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
+        <input type="number" id="stepModeNInput" min="1" max="200" value="15" step="1"
+               title="N for 'N w' step mode"
+               style="width: 38px; padding: 1px 4px;
+                      font-family: var(--mono); font-size: 10.5px;
+                      background: var(--panel-2); color: var(--ink);
+                      border: 1px solid var(--rule); border-radius: 3px;">
+        <label style="display: flex; align-items: center; gap: 4px; font-size: 10px;
+                      color: var(--ink-dim); cursor: pointer; user-select: none;"
+               title="When checked, the L3 'compare unit' selector and the sidebar arrow stepping share the same value. Default ON.">
+          <input type="checkbox" id="stepModeSync" checked
+                 style="margin: 0; vertical-align: middle;">
+          sync L3 compare unit
+        </label>
+      </div>
+      <div class="dim" style="font-size: 10px; margin-top: 3px;" id="stepModeInfo">←/→ jump between L2 envelopes · Shift+arrow = 20-window skip</div>
+    </div>
+    <div class="ctl"><button id="jumpToL2">Jump to next L2 →</button></div>
+    <div class="ctl"><button id="jumpPrevL2">← Jump to prev L2</button></div>
+    <div class="ctl"><button id="jumpToL1">Jump to next L1 →</button></div>
+    <div class="ctl"><button id="jumpPrevL1">← Jump to prev L1</button></div>
+
+    <h2>Current window</h2>
+    <div class="num" id="sidebarInfo" style="line-height: 1.6;">—</div>
+  </aside>
+
+  <div id="pagesArea" style="overflow: hidden;">
   <main id="page1" class="page active">
     <div id="ctrlBar">
       <button class="play" id="playBtn">▶ Play</button>
       <input type="range" id="scrubber" min="0" max="0" value="0" step="1" disabled />
+      <!-- v3.62: layout-mode toggle. "fixed" = grid template with explicit row
+           heights (current behavior); "free" = main becomes scrollable;
+           "compact" = 2×2 upper grid + L3 below. Ported from legacy line 4801. -->
+      <button id="layoutModeBtn"
+              title="Toggle layout — fixed (grid) / free (scrollable) / compact (2×2). Click to cycle."
+              data-mode="fixed">📐 fixed</button>
+      <button id="resetLayoutBtn"
+              title="Reset layout to defaults (sidebar expanded, panels at default size)">↺ reset layout</button>
       <!-- v3.99 turn 5: viewModeBar moved here from header. Sits between
            slider and window stats.
            v3.99 turn 8: added L2 zoom button — shows only the current L2
@@ -1342,3 +1677,5 @@
       </div>
     </div>
   </main>
+  </div>
+</div>

@@ -10,6 +10,7 @@
 // Bodies extracted verbatim from the pre-split page1.js (eighth pass).
 
 import { alignLabels } from '../../../shared/hungarian.js';
+import { fmt, shortId } from '../../../shared/page1_utils.js';
 
 import { _setActiveState } from './_state.js';
 import { getL2Cluster, getL2ClusterAt } from './_data.js';

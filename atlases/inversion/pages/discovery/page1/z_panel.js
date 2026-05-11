@@ -19,6 +19,16 @@ import { _lineageColor, _pageState, _setActiveState } from './_state.js';
 import { currentMbRange, getL2Cluster } from './_data.js';
 import { _assignCandidateLanes, _drawWRow, _drawWinNavLane, _ensureCsOverlayIndex, _wRowBand, _winNavBand, drawCandidateBar } from './candidates.js';
 
+// --- STATUS_COLOR — legacy line 9805 ---
+// Color palette for L2 boundary validation_status markers drawn in the Z panel.
+const STATUS_COLOR = {
+  STABLE_BLUE: '#c8102e',
+  MARGINAL:    '#e07b3f',
+  DECAYS:      '#999999',
+  EDGE:        '#9b59b6',
+  DEDUP:       '#555555',
+};
+
 // --- _drawSnpDensityStrip — legacy lines 34495-34568 ---
 export function _drawSnpDensityStrip(ctx, pad, plotW, plotH, mbMin, mbMax) {
   const _state = _pageState;

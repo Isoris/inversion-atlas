@@ -37,6 +37,9 @@ import { autoPickRadial, cycleKAside, drawAnchorStrip, drawPCA, renderManualGrou
 import { renderL3Panel, renderL3PanelScaleStability, renderL3PanelSlab } from './page1/l3_panel.js';
 import { refreshBandPickBar, refreshCandidateUI } from './page1/candidates.js';
 import { buildTrackPanels, drawTracks, onPCAClick, onSimClick, onZClick, setCur, updateWinLabel } from './page1/events.js';
+import { attachSidebarHandlers } from './page1/sidebar.js';
+import { attachHotkeys } from './page1/hotkeys.js';
+import { attachPcaLasso } from './page1/pca_panel.js';
 
 // Re-export public entry points so the manifest's `module:` contract
 // (atlas_router imports drawSim, applyData, etc. from this file) is
@@ -312,6 +315,16 @@ export async function mount(root, atlasState, registry) {
   // as their first argument, so we just need to assemble one and pass it.
   const legacyState = _buildLegacyState(atlasState);
 
+  // Legacy CSS rules for main#page1 grid layout are gated on
+  // body[data-layout-mode]. Without this attribute the PCA / lines / L3
+  // grid rows collapse and the canvases get 0px height. Restore the
+  // persisted mode if it exists AND we trust the new shell with it; for
+  // now we force 'fixed' on every mount to match legacy default and
+  // because free/compact have layout quirks we haven't fully reproduced.
+  document.body.dataset.layoutMode = 'fixed';
+  legacyState.layoutMode = 'fixed';
+  try { localStorage.setItem('pca_scrubber_v3.layoutmode', 'fixed'); } catch (_) {}
+
   // Resolve the precomp data layer for the active chromosome.
   const chrom = atlasState.shared.activeChrom;
   if (!chrom) {
@@ -358,6 +371,36 @@ export async function mount(root, atlasState, registry) {
   // so old handlers don't accumulate when the user navigates between pages.
   _wireCanvasHandlers(root, legacyState);
 
+  // Batch 1.5: wire every aside control (kSelect / aggMethod / mergeThr /
+  // colorModeBar / lockColorsBtn / trailOn / flipPC1 / trailN / trackedN /
+  // bandPickBar / jump / step-mode / sidebar toggle / etc.). Verbatim port
+  // from the legacy monolith.
+  try { attachSidebarHandlers(legacyState); }
+  catch (e) { console.warn('page1.mount: attachSidebarHandlers threw — continuing.', e); }
+
+  // Batch 2: document-level keyboard surface. Stash the detach() function
+  // on state so unmount can remove listeners and prevent accumulation
+  // across page navigations.
+  try { legacyState._hotkeyDetach = attachHotkeys(legacyState); }
+  catch (e) { console.warn('page1.mount: attachHotkeys threw — continuing.', e); }
+
+  // Batch 3 (lasso): shift+drag on #pcaCanvas → manual group from enclosed
+  // samples; with #pcaLassoToggle on, plain drag → replace state.tracked.
+  // Idempotent — guards against double-attach on re-mount.
+  try { attachPcaLasso(legacyState); }
+  catch (e) { console.warn('page1.mount: attachPcaLasso threw — continuing.', e); }
+
+  // Populate #chromSelect with the loaded chrom and enable it so the user
+  // sees a real option instead of "— none loaded —". The full multi-chrom
+  // cache lives in the atlas-core shell now; this is a minimal stand-in.
+  try {
+    const sel = document.getElementById('chromSelect');
+    if (sel) {
+      sel.innerHTML = `<option value="${chrom}" selected>${chrom}</option>`;
+      sel.disabled = false;
+    }
+  } catch (_) {}
+
   // Stash the legacy state on the atlas bucket for inter-function access
   // during this mount lifetime. The unmount path clears it.
   atlasState.inversion._page1State = legacyState;
@@ -368,13 +411,21 @@ export async function mount(root, atlasState, registry) {
  */
 export async function unmount(root) {
   // The DOM gets replaced by the next mount; we just need to stop any
-  // playback timer and unhook the page1 state.
+  // playback timer, detach document-level hotkeys, and unhook the page1
+  // state.
   const state = _getState();
   const legacyState = state && state.inversion && state.inversion._page1State;
   if (legacyState && legacyState.playTimer) {
     clearInterval(legacyState.playTimer);
     legacyState.playTimer = null;
     legacyState.playing = false;
+  }
+  // Detach document-level keydown listeners — must run before page swap or
+  // the listeners accumulate and a single key press triggers handlers for
+  // every previous mount.
+  if (legacyState && typeof legacyState._hotkeyDetach === 'function') {
+    try { legacyState._hotkeyDetach(); } catch (_) {}
+    legacyState._hotkeyDetach = null;
   }
   if (state && state.inversion) {
     delete state.inversion._page1State;
@@ -391,15 +442,78 @@ function _buildLegacyState(atlasState) {
   const inv = atlasState.inversion || {};
   const sh = atlasState.shared || {};
 
-  // Start with all inversion slots, then overlay any shared slots the
-  // legacy code references. The reference is the legacy state.js
-  // SLOT_REGISTRY constant — that's the canonical inventory.
-  const legacy = Object.assign({}, inv);
+  // Legacy state defaults — extracted verbatim from legacy lines 9344-9462
+  // (`const state = { ... }`). The sidebar handlers read these (state.k,
+  // state.colorMode, state.trailN, etc.); without defaults the controls
+  // would read `undefined` on first paint and downstream code throws or
+  // renders empty. Defaults applied first so per-atlas saved values
+  // (`inv.*`) and per-mount overrides win.
+  const defaults = {
+    cur: 0,
+    tracked: [],
+    trailN: 15,
+    trailOn: true,
+    flipPC1: true,
+    playing: false,
+    playTimer: null,
+    pc1Sign: null,
+    activeSampleSet: null,
+    activeSampleReasons: new Map(),
+    activeSampleRules: [],
+    viewControls: { pcaXY: ['pc1', 'pc2'], linesYsources: ['pc1'], linked: true },
+    // L3 / clustering
+    k: 3,
+    kMode: 'fixed',
+    kRange: [2, 5],
+    silThreshold: 0.45,
+    aggMethod: 'mean_pc1',
+    mergeThr: 0.85,
+    alpha: 0.05,
+    minNGroup: 5,
+    minNWin: 3,
+    colorByL2: true,
+    colorMode: 'cluster',
+    manualGroups: null,
+    lockedLabels: null,
+    lockedRefL2: null,
+    l3Layout: 'leftright',
+    l3ColorMode: 'shared',
+    l3KMode: 'k3',
+    l3HetColoring: false,
+    l2SweepEnabled: false,
+    // Tracked samples
+    trackedN: 10,
+    // Display / navigation
+    simScale: null,             // populated by populateSimScales at applyData time
+    pdfStyle: true,
+    candidateList: [],
+    candidateMode: false,
+    travelMode: 'L2',
+    stepMode: 'l2',
+    stepModeN: 15,
+    stepModeSync: true,
+    labelVocab: 'legacy',
+    activeMode: 'default',
+    qDisplayMode: 'hard',
+    qLegendMode: 'per_cluster',
+    // Cache pointers
+    l2GroupCache: null,
+    cacheKey: null,
+    secondaryL2: null,
+    // Cross-species + family palette
+    familyPalette: {},
+    hubFamilies: [],
+    smallFamilyIds: new Set(),
+    singletonFamilyIds: new Set(),
+    crossSpecies: null,
+  };
+
+  const legacy = Object.assign(defaults, inv);
 
   // Cross-atlas slots that the legacy code reads as state.candidate etc.
   legacy.candidate              = sh.activeCandidate || null;
-  legacy.candidateList          = inv.candidateList || [];
-  legacy.activeSampleSet        = sh.activeSampleSet || null;
+  legacy.candidateList          = inv.candidateList || legacy.candidateList;
+  legacy.activeSampleSet        = sh.activeSampleSet || legacy.activeSampleSet;
   legacy.candidate_review_decisions = inv.candidate_review_decisions || {};
   legacy.locked_karyotype_groups    = inv.locked_karyotype_groups || {};
 

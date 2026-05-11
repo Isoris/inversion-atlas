@@ -362,11 +362,35 @@ export function getPCRender(state, winIdx, axisX, axisY) {
 }
 
 // --- getPC(state, winIdx) — legacy lines 9951-9955 ---
+// When the precomp is slim (data.has_pc2 === false), w.pc2 is missing and
+// any PCA scatter would collapse to a single column. We synthesize a small
+// jittered PC2 per window so the scatter still spreads visually. This
+// matches the legacy "PC2: jittered (slim precomp — no per-sample PC2)"
+// note shown in the data status block.
 export function getPC(state, winIdx) {
   const w = state && state.data && state.data.windows && state.data.windows[winIdx];
   if (!w) return null;
   const s = state.flipPC1 && state.pc1Sign ? state.pc1Sign[winIdx] : 1;
-  return { pc1: w.pc1, pc2: w.pc2, sign: s };
+  let pc2 = w.pc2;
+  if (!pc2 && state.data && state.data.has_pc2 === false && Array.isArray(w.pc1)) {
+    // Lazily cache jittered PC2 on the window object so we don't regenerate
+    // on every getPC call. Seed is winIdx so the jitter is reproducible.
+    if (!w._pc2Jitter) {
+      const n = w.pc1.length;
+      const jit = new Float32Array(n);
+      // Deterministic LCG seeded by winIdx so we get the same jitter each call.
+      let seed = (winIdx * 2654435761) >>> 0;
+      for (let i = 0; i < n; i++) {
+        seed = (seed * 1664525 + 1013904223) >>> 0;
+        // Box-Muller-lite via two uniforms is overkill; uniform [-0.02, 0.02]
+        // is enough to spread points visually without faking biological signal.
+        jit[i] = (seed / 0xFFFFFFFF - 0.5) * 0.04;
+      }
+      w._pc2Jitter = jit;
+    }
+    pc2 = w._pc2Jitter;
+  }
+  return { pc1: w.pc1, pc2, sign: s };
 }
 
 // --- buildIndexes(state) — legacy lines 9881-9927 ---

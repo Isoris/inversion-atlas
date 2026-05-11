@@ -101,6 +101,32 @@ export function formatTrackVal(v) {
   return v.toFixed(3);
 }
 
+// Legacy: function fmt(v, p=3) — line 31231
+// General scalar formatter used by the sidebar info block and L3 pane headers.
+export function fmt(v, p = 3) {
+  if (v === null || v === undefined || (typeof v === 'number' && !isFinite(v))) return '—';
+  if (typeof v !== 'number') return String(v);
+  if (Math.abs(v) >= 100) return v.toFixed(0);
+  if (Math.abs(v) >= 10)  return v.toFixed(1);
+  return v.toFixed(p);
+}
+
+// Legacy: function fmtMb(bp) — line 31243
+export function fmtMb(bp) {
+  return (bp / 1e6).toFixed(3);
+}
+
+// Legacy: function shortId(id) — line 48319
+// Collapses a candidate_id like C_gar_LG28_d17L2_0008_03 -> "L2 0008/03".
+export function shortId(id) {
+  if (!id) return '—';
+  const m = String(id).match(/d17L2_(\d+)_(\d+)$/);
+  if (m) return `L2 ${m[1]}/${m[2]}`;
+  const m2 = String(id).match(/d17L1_(\d+)$/);
+  if (m2) return `L1 ${m2[1]}`;
+  return id;
+}
+
 // ---------------------------------------------------------------------
 // HTML / DOM
 // ---------------------------------------------------------------------

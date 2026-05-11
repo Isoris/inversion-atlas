@@ -41,6 +41,13 @@ const FAMILY_COLOR_SMALL     = '#cbd5e1';   // n==2 or 3
 const FAMILY_COLOR_SINGLETON = '#dde3eb';   // n==1
 const FAMILY_COLOR_UNMATCHED = '#94a3b8';   // family_id == -1
 
+// --- Generic tracked-sample / ancestry palette — legacy line 9791 ---
+// Used by trackedColor() and ancestryColor() below. 8 distinct colors.
+const PALETTE = [
+  '#f5a524', '#4fa3ff', '#3cc08a', '#e0555c',
+  '#b07cf7', '#f0d56a', '#7ad3db', '#ff8c6e',
+];
+
 // --- trackedColor — legacy lines 35959-35959 ---
 export function trackedColor(si) {
   const state = _pageState;
