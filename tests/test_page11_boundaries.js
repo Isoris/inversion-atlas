@@ -415,6 +415,128 @@ const edgesNoSmooth = B.computeBoundaryEdges(ts1, B.BOUNDARY_TRACK_WEIGHTS, { sm
 check('edges: smooth_window=1 still finds edges',  !!edgesNoSmooth.left);
 
 // -----------------------------------------------------------------------------
+group('resampleBoundaryEvidenceTrack');
+// Source: 4 buckets, each 1000 bp wide, starting at scan_start=0.
+//   bucket 0 [0..999], val=10
+//   bucket 1 [1000..1999], val=20
+//   bucket 2 [2000..2999], val=30
+//   bucket 3 [3000..3999], val=40
+// Target windows: 2 windows of [0..1999] and [2000..3999].
+const sourceArr = [10, 20, 30, 40];
+const winStart = [0, 2000];
+const winEnd   = [1999, 3999];
+const rs1 = B.resampleBoundaryEvidenceTrack(sourceArr, 0, 1000, winStart, winEnd, 0, 2);
+check('resample: target window 0 averages buckets 0+1',  rs1[0] === 15);
+check('resample: target window 1 averages buckets 2+3',  rs1[1] === 35);
+
+// NaN tolerance
+const sourceWithNaN = [10, NaN, 30, 40];
+const rs2 = B.resampleBoundaryEvidenceTrack(sourceWithNaN, 0, 1000, winStart, winEnd, 0, 2);
+check('resample: NaN excluded from average',             rs2[0] === 10);
+
+// Empty/missing inputs
+check('resample: null source → null',
+      B.resampleBoundaryEvidenceTrack(null, 0, 1000, winStart, winEnd, 0, 2) === null);
+check('resample: missing target windows → null',
+      B.resampleBoundaryEvidenceTrack(sourceArr, 0, 1000, null, null, 0, 2) === null);
+check('resample: zero scan_window → null',
+      B.resampleBoundaryEvidenceTrack(sourceArr, 0, 0, winStart, winEnd, 0, 2) === null);
+
+// -----------------------------------------------------------------------------
+group('buildBoundaryTrackScores');
+// Synthesise a candidate + data shape that produces several tracks at once.
+const candBT = { id: 'cand_X', start_bp: 1_000_000, end_bp: 2_000_000 };
+const data = {
+  windows: {
+    pve1:                  [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+    band_continuity_score: [0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2],
+    similarity_edge_score: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+    start_bp:              [0, 250000, 500000, 750000, 1000000, 1250000, 1500000, 1750000],
+    end_bp:                [249999, 499999, 749999, 999999, 1249999, 1499999, 1749999, 1999999],
+  },
+  ghsl_panel: {
+    div_median: [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40],  // [nW] (cohort mean)
+  },
+  candidate_marker_polarity: [
+    { candidate_id: 'cand_X', pos: 1_100_000, final_flip_decision: true },
+    { candidate_id: 'cand_X', pos: 1_200_000, final_flip_decision: false },
+    { candidate_id: 'other',  pos: 1_100_000, final_flip_decision: true },  // filtered out
+  ],
+  boundary_evidence: [
+    {
+      candidate_id: 'cand_X',
+      scan_start_bp: 1_000_000,
+      scan_window_bp: 250000,
+      tracks: {
+        fst:                      [0.1, 0.2, 0.3, 0.4],
+        theta_pi_homo1:           [0.05, 0.06, 0.07, 0.08],
+        theta_pi_het:             [0.10, 0.11, 0.12, 0.13],
+        discordant_pair_pileup:   [1, 2, 3, 4],
+        sv_anchors: [{ kind: 'DEL', pos_bp: 1_300_000 }],
+      },
+    },
+  ],
+};
+const sr = { win_lo: 0, win_hi: 7 };  // 8 windows
+const ts = B.buildBoundaryTrackScores(data, candBT, sr);
+check('buildTS: len = 8',                  ts.len === 8);
+check('buildTS: pca_drop present',         !!ts.tracks.pca_drop);
+check('buildTS: band_continuity_drop',     !!ts.tracks.band_continuity_drop);
+check('buildTS: similarity_edge',          !!ts.tracks.similarity_edge);
+check('buildTS: ghsl_step + het_transition',
+      !!ts.tracks.ghsl_step && !!ts.tracks.het_transition);
+check('buildTS: ghsl_step != het_transition (separate arrays)',
+      ts.tracks.ghsl_step !== ts.tracks.het_transition);
+check('buildTS: polarity_change present',  !!ts.tracks.polarity_change);
+check('buildTS: fst_edge present',         !!ts.tracks.fst_edge);
+check('buildTS: theta_pi_step present',    !!ts.tracks.theta_pi_step);
+check('buildTS: discordant_pile present',  !!ts.tracks.discordant_pile);
+check('buildTS: sv_anchor present',        !!ts.tracks.sv_anchor);
+
+// Verify some values
+check('buildTS: pca_drop[0] = 0.1',        ts.tracks.pca_drop[0] === 0.1);
+// polarity_change: 2 markers in window covering 1_100_000 — well actually
+// the windows are 250kb wide, so 1_100_000 is in window [1_000_000..1_249_999]
+// = window index 4. 1_200_000 is also in window index 4. Both markers in
+// window 4. polarity_change[4] = nFlip/nIn = 1/2 = 0.5.
+check('buildTS: polarity_change[4] = 0.5', ts.tracks.polarity_change[4] === 0.5);
+// sv_anchor: pos_bp=1_300_000 falls in window covering [1_250_000..1_499_999]
+// = window index 5. So sv_anchor[5] = 1.
+check('buildTS: sv_anchor[5] = 1',         ts.tracks.sv_anchor[5] === 1);
+check('buildTS: sv_anchor[4] = 0',         ts.tracks.sv_anchor[4] === 0);
+
+// ghsl_panel as [nS][nW] matrix
+const dataMat = Object.assign({}, data, {
+  ghsl_panel: {
+    div_median: [
+      [0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80],
+      [0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90],
+    ],
+  },
+});
+const tsMat = B.buildBoundaryTrackScores(dataMat, candBT, sr);
+check('buildTS matrix: ghsl_step[0] = 0.15 (mean of [0.1,0.2])',
+      Math.abs(tsMat.tracks.ghsl_step[0] - 0.15) < 1e-9);
+
+// dosageMeans injection
+const dmeans = new Float64Array([1, 2, 3, 4, 5, 6, 7, 8]);
+const tsDose = B.buildBoundaryTrackScores(data, candBT, sr, { dosageMeans: dmeans });
+check('buildTS: dosage_transition injected', !!tsDose.tracks.dosage_transition);
+check('buildTS: dosage_transition copies (not ref)',
+      tsDose.tracks.dosage_transition !== dmeans);
+
+// Empty inputs
+check('buildTS: null cand → empty',
+      Object.keys(B.buildBoundaryTrackScores(data, null, sr).tracks).length === 0);
+check('buildTS: zero-len → empty',
+      B.buildBoundaryTrackScores(data, candBT, { win_lo: 0, win_hi: -1 }).len === 0);
+
+// Whole pipeline end-to-end: buildBoundaryTrackScores → computeBoundaryEdges
+const edgesE2E = B.computeBoundaryEdges(ts, B.BOUNDARY_TRACK_WEIGHTS);
+check('end-to-end: edges produced',
+      !!edgesE2E.left || !!edgesE2E.right);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

@@ -378,6 +378,207 @@ export function buildBoundaryRecord(edge, side, source, opts) {
 }
 
 // =====================================================================
+// Track score builder — converts layer data → per-track per-window arrays
+// =====================================================================
+
+/**
+ * Resample a fixed-window-grid source array onto the local-PCA window
+ * grid via bp-overlap averaging. Pure: takes the scan window bp grid
+ * + the source's bp grid origin + step.
+ *
+ * @param {ArrayLike<number>?} sourceArr   values on the source grid
+ * @param {number} scanStartBp             source grid origin
+ * @param {number} scanWindowBp            source grid step
+ * @param {ArrayLike<number>} winStartBp   target window start_bp
+ * @param {ArrayLike<number>} winEndBp     target window end_bp
+ * @param {number} winLo                   local window-index offset
+ * @param {number} len                     local length
+ * @returns {Float64Array|null}
+ */
+export function resampleBoundaryEvidenceTrack(sourceArr, scanStartBp, scanWindowBp, winStartBp, winEndBp, winLo, len) {
+  if (!Array.isArray(sourceArr) && !ArrayBuffer.isView(sourceArr)) return null;
+  if (!winStartBp || !winEndBp) return null;
+  if (!Number.isFinite(scanStartBp) || !Number.isFinite(scanWindowBp) || scanWindowBp <= 0) return null;
+  const a = new Float64Array(len);
+  for (let i = 0; i < len; i++) {
+    const wi = winLo + i;
+    const s = winStartBp[wi], e = winEndBp[wi];
+    if (!Number.isFinite(s) || !Number.isFinite(e)) { a[i] = NaN; continue; }
+    const j0 = Math.max(0, Math.floor((s - scanStartBp) / scanWindowBp));
+    const j1 = Math.min(sourceArr.length - 1, Math.floor((e - scanStartBp) / scanWindowBp));
+    let sum = 0, n = 0;
+    for (let j = j0; j <= j1; j++) {
+      const v = sourceArr[j];
+      if (v != null && Number.isFinite(v)) { sum += v; n++; }
+    }
+    a[i] = n > 0 ? (sum / n) : NaN;
+  }
+  return a;
+}
+
+/**
+ * Build per-track per-window score arrays for a candidate's scan range.
+ * Pure: takes `data` (= state.data shape) explicitly. Only includes
+ * tracks whose source layer is present; absent tracks are omitted from
+ * the result entirely so caller can detect via Object.keys.
+ *
+ * Recognised data sources (sub-fields of `data`):
+ *   - windows.pve1                       → pca_drop
+ *   - windows.band_continuity_score      → band_continuity_drop
+ *   - windows.similarity_edge_score      → similarity_edge
+ *   - ghsl_panel.div_median ([nS][nW] or [nW]) → ghsl_step + het_transition
+ *   - candidate_marker_polarity (per-cand rows) → polarity_change
+ *   - boundary_evidence (per-cand row) → fst_edge, theta_pi_step,
+ *     discordant_pile, sv_anchor
+ *
+ * `opts.dosageMeans` (optional ArrayLike) lets caller inject a cached
+ * dosage mean array; when present and length matches `len`, ships as
+ * the `dosage_transition` track.
+ *
+ * @param {Object} data
+ * @param {Object} cand
+ * @param {{win_lo:number, win_hi:number}} scanRange
+ * @param {{dosageMeans?:ArrayLike<number>}} opts
+ * @returns {{tracks:Object<string,Float64Array>, len:number, win_lo:number, win_hi:number}}
+ */
+export function buildBoundaryTrackScores(data, cand, scanRange, opts) {
+  if (!cand || !scanRange) return { tracks: {}, len: 0, win_lo: 0, win_hi: 0 };
+  const winLo = scanRange.win_lo | 0;
+  const winHi = scanRange.win_hi | 0;
+  const len = Math.max(0, winHi - winLo + 1);
+  const tracks = {};
+  if (len === 0) return { tracks, len: 0, win_lo: winLo, win_hi: winHi };
+
+  const d = data || {};
+  const W = d.windows || null;
+  const o = opts || {};
+
+  const _copyWindow = (arr) => {
+    if (!arr || arr.length <= winHi) return null;
+    const a = new Float64Array(len);
+    for (let i = 0; i < len; i++) {
+      const v = arr[winLo + i];
+      a[i] = (v != null && Number.isFinite(v)) ? v : NaN;
+    }
+    return a;
+  };
+
+  if (W) {
+    const pca = _copyWindow(W.pve1);
+    if (pca) tracks.pca_drop = pca;
+    const bcd = _copyWindow(W.band_continuity_score);
+    if (bcd) tracks.band_continuity_drop = bcd;
+    const sim = _copyWindow(W.similarity_edge_score);
+    if (sim) tracks.similarity_edge = sim;
+  }
+
+  // ghsl_step + het_transition from ghsl_panel.div_median
+  if (d.ghsl_panel && d.ghsl_panel.div_median) {
+    const dm = d.ghsl_panel.div_median;
+    if (Array.isArray(dm) && dm.length > 0) {
+      const isMatrix = Array.isArray(dm[0]);
+      const a = new Float64Array(len);
+      if (isMatrix) {
+        for (let i = 0; i < len; i++) {
+          const wi = winLo + i;
+          let sum = 0, n = 0;
+          for (let s = 0; s < dm.length; s++) {
+            const v = dm[s] && dm[s][wi];
+            if (v != null && Number.isFinite(v)) { sum += v; n++; }
+          }
+          a[i] = n > 0 ? sum / n : NaN;
+        }
+      } else {
+        for (let i = 0; i < len; i++) {
+          const v = dm[winLo + i];
+          a[i] = (v != null && Number.isFinite(v)) ? v : NaN;
+        }
+      }
+      tracks.ghsl_step = a;
+      tracks.het_transition = new Float64Array(a);
+    }
+  }
+
+  // Dosage transition (caller-injected cache)
+  if (o.dosageMeans && o.dosageMeans.length === len) {
+    tracks.dosage_transition = new Float64Array(o.dosageMeans);
+  }
+
+  // polarity_change from candidate_marker_polarity (per-cand rows)
+  if (Array.isArray(d.candidate_marker_polarity) && W && W.start_bp && W.end_bp) {
+    const pol = d.candidate_marker_polarity.filter(r =>
+      r && r.candidate_id === cand.id && Number.isFinite(r.pos));
+    if (pol.length > 0) {
+      const a = new Float64Array(len);
+      for (let i = 0; i < len; i++) {
+        const wi = winLo + i;
+        const s = W.start_bp[wi], e = W.end_bp[wi];
+        let nIn = 0, nFlip = 0;
+        for (const p of pol) {
+          if (p.pos >= s && p.pos <= e) {
+            nIn++;
+            if (p.final_flip_decision === true) nFlip++;
+          }
+        }
+        a[i] = nIn > 0 ? (nFlip / nIn) : NaN;
+      }
+      tracks.polarity_change = a;
+    }
+  }
+
+  // boundary_evidence-derived tracks
+  if (Array.isArray(d.boundary_evidence) && W && W.start_bp && W.end_bp) {
+    const beRow = d.boundary_evidence.find(r => r && r.candidate_id === cand.id);
+    if (beRow && beRow.tracks) {
+      const sw = beRow.scan_window_bp || 5000;
+      const ss = beRow.scan_start_bp != null ? beRow.scan_start_bp : 0;
+      const t = beRow.tracks;
+      const fst = resampleBoundaryEvidenceTrack(t.fst, ss, sw, W.start_bp, W.end_bp, winLo, len);
+      if (fst) tracks.fst_edge = fst;
+
+      // theta-pi step: mean across regimes when present
+      const tpArrays = [];
+      if (Array.isArray(t.theta_pi_homo1)) tpArrays.push(resampleBoundaryEvidenceTrack(t.theta_pi_homo1, ss, sw, W.start_bp, W.end_bp, winLo, len));
+      if (Array.isArray(t.theta_pi_het))   tpArrays.push(resampleBoundaryEvidenceTrack(t.theta_pi_het,   ss, sw, W.start_bp, W.end_bp, winLo, len));
+      if (Array.isArray(t.theta_pi_homo2)) tpArrays.push(resampleBoundaryEvidenceTrack(t.theta_pi_homo2, ss, sw, W.start_bp, W.end_bp, winLo, len));
+      const tpClean = tpArrays.filter(Boolean);
+      if (tpClean.length > 0) {
+        const a = new Float64Array(len);
+        for (let i = 0; i < len; i++) {
+          let sum = 0, n = 0;
+          for (const tpa of tpClean) {
+            const v = tpa[i];
+            if (v != null && Number.isFinite(v)) { sum += v; n++; }
+          }
+          a[i] = n > 0 ? sum / n : NaN;
+        }
+        tracks.theta_pi_step = a;
+      }
+
+      const disc = resampleBoundaryEvidenceTrack(t.discordant_pair_pileup, ss, sw, W.start_bp, W.end_bp, winLo, len);
+      if (disc) tracks.discordant_pile = disc;
+
+      // sv_anchor: 1 per window when any anchor's pos_bp lands inside
+      if (Array.isArray(t.sv_anchors) && t.sv_anchors.length > 0) {
+        const a = new Float64Array(len);
+        for (let i = 0; i < len; i++) {
+          const wi = winLo + i;
+          const s = W.start_bp[wi], e = W.end_bp[wi];
+          let any = 0;
+          for (const sv of t.sv_anchors) {
+            if (sv && sv.pos_bp >= s && sv.pos_bp <= e) { any = 1; break; }
+          }
+          a[i] = any;
+        }
+        tracks.sv_anchor = a;
+      }
+    }
+  }
+
+  return { tracks, len, win_lo: winLo, win_hi: winHi };
+}
+
+// =====================================================================
 // Edge detection — combined boundary peak finder
 // =====================================================================
 
