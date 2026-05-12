@@ -61,6 +61,7 @@ UNITS=(
   test_shared_cross_page_clusters.js
   test_shared_q_ancestry.js
   test_shared_repeat_density.js
+  test_shared_ncrna_density.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
