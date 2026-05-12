@@ -11,6 +11,13 @@
 
 import { alignLabels } from '../../../shared/hungarian.js';
 import {
+  chiSquare,
+  nmiFromTable,
+  amiFromTable,
+  ariFromTable,
+  restrictedConcord,
+} from '../../../shared/contingency.js';
+import {
   escapeHtml,
   fitCanvas,
   fmt,
@@ -1375,10 +1382,7 @@ function focalContentHtml(cl, env, l2idx, options) {
   // when called from a K=3+6 stack, the caller passes skipInvariantMeta:true
   // to avoid rendering the invariant block twice.
   const skipInvariantMeta = !!(options && options.skipInvariantMeta);
-  // TODO_MISSING: _l2InvariantStats + _invariantMetaInlineHtml live at
-  // legacy 49774-49855 and haven't been ported yet. Render only when present.
-  if (!skipInvariantMeta && typeof _l2InvariantStats === 'function'
-      && typeof _invariantMetaInlineHtml === 'function') {
+  if (!skipInvariantMeta) {
     const stats = _l2InvariantStats(cl, env, l2idx);
     html += _invariantMetaInlineHtml(stats);
   }
@@ -1498,9 +1502,12 @@ function focalContentHtml(cl, env, l2idx, options) {
   //   - mini-chips (always visible when the diagnostics layer has anything to
   //     report, even just "?" placeholders for missing layers)
   //   - full table (collapsed by default, click summary to expand)
-  // TODO_MISSING: computeBandDiagnostics + _bandDiagsMiniChipsHtml +
-  // _bandDiagsPanelHtml still live in legacy (line ~50424). Render block skips
-  // until they're ported.
+  // PENDING: computeBandDiagnostics (legacy 15254-15583, ~330 LOC) +
+  // _bandDiagsMiniChipsHtml (50134) + _bandDiagsPanelHtml (50183). The
+  // diagnostics function reads page1-specific state.data slots (ghsl_panel,
+  // theta_pi_panel, roh_intervals, sample_froh) so it belongs in a page1
+  // sub-module rather than shared/. The typeof guards below correctly skip
+  // when those names aren't bound; rendering degrades gracefully.
   if (typeof computeBandDiagnostics === 'function') {
     const _diag = computeBandDiagnostics(cl, env, l2idx);
     if (_diag) {
@@ -1633,7 +1640,14 @@ function focalContentHtml(cl, env, l2idx, options) {
   //   TWO_INVERSIONS — all samples low σ (joint karyotypes are stable)
   //   CROSSOVER_ARTIFACTS — bimodal σ with small high-σ tail
   //   NOISY_REGION — everyone's σ is high
-  // TODO_MISSING: sigmaProfileL2 lives at legacy ~52000 (unported).
+  // INTEGRATION GAP: shared/per_l2_cluster.js exports sigmaProfileL2 with a
+  // different signature (ctx, l2idx, usedK) and renamed verdicts
+  // (STACKED_INVERSIONS / DOUBLE_CROSSOVER_LIKELY / NOISY / NORMAL) — and no
+  // `top_high` field. Wiring it here requires building a ctx via
+  // contextFromState(state), mapping the new verdicts back to the labels this
+  // panel renders, and either dropping the drifter list or extending the
+  // shared function to also return top_high. Until that's done, the legacy
+  // global isn't present and this block stays skipped — same render as before.
   if (l2idx != null && cl.usedK != null && cl.usedK >= 4 && typeof sigmaProfileL2 === 'function') {
     const profile = sigmaProfileL2(l2idx, cl.usedK);
     if (profile) {
@@ -1806,10 +1820,7 @@ function ctHtml(cmp, offset, alignedLabels) {
   // misreading: V is the right diagnostic for "are these clusterings associated?"
   // (p answers "do we have power to reject independence?" which is always yes
   // when sample identity persists across windows.)
-  // TODO_MISSING: chiSquare / nmiFromTable / amiFromTable / ariFromTable live
-  // at legacy 30958-31180 — unported. When absent, default the metrics to 0
-  // so the chip still renders something honest.
-  const cs = (typeof chiSquare === 'function') ? chiSquare(cmp.table, K) : { chi2: 0 };
+  const cs = chiSquare(cmp.table, K);
   const cramerV = (n > 0 && K > 1) ? Math.sqrt(cs.chi2 / (n * (K - 1))) : 0;
 
   // Random-baseline concord under independence with Hungarian alignment.
@@ -1821,9 +1832,9 @@ function ctHtml(cmp, offset, alignedLabels) {
 
   // v4.1: compute partition-comparison metrics alongside Cramér's V.
   // NMI, AMI, ARI all take the K×K contingency table directly.
-  const nmiVal = (typeof nmiFromTable === 'function') ? nmiFromTable(cmp.table, K) : 0;
-  const amiVal = (typeof amiFromTable === 'function') ? amiFromTable(cmp.table, K) : 0;
-  const ariVal = (typeof ariFromTable === 'function') ? ariFromTable(cmp.table, K) : 0;
+  const nmiVal = nmiFromTable(cmp.table, K);
+  const amiVal = amiFromTable(cmp.table, K);
+  const ariVal = ariFromTable(cmp.table, K);
 
   // Effect-size labels per metric (independent thresholds — cluster-comparison
   // literature uses different cutoffs per metric).
@@ -1887,7 +1898,6 @@ function ctHtml(cmp, offset, alignedLabels) {
   // If the FOCAL has a band selection active, compute restricted concord
   // using only samples whose focal cluster is in the keep set. Show as a
   // separate line beneath the strict verdict.
-  // TODO_MISSING: restrictedConcord lives in legacy ~31xxx — unported.
   let restrictedHtml = '';
   let sel = null;
   if (cmp && cmp.isSlabPair) {
@@ -1908,7 +1918,7 @@ function ctHtml(cmp, offset, alignedLabels) {
     if (candidate && Array.isArray(candidate.keep) && candidate.keep.length > 0 &&
         candidate.K === K) sel = candidate;
   }
-  if (sel && typeof restrictedConcord === 'function') {
+  if (sel) {
     // Restricted concord uses the FOCAL row indices (sel.keep). The aligned
     // table has focal = rows for offset>=0, focal = cols for offset<0. We
     // need the table where focal-on-rows: for offset<0, transpose conceptually.

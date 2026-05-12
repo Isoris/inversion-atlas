@@ -1,4 +1,5 @@
-# HANDOFF — cartridge test infrastructure fix, page22 unit test
+# HANDOFF — cartridge test infrastructure fix, page22 unit test,
+# table-based metrics extracted to shared/contingency.js
 
 **Date:** 2026-05-12
 **Branch:** `claude/legacy-atlas-merge-Ul7cd`
@@ -77,6 +78,56 @@ separated into distinct buckets. Core-dependent tests skip with a
 - `unmount(null)` does not throw
 
 **37/37 pass.** Added to the runner under the cartridge-only UNITS bucket.
+
+### Table-based metrics extracted from legacy (round 3)
+
+`page1/l3_panel.js` had five TODO_MISSING markers referencing
+table-based contingency metrics (chiSquare, nmiFromTable, amiFromTable,
+ariFromTable, restrictedConcord). All five legacy implementations exist
+at lines 30915–31178 of `legacy/Inversion_atlas.html` and are pure
+functions (no `state`, no DOM). They've been extracted to
+`atlases/inversion/shared/contingency.js` and the l3_panel.js
+imports/typeof guards have been replaced with explicit ES imports.
+
+Extracted exports (added to shared/contingency.js):
+- `chiSquare(table, K)` → `{chi2, df, p_approx, n}` (Wilson–Hilferty
+  approximation, matches legacy verbatim)
+- `normalCDF(z)` (Abramowitz–Stegun 7.1.26)
+- `nmiFromTable(table, K)` (Strehl–Ghosh geometric-mean variant)
+- `amiFromTable(table, K)` (Vinh–Epps–Bailey 2010, exact hypergeometric
+  expectation — adequate for K≤6, N≤few hundred)
+- `ariFromTable(table, K)` (Hubert–Arabie 1985)
+- `restrictedConcord(cmp, keep, mergeThr)` (focal-row subset concord,
+  returns LOW_POWER on empty keep set)
+- `fisher2x2(table)` (exact two-tailed p-value via lgamma)
+- `logFact(n)`, `logChoose(n,k)` (cached helpers)
+
+The legacy `sigmaProfileL2` site in l3_panel.js stays typeof-guarded —
+a modern version exists in `shared/per_l2_cluster.js` but with an
+incompatible signature `(ctx, l2idx, usedK)`, renamed verdicts
+(`STACKED_INVERSIONS` / `DOUBLE_CROSSOVER_LIKELY` / `NOISY` / `NORMAL`),
+and no `top_high` field. Wiring requires building a ctx via
+`contextFromState(state)`, mapping verdicts back to the panel's
+expected labels (`TWO_INVERSIONS` / `CROSSOVER_ARTIFACTS` /
+`NOISY_REGION`), and either dropping the drifter list or extending
+shared to return top_high. Comment updated to describe the gap.
+
+`computeBandDiagnostics` (legacy 15254–15583, ~330 LOC) is the largest
+remaining TODO_MISSING in l3_panel. It depends on page1-specific
+`state.data` slots (ghsl_panel, theta_pi_panel, roh_intervals,
+sample_froh) and belongs in a page1 sub-module rather than `shared/`.
+Deferred to a separate round.
+
+40 new contingency-table assertions added to
+`tests/test_shared_contingency.js`:
+- normalCDF symmetry + boundary cases
+- chiSquare on independent / diagonal / 3×3 tables
+- nmi/ami/ariFromTable on perfect-agreement and uniform tables
+- ARI table vs label-array parity check against `computeARI`
+- restrictedConcord verdict logic + mergeThr threshold sweep
+- fisher2x2 independent vs diagonal cases
+
+**Cartridge-only baseline now 1505 pass / 0 fail across 31 test files.**
 
 ## Current state of the merge
 
