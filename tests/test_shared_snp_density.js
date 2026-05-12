@@ -142,6 +142,51 @@ try {
 check('drawStrip: headless safety',  headlessOK);
 
 // -----------------------------------------------------------------------------
+group('drawSnpDensityShade');
+const shadeCtx = new FakeCtx();
+SD.drawSnpDensityShade(shadeCtx, { l: 50, t: 30 }, 600, 200, 0, 5, windows);
+check('drawShade: save/restore',
+      shadeCtx.calls[0][0] === 'save' && shadeCtx.calls[shadeCtx.calls.length - 1][0] === 'restore');
+const shadeFills = shadeCtx.calls.filter(c => c[0] === 'fillRect');
+check('drawShade: 1+ fillRects (high-density bars skipped near-transparent)',
+      shadeFills.length >= 5 && shadeFills.length <= 10);
+// All shade fills use the dark backdrop color
+check('drawShade: bars use dark rgba',
+      shadeFills.every(c => c[5].includes('40, 50, 70')));
+// Shade height = plotH (full plot)
+check('drawShade: bars span plot height',
+      shadeFills.every(c => c[4] === 200));
+
+// mode = 'off' → no draw
+const shadeOffCtx = new FakeCtx();
+SD.drawSnpDensityShade(shadeOffCtx, { l: 0, t: 30 }, 600, 200, 0, 5, windows, { mode: 'off' });
+check('drawShade: mode=off → no fillRect',
+      !shadeOffCtx.calls.some(c => c[0] === 'fillRect'));
+
+// mode = 'strip' → no draw (different drawer handles it)
+const shadeStripCtx = new FakeCtx();
+SD.drawSnpDensityShade(shadeStripCtx, { l: 0, t: 30 }, 600, 200, 0, 5, windows, { mode: 'strip' });
+check('drawShade: mode=strip → no fillRect (sibling drawer)',
+      !shadeStripCtx.calls.some(c => c[0] === 'fillRect'));
+
+// Custom maxAlpha
+const shadeMaxCtx = new FakeCtx();
+SD.drawSnpDensityShade(shadeMaxCtx, { l: 0, t: 30 }, 600, 200, 0, 5, windows, { maxAlpha: 0.4 });
+const shadeMaxFills = shadeMaxCtx.calls.filter(c => c[0] === 'fillRect');
+// Higher maxAlpha lets MORE bars survive the near-transparent threshold
+check('drawShade: higher maxAlpha → ≥ default count',
+      shadeMaxFills.length >= shadeFills.length);
+
+// Headless safety
+let shadeHeadlessOK = true;
+try {
+  SD.drawSnpDensityShade(null, { l: 0, t: 0 }, 100, 100, 0, 1, windows);
+  SD.drawSnpDensityShade({}, { l: 0, t: 0 }, 100, 100, 0, 1, windows);
+  SD.drawSnpDensityShade(shadeCtx, { l: 0, t: 0 }, 100, 100, 0, 1, null);
+} catch (_) { shadeHeadlessOK = false; }
+check('drawShade: headless safety',  shadeHeadlessOK);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

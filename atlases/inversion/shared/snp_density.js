@@ -191,3 +191,73 @@ export function drawSnpDensityStrip(ctx, pad, plotW, plotH, mbMin, mbMax, window
 
   if (typeof ctx.restore === 'function') ctx.restore();
 }
+
+/**
+ * Paint the SNP-density SHADE over the full plot height (mode='shade').
+ * Alpha = (1 - t) × maxAlpha, so darker shade = lower density (worse
+ * resolution). One translucent vertical bar per visible window;
+ * near-transparent bars (< 0.01 alpha) are skipped.
+ *
+ * Companion to drawSnpDensityStrip — caller picks one based on
+ * state.linesSnpDensityMode.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{l:number, t:number}} pad
+ * @param {number} plotW
+ * @param {number} plotH        used as the bar height (full plot)
+ * @param {number} mbMin
+ * @param {number} mbMax
+ * @param {Array<Object>} windows
+ * @param {{mode?:string, maxAlpha?:number}} opts
+ */
+export function drawSnpDensityShade(ctx, pad, plotW, plotH, mbMin, mbMax, windows, opts) {
+  if (!ctx || typeof ctx.fillRect !== 'function') return;
+  if (!Array.isArray(windows) || windows.length === 0) return;
+  const o = opts || {};
+  const mode = (typeof o.mode === 'string') ? o.mode : 'shade';
+  if (mode !== 'shade') return;
+  const maxAlpha = Number.isFinite(o.maxAlpha) ? o.maxAlpha : 0.18;
+
+  const visibleW = [];
+  for (let wi = 0; wi < windows.length; wi++) {
+    const w = windows[wi];
+    if (!w) continue;
+    const mb = w.center_mb;
+    if (Number.isFinite(mb) && mb >= mbMin && mb <= mbMax) visibleW.push(wi);
+  }
+  if (visibleW.length < 5) return;
+
+  const vals = visibleW.map(wi => snpDensityForWindow(windows[wi]))
+                       .filter(v => v != null && Number.isFinite(v));
+  if (vals.length < 5) return;
+  let vMin = Infinity, vMax = -Infinity;
+  for (const v of vals) { if (v < vMin) vMin = v; if (v > vMax) vMax = v; }
+  if (!Number.isFinite(vMin) || !Number.isFinite(vMax) || vMin === vMax) return;
+
+  const mbToX = (mb) => pad.l + ((mb - mbMin) / (mbMax - mbMin)) * plotW;
+
+  if (typeof ctx.save === 'function') ctx.save();
+
+  for (const wi of visibleW) {
+    const w = windows[wi];
+    const v = snpDensityForWindow(w);
+    if (v == null || !Number.isFinite(v)) continue;
+    const t = (v - vMin) / (vMax - vMin);
+    const alpha = (1 - t) * maxAlpha;
+    if (alpha < 0.01) continue;
+    const mb = w.center_mb;
+    if (!Number.isFinite(mb)) continue;
+    const x = mbToX(mb);
+    let bw = 2;
+    if (wi > 0 && wi < windows.length - 1) {
+      const wL = windows[wi - 1], wR = windows[wi + 1];
+      if (wL && wR && Number.isFinite(wL.center_mb) && Number.isFinite(wR.center_mb)) {
+        bw = ((mbToX(wR.center_mb) - mbToX(wL.center_mb)) / 2) + 1;
+      }
+    }
+    ctx.fillStyle = 'rgba(40, 50, 70, ' + alpha.toFixed(3) + ')';
+    ctx.fillRect(x - bw / 2, pad.t, bw, plotH);
+  }
+
+  if (typeof ctx.restore === 'function') ctx.restore();
+}
