@@ -56,6 +56,7 @@ UNITS=(
   test_shared_sample_color.js
   test_analysis_mendelian.js
   test_analysis_mendelian_inheritance.js
+  test_relatedness_schema.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
