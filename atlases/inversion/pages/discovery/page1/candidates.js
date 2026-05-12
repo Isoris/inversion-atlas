@@ -223,7 +223,7 @@ export function drawCandidateBar(ctx, d, toX, y0, h, opts) {
     if (!c || !Array.isArray(c.tracks) || !c.tracks[trackIdx]) return null;
     const t = c.tracks[trackIdx];
     if (!Array.isArray(t.active_bands) || t.active_bands.length === 0) return null;
-    return (typeof groupColor === 'function') ? groupColor(t.active_bands[0]) : null;
+    return groupColor(t.active_bands[0]);
   };
 
   // Pass 1: pending (grey)
@@ -663,9 +663,7 @@ export function refreshCandidateUI(state) {
   // v3.84: refresh the candidate overlay badge in the per-sample-lines header
   if (typeof _refreshCandOverlayBadge === 'function') _refreshCandOverlayBadge();
   // v3.84: redraw the lines panel so the candidate-span overlay updates
-  if (typeof drawLinesPanel === 'function') {
-    try { drawLinesPanel(state); } catch (e) {}
-  }
+  try { drawLinesPanel(state); } catch (e) {}
 }
 
 // =============================================================================

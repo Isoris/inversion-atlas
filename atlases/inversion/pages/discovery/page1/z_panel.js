@@ -794,8 +794,7 @@ export function drawZ(state) {
     // same per-lane height as the single-lane case.
     const candBarH = 5;
     const candGap  = 1;
-    const _candLanes = (typeof _assignCandidateLanes === 'function')
-      ? _assignCandidateLanes(state.candidateList || []).n_lanes : 1;
+    const _candLanes = _assignCandidateLanes(state.candidateList || []).n_lanes;
     const candBarTotal = candBarH * _candLanes;
     const zoneTop  = pad.t + candBarTotal + candGap;
     const plotW = w - pad.l - pad.r;
@@ -1341,8 +1340,7 @@ export function drawZ(state) {
   // Source data: state.crossSpecies.breakpoints filtered by chrom (built
   // by _ensureCsOverlayIndex).
   try {
-    const csIdx = (typeof _ensureCsOverlayIndex === 'function')
-      ? _ensureCsOverlayIndex() : null;
+    const csIdx = _ensureCsOverlayIndex();
     if (csIdx && csIdx.bps.length > 0) {
       ctx.save();
       ctx.strokeStyle = '#e85a5a';

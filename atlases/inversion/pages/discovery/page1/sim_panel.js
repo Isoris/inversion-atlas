@@ -215,8 +215,7 @@ export function drawSim(state) {
   // page-16 catalogue. Drawn before the orange cursor crosshair so the
   // cursor stays visually on top.
   try {
-    const csIdx = (typeof _ensureCsOverlayIndex === 'function')
-      ? _ensureCsOverlayIndex() : null;
+    const csIdx = _ensureCsOverlayIndex();
     if (csIdx && csIdx.bps.length > 0) {
       ctx.save();
       ctx.strokeStyle = 'rgba(232, 90, 90, 0.85)';

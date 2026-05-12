@@ -182,8 +182,7 @@ export function drawLinesPanel(state) {
     // / palette assignment. Wrapped in try/catch so a misbehaving
     // candidate (e.g. a malformed bp value) can't take out the whole
     // panel — band drawing is purely additive and safe to skip.
-    if (state.linesPanelCandidateBands !== false &&
-        typeof _paintCandidateBands === 'function') {
+    if (state.linesPanelCandidateBands !== false) {
       try {
         _paintCandidateBands(ctx, {
           pad, plotW, plotH, toX, mbMin, mbMax,
@@ -347,15 +346,12 @@ export function drawLinesPanel(state) {
       for (let si = 0; si < nS; si++) {
         if (trackedSet.has(si)) continue;
         // Pick per-sample stroke color when in a per-sample-coloring mode.
-        if (usePerSampleColor && typeof _resolveSampleScopeColor === 'function') {
+        if (usePerSampleColor) {
           const c = _resolveSampleScopeColor(si, lcMode);
           if (c) {
             _perSampleColorHits++;
-            // c may be 'rgb(r,g,b)' or '#rrggbb' — wrap with alpha via
-            // withAlpha if available, else pass through.
-            offCtx.strokeStyle = (typeof withAlpha === 'function')
-              ? withAlpha(c, baseAlpha)
-              : c;
+            // c may be 'rgb(r,g,b)' or '#rrggbb' — wrap with alpha.
+            offCtx.strokeStyle = withAlpha(c, baseAlpha);
           } else {
             offCtx.strokeStyle = defaultStroke;
           }
@@ -631,8 +627,7 @@ export function drawLinesPanel(state) {
             else break;
           }
           if (lastGi >= 0) {
-            const valsLast = (typeof getLinesValuesAt === 'function')
-              ? getLinesValuesAt(state, lastGi, source) : null;
+            const valsLast = getLinesValuesAt(state, lastGi, source);
             const xMarker = toX(visEndMb) + 6;   // just outside the band
             // v3.91: stash marker positions for click hit-testing. One entry
             // per drawn ⚠ glyph; carries the fish index, marker center on
@@ -723,7 +718,7 @@ export function drawLinesPanel(state) {
     // (state.tracked), shade each candidate's bp range on the lines panel
     // by the dominant band's inheritance group, with alpha keyed to purity.
     // Drawn FIRST so subsequent overlays (diamond, transitions, lines) sit on top.
-    if (isPC1 && typeof _drawTrackedLinkageStrip === 'function') {
+    if (isPC1) {
       try {
         _drawTrackedLinkageStrip(ctx, pad, plotW, plotH, mbMin, mbMax);
       } catch (_) {}
@@ -737,7 +732,7 @@ export function drawLinesPanel(state) {
     //
     // Only on PC1 sub-panel and only when zoomed enough that the diamond
     // is visually distinguishable (otherwise it looks like a thin smear).
-    if (isPC1 && typeof _drawDiamondOverlay === 'function') {
+    if (isPC1) {
       try {
         _drawDiamondOverlay(ctx, pad, plotW, plotH, mbMin, mbMax, w, h);
       } catch (_) {}
@@ -746,7 +741,7 @@ export function drawLinesPanel(state) {
     // v4 turn 95: SNP-density strip on PC1 sub-panel (only when activated
     // via toolbar button + the user is zoomed). Thin gradient bar above the
     // plot showing where SNP density is low (PC1 loses resolution) vs high.
-    if (isPC1 && typeof _drawSnpDensityStrip === 'function') {
+    if (isPC1) {
       try {
         _drawSnpDensityStrip(ctx, pad, plotW, plotH, mbMin, mbMax);
       } catch (_) {}
@@ -756,7 +751,7 @@ export function drawLinesPanel(state) {
     // bars across plot height for low-density windows. Drawn on top of lines
     // because the alpha is low (≤ 0.18) and the visual "darkening" of low-density
     // columns is the intended effect. Activated via toolbar button (mode='shade').
-    if (isPC1 && typeof _drawSnpDensityShade === 'function') {
+    if (isPC1) {
       try {
         _drawSnpDensityShade(ctx, pad, plotW, plotH, mbMin, mbMax);
       } catch (_) {}
@@ -766,7 +761,7 @@ export function drawLinesPanel(state) {
     // Per-L2-boundary transition_rate (fraction of fish that change band)
     // shown as red-graded bars at the bottom of the plot. Hotspots (rate >=
     // 0.30) get a thin vertical tick across the plot height.
-    if (isPC1 && typeof _drawTransitionRateStrip === 'function') {
+    if (isPC1) {
       try {
         _drawTransitionRateStrip(ctx, pad, plotW, plotH, mbMin, mbMax);
       } catch (_) {}
@@ -776,7 +771,7 @@ export function drawLinesPanel(state) {
     // per-L2 classification (narrow/medium/wide/no_signal) drawn as a thin
     // colored bar at the top of the plot. Green = narrow (clean segregation),
     // red = wide (no clean segregation), amber = mixed, grey = no signal.
-    if (isPC1 && typeof _drawRegimeBreadthStrip === 'function') {
+    if (isPC1) {
       try {
         _drawRegimeBreadthStrip(ctx, pad, plotW, plotH, mbMin, mbMax);
       } catch (_) {}
@@ -787,7 +782,7 @@ export function drawLinesPanel(state) {
     // number on this chromosome by start_bp; 3g = number of inheritance
     // groups (computed via inheritanceGroupClustering on confirmed
     // candidates' band labels). Placed above the regime-breadth strip.
-    if (isPC1 && typeof _drawInheritanceLabelsStrip === 'function') {
+    if (isPC1) {
       try {
         _drawInheritanceLabelsStrip(ctx, pad, plotW, plotH, mbMin, mbMax);
       } catch (_) {}
@@ -796,7 +791,7 @@ export function drawLinesPanel(state) {
     // turn 130 Slice 2: lineage strip — per-L2 dominant lineage
     // (computed from the fish-trajectory clustering, runLineageCompute).
     // Sibling to the regime-breadth strip. Toggle: state.linesLineageStripOn.
-    if (isPC1 && typeof _drawLineageStrip === 'function') {
+    if (isPC1) {
       try {
         _drawLineageStrip(ctx, pad, plotW, plotH, mbMin, mbMax);
       } catch (_) {}
@@ -809,7 +804,7 @@ export function drawLinesPanel(state) {
     // lines header. Observation-only — no inversion-call markers in
     // this slice (manuscript framing: report co-segregation, do not
     // interpret).
-    if (isPC1 && typeof _drawBandTraceStrip === 'function') {
+    if (isPC1) {
       try {
         _drawBandTraceStrip(ctx, pad, plotW, plotH, mbMin, mbMax);
       } catch (_) {}
@@ -852,8 +847,7 @@ export function drawLinesPanel(state) {
     // dosage, etc.). Source data: state.crossSpecies.breakpoints filtered
     // by chrom (built lazily by _ensureCsOverlayIndex).
     try {
-      const csIdx = (typeof _ensureCsOverlayIndex === 'function')
-        ? _ensureCsOverlayIndex() : null;
+      const csIdx = _ensureCsOverlayIndex();
       if (csIdx && csIdx.bps.length > 0) {
         ctx.save();
         ctx.strokeStyle = '#e85a5a';
@@ -924,7 +918,7 @@ export function buildLinesPanelCheckboxes(state) {
       // If linked, the PCA selector also updates — refresh its UI
       if (state.viewControls.linked) {
         if (typeof refreshPcaAxisBar === 'function') refreshPcaAxisBar();
-        if (typeof drawPCA === 'function') drawPCA(state);
+        drawPCA(state);
       }
       buildLinesPanel(state);
       drawLinesPanel(state);
@@ -1073,8 +1067,7 @@ export function buildLinesPanel(state) {
           if (d2 <= bestD2) { bestD2 = d2; bestM = m; }
         }
         if (bestM) {
-          if (Number.isFinite(bestM.jump_win_idx) && bestM.jump_win_idx >= 0 &&
-              typeof setCur === 'function') {
+          if (Number.isFinite(bestM.jump_win_idx) && bestM.jump_win_idx >= 0) {
             setCur(state, bestM.jump_win_idx);
           }
           if (typeof _showFishInspectPopover === 'function') {
@@ -1114,16 +1107,14 @@ export function buildLinesPanel(state) {
       // the click fraction to an Mb position via currentMbRange(state), then
       // find the window with the closest center_mb.
       const d = state.data;
-      const _mbR = (typeof currentMbRange === 'function')
-        ? currentMbRange(state)
-        : { mbMin: d.windows[0].center_mb, mbMax: d.windows[d.n_windows - 1].center_mb };
+      const _mbR = currentMbRange(state);
       // v4 turn 114c (remaining): cs-breakpoint click-to-jump. Same red
       // dashed lines that drawLinesPanel paints across each subpanel get
       // a click-target priority over the generic Mb-frac → setCur fallback,
       // so a click near a cs-bp line lands on that breakpoint's window
       // exactly. Re-derive the per-subpanel toX from rect + pad here
       // (drawLinesPanel uses the same pad constants).
-      if (typeof _ensureCsOverlayIndex === 'function') {
+      {
         const csIdx = _ensureCsOverlayIndex();
         if (csIdx && csIdx.bps.length > 0) {
           const _mbMinL = _mbR.mbMin, _mbMaxL = _mbR.mbMax;
@@ -1144,7 +1135,7 @@ export function buildLinesPanel(state) {
         const dd = Math.abs(d.windows[i].center_mb - targetMb);
         if (dd < bestD) { bestD = dd; bestWin = i; }
       }
-      if (typeof setCur === 'function') setCur(state, bestWin);
+      setCur(state, bestWin);
     });
     // v4 turn 114d: cs-breakpoint hover-glow on this subpanel. Same toX
     // mapping as the click hit-test above; tolerance is _CS_BP_HOVER_TOL_PX
@@ -1161,10 +1152,7 @@ export function buildLinesPanel(state) {
         const pad = { l: 44, r: 16 };
         const plotW = rect.width - pad.l - pad.r;
         if (plotW <= 0) return null;
-        const _mbR = (typeof currentMbRange === 'function')
-          ? currentMbRange(state)
-          : { mbMin: state.data.windows[0].center_mb,
-              mbMax: state.data.windows[state.data.n_windows - 1].center_mb };
+        const _mbR = currentMbRange(state);
         const _toX = (bp) => {
           if (bp.mb < _mbR.mbMin || bp.mb > _mbR.mbMax) return NaN;
           return pad.l + ((bp.mb - _mbR.mbMin) / (_mbR.mbMax - _mbR.mbMin)) * plotW;
@@ -1201,7 +1189,7 @@ export function buildLinesPanel(state) {
           state.linesLassoRect.y1 = y;
         }
         // Live redraw (cheap — single subcanvas)
-        if (typeof drawLinesPanel === 'function') drawLinesPanel(state);
+        drawLinesPanel(state);
       });
       cv.addEventListener('pointerup', e => {
         if (!dragging) return;
@@ -1214,7 +1202,7 @@ export function buildLinesPanel(state) {
         // jumps to that window). Clear rect so no overlay sticks around.
         if (dx < 4 && dy < 4) {
           state.linesLassoRect = null;
-          if (typeof drawLinesPanel === 'function') drawLinesPanel(state);
+          drawLinesPanel(state);
           return;
         }
         // Real drag → commit rect, compute lasso. Suppress the trailing click.
@@ -1227,12 +1215,12 @@ export function buildLinesPanel(state) {
         const lassoed = _computeLinesLassoSamples(cv, state.linesLassoCommitted);
         state.linesLassoSelected = lassoed;
         if (typeof _updateLinesLassoUI === 'function') _updateLinesLassoUI();
-        if (typeof drawLinesPanel === 'function') drawLinesPanel(state);
+        drawLinesPanel(state);
       });
       cv.addEventListener('pointercancel', () => {
         dragging = false;
         state.linesLassoRect = null;
-        if (typeof drawLinesPanel === 'function') drawLinesPanel(state);
+        drawLinesPanel(state);
       });
       // v3.91: cursor affordance — show a pointer cursor when hovering over
       // a ⚠ jumper marker so the user knows it's clickable. Cheap: just walks
@@ -1300,7 +1288,7 @@ export function setLinesPanelCandidateBands(state, b) {
   const _state = (typeof window !== 'undefined' && window.state) ? window.state : state;
   _state.linesPanelCandidateBands = !!b;
   try { localStorage.setItem(_LINES_PANEL_CAND_BANDS_KEY, b ? '1' : '0'); } catch (_) {}
-  if (typeof drawLinesPanel === 'function') drawLinesPanel(state);
+  drawLinesPanel(state);
 }
 
 // --- lasso wiring — legacy lines 33752-33782 + 34011-34014 + 34229-34262 ---
