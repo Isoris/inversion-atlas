@@ -29,7 +29,7 @@
 // =====================================================================
 
 import { fitCanvas, themeColor, withAlpha } from '../../../shared/page1_utils.js';
-import { _resolveSampleScopeColor } from '../page1/_state.js';
+import { resolveSampleScopeColor } from '../../../shared/sample_color.js';
 import {
   buildFocalVoter, ensureRegimesTrack, PATTERN_CLASS_COLORS,
   DOSAGE_CLASS_COLOURS,
@@ -251,7 +251,7 @@ export function drawRegimesPC1Panel(state) {
     if (voterSet.has(si)) continue;
     let col = '#aab2c0';
     {
-      const c = _resolveSampleScopeColor(si, state.linesColorMode || 'kmeans');
+      const c = resolveSampleScopeColor(state, si, state.linesColorMode || 'kmeans');
       if (c) col = c;
     }
     ctx.lineWidth = 1.0;

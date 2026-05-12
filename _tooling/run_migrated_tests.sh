@@ -53,6 +53,7 @@ UNITS=(
   test_page1_band_diagnostics.js
   test_page1_band_diagnostics_html.js
   test_shared_candidate_predicates.js
+  test_shared_sample_color.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js

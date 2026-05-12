@@ -44,6 +44,11 @@ export function _setActiveState(s) { _pageState = s; }
 // to keep all imports at the top per ESM convention. ESM hoists imports
 // regardless of position, so this is purely stylistic.
 import { runLineageCompute } from './lineage.js';
+import {
+  familyColor as _sharedFamilyColor,
+  lineageColor as _sharedLineageColor,
+  resolveSampleScopeColor as _sharedResolveSampleScopeColor,
+} from '../../../shared/sample_color.js';
 
 // =====================================================================
 // Cache-invalidation helpers (legacy 34321 / 39362 / 39973)
@@ -77,13 +82,9 @@ export function _bandTraceClearCache(state) {
   state._btraceHits = null;
 }
 
-// --- Family / lineage palette small-cohort fallbacks (legacy 36262-36264) ---
-// FAMILY_PALETTE_BASE itself was hoisted to shared/page1_data_helpers.js;
-// the three fallback colors below are only used by familyColor() in this
-// module so they stay here.
-const FAMILY_COLOR_SMALL     = '#cbd5e1';   // n==2 or 3
-const FAMILY_COLOR_SINGLETON = '#dde3eb';   // n==1
-const FAMILY_COLOR_UNMATCHED = '#94a3b8';   // family_id == -1
+// --- Family / lineage palette small-cohort fallbacks ---
+// (Hoisted to shared/sample_color.js. The familyColor wrapper below
+// just delegates to the shared resolver.)
 
 // --- Generic tracked-sample / ancestry palette — legacy line 9791 ---
 // Used by trackedColor() and ancestryColor() below. 8 distinct colors.
@@ -121,15 +122,18 @@ export function _vColor(v) {
   return `rgb(${r},${g},${b})`;
 }
 
-// --- _lineageColor — legacy lines 33220-33254 ---
+// --- _lineageColor — wraps shared.lineageColor with auto-trigger ---
+// page1 schedules the lineage compute via requestIdleCallback on first
+// reference. The pure shared.lineageColor returns null when the result
+// isn't ready; the wrapper here adds the scheduling so subsequent
+// paints find a populated state.lineageResult.
 export function _lineageColor(si) {
   const _state = _pageState;
   if (!_state || !_state.data) return null;
-  let result = _state.lineageResult;
   // Auto-trigger compute on first reference. Mirrors the pattern in
   // _drawInheritanceLabelsStrip — schedule via requestIdleCallback so
   // the current paint completes; the next paint picks up the result.
-  if (!result
+  if (!_state.lineageResult
       && !_state._lineageComputeScheduled
       && _state.data.l2_envelopes && _state.data.l2_envelopes.length >= 3) {
     _state._lineageComputeScheduled = true;
@@ -147,27 +151,12 @@ export function _lineageColor(si) {
     }
     return null;
   }
-  if (!result || !result.lineage_id_per_sample) return null;
-  if (si < 0 || si >= result.n_samples) return null;
-  const lid = result.lineage_id_per_sample[si];
-  if (lid == null || lid < 0 || lid >= result.n_lineages) return null;
-  // Golden-angle rotation: each lineage gets a distinct hue.
-  const baseHue = 210;                  // cool blue anchor for lineage 0
-  const goldenAngle = 137.508;
-  const hue = (baseHue + lid * goldenAngle) % 360;
-  return `hsl(${hue.toFixed(1)}, 70%, 55%)`;
+  return _sharedLineageColor(_state, si);
 }
 
-// --- familyColor — legacy lines 36303-36311 ---
+// --- familyColor — wraps shared.familyColor with page1's _pageState ---
 function familyColor(si) {
-  const state = _pageState;
-  if (!state.data || !state.data.samples) return FAMILY_COLOR_UNMATCHED;
-  const f = state.data.samples[si].family_id;
-  if (f == null || f === -1) return FAMILY_COLOR_UNMATCHED;
-  if (state.familyPalette[f]) return state.familyPalette[f];
-  if (state.smallFamilyIds.has(f)) return FAMILY_COLOR_SMALL;
-  if (state.singletonFamilyIds.has(f)) return FAMILY_COLOR_SINGLETON;
-  return FAMILY_COLOR_UNMATCHED;
+  return _sharedFamilyColor(_pageState, si);
 }
 
 // --- ancestryColor — legacy lines 35950-35958 ---
@@ -221,16 +210,13 @@ export function getSampleColor(si, mode, groupLabels) {
   /* mode === 'none' */    return '#888';
 }
 
-// --- _resolveSampleScopeColor — legacy lines 33287-33298 ---
+// --- _resolveSampleScopeColor — page1-flavoured wrapper ---
+// Uses page1's _lineageColor (with the auto-trigger scheduling) for
+// 'lineage' mode, otherwise defers to the pure shared resolver. The
+// shared resolver alone is what page22 and any future page consumes
+// — they import resolveSampleScopeColor from shared/sample_color.js
+// and never reach into this module.
 export function _resolveSampleScopeColor(si, mode) {
-  // v4 turn 108: family case implemented (same as window-aware path)
-  if (mode === 'family') {
-    if (typeof familyColor === 'function') return familyColor(si);
-  }
-  // turn 130 Slice 2: lineage mode — per-sample.
-  if (mode === 'lineage') {
-    return _lineageColor(si);
-  }
-  // STUB for other modes — see _resolveSampleColorByMode above.
-  return null;
+  if (mode === 'lineage') return _lineageColor(si);
+  return _sharedResolveSampleScopeColor(_pageState, si, mode);
 }
