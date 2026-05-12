@@ -4,6 +4,7 @@ import {
   argsort,
   groupedArgsort,
   meanDosagePerSample,
+  medianDosagePerSample,
   computeSampleOrder,
 } from '../atlases/inversion/shared/candidate_pca_ordering.js';
 
@@ -213,6 +214,87 @@ group('computeSampleOrder');
   const s = fixtureState({ row_order: 'whatever' });
   const r = computeSampleOrder(s);
   check('unknown row_order → identity',         JSON.stringify(r) === JSON.stringify([0, 1, 2, 3]));
+}
+
+// =====================================================================
+group('medianDosagePerSample');
+
+{
+  // 3 samples × 3 markers; sample 0 has 0/1/2 → median 1; sample 1 has
+  // 1/3/5 → median 3; sample 2 has -1/-1/3 → median -1
+  const markers = [
+    { dosage_centered: new Float32Array([0, 1, -1]) },
+    { dosage_centered: new Float32Array([1, 3, -1]) },
+    { dosage_centered: new Float32Array([2, 5,  3]) },
+  ];
+  const r = medianDosagePerSample(markers, 3);
+  check('median: 3 samples', r.length === 3);
+  check('sample 0 median = 1', Math.abs(r[0] - 1) < 1e-6);
+  check('sample 1 median = 3', Math.abs(r[1] - 3) < 1e-6);
+  check('sample 2 median = -1', Math.abs(r[2] + 1) < 1e-6);
+}
+{
+  // Even-length → average of middle two
+  const markers = [
+    { dosage_centered: [0] },
+    { dosage_centered: [10] },
+    { dosage_centered: [20] },
+    { dosage_centered: [30] },
+  ];
+  const r = medianDosagePerSample(markers, 1);
+  check('even count: midpoint average', Math.abs(r[0] - 15) < 1e-6);
+}
+{
+  // NaN values skipped
+  const markers = [
+    { dosage_centered: [NaN, 1] },
+    { dosage_centered: [5,   2] },
+    { dosage_centered: [10,  3] },
+  ];
+  const r = medianDosagePerSample(markers, 2);
+  // sample 0: [5, 10] → median = 7.5
+  // sample 1: [1, 2, 3] → median = 2
+  check('NaN skipped: sample 0 median = 7.5', Math.abs(r[0] - 7.5) < 1e-6);
+  check('NaN skipped: sample 1 median = 2',   Math.abs(r[1] - 2) < 1e-6);
+}
+{
+  // All NaN → NaN result
+  const markers = [{ dosage_centered: [NaN] }];
+  const r = medianDosagePerSample(markers, 1);
+  check('all NaN → NaN result', Number.isNaN(r[0]));
+}
+{
+  // Empty / null inputs
+  const r1 = medianDosagePerSample([], 2);
+  check('empty markers → all NaN',
+        Number.isNaN(r1[0]) && Number.isNaN(r1[1]));
+  const r2 = medianDosagePerSample(null, 2);
+  check('null markers → all NaN',
+        Number.isNaN(r2[0]) && Number.isNaN(r2[1]));
+}
+
+// =====================================================================
+group('computeSampleOrder — median_dosage mode');
+
+{
+  const markers = [
+    { dosage_centered: [0.1, 0.5, 0.9] },
+    { dosage_centered: [0.2, 0.4, 0.8] },
+    { dosage_centered: [0.0, 0.6, 1.0] },
+  ];
+  // sample 0 median ≈ 0.1; sample 1 ≈ 0.5; sample 2 ≈ 0.9
+  const s = fixtureState({ row_order: 'median_dosage', n_samples: 3 });
+  const r = computeSampleOrder(s, { heatmapMarkers: markers, n_samples: 3 });
+  check('median_dosage: 3 indices', r.length === 3);
+  check('median_dosage: order ascending',
+        r[0] === 0 && r[1] === 1 && r[2] === 2);
+}
+{
+  // No markers → identity fallback
+  const s = fixtureState({ row_order: 'median_dosage', n_samples: 3 });
+  const r = computeSampleOrder(s);
+  check('median_dosage no markers → identity',
+        JSON.stringify(r) === JSON.stringify([0, 1, 2]));
 }
 
 // =====================================================================
