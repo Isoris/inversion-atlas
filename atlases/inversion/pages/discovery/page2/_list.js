@@ -17,6 +17,7 @@
 import { _pageState } from './_state.js';
 import { refreshCandidateUI } from '../page2.js';
 import { persistActiveCandidateId } from '../../../shared/active_candidate.js';
+import { isAutoCandidate } from '../page1/inheritance.js';
 
 // ---------------------------------------------------------------------------
 // Module-private constants (extracted from legacy)
@@ -219,8 +220,8 @@ export function refreshCandidateListUI() {
   // visual treatment + 🤖 prefix so they're immediately distinguishable
   // from user-confirmed ones. (turn 130 follow-up — review-surfaces spec.)
   const sorted = state.candidateList.slice().sort((a, b) => {
-    const aAuto = (typeof _isAutoCandidate === 'function') ? _isAutoCandidate(a) : false;
-    const bAuto = (typeof _isAutoCandidate === 'function') ? _isAutoCandidate(b) : false;
+    const aAuto = isAutoCandidate(a);
+    const bAuto = isAutoCandidate(b);
     if (aAuto !== bAuto) return aAuto ? 1 : -1;   // non-auto first
     return b.created_at - a.created_at;
   });
@@ -268,7 +269,7 @@ export function refreshCandidateListUI() {
     // turn 130 follow-up: auto-promoted candidates wear a dashed outline
     // and 🤖 prefix so the user can scan the list and know which entries
     // are user-confirmed vs algorithm-proposed awaiting review.
-    const isAuto = (typeof _isAutoCandidate === 'function') ? _isAutoCandidate(c) : false;
+    const isAuto = isAutoCandidate(c);
     const autoPrefix = isAuto ? '<span class="cli-auto-prefix" title="Algorithm-proposed candidate (auto-promoted from L2-sweep). Review and Confirm to add to your saved list, or Dismiss to drop.">🤖&nbsp;</span>' : '';
     let twoTrackBadge = '';
     let perTrackMeta = '';
