@@ -228,6 +228,102 @@ check('combined: K propagated',            combined.K === 4);
 check('combined: null clusters → null',    BR.bandReachBimodality(null) === null);
 
 // -----------------------------------------------------------------------------
+group('windowedBandReachPerL2');
+const envs = [
+  { start_bp: 0,         end_bp: 1_000_000 },
+  { start_bp: 1_000_000, end_bp: 2_000_000 },
+  { start_bp: 2_000_000, end_bp: 3_000_000 },
+  { start_bp: 3_000_000, end_bp: 4_000_000 },
+];
+// All L2s stable → reach = 1, regime = narrow
+const stableClusters = _makeStableChain(envs.length, 3);
+const wEntries = BR.windowedBandReachPerL2(envs, (i) => stableClusters[i], { K: 3 });
+check('entries: one per envelope',         wEntries.length === envs.length);
+check('center_l2 set per entry',
+      wEntries.every((e, i) => e.center_l2 === i));
+check('window_l2_indices: 3 around middle',
+      wEntries[1].window_l2_indices.join(',') === '0,1,2');
+check('window_l2_indices: 2 at first L2 (no left)',
+      wEntries[0].window_l2_indices.join(',') === '0,1');
+check('window_l2_indices: 2 at last L2 (no right)',
+      wEntries[3].window_l2_indices.join(',') === '2,3');
+check('center_mb derived from envelope bp',
+      Math.abs(wEntries[0].center_mb - 0.5) < 1e-9);
+check('all stable: regime = narrow',
+      wEntries.every(e => e.regime_breadth === 'narrow'));
+
+// Empty / null
+check('null envelopes → []',
+      BR.windowedBandReachPerL2(null, () => null).length === 0);
+check('no getCluster → []',
+      BR.windowedBandReachPerL2(envs, null).length === 0);
+
+// Missing cluster mid-chain: entire entry skipped
+const sparse = (i) => i === 1 ? null : stableClusters[i];
+const wSparse = BR.windowedBandReachPerL2(envs, sparse, { K: 3 });
+// L2 0: needs clusters [0,1] → 1 is null → drop
+// L2 1: needs [0,1,2] → 1 is null → drop
+// L2 2: needs [1,2,3] → 1 is null → drop
+// L2 3: needs [2,3] → ok → keep
+check('sparse: only the L2 whose chain skips index 1 survives',
+      wSparse.length === 1 && wSparse[0].center_l2 === 3);
+
+// -----------------------------------------------------------------------------
+group('regimeBreadthColor');
+check('narrow → green',     BR.regimeBreadthColor('narrow').includes('60, 192, 138'));
+check('medium → amber',     BR.regimeBreadthColor('medium').includes('245, 165, 36'));
+check('wide → red',         BR.regimeBreadthColor('wide').includes('224, 85, 92'));
+check('no_signal → grey',   BR.regimeBreadthColor('no_signal').includes('140, 140, 140'));
+check('unknown → grey',     BR.regimeBreadthColor('mystery').includes('140, 140, 140'));
+
+// -----------------------------------------------------------------------------
+group('drawRegimeBreadthStrip');
+class FakeCtx {
+  constructor() {
+    this.calls = [];
+    this.fillStyle = '';
+    this.strokeStyle = '';
+    this.lineWidth = 1;
+  }
+  save()    { this.calls.push(['save']); }
+  restore() { this.calls.push(['restore']); }
+  fillRect(x, y, w, h)   { this.calls.push(['fillRect', x, y, w, h, this.fillStyle]); }
+  strokeRect(x, y, w, h) { this.calls.push(['strokeRect', x, y, w, h, this.strokeStyle]); }
+}
+
+const ctx = new FakeCtx();
+const stripEntries = [
+  { center_l2: 0, regime_breadth: 'narrow' },
+  { center_l2: 1, regime_breadth: 'wide' },
+  { center_l2: 2, regime_breadth: 'medium' },
+];
+BR.drawRegimeBreadthStrip(ctx, { l: 50, t: 30 }, 600, 200, 0, 4, stripEntries, envs);
+check('drawStrip: save/restore called',
+      ctx.calls[0][0] === 'save' && ctx.calls[ctx.calls.length - 1][0] === 'restore');
+check('drawStrip: backdrop fillRect drawn',
+      ctx.calls.some(c => c[0] === 'fillRect' && c[5].includes('40, 50, 70')));
+check('drawStrip: 3 per-L2 fillRects + 1 backdrop',
+      ctx.calls.filter(c => c[0] === 'fillRect').length === 4);
+check('drawStrip: frame strokeRect drawn',
+      ctx.calls.some(c => c[0] === 'strokeRect'));
+
+// Outside visible range
+const ctxOut = new FakeCtx();
+BR.drawRegimeBreadthStrip(ctxOut, { l: 0, t: 30 }, 600, 200, 100, 200, stripEntries, envs);
+const fillCountOut = ctxOut.calls.filter(c => c[0] === 'fillRect').length;
+check('drawStrip: outside visible → only backdrop',  fillCountOut === 1);
+
+// Headless safety
+let headlessOK = true;
+try {
+  BR.drawRegimeBreadthStrip(null, { l: 0, t: 0 }, 100, 100, 0, 1, stripEntries, envs);
+  BR.drawRegimeBreadthStrip({}, { l: 0, t: 0 }, 100, 100, 0, 1, stripEntries, envs);
+  BR.drawRegimeBreadthStrip(ctx, { l: 0, t: 0 }, 100, 100, 0, 1, null, envs);
+  BR.drawRegimeBreadthStrip(ctx, { l: 0, t: 0 }, 100, 100, 0, 1, [], envs);
+} catch (_) { headlessOK = false; }
+check('drawStrip: headless safety',  headlessOK);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

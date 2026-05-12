@@ -301,6 +301,141 @@ export function bandReachBimodalityFromReach(reachData) {
   };
 }
 
+// =====================================================================
+// Per-L2 sliding-window band reach
+// =====================================================================
+
+/**
+ * Per-L2 in isolation has band_reach exactly 1 for every fish (one L2
+ * = one label set), which isn't useful for the regime-breadth strip.
+ * Extend each L2 with its left + right neighbors so band-reach has
+ * somewhere to grow. Returns one row per L2 with:
+ *   { center_l2, window_l2_indices, center_mb, ...reach }
+ *
+ * `envelopes` is the L2-envelope array (each row needs start_bp/end_bp
+ * for center_mb derivation; missing bp leaves center_mb = NaN).
+ *
+ * `getCluster(l2idx)` returns the cluster output for that L2:
+ *   { labels, fixedKLabels?, usedK? } — same shape as
+ *   computeBandReachAcrossL2s consumes.
+ *
+ * Empty array when envelopes is missing/empty. Pure.
+ *
+ * @param {Array<{start_bp?:number, end_bp?:number}>} envelopes
+ * @param {Function} getCluster
+ * @param {{K?:number}} opts
+ * @returns {Array<Object>}
+ */
+export function windowedBandReachPerL2(envelopes, getCluster, opts) {
+  if (!Array.isArray(envelopes) || envelopes.length === 0) return [];
+  if (typeof getCluster !== 'function') return [];
+  const out = [];
+  for (let i = 0; i < envelopes.length; i++) {
+    const lo = Math.max(0, i - 1);
+    const hi = Math.min(envelopes.length - 1, i + 1);
+    const chain = [];
+    const clusters = [];
+    let valid = true;
+    for (let j = lo; j <= hi; j++) {
+      const cl = getCluster(j);
+      if (!cl) { valid = false; break; }
+      chain.push(j);
+      clusters.push(cl);
+    }
+    if (!valid) continue;
+    const r = computeBandReachAcrossL2s(clusters, {
+      l2_indices: chain,
+      K: opts && opts.K,
+    });
+    if (r) {
+      r.center_l2 = i;
+      r.window_l2_indices = chain;
+      const env = envelopes[i];
+      r.center_mb = (env && Number.isFinite(env.start_bp) && Number.isFinite(env.end_bp))
+        ? (env.start_bp + env.end_bp) / 2 / 1e6
+        : NaN;
+      out.push(r);
+    }
+  }
+  return out;
+}
+
+// =====================================================================
+// Regime-breadth palette + canvas strip drawer
+// =====================================================================
+
+/**
+ * Resolve the regime-breadth strip color. Returns an rgba() string.
+ *   'narrow'    → green
+ *   'medium'    → amber
+ *   'wide'      → red
+ *   anything else (incl. 'no_signal') → translucent grey
+ */
+export function regimeBreadthColor(breadth) {
+  if (breadth === 'narrow') return 'rgba(60, 192, 138, 0.85)';
+  if (breadth === 'medium') return 'rgba(245, 165, 36, 0.80)';
+  if (breadth === 'wide')   return 'rgba(224, 85, 92, 0.85)';
+  return 'rgba(140, 140, 140, 0.40)';
+}
+
+/**
+ * Paint the regime-breadth strip at the top of the PC1 panel. One
+ * per-L2 colored bar (using regimeBreadthColor) over a faint
+ * background. Strip sits at `pad.t - stripH - 1` with stripH = 5
+ * by default. Frame border drawn last.
+ *
+ * Pure given the entries from windowedBandReachPerL2 + the envelopes
+ * for bp-range lookup. Headless-tolerant.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{l:number, t:number}} pad
+ * @param {number} plotW
+ * @param {number} plotH        (unused but kept for consistency with other drawers)
+ * @param {number} mbMin
+ * @param {number} mbMax
+ * @param {Array<{center_l2:number, regime_breadth:string}>} entries
+ * @param {Array<{start_bp:number, end_bp:number}>} envelopes
+ * @param {{stripHeight?:number, stripOffset?:number}} opts
+ */
+export function drawRegimeBreadthStrip(ctx, pad, plotW, plotH, mbMin, mbMax, entries, envelopes, opts) {
+  if (!ctx || typeof ctx.fillRect !== 'function') return;
+  if (!Array.isArray(entries) || entries.length === 0) return;
+  if (!Array.isArray(envelopes)) return;
+
+  const o = opts || {};
+  const stripH = Number.isFinite(o.stripHeight) ? o.stripHeight : 5;
+  const offset = Number.isFinite(o.stripOffset) ? o.stripOffset : (stripH + 1);
+  const stripY = Math.max(0, pad.t - offset);
+
+  if (typeof ctx.save === 'function') ctx.save();
+
+  ctx.fillStyle = 'rgba(40, 50, 70, 0.18)';
+  ctx.fillRect(pad.l, stripY, plotW, stripH);
+
+  for (const e of entries) {
+    if (!e) continue;
+    const env = envelopes[e.center_l2];
+    if (!env) continue;
+    if (!Number.isFinite(env.start_bp) || !Number.isFinite(env.end_bp)) continue;
+    const mbLo = env.start_bp / 1e6;
+    const mbHi = env.end_bp / 1e6;
+    if (mbHi < mbMin || mbLo > mbMax) continue;
+    const xLo = pad.l + Math.max(0, ((mbLo - mbMin) / (mbMax - mbMin)) * plotW);
+    const xHi = pad.l + Math.min(plotW, ((mbHi - mbMin) / (mbMax - mbMin)) * plotW);
+    if (xHi - xLo < 1) continue;
+    ctx.fillStyle = regimeBreadthColor(e.regime_breadth);
+    ctx.fillRect(xLo, stripY, xHi - xLo, stripH);
+  }
+
+  if (typeof ctx.strokeRect === 'function') {
+    ctx.strokeStyle = 'rgba(120, 128, 140, 0.40)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(pad.l, stripY, plotW, stripH);
+  }
+
+  if (typeof ctx.restore === 'function') ctx.restore();
+}
+
 /**
  * Convenience: compute reach then derive bimodality verdict in one call.
  * Returns the bimodality result, or null when computeBandReachAcrossL2s
