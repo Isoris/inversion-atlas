@@ -49,6 +49,7 @@ UNITS=(
   test_page1_enrichment.js
   test_shared_active_candidate.js
   test_page1_chrom_cache.js
+  test_page1_idb_restore.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
