@@ -169,6 +169,105 @@ check('null summary → 0',              DD.diamondCountFor(null, 'loose') === 0
 check('unknown mode → loose count',    DD.diamondCountFor(summary, 'unknown') === summary.n_loose);
 
 // -----------------------------------------------------------------------------
+group('drawDiamondOverlay');
+class FakeCtx {
+  constructor() {
+    this.calls = [];
+    this.fillStyle = '';
+    this.strokeStyle = '';
+    this.lineWidth = 1;
+    this.font = '';
+    this.textAlign = '';
+    this.textBaseline = '';
+  }
+  save()    { this.calls.push(['save']); }
+  restore() { this.calls.push(['restore']); }
+  fillRect(x, y, w, h) { this.calls.push(['fillRect', x, y, w, h, this.fillStyle]); }
+  fillText(s, x, y)    { this.calls.push(['fillText', s, x, y]); }
+  beginPath()          { this.calls.push(['beginPath']); }
+  moveTo(x, y)         { this.calls.push(['moveTo', x, y]); }
+  lineTo(x, y)         { this.calls.push(['lineTo', x, y]); }
+  stroke()             { this.calls.push(['stroke']); }
+  setLineDash(d)       { this.calls.push(['setLineDash', d.slice()]); }
+}
+
+// Build a windows array compatible with drawDiamondOverlay
+const drawWindows = new Array(16);
+for (let i = 0; i < 16; i++) drawWindows[i] = { center_mb: i * 0.1 };
+const summaryForDraw = {
+  diamonds: [{
+    splitting_band: 0,
+    diamond_start_w: 5, diamond_end_w: 9,
+    stable_bands: [1, 2], slanting_bands: [],
+    strict: true, strict2: true,
+    baseline_spread: 0.1, peak_spread: 0.5, peak_spread_ratio: 5.0,
+  }],
+  n_strict: 1, n_strict2: 1, n_loose: 1, n_diamonds: 1,
+  has_loose: true, has_strict: true, has_strict2: true,
+};
+
+const dCtx = new FakeCtx();
+DD.drawDiamondOverlay(dCtx, { l: 50, t: 10 }, 800, 200, 0, 2.0, summaryForDraw, drawWindows);
+check('drawOverlay: save/restore called',
+      dCtx.calls[0][0] === 'save' && dCtx.calls[dCtx.calls.length - 1][0] === 'restore');
+check('drawOverlay: cyan fillRect drawn',
+      dCtx.calls.some(c => c[0] === 'fillRect' && c[5].includes('60, 223, 255')));
+check('drawOverlay: dashed border drawn',
+      dCtx.calls.some(c => c[0] === 'setLineDash' && c[1].length === 2));
+check('drawOverlay: split-detected label rendered (≥110px → "[strict2]")',
+      dCtx.calls.some(c => c[0] === 'fillText' && c[1].includes('strict2')));
+
+// mode='off' → no draw
+const dCtxOff = new FakeCtx();
+DD.drawDiamondOverlay(dCtxOff, { l: 0, t: 0 }, 800, 200, 0, 2.0, summaryForDraw, drawWindows, { mode: 'off' });
+check('drawOverlay: mode=off → no fillRect',
+      !dCtxOff.calls.some(c => c[0] === 'fillRect'));
+
+// mode='strict2' filters out non-strict2 diamonds
+const summaryLoose = {
+  diamonds: [{
+    splitting_band: 0, diamond_start_w: 5, diamond_end_w: 9,
+    stable_bands: [], slanting_bands: [],
+    strict: false, strict2: false,
+    baseline_spread: 0.1, peak_spread: 0.5, peak_spread_ratio: 5.0,
+  }],
+};
+const dCtxStrict2 = new FakeCtx();
+DD.drawDiamondOverlay(dCtxStrict2, { l: 0, t: 0 }, 800, 200, 0, 2.0, summaryLoose, drawWindows, { mode: 'strict2' });
+check('drawOverlay: strict2 mode filters loose-only diamonds',
+      !dCtxStrict2.calls.some(c => c[0] === 'fillRect'));
+
+// Outside visible range
+const dCtxOut = new FakeCtx();
+DD.drawDiamondOverlay(dCtxOut, { l: 0, t: 0 }, 800, 200, 100, 200, summaryForDraw, drawWindows);
+check('drawOverlay: outside visible range → no fillRect',
+      !dCtxOut.calls.some(c => c[0] === 'fillRect'));
+
+// Diamond covers < 8% → skipped
+const tinyDiamond = {
+  diamonds: [{
+    splitting_band: 0, diamond_start_w: 5, diamond_end_w: 5,
+    stable_bands: [1], slanting_bands: [], strict: true, strict2: false,
+    baseline_spread: 0.1, peak_spread: 0.5, peak_spread_ratio: 5.0,
+  }],
+};
+const dCtxTiny = new FakeCtx();
+// Visible range 0..20 Mb (huge), diamond is one window 0.1Mb wide → < 8%
+DD.drawDiamondOverlay(dCtxTiny, { l: 0, t: 0 }, 800, 200, 0, 20, tinyDiamond, drawWindows);
+check('drawOverlay: diamond < 8% visible → skipped',
+      !dCtxTiny.calls.some(c => c[0] === 'fillRect'));
+
+// Headless safety
+let drawHeadlessOK = true;
+try {
+  DD.drawDiamondOverlay(null, { l: 0, t: 0 }, 100, 100, 0, 1, summaryForDraw, drawWindows);
+  DD.drawDiamondOverlay({}, { l: 0, t: 0 }, 100, 100, 0, 1, summaryForDraw, drawWindows);
+  DD.drawDiamondOverlay(dCtx, { l: 0, t: 0 }, 100, 100, 0, 1, null, drawWindows);
+  DD.drawDiamondOverlay(dCtx, { l: 0, t: 0 }, 100, 100, 0, 1, summaryForDraw, null);
+} catch (_) { drawHeadlessOK = false; }
+check('drawOverlay: headless safety',  drawHeadlessOK);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

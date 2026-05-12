@@ -134,6 +134,69 @@ check('strict floor 0.7: c2 kept',
 check('null projection → []',  TLP.filterByPurityFloor(null).length === 0);
 
 // -----------------------------------------------------------------------------
+group('drawTrackedLinkageStrip');
+// Fake canvas context that records calls
+class FakeCtx {
+  constructor() {
+    this.calls = [];
+    this.fillStyle = '';
+    this.font = '';
+    this.textAlign = '';
+    this.textBaseline = '';
+  }
+  save()      { this.calls.push(['save']); }
+  restore()   { this.calls.push(['restore']); }
+  fillRect(x, y, w, h) { this.calls.push(['fillRect', x, y, w, h, this.fillStyle]); }
+  fillText(s, x, y)    { this.calls.push(['fillText', s, x, y, this.fillStyle]); }
+}
+
+// Projection from earlier: 2 candidates kept. Mb range covers c1 (100bp = 0.0001 Mb).
+const projForDraw = TLP.computeTrackedLinkageProjection([0, 1, 2, 3, 4], [
+  { id: 'c1', K: 3, seq_num: 1, start_bp: 10_000_000, end_bp: 12_000_000,
+    labels: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },  // purity 1.0
+  { id: 'c2', K: 3, seq_num: 2, start_bp: 15_000_000, end_bp: 16_000_000,
+    labels: [0, 0, 1, 1, 2, 2, 2, 2, 2, 2] },  // purity 0.4 (below default floor)
+]);
+
+const ctx = new FakeCtx();
+TLP.drawTrackedLinkageStrip(ctx, { l: 50, t: 10 }, 600, 200, 5, 20, projForDraw);
+check('drawStrip: save/restore called',
+      ctx.calls[0][0] === 'save' && ctx.calls[ctx.calls.length - 1][0] === 'restore');
+check('drawStrip: fillRect called for c1 (purity 1.0)',
+      ctx.calls.some(c => c[0] === 'fillRect'));
+// c2's purity 0.4 is above default floor 0.30 so it should also draw.
+const fillRectCount = ctx.calls.filter(c => c[0] === 'fillRect').length;
+check('drawStrip: 2 fill rects (c1 + c2)',  fillRectCount === 2);
+
+// Label "I1·b0 · 100%" should appear for c1 (wide + purity ≥ 0.5)
+const labels = ctx.calls.filter(c => c[0] === 'fillText').map(c => c[1]);
+check('drawStrip: c1 label rendered',
+      labels.some(l => l.includes('I1·b0') && l.includes('100%')));
+
+// purityFloor override
+const ctx2 = new FakeCtx();
+TLP.drawTrackedLinkageStrip(ctx2, { l: 50, t: 10 }, 600, 200, 5, 20, projForDraw, { purityFloor: 0.9 });
+const fillRectCount2 = ctx2.calls.filter(c => c[0] === 'fillRect').length;
+check('drawStrip: custom floor 0.9 → only c1 (purity 1.0) kept',
+      fillRectCount2 === 1);
+
+// Outside visible range
+const ctx3 = new FakeCtx();
+TLP.drawTrackedLinkageStrip(ctx3, { l: 50, t: 10 }, 600, 200, 100, 200, projForDraw);
+check('drawStrip: outside visible range → no fillRect',
+      ctx3.calls.filter(c => c[0] === 'fillRect').length === 0);
+
+// Headless safety
+let headlessOK = true;
+try {
+  TLP.drawTrackedLinkageStrip(null, { l: 0, t: 0 }, 100, 100, 0, 1, projForDraw);
+  TLP.drawTrackedLinkageStrip({}, { l: 0, t: 0 }, 100, 100, 0, 1, projForDraw);
+  TLP.drawTrackedLinkageStrip(ctx, { l: 0, t: 0 }, 100, 100, 0, 1, null);
+  TLP.drawTrackedLinkageStrip(ctx, { l: 0, t: 0 }, 100, 100, 0, 1, { per_candidate: [] });
+} catch (_) { headlessOK = false; }
+check('drawStrip: headless safety',  headlessOK);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

@@ -283,6 +283,108 @@ export function summarizeDiamonds(candidate, windows) {
   };
 }
 
+// =====================================================================
+// Canvas overlay drawer
+// =====================================================================
+
+/**
+ * Draw the diamond overlay on the PC1 panel. One translucent cyan
+ * rectangle per detected diamond, with dashed left/right edges and a
+ * top annotation strip ("◆ split detected" or "[strict]" / "[strict2]"
+ * variants). Skips diamonds covering < 8% of visible range (too
+ * zoomed-out for the annotation to be useful).
+ *
+ * Pure given the diamond summary + canvas context. Caller pre-computes
+ * the summary via summarizeDiamonds.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{l:number, t:number}} pad
+ * @param {number} plotW
+ * @param {number} plotH
+ * @param {number} mbMin
+ * @param {number} mbMax
+ * @param {Object} summary  from summarizeDiamonds
+ * @param {Array<{center_mb:number}>} windows  state.data.windows
+ * @param {{mode?:'loose'|'strict'|'strict2'}} opts
+ */
+export function drawDiamondOverlay(ctx, pad, plotW, plotH, mbMin, mbMax, summary, windows, opts) {
+  if (!ctx || typeof ctx.fillRect !== 'function') return;
+  if (!summary || !Array.isArray(summary.diamonds) || summary.diamonds.length === 0) return;
+  if (!Array.isArray(windows)) return;
+  const mode = (opts && opts.mode) || 'loose';
+  if (mode === 'off') return;
+  const filtered = summary.diamonds.filter(dd =>
+    mode === 'strict'  ? dd.strict  :
+    mode === 'strict2' ? dd.strict2 :
+    true
+  );
+  if (filtered.length === 0) return;
+
+  if (typeof ctx.save === 'function') ctx.save();
+  const mbToX = (mb) => pad.l + ((mb - mbMin) / (mbMax - mbMin)) * plotW;
+
+  for (const dd of filtered) {
+    const wLo = dd.diamond_start_w;
+    const wHi = dd.diamond_end_w;
+    if (wLo == null || wHi == null) continue;
+    if (wLo < 0 || wHi >= windows.length) continue;
+    const winLo = windows[wLo], winHi = windows[wHi];
+    if (!winLo || !winHi) continue;
+    const mbLo = winLo.center_mb;
+    const mbHi = winHi.center_mb;
+    if (!Number.isFinite(mbLo) || !Number.isFinite(mbHi)) continue;
+    if (mbHi < mbMin || mbLo > mbMax) continue;
+    const xLo = Math.max(pad.l, mbToX(Math.max(mbLo, mbMin)));
+    const xHi = Math.min(pad.l + plotW, mbToX(Math.min(mbHi, mbMax)));
+    if (xHi - xLo < 12) continue;
+    const visibleSpan = mbMax - mbMin;
+    const diamondSpan = mbHi - mbLo;
+    if (visibleSpan <= 0 || (diamondSpan / visibleSpan < 0.08)) continue;
+
+    const alpha = dd.strict2 ? 0.16 : (dd.strict ? 0.12 : 0.08);
+    ctx.fillStyle = 'rgba(60, 223, 255, ' + alpha + ')';
+    ctx.fillRect(xLo, pad.t, xHi - xLo, plotH);
+
+    if (typeof ctx.beginPath === 'function' && typeof ctx.stroke === 'function') {
+      ctx.strokeStyle = 'rgba(60, 223, 255, 0.55)';
+      ctx.lineWidth = 1;
+      if (typeof ctx.setLineDash === 'function') ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(xLo + 0.5, pad.t);
+      ctx.lineTo(xLo + 0.5, pad.t + plotH);
+      ctx.moveTo(xHi - 0.5, pad.t);
+      ctx.lineTo(xHi - 0.5, pad.t + plotH);
+      ctx.stroke();
+      if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+    }
+
+    if (typeof ctx.fillText === 'function') {
+      if (xHi - xLo >= 110) {
+        const stripH = 12;
+        ctx.fillStyle = 'rgba(60, 223, 255, 0.85)';
+        ctx.fillRect(xLo, pad.t, xHi - xLo, stripH);
+        ctx.fillStyle = '#000';
+        ctx.font = '10px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const tag = dd.strict2 ? '◆ split [strict2]'
+                  : dd.strict  ? '◆ split [strict]'
+                  : '◆ split detected';
+        ctx.fillText(tag, (xLo + xHi) / 2, pad.t + stripH / 2);
+      } else if (xHi - xLo >= 40) {
+        ctx.fillStyle = 'rgba(60, 223, 255, 0.85)';
+        ctx.fillRect(xLo, pad.t, xHi - xLo, 8);
+        ctx.fillStyle = '#000';
+        ctx.font = '8px ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('◆', (xLo + xHi) / 2, pad.t + 4);
+      }
+    }
+  }
+  if (typeof ctx.restore === 'function') ctx.restore();
+}
+
 /**
  * Resolve the count under a given strictness mode. Convenience for the
  * catalogue Diamond column renderer.

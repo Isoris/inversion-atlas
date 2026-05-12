@@ -122,6 +122,78 @@ export function computeTrackedLinkageProjection(fishIdx, items, inh, opts) {
   return out;
 }
 
+// =====================================================================
+// Canvas drawer
+// =====================================================================
+
+function _hexToRgb(hex) {
+  if (typeof hex !== 'string' || hex.length !== 7 || hex[0] !== '#') {
+    return [122, 131, 152];  // neutral grey fallback
+  }
+  return [
+    parseInt(hex.slice(1, 3), 16) || 0,
+    parseInt(hex.slice(3, 5), 16) || 0,
+    parseInt(hex.slice(5, 7), 16) || 0,
+  ];
+}
+
+/**
+ * Draw the tracked-linkage shading strip behind PC1 trajectories.
+ * One translucent rectangle per candidate whose purity ≥ floor,
+ * colored by inheritance group (alpha = purity² × 0.45). Adds a
+ * compact label "I<seq>·b<band> · <purity%>" when the rectangle is
+ * wide enough (≥ 36px) AND purity ≥ 0.5.
+ *
+ * Pure given the projection + canvas context. Caller pre-computes
+ * the projection via computeTrackedLinkageProjection.
+ *
+ * Headless-tolerant: returns silently when ctx is not a CanvasRenderingContext.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{l:number, t:number}} pad
+ * @param {number} plotW
+ * @param {number} plotH
+ * @param {number} mbMin
+ * @param {number} mbMax
+ * @param {Object} projection   from computeTrackedLinkageProjection
+ * @param {{purityFloor?:number}} opts
+ */
+export function drawTrackedLinkageStrip(ctx, pad, plotW, plotH, mbMin, mbMax, projection, opts) {
+  if (!ctx || typeof ctx.fillRect !== 'function') return;
+  if (!projection || !Array.isArray(projection.per_candidate)
+      || projection.per_candidate.length === 0) return;
+  const floor = (opts && Number.isFinite(opts.purityFloor)) ? opts.purityFloor : TLP_PURITY_FLOOR;
+
+  if (typeof ctx.save === 'function') ctx.save();
+  for (const rec of projection.per_candidate) {
+    if (!rec || rec.purity < floor) continue;
+    if (!Number.isFinite(rec.start_bp) || !Number.isFinite(rec.end_bp)) continue;
+    const mbLo = rec.start_bp / 1e6;
+    const mbHi = rec.end_bp / 1e6;
+    if (mbHi < mbMin || mbLo > mbMax) continue;
+    const xLo = pad.l + Math.max(0, ((mbLo - mbMin) / (mbMax - mbMin)) * plotW);
+    const xHi = pad.l + Math.min(plotW, ((mbHi - mbMin) / (mbMax - mbMin)) * plotW);
+    const w = xHi - xLo;
+    if (w < 1) continue;
+    const alpha = rec.purity * rec.purity * 0.45;
+    const [r, g, b] = _hexToRgb(rec.inh_group_color || '#7a8398');
+    ctx.fillStyle = 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha.toFixed(3) + ')';
+    ctx.fillRect(xLo, pad.t, w, plotH);
+    if (w >= 36 && rec.purity >= 0.5) {
+      if (typeof ctx.fillText === 'function') {
+        ctx.font = '9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = 'rgba(' + r + ', ' + g + ', ' + b + ', 0.95)';
+        const label = 'I' + rec.seq_num + '·b' + rec.dominant_band
+          + ' · ' + (rec.purity * 100).toFixed(0) + '%';
+        ctx.fillText(label, (xLo + xHi) / 2, pad.t + plotH - 2);
+      }
+    }
+  }
+  if (typeof ctx.restore === 'function') ctx.restore();
+}
+
 /**
  * Filter the projection to candidates whose purity ≥ floor (for the
  * PC1-panel shading layer that the legacy uses). Pure: returns a new
