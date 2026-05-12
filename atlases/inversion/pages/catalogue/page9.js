@@ -44,73 +44,28 @@
 // =============================================================================
 
 import { _pageState, _setActiveState } from './page9/_state.js';
+import {
+  renderConfirmedCarousel,
+  wireConfirmedCarouselNav,
+  teardownConfirmedCarouselNav,
+} from './page9/carousel.js';
 
 /**
- * Internal: refresh the confirmed-candidates carousel using the
- * currently-active _pageState (set by mount() or refreshConfirmedCarousel(state)).
- *
- * Current behaviour (matches legacy stub): show #confirmedEmpty, hide
- * #confirmedNavBar and #confirmedCandidateMeta. This is a placeholder; the
- * full carousel is TODO_MISSING.
- */
-function _refreshConfirmedCarousel() {
-  if (typeof document === 'undefined') return;
-  const state = _pageState || {};
-  const navBar = document.getElementById('confirmedNavBar');
-  const meta   = document.getElementById('confirmedCandidateMeta');
-  const empty  = document.getElementById('confirmedEmpty');
-
-  // TODO_MISSING(_renderConfirmedCarousel) — full carousel implementation.
-  // For now: count confirmed candidates. If zero, keep the empty message.
-  // If non-zero, still keep the empty message because the carousel renderer
-  // is not yet implemented; the merge chat / a follow-up batch ships it.
-  const confirmedCount = (Array.isArray(state.candidateList))
-    ? state.candidateList.filter(c => c && c.confirmed === true).length
-    : 0;
-
-  if (confirmedCount === 0) {
-    if (navBar) navBar.style.display = 'none';
-    if (meta)   meta.style.display = 'none';
-    if (empty)  empty.style.display = 'block';
-    return;
-  }
-
-  // Non-zero confirmed candidates exist — but the carousel logic is not
-  // ported yet. Show a placeholder telling the user where to look.
-  if (empty) {
-    empty.style.display = 'block';
-    empty.innerHTML =
-      '<div style="font-size:14px; margin-bottom:14px;">' +
-        confirmedCount + ' confirmed candidate' +
-        (confirmedCount === 1 ? '' : 's') + '.' +
-      '</div>' +
-      '<div style="font-size:12px; line-height:1.7; max-width:540px; margin:0 auto;">' +
-        'Carousel rendering is not yet wired in the modular build. ' +
-        'View confirmed candidates on <b>page 2 candidate focus</b>.' +
-      '</div>';
-  }
-  if (navBar) navBar.style.display = 'none';
-  if (meta)   meta.style.display = 'none';
-}
-
-/**
- * Public entry — state-aware wrapper. Sets _pageState before delegating
- * so the helper sees live data.
+ * Public entry — state-aware wrapper. Sets _pageState before
+ * delegating to the carousel renderer.
  */
 export function refreshConfirmedCarousel(state) {
   if (state) _setActiveState(state);
-  return _refreshConfirmedCarousel();
+  return renderConfirmedCarousel(_pageState);
 }
 
 /**
- * Public entry: wire the prev/next/keydown handlers. Idempotent.
- *
- * TODO_MISSING(_wireConfirmedCarouselNav) — full handler wiring.
+ * Wire the prev/next/keydown handlers. Idempotent (the carousel
+ * module tears down any prior handlers internally before wiring
+ * new ones).
  */
 export function initConfirmedCarousel() {
-  // TODO_MISSING(_wireConfirmedCarouselNav)
-  // Stub: no-op until the carousel renderer is implemented.
-  return;
+  wireConfirmedCarouselNav(_pageState);
 }
 
 // ---------------------------------------------------------------------------
@@ -138,9 +93,12 @@ export async function mount(root, atlasState, registry) {
 }
 
 /**
- * Unmount: clear _pageState so post-unmount callbacks see null.
+ * Unmount: remove keydown / button handlers, clear _pageState so
+ * post-unmount callbacks see null.
  */
 export async function unmount(root) {
+  try { teardownConfirmedCarouselNav(); }
+  catch (e) { console.warn('page9.unmount: teardown threw —', e); }
   _setActiveState(null);
 }
 

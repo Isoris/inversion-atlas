@@ -126,10 +126,18 @@ check('_pageState has precomp slot',                     'precomp' in stashedSta
 
 // -----------------------------------------------------------------------------
 group('Smoke: mount() with populated state (active chromosome)');
+_nodes.clear();
+
 const atlasState2 = buildAtlasState({
   inversion: {
     activeChrom: 'LG28',
-    precomp: { chrom: 'LG28', windows: [], _stub: true },
+    precomp: {
+      chrom: 'LG28',
+      windows: [
+        { start_bp: 0,       end_bp: 100_000, center_bp:  50_000, z: 1.0, lam1: 1.5, lam2: 0.5, n_snps: 80, l2_id: 'L2_a' },
+        { start_bp: 100_000, end_bp: 200_000, center_bp: 150_000, z: 3.2, lam1: 3.0, lam2: 0.3, n_snps: 120, l2_id: 'L2_b' },
+      ],
+    },
   },
 });
 
@@ -140,6 +148,14 @@ check('populated mount() ran without throwing', mount2OK, mount2Err ? mount2Err.
 check('_pageState.activeChrom propagated',     state._pageState.activeChrom === 'LG28');
 check('_pageState.precomp propagated',         state._pageState.precomp && state._pageState.precomp.chrom === 'LG28');
 check('atlasState2 stash refreshed',           atlasState2.inversion._page8State === state._pageState);
+
+const chips = _ensureNode('winSumChips');
+const body  = _ensureNode('winSumTableBody');
+check('winSumChips rendered (chrom)',          chips.innerHTML.includes('LG28'));
+check('winSumChips counts "2 / 2"',            chips.innerHTML.includes('2 / 2'));
+check('winSumTableBody has 2 rows',            (body.innerHTML.match(/<tr/g) || []).length === 2);
+check('winSumNoChrom hidden after populated',  _ensureNode('winSumNoChrom').style.display === 'none');
+check('winSumStrip visible after populated',   _ensureNode('winSumStrip').style.display === 'block');
 
 // -----------------------------------------------------------------------------
 group('Smoke: unmount()');

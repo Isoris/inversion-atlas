@@ -43,6 +43,11 @@ import {
   _exportBreedingCardsJSON,
   _wireCatalogueBreedingExportBtns,
 } from './page3/_breeding_export.js';
+import {
+  renderCatalogue,
+  wireCatalogueToolbar,
+  teardownCatalogueToolbar,
+} from './page3/catalogue.js';
 
 // Re-export the public set so the manifest's module: contract is preserved
 // across the split.
@@ -51,6 +56,24 @@ export {
   _exportBreedingCardsJSON,
   _wireCatalogueBreedingExportBtns,
 } from './page3/_breeding_export.js';
+export {
+  CAT_COLUMNS,
+  CAT_VIEW_MODES,
+  buildCatalogueRows,
+  filterCatalogueRows,
+  sortCatalogueRows,
+  visibleColumns,
+  renderCatHeaderHtml,
+  renderCatBodyHtml,
+  renderCatalogue,
+  exportCatalogueTSV,
+  exportCatalogueMarkdown,
+  exportCatalogueJSON,
+  promoteRowsToCandidates,
+  promoteSelectedToCandidates,
+  wireCatalogueToolbar,
+  teardownCatalogueToolbar,
+} from './page3/catalogue.js';
 
 // ---------------------------------------------------------------------------
 // Public entry: render the catalogue page
@@ -72,23 +95,7 @@ export {
  */
 export function renderCataloguePage(state) {
   _setActiveState(state);
-  if (typeof document === 'undefined') return;
-  const head    = document.getElementById('catHead');
-  const body    = document.getElementById('catBody');
-  const empty   = document.getElementById('catEmpty');
-  const selInfo = document.getElementById('catSelInfo');
-
-  // TODO_MISSING(_buildCatalogueRows + _filterCatalogueRows
-  //              + _sortCatalogueRows + _paintCatalogueRow):
-  //   The catalogue renderer is not in legacy. Show empty state.
-  if (head) head.innerHTML = '';
-  if (body) body.innerHTML = '';
-  if (empty) {
-    empty.style.display = 'block';
-    empty.textContent = 'Load a JSON to populate the catalogue. '
-      + '(Catalogue rendering not yet migrated; breeding-card export buttons are wired.)';
-  }
-  if (selInfo) selInfo.textContent = '0 selected of 0';
+  renderCatalogue(state);
 }
 
 /**
@@ -103,14 +110,16 @@ export function renderCataloguePage(state) {
  */
 export function initCataloguePage(state) {
   _setActiveState(state);
-  // The only catalogue-toolbar action that has a working legacy
-  // implementation: breeding-card export.
+  // Breeding-card export (legacy implementation, already wired).
   try { _wireCatalogueBreedingExportBtns(); }
   catch (e) { console.warn('_wireCatalogueBreedingExportBtns:', e.message); }
-  // TODO_MISSING(_wireCatalogueToolbar) — view/display/diamond/filter
-  // TODO_MISSING(_wireCatalogueExportBtns) — TSV/MD/JSON/gallery
+  // Filter / sort / view-mode / disp-mode / select-all / clear / TSV / MD / JSON.
+  try { wireCatalogueToolbar(state, { onChange: () => renderCatalogue(state) }); }
+  catch (e) { console.warn('wireCatalogueToolbar:', e.message); }
   // TODO_MISSING(_wireCatalogueRegimeBtns) — registry, assign-sel
   // TODO_MISSING(_wireCatalogueCandidatePromote) — view-as-candidate
+  // TODO_MISSING(_wireCatalogueDiamondMode) — diamond strictness toggle
+  // TODO_MISSING(_wireCatalogueGalleryExports) — SVG / PNG / PDF
 }
 
 // ---------------------------------------------------------------------------
@@ -145,9 +154,8 @@ export async function mount(root, atlasState, registry) {
  * Unmount: called by atlas_router before navigating away.
  */
 export async function unmount(root) {
-  // Atlas-router may also call this from a different module instance;
-  // guard against accessing _getState directly here. Just clear our
-  // own state binding.
+  try { teardownCatalogueToolbar(); }
+  catch (e) { console.warn('page3.unmount: teardownCatalogueToolbar —', e); }
   _setActiveState(null);
 }
 
@@ -179,6 +187,28 @@ function _buildLegacyState(atlasState) {
   // cohortDiversity slot — populated by atlas_turn7's makeShelfLDPanel
   // when that ships. Default empty for now.
   legacy.cohortDiversity = inv.cohortDiversity || null;
+
+  // Catalogue rows — supplied either directly via inv.catalogueRows (from
+  // a future JSON-loader) or derived from inv.tracks[chrom].l2_envelopes
+  // when available. Falls back to empty array → empty-state hint.
+  if (Array.isArray(inv.catalogueRows)) {
+    legacy.catalogueRows = inv.catalogueRows;
+  } else if (legacy.data && Array.isArray(legacy.data.l2_envelopes)) {
+    legacy.catalogueRows = legacy.data.l2_envelopes;
+  } else {
+    legacy.catalogueRows = [];
+  }
+  // Seed slots that the renderer expects (so the first render-pass
+  // doesn't have to back-fill them).
+  legacy.catFavorites      = inv.catFavorites      instanceof Set ? inv.catFavorites      : new Set();
+  legacy.catSelection      = inv.catSelection      instanceof Set ? inv.catSelection      : new Set();
+  legacy.catFilter         = typeof inv.catFilter         === 'string' ? inv.catFilter         : '';
+  legacy.catVerdictFilter  = typeof inv.catVerdictFilter  === 'string' ? inv.catVerdictFilter  : '';
+  legacy.catViewMode       = typeof inv.catViewMode       === 'string' ? inv.catViewMode       : 'l2_raw';
+  legacy.catDispMode       = typeof inv.catDispMode       === 'string' ? inv.catDispMode       : 'detailed';
+  legacy.catSortKey        = typeof inv.catSortKey        === 'string' ? inv.catSortKey        : 'id';
+  legacy.catSortDir        = typeof inv.catSortDir        === 'string' ? inv.catSortDir        : 'asc';
+  legacy.activeChrom       = chrom || null;
 
   return legacy;
 }

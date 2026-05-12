@@ -55,42 +55,70 @@ import { buildContingency, computeARI, computeNMI, cramersV } from '../../shared
 import { kmeans1D, kmeans2D, silhouette1D, adaptiveK1D } from '../../shared/kmeans.js';
 
 import { _pageState, _setActiveState } from './page19/_state.js';
+import {
+  renderNegativeRegions,
+  wireNegativeRegionsToolbar,
+  teardownNegativeRegionsToolbar,
+} from './page19/negative_regions.js';
+
+/**
+ * Public entry — state-aware wrapper. Sets _pageState before
+ * delegating to the renderer.
+ */
+export function refreshNegativeRegions(state) {
+  if (state) _setActiveState(state);
+  return renderNegativeRegions(_pageState);
+}
+
+/**
+ * Wire load / export / reset toolbar buttons. Idempotent.
+ */
+export function initNegativeRegionsToolbar() {
+  wireNegativeRegionsToolbar(_pageState, {
+    onChange: () => renderNegativeRegions(_pageState),
+  });
+}
 
 // ---------------------------------------------------------------------------
-// Atlas-router lifecycle (chat 38 round 5 step 14, 2026-05-07).
+// Atlas-router lifecycle.
 // ---------------------------------------------------------------------------
 
 /**
  * Mount: called by atlas_router when the user navigates to page19.
  *
- * Builds a legacy-shape state with the slots page19 will eventually need
- * (negativeRegions for the loaded region list, activeChrom for any
- * chrom-filtered summary cards). No render call yet — the legacy page is
- * pure HTML scaffold; the static caution banner + empty summary cards
- * remain visible until renderers are authored.
+ * Builds a legacy-shape state with negativeRegions + activeChrom.
+ * Renders the summary cards + region table against the loaded list
+ * (empty-state message when none) and wires the load / export / reset
+ * toolbar handlers.
  */
 export async function mount(root, atlasState, registry) {
   const legacyState = _buildLegacyState(atlasState);
   _setActiveState(legacyState);
 
-  // No render. Page19 is a pure-HTML-scaffold stub even in legacy
-  // (see header comment). Leaving _pageState set lets future renderers
-  // observe a non-null state via the live-binding pattern.
+  try { refreshNegativeRegions(legacyState); }
+  catch (e) { console.warn('page19.mount: refreshNegativeRegions threw —', e); }
+
+  try { initNegativeRegionsToolbar(); }
+  catch (e) { console.warn('page19.mount: initNegativeRegionsToolbar threw —', e); }
 
   if (atlasState.inversion) atlasState.inversion._page19State = legacyState;
 }
 
 /**
- * Unmount: clear _pageState so post-unmount callbacks see null.
+ * Unmount: remove wired handlers, clear _pageState so post-unmount
+ * callbacks see null.
  */
 export async function unmount(root) {
+  try { teardownNegativeRegionsToolbar(); }
+  catch (e) { console.warn('page19.unmount: teardown threw —', e); }
   _setActiveState(null);
 }
 
 function _buildLegacyState(atlasState) {
   const inv = atlasState.inversion || {};
   const legacy = Object.assign({}, inv);
-  legacy.negativeRegions = inv.negativeRegions || [];
-  legacy.activeChrom     = inv.activeChrom     || null;
+  legacy.negativeRegions         = inv.negativeRegions         || [];
+  legacy.negativeRegionsMetadata = inv.negativeRegionsMetadata || {};
+  legacy.activeChrom             = inv.activeChrom             || null;
   return legacy;
 }
