@@ -28,7 +28,12 @@
 import { escapeHtml } from '../../shared/page1_utils.js';
 import { resolve as _registryResolve, getState as _getState } from '../../../../core/atlas_api.js';
 
-import { _setActiveState } from './page1/_state.js';
+import {
+  _setActiveState,
+  _linesCacheInvalidate,
+  invalidateLineageCache,
+  _bandTraceClearCache,
+} from './page1/_state.js';
 import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayers, listLayers, loadViewControls, populateSimScales, reconcileViewControlsForData } from './page1/_data.js';
 import { drawSim, drawSimMini } from './page1/sim_panel.js';
 import { drawZ } from './page1/z_panel.js';
@@ -91,15 +96,11 @@ export function applyData(state, data) {
   // matrix and lineage labels only mean something within one chrom). When
   // data swaps, drop the cached result so the next paint re-triggers
   // compute on the new chromosome's L2 inventory.
-  if (typeof invalidateLineageCache === 'function') {
-    try { invalidateLineageCache(); } catch (_) {}
-  }
+  invalidateLineageCache(state);
   // turn 161: same for the band-trace cache (per-chromosome, per-fish-set).
   // Also drop the fish-set itself — sample indices are per-chrom and
   // generally don't transfer to a new chromosome's data shape.
-  if (typeof _bandTraceClearCache === 'function') {
-    try { _bandTraceClearCache(); } catch (_) {}
-  }
+  _bandTraceClearCache(state);
   state.bandTraceFishSet = null;
   state._lineageComputeScheduled = false;
   // v3.99 turn 14e: if simInMinimap was restored from localStorage at
@@ -185,7 +186,7 @@ export function applyData(state, data) {
   state.cacheKey = null;
   // v3.99 turn 7 perf: clear render caches whenever a new dataset loads
   _l3CacheInvalidate();
-  if (typeof _linesCacheInvalidate === 'function') _linesCacheInvalidate();
+  _linesCacheInvalidate(state);
   // 2026-05-06 round 3: these helpers were extracted in step 3 and are now
   // imported at the top of this file — calling them directly is safe.
   // refreshColorModeBar / refreshPcaAxisBar / refreshPinUI are never-defined-

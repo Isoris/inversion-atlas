@@ -40,6 +40,38 @@ import { manualGroupForSample } from './manual_groups.js';
 export let _pageState = null;
 export function _setActiveState(s) { _pageState = s; }
 
+// =====================================================================
+// Cache-invalidation helpers (legacy 34321 / 39362 / 39973)
+// =====================================================================
+// Reset the per-chromosome render caches so that the next paint after a
+// data swap recomputes from scratch. Legacy versions read `state` as a
+// global; here state is passed explicitly so the helpers compose with
+// any state shape (page1's _pageState is the typical caller).
+
+// --- _linesCacheInvalidate — legacy line 34321 ---
+export function _linesCacheInvalidate(state) {
+  if (!state) return;
+  state.__linesCache = {};
+}
+
+// --- invalidateLineageCache — legacy lines 39362-39367 ---
+export function invalidateLineageCache(state) {
+  if (!state) return;
+  state.lineageResult = null;
+  state.lineageCacheKey = null;
+}
+
+// --- _bandTraceClearCache — legacy lines 39973-39982 ---
+export function _bandTraceClearCache(state) {
+  if (!state) return;
+  state.bandTraceCache = null;
+  state.bandTraceCacheKey = null;
+  // turn 162 — also clear the hit-region stash so stale rectangles from
+  // a prior chromosome can't fire false positives in the tooltip handler
+  // before drawLinesPanel runs against the new chromosome.
+  state._btraceHits = null;
+}
+
 // --- Family / lineage palette small-cohort fallbacks (legacy 36262-36264) ---
 // FAMILY_PALETTE_BASE itself was hoisted to shared/page1_data_helpers.js;
 // the three fallback colors below are only used by familyColor() in this
