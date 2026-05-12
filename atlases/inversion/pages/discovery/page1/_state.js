@@ -40,6 +40,11 @@ import { manualGroupForSample } from './manual_groups.js';
 export let _pageState = null;
 export function _setActiveState(s) { _pageState = s; }
 
+// runLineageCompute is imported here (rather than below `_lineageColor`)
+// to keep all imports at the top per ESM convention. ESM hoists imports
+// regardless of position, so this is purely stylistic.
+import { runLineageCompute } from './lineage.js';
+
 // =====================================================================
 // Cache-invalidation helpers (legacy 34321 / 39362 / 39973)
 // =====================================================================
@@ -124,13 +129,13 @@ export function _lineageColor(si) {
   // Auto-trigger compute on first reference. Mirrors the pattern in
   // _drawInheritanceLabelsStrip — schedule via requestIdleCallback so
   // the current paint completes; the next paint picks up the result.
-  if (!result && typeof runLineageCompute === 'function'
+  if (!result
       && !_state._lineageComputeScheduled
       && _state.data.l2_envelopes && _state.data.l2_envelopes.length >= 3) {
     _state._lineageComputeScheduled = true;
     const fire = () => {
       _state._lineageComputeScheduled = false;
-      try { runLineageCompute(); } catch (_) {}
+      try { runLineageCompute(_state); } catch (_) {}
       if (typeof window !== 'undefined' && typeof window.requestRepaint === 'function') {
         try { window.requestRepaint(); } catch (_) {}
       }

@@ -37,6 +37,8 @@ UNITS=(
   test_page1_active_samples.js
   test_shared_band_trace.js
   test_page1_band_trace_state.js
+  test_shared_clustering.js
+  test_page1_lineage.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
