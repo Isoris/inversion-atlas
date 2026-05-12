@@ -99,6 +99,65 @@
 // =============================================================================
 
 import { _pageState, _setActiveState } from './page4/_state.js';
+import { renderTierAxesGrid as _renderTierAxesGrid, TIER_AXES, TIER_GROUPS, tierAxisValueColor } from './page4/tier_axes.js';
+import {
+  renderKaryotypeBody as _renderCandidateKaryotypeBody,
+  renderKaryotypeBodyHtml,
+  wireKaryotypeToolbar,
+  teardownKaryotypeToolbar,
+  exportKaryotypeTSV,
+} from './page4/karyo_body.js';
+import {
+  buildKaryotypeRows,
+  filterKaryoRows,
+  sortKaryoRows,
+  isKaryoTwoTrack,
+  karyoBandToTrackMap,
+} from './page4/karyo_rows.js';
+import {
+  KARYO_LABEL_VOCABS,
+  KARYO_DETAILED_LABELS,
+  KARYO_LEGACY_LABELS_K3,
+  ensureKaryoLabelVocab,
+  setKaryoLabelVocab,
+  getKaryotypeLabel,
+  getKaryotypeLabelCaveat,
+} from './page4/karyo_labels.js';
+
+// Re-export sub-module public surface so downstream consumers don't need
+// to know about the split.
+export {
+  TIER_AXES, TIER_GROUPS, tierAxisValueColor,
+  renderTierAxesGrid,
+} from './page4/tier_axes.js';
+export {
+  buildKaryotypeRows, filterKaryoRows, sortKaryoRows,
+  isKaryoTwoTrack, karyoBandToTrackMap,
+} from './page4/karyo_rows.js';
+export {
+  KARYO_LABEL_VOCABS, KARYO_DETAILED_LABELS, KARYO_LEGACY_LABELS_K3,
+  ensureKaryoLabelVocab, setKaryoLabelVocab,
+  getKaryotypeLabel, getKaryotypeLabelCaveat,
+} from './page4/karyo_labels.js';
+export {
+  renderKaryotypeBody, renderKaryotypeBodyHtml,
+  wireKaryotypeToolbar, teardownKaryotypeToolbar,
+  exportKaryotypeTSV,
+} from './page4/karyo_body.js';
+
+function _wireCandSubviewButtons() {
+  if (typeof document === 'undefined') return;
+  const kBtn = document.getElementById('candSubviewKaryoBtn');
+  const tBtn = document.getElementById('candSubviewTierBtn');
+  if (kBtn && !kBtn.__sub_wired) {
+    kBtn.addEventListener('click', () => setKaryoSubview('karyotype'));
+    kBtn.__sub_wired = true;
+  }
+  if (tBtn && !tBtn.__sub_wired) {
+    tBtn.addEventListener('click', () => setKaryoSubview('tier'));
+    tBtn.__sub_wired = true;
+  }
+}
 
 // -----------------------------------------------------------------------------
 // Page-local UI state (not in SLOT_REGISTRY — page-private)
@@ -428,6 +487,8 @@ export async function mount(root, atlasState, registry) {
  * Unmount: clear _pageState so post-unmount callbacks see null.
  */
 export async function unmount(root) {
+  try { teardownKaryotypeToolbar(); }
+  catch (e) { console.warn('page4.unmount: teardownKaryotypeToolbar threw —', e); }
   _setActiveState(null);
 }
 
