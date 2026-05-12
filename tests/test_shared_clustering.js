@@ -7,6 +7,7 @@ import {
   agglomerativeAverageLinkage,
   cutDendrogram,
   clusterByConcordance,
+  cosineDistance,
 } from '../atlases/inversion/shared/clustering.js';
 
 let pass = 0, fail = 0;
@@ -151,6 +152,45 @@ group('clusterByConcordance — full concordance produces 1 group');
   const result = clusterByConcordance(C, N, 0.5);
   check('all-1 concordance: 1 lineage', result.n_lineages === 1);
 }
+
+// =====================================================================
+group('cosineDistance');
+check('identical → 0',
+      Math.abs(cosineDistance([1, 0, 0], [1, 0, 0])) < 1e-9);
+check('orthogonal → 1',
+      Math.abs(cosineDistance([1, 0, 0], [0, 1, 0]) - 1) < 1e-9);
+check('opposite → 2 (clamped from -1 sim)',
+      Math.abs(cosineDistance([1, 0, 0], [-1, 0, 0]) - 2) < 1e-9);
+check('scale-invariant (same direction)',
+      Math.abs(cosineDistance([2, 0, 0], [1, 0, 0])) < 1e-9);
+check('45° angle → 1 - cos(45°) ≈ 0.293',
+      Math.abs(cosineDistance([1, 0], [1, 1]) - (1 - 1 / Math.sqrt(2))) < 1e-9);
+{
+  // Float32Array input works
+  const u = Float32Array.from([1, 1, 0]);
+  const v = Float32Array.from([1, 0, 1]);
+  // cos sim = 1 / (sqrt(2) * sqrt(2)) = 0.5, distance = 0.5
+  check('Float32Array input',                   Math.abs(cosineDistance(u, v) - 0.5) < 1e-6);
+}
+// Zero vector returns maximally distant (1) per legacy convention
+check('zero u → 1',                           cosineDistance([0, 0, 0], [1, 1, 1]) === 1);
+check('zero v → 1',                           cosineDistance([1, 1, 1], [0, 0, 0]) === 1);
+check('both zero → 1',                        cosineDistance([0, 0], [0, 0]) === 1);
+// Shape errors → NaN
+check('null u → NaN',                         Number.isNaN(cosineDistance(null, [1])));
+check('null v → NaN',                         Number.isNaN(cosineDistance([1], null)));
+check('unequal length → NaN',
+      Number.isNaN(cosineDistance([1, 2], [1, 2, 3])));
+// Numerical safety: small floating-point can push sim outside [-1, 1]
+{
+  // Construct vectors that should give sim = 1 exactly; ensure result is
+  // exactly 0 (no negative-due-to-fp).
+  const u = Float64Array.from([0.1, 0.2, 0.3, 0.4]);
+  const v = Float64Array.from([0.1, 0.2, 0.3, 0.4]);
+  const d = cosineDistance(u, v);
+  check('identical fp64 → ≥ 0 (clamped)',      d >= 0 && d < 1e-9);
+}
+check('empty arrays → both zero norms → 1',   cosineDistance([], []) === 1);
 
 // =====================================================================
 console.log('\n=================');

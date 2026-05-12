@@ -172,3 +172,45 @@ export function clusterByConcordance(concordance, N, threshold) {
     n_lineages: cut.n_groups,
   };
 }
+
+// =====================================================================
+// cosineDistance (legacy line 38789)
+// =====================================================================
+
+/**
+ * Cosine distance between two equal-length numeric vectors:
+ *   cosineDistance(u, v) = 1 − (u · v) / (‖u‖ · ‖v‖)
+ * Clamped to [0, 2] for numerical safety (the cos-sim domain is
+ * [−1, 1], so the distance maps into [0, 2]).
+ *
+ * Returns NaN when inputs are missing or unequal length; returns 1
+ * (maximally distant) when either vector is zero — matches the
+ * legacy convention used by the inheritance-group clustering's
+ * fingerprint-cosine path.
+ *
+ * @param {Float32Array|Float64Array|number[]} u
+ * @param {Float32Array|Float64Array|number[]} v
+ * @returns {number}
+ */
+export function cosineDistance(u, v) {
+  if (!u || !v || u.length !== v.length) return NaN;
+  let dot = 0, nu = 0, nv = 0;
+  for (let i = 0; i < u.length; i++) {
+    dot += u[i] * v[i];
+    nu  += u[i] * u[i];
+    nv  += v[i] * v[i];
+  }
+  if (nu === 0 || nv === 0) return 1;
+  const sim = dot / Math.sqrt(nu * nv);
+  const clamped = Math.max(-1, Math.min(1, sim));
+  return 1 - clamped;
+}
+
+// =====================================================================
+// Console-debug exposures (parity with legacy `window._cosineDistance`)
+// =====================================================================
+if (typeof window !== 'undefined') {
+  window._cosineDistance              = cosineDistance;
+  window._agglomerativeAverageLinkage = agglomerativeAverageLinkage;
+  window._cutDendrogram               = cutDendrogram;
+}
