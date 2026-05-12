@@ -154,6 +154,88 @@ const cs = TG.summarizeTransitionBoundary(graph.boundaries[0], 0.01);
 check('summary custom threshold: stable=false vs 0.01',  cs.is_hotspot === false);
 
 // -----------------------------------------------------------------------------
+group('drawTransitionRateStrip');
+class FakeCtx {
+  constructor() {
+    this.calls = [];
+    this.fillStyle = '';
+    this.strokeStyle = '';
+    this.lineWidth = 1;
+  }
+  save()    { this.calls.push(['save']); }
+  restore() { this.calls.push(['restore']); }
+  fillRect(x, y, w, h)   { this.calls.push(['fillRect', x, y, w, h, this.fillStyle]); }
+  strokeRect(x, y, w, h) { this.calls.push(['strokeRect', x, y, w, h]); }
+  beginPath() { this.calls.push(['beginPath']); }
+  moveTo(x, y) { this.calls.push(['moveTo', x, y]); }
+  lineTo(x, y) { this.calls.push(['lineTo', x, y]); }
+  stroke()    { this.calls.push(['stroke']); }
+}
+
+const graphForDraw = {
+  boundaries: [
+    { position_mb: 1.0, transition_rate: 0.05 },  // green (low)
+    { position_mb: 2.0, transition_rate: 0.20 },  // amber (medium)
+    { position_mb: 3.0, transition_rate: 0.50 },  // red (hotspot)
+    { position_mb: 4.0, transition_rate: 0.01 },  // skipped (< 0.02)
+  ],
+};
+
+const drawCtx = new FakeCtx();
+TG.drawTransitionRateStrip(drawCtx, { l: 50, t: 30 }, 600, 200, 0, 5, graphForDraw);
+check('drawStrip: save/restore',
+      drawCtx.calls[0][0] === 'save' && drawCtx.calls[drawCtx.calls.length - 1][0] === 'restore');
+check('drawStrip: backdrop fillRect drawn',
+      drawCtx.calls.some(c => c[0] === 'fillRect' && c[5].includes('40, 50, 70')));
+// 3 bars: green/amber/red (the 4th is < 0.02 → skipped)
+const fillRects = drawCtx.calls.filter(c => c[0] === 'fillRect');
+check('drawStrip: 1 backdrop + 3 per-boundary bars',  fillRects.length === 4);
+
+// Verify color tiers
+const colors = fillRects.slice(1).map(c => c[5]);
+check('drawStrip: green bar (low rate)',   colors.some(c => c.includes('60, 192, 138')));
+check('drawStrip: amber bar (medium rate)', colors.some(c => c.includes('245, 165, 36')));
+check('drawStrip: red bar (hotspot)',       colors.some(c => c.includes('224, 85, 92')));
+
+// Hotspot tick: full plot height stroke
+check('drawStrip: hotspot tick stroked',
+      drawCtx.calls.some(c => c[0] === 'stroke'));
+
+// Frame
+check('drawStrip: strokeRect frame',
+      drawCtx.calls.some(c => c[0] === 'strokeRect'));
+
+// Custom threshold
+const drawCtx2 = new FakeCtx();
+TG.drawTransitionRateStrip(drawCtx2, { l: 0, t: 30 }, 600, 200, 0, 5, graphForDraw, { hotspotThreshold: 0.15 });
+// Now boundaries at 0.20 + 0.50 both become "red"
+const colors2 = drawCtx2.calls.filter(c => c[0] === 'fillRect').slice(1).map(c => c[5]);
+const redCount2 = colors2.filter(c => c.includes('224, 85, 92')).length;
+check('drawStrip: lower threshold → more reds',  redCount2 >= 2);
+
+// Outside visible range
+const ctxOut = new FakeCtx();
+TG.drawTransitionRateStrip(ctxOut, { l: 0, t: 30 }, 600, 200, 100, 200, graphForDraw);
+const fillsOut = ctxOut.calls.filter(c => c[0] === 'fillRect');
+check('drawStrip: outside range → only backdrop',  fillsOut.length === 1);
+
+// Empty graph
+let emptyHandled = true;
+try {
+  TG.drawTransitionRateStrip(drawCtx, { l: 0, t: 30 }, 600, 200, 0, 5, null);
+  TG.drawTransitionRateStrip(drawCtx, { l: 0, t: 30 }, 600, 200, 0, 5, { boundaries: [] });
+} catch (_) { emptyHandled = false; }
+check('drawStrip: empty/null graph handled silently', emptyHandled);
+
+// Headless safety
+let headlessOK = true;
+try {
+  TG.drawTransitionRateStrip(null, { l: 0, t: 0 }, 100, 100, 0, 1, graphForDraw);
+  TG.drawTransitionRateStrip({}, { l: 0, t: 0 }, 100, 100, 0, 1, graphForDraw);
+} catch (_) { headlessOK = false; }
+check('drawStrip: headless safety',  headlessOK);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

@@ -151,6 +151,83 @@ export function computeStructuralHaplotypeTransitionGraph(state, opts) {
 // Display summary
 // =====================================================================
 
+// =====================================================================
+// Canvas strip drawer
+// =====================================================================
+
+/**
+ * Paint the transition-rate strip near the bottom of the PC1 panel.
+ * One vertical bar per boundary at its midpoint, height encoding the
+ * transition rate. Boundaries with rate ≥ hotspot threshold get a
+ * full-plot-height tick. Color tiers:
+ *
+ *   rate ≥ hotspotThreshold   → red
+ *   rate ≥ 0.15               → amber
+ *   rate ≥ 0.02               → green
+ *
+ * Boundaries with rate < 0.02 are skipped (would be 1px and noisy).
+ * Pure given the graph from computeStructuralHaplotypeTransitionGraph
+ * + the canvas context. Headless-tolerant.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{l:number, t:number}} pad
+ * @param {number} plotW
+ * @param {number} plotH
+ * @param {number} mbMin
+ * @param {number} mbMax
+ * @param {{boundaries:Array<{position_mb:number, transition_rate:number}>}} graph
+ * @param {{hotspotThreshold?:number, stripHeight?:number}} opts
+ */
+export function drawTransitionRateStrip(ctx, pad, plotW, plotH, mbMin, mbMax, graph, opts) {
+  if (!ctx || typeof ctx.fillRect !== 'function') return;
+  if (!graph || !Array.isArray(graph.boundaries) || graph.boundaries.length === 0) return;
+  const o = opts || {};
+  const hotspotThr = Number.isFinite(o.hotspotThreshold)
+    ? o.hotspotThreshold : SHTG_HOTSPOT_THRESHOLD;
+  const stripH = Number.isFinite(o.stripHeight) ? o.stripHeight : 5;
+  const stripY = pad.t + plotH - stripH - 1;
+  const mbToX = (mb) => pad.l + ((mb - mbMin) / (mbMax - mbMin)) * plotW;
+
+  if (typeof ctx.save === 'function') ctx.save();
+
+  // Faint background
+  ctx.fillStyle = 'rgba(40, 50, 70, 0.25)';
+  ctx.fillRect(pad.l, stripY, plotW, stripH);
+
+  for (const b of graph.boundaries) {
+    if (!b || !Number.isFinite(b.position_mb)) continue;
+    if (b.position_mb < mbMin || b.position_mb > mbMax) continue;
+    const x = mbToX(b.position_mb);
+    const r = Math.max(0, Math.min(1, Number.isFinite(b.transition_rate) ? b.transition_rate : 0));
+    if (r < 0.02) continue;
+    const barH = r * stripH;
+    let color;
+    if (r >= hotspotThr)   color = 'rgba(224, 85, 92, 0.90)';
+    else if (r >= 0.15)    color = 'rgba(245, 165, 36, 0.80)';
+    else                   color = 'rgba(60, 192, 138, 0.60)';
+    ctx.fillStyle = color;
+    ctx.fillRect(x - 1.5, stripY + (stripH - barH), 3, barH);
+
+    // Full-plot-height hotspot tick
+    if (r >= hotspotThr && typeof ctx.beginPath === 'function' && typeof ctx.stroke === 'function') {
+      ctx.strokeStyle = 'rgba(224, 85, 92, 0.20)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, pad.t);
+      ctx.lineTo(x + 0.5, pad.t + plotH);
+      ctx.stroke();
+    }
+  }
+
+  if (typeof ctx.strokeRect === 'function') {
+    ctx.strokeStyle = 'rgba(120, 128, 140, 0.40)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(pad.l, stripY, plotW, stripH);
+  }
+
+  if (typeof ctx.restore === 'function') ctx.restore();
+}
+
 /**
  * Per-boundary summary suitable for inline display:
  *   { position_mb, transition_rate, n_changed, n_samples,
