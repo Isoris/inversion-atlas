@@ -158,9 +158,7 @@ export function renderCandidateMetadata(state) {
   // Wire interactions after DOM insertion
   try { wireCandidateButtons(c, profile); } catch (e) { console.warn('wireCandidateButtons:', e.message); }
   try { wireCandidateNav(state, c); } catch (e) { console.warn('wireCandidateNav:', e.message); }
-  if (typeof _wireCandidateBlockChips === 'function') {
-    try { _wireCandidateBlockChips(); } catch (e) { console.warn('_wireCandidateBlockChips:', e.message); }
-  }
+  try { _wireCandidateBlockChips(); } catch (e) { console.warn('_wireCandidateBlockChips:', e.message); }
   try { wireCandidateAncestryConfound(c); } catch (e) { console.warn('wireCandidateAncestryConfound:', e.message); }
   try { _wireCandidateHaplotypeAnnotations(c); } catch (e) { console.warn('haplotype annotations:', e.message); }
   try { _wireCandidateBandClicks(c, bands); } catch (e) { console.warn('band clicks:', e.message); }

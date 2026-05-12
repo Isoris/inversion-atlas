@@ -216,7 +216,7 @@ export function applyData(state, data) {
   state.lockedLabels = null;
   state.lockedRefL2 = null;
   try { refreshLockBtn(state); } catch (_) {}
-  if (typeof buildTrackPanels === 'function')     buildTrackPanels(state);
+  buildTrackPanels(state);
   const _scrubEl = document.getElementById('scrubber');
   if (_scrubEl) {
     _scrubEl.max = data.n_windows - 1;
@@ -283,7 +283,7 @@ export function applyData(state, data) {
   // reflects whatever subset of {summary, catalogue, primers} arrived.
   if (typeof _refreshMarkerPageActivation === 'function') _refreshMarkerPageActivation();
   if (typeof renderMarkerPage === 'function') renderMarkerPage();
-  if (typeof setCur === 'function') setCur(state, 0);
+  setCur(state, 0);
   // v4 turn 73f: persist this chromosome to IndexedDB so it survives page
   // reloads / cross-atlas navigation. Async, fire-and-forget; failures log
   // to console but don't block the UI.
