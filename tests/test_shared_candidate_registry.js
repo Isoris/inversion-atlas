@@ -193,6 +193,50 @@ try { CR.clearCandidateList(null); } catch (_) { safeClear = false; }
 check('null state: no-throw',  safeClear);
 
 // -----------------------------------------------------------------------------
+group('persistActiveCandidateId + restoreActiveCandidateId');
+check('ACTIVE_CAND_STORAGE_KEY constant',
+      CR.ACTIVE_CAND_STORAGE_KEY === 'pca_scrubber_v3.activeCandidateId');
+
+const lsA = _makeLS();
+CR.persistActiveCandidateId('cand_X', { localStorage: lsA });
+check('persisted to LS',
+      lsA.getItem('pca_scrubber_v3.activeCandidateId') === 'cand_X');
+check('restored matches',
+      CR.restoreActiveCandidateId({ localStorage: lsA }) === 'cand_X');
+
+// Clear with null
+CR.persistActiveCandidateId(null, { localStorage: lsA });
+check('null cleared LS',
+      lsA.getItem('pca_scrubber_v3.activeCandidateId') === null);
+check('restore after clear → null',
+      CR.restoreActiveCandidateId({ localStorage: lsA }) === null);
+
+// Empty string acts like null
+CR.persistActiveCandidateId('cand_Y', { localStorage: lsA });
+CR.persistActiveCandidateId('', { localStorage: lsA });
+check('empty string clears LS',
+      lsA.getItem('pca_scrubber_v3.activeCandidateId') === null);
+
+// LS write failure is silent
+const throwingLS2 = {
+  getItem: () => { throw new Error('boom'); },
+  setItem: () => { throw new Error('boom'); },
+  removeItem: () => { throw new Error('boom'); },
+};
+let safePersist = true;
+try {
+  CR.persistActiveCandidateId('id', { localStorage: throwingLS2 });
+  CR.persistActiveCandidateId(null, { localStorage: throwingLS2 });
+} catch (_) { safePersist = false; }
+check('throwing LS: persist silent',  safePersist);
+check('throwing LS: restore returns null',
+      CR.restoreActiveCandidateId({ localStorage: throwingLS2 }) === null);
+
+// No localStorage shim: silent + returns null
+check('no LS shim: restore returns null',
+      CR.restoreActiveCandidateId({ localStorage: null }) === null);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

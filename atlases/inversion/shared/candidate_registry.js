@@ -18,6 +18,9 @@ import { candidateToJSON } from './candidate_io.js';
 /** localStorage key prefix for the per-chromosome candidate list. */
 export const CAND_STORAGE_PREFIX = 'pca_scrubber_v3.candidates.';
 
+/** localStorage key for the persisted active-candidate id. */
+export const ACTIVE_CAND_STORAGE_KEY = 'pca_scrubber_v3.activeCandidateId';
+
 function _safeLocalStorage() {
   if (typeof localStorage !== 'undefined') return localStorage;
   return null;
@@ -185,6 +188,47 @@ export function restoreCandidateList(state, opts) {
     return state.candidateList;
   } catch (_) {
     return Array.isArray(state.candidateList) ? state.candidateList : [];
+  }
+}
+
+// =====================================================================
+// Active-candidate id persistence
+// =====================================================================
+
+/**
+ * Persist the active-candidate id so a reload can restore focus.
+ * Passing null / empty / undefined clears the saved id.
+ *
+ * @param {string|null} candId
+ * @param {{localStorage?:Storage}} opts
+ */
+export function persistActiveCandidateId(candId, opts) {
+  const ls = (opts && opts.localStorage) || _safeLocalStorage();
+  if (!ls) return;
+  try {
+    if (candId) {
+      ls.setItem(ACTIVE_CAND_STORAGE_KEY, String(candId));
+    } else {
+      ls.removeItem(ACTIVE_CAND_STORAGE_KEY);
+    }
+  } catch (_) { /* fail-soft */ }
+}
+
+/**
+ * Restore the previously-persisted active-candidate id. Returns null
+ * when no id is saved or localStorage is unavailable.
+ *
+ * @param {{localStorage?:Storage}} opts
+ * @returns {string|null}
+ */
+export function restoreActiveCandidateId(opts) {
+  const ls = (opts && opts.localStorage) || _safeLocalStorage();
+  if (!ls) return null;
+  try {
+    const v = ls.getItem(ACTIVE_CAND_STORAGE_KEY);
+    return v || null;
+  } catch (_) {
+    return null;
   }
 }
 
