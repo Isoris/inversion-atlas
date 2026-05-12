@@ -49,6 +49,9 @@ import {
   lineageColor as _sharedLineageColor,
   resolveSampleScopeColor as _sharedResolveSampleScopeColor,
 } from '../../../shared/sample_color.js';
+import { diagSampleColor } from './diag_residuals.js';
+import { xpSampleColor } from '../../../shared/cross_page_clusters.js';
+import { qaSampleColor } from '../../../shared/q_ancestry.js';
 
 // =====================================================================
 // Cache-invalidation helpers (legacy 34321 / 39362 / 39973)
@@ -190,20 +193,21 @@ export function getSampleColor(si, mode, groupLabels) {
   // v4 turn 83: residual mode — recolor by per-fish residual_z from the
   // focal-window K-means band centroid. Cool blue = clean homozygote;
   // amber = intermediate; red = suspicious (≥2.5σ from band centroid).
+  // Compute lives in page1/diag_residuals.js.
   if (mode === 'residual') {
-    return _diagSampleColor(si, state.cur);
+    return diagSampleColor(state, si, state.cur);
   }
   // v4 turn 84: cross-page cluster modes — color by another page's clusters
   // for the active candidate. When the requested source has no clusters
   // loaded for this candidate, falls through to grey so the user can see
   // that the source is missing rather than a misleading default.
-  if (mode === 'cluster_dosage')   return _xpSampleColor(si, 'dosage');
-  if (mode === 'cluster_theta_pi') return _xpSampleColor(si, 'theta_pi');
-  if (mode === 'cluster_ghsl')     return _xpSampleColor(si, 'ghsl');
+  if (mode === 'cluster_dosage')   return xpSampleColor(state, si, 'dosage');
+  if (mode === 'cluster_theta_pi') return xpSampleColor(state, si, 'theta_pi');
+  if (mode === 'cluster_ghsl')     return xpSampleColor(state, si, 'ghsl');
   // v4 turn 86: Q-association ancestry mode — color by per-fish Q-vector at
   // the user-selected K. Two sub-modes (hard / blend) selected via
   // state.qDisplayMode. Falls through to grey if no Q-vectors are loaded.
-  if (mode === 'q_ancestry') return _qaSampleColor(si);
+  if (mode === 'q_ancestry') return qaSampleColor(state, si);
   if (mode === 'family')   return familyColor(si);
   if (mode === 'ancestry') return ancestryColor(si);
   if (mode === 'manual')   return manualGroupColor(si);

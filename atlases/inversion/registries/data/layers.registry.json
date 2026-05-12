@@ -141,7 +141,8 @@
       "schema": "schemas/relatedness.schema.json",
       "schema_status": "pending",
       "provisional": true,
-      "owned_by": "population"
+      "owned_by": "population",
+      "_doc": "Aggregated cohort relatedness JSON: {pairs: [{sample_a, sample_b, kinship, relationship_class, ...}], samples?, kinship_thresholds?, _provenance?}. Source of truth for mendelian.js / mendelian_inheritance.js / lineage inference. Distinct from `relatedness_ngsrelate` which is the raw per-tool TSV; this is the aggregator's output combining one or more tool runs. SPEC_v2 §4 replaced the empty placeholder schema with the real one in 2026-05-12. schema_status remains 'pending' until a real file lands at the path — flip to 'validated' to enable resolver-side validation."
     },
     "cohort_diversity": {
       "tier": "warm",

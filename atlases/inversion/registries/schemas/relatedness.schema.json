@@ -1,6 +1,90 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "_doc": "PLACEHOLDER schema. Accepts any object. Replace with the real schema when the data shape stabilizes. Referenced from registries/data/layers.registry.json with schema_status: pending.",
-  "_status": "pending",
-  "type": "object"
+  "$id": "relatedness.schema.json",
+  "title": "Cohort relatedness — aggregated JSON",
+  "description": "Per-pair relatedness for the active cohort, in the aggregated JSON shape that analysis modules (mendelian.js, mendelian_inheritance.js, lineage inference, manual-review filters) consume directly. Distinct from `relatedness_ngsrelate.schema.json` which describes the raw per-tool TSV; this schema describes the JSON that aggregates one or more tool runs into the canonical {pairs: [...]} shape the atlas pages read from `data/cohort/relatedness.json`. SPEC_registry_v2 §4 replaces the previous empty placeholder.",
+  "version": "v1_2026-05-12",
+
+  "_format": "json",
+  "_layer_doc": "Layer key: `cohort_relatedness` (warm tier, preload on page_mount). Path: data/cohort/relatedness.json. schema_status remains 'pending' until a real aggregate file lands at that path — flip to 'validated' to enable resolver-side row validation against this schema. Provisional/owned_by 'population' so the future population atlas can take over without conflict.",
+
+  "type": "object",
+  "required": ["pairs"],
+  "properties": {
+    "pairs": {
+      "type": "array",
+      "description": "Per-pair relatedness rows. Convention: sample_a < sample_b when both are integer indices.",
+      "items": {
+        "type": "object",
+        "required": ["sample_a", "sample_b", "kinship", "relationship_class"],
+        "properties": {
+          "sample_a": {
+            "type": ["integer", "string"],
+            "description": "First sample. Integer index (into cohort_sample_manifest) or canonical sample id (CGA/Ind string)."
+          },
+          "sample_b": {
+            "type": ["integer", "string"],
+            "description": "Second sample. Same type discipline as sample_a within a given file."
+          },
+          "kinship": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1,
+            "description": "Kinship coefficient (KING-robust convention: ~0.25 PO/FS, ~0.125 2nd, ~0.0625 3rd, ~0 unrelated). Negative values are valid for KING (subtle population structure)."
+          },
+          "relationship_class": {
+            "type": "string",
+            "enum": [
+              "1st_degree",
+              "2nd_degree",
+              "3rd_degree",
+              "parent_offspring",
+              "full_sibling",
+              "half_sibling",
+              "avuncular",
+              "first_cousin",
+              "unrelated",
+              "unknown"
+            ],
+            "description": "Coarse class label. Both degree-based (`1st_degree`, `2nd_degree`, `3rd_degree`) and exact-class (`parent_offspring`, `full_sibling`, …) values are accepted. mendelian.js `_findTrios` matches on `1st_degree`; downstream consumers can use the finer-grained classes when present."
+          },
+          "ibs0":               { "type": "number", "minimum": 0, "maximum": 1, "description": "Proportion of sites IBS=0. Optional aggregate carry-through from ngsRelate." },
+          "ibs1":               { "type": "number", "minimum": 0, "maximum": 1, "description": "Proportion of sites IBS=1." },
+          "ibs2":               { "type": "number", "minimum": 0, "maximum": 1, "description": "Proportion of sites IBS=2." },
+          "n_sites":            { "type": "integer", "minimum": 0, "description": "Number of variant sites used to compute the kinship estimate." },
+          "tool":               { "type": "string", "description": "Tool that produced this row (e.g. 'ngsrelate', 'king', 'plink-ibd', 'hap-ibd'). Falls through to layer-level tool default when omitted." },
+          "run_id":             { "type": "string", "description": "Tool run identifier (e.g. 'broodstock_qc_pass_v1'). Optional carry-through; lets downstream consumers trace which raw run an aggregated pair came from." }
+        },
+        "additionalProperties": true
+      }
+    },
+    "samples": {
+      "type": "array",
+      "description": "Optional canonical sample-id list, in cohort_sample_manifest order. When present, integer sample_a / sample_b values index into this array.",
+      "items": { "type": "string" }
+    },
+    "schema_version": {
+      "type": "string",
+      "description": "Aggregator-side schema version stamp. Useful when one cohort_relatedness file mixes tools or run-ids."
+    },
+    "tool_default": {
+      "type": "string",
+      "description": "Default `tool` for rows whose `tool` field is omitted (e.g. 'ngsrelate')."
+    },
+    "kinship_thresholds": {
+      "type": "object",
+      "description": "Threshold map used to derive `relationship_class` from `kinship`. Defaults follow Manichaikul et al. 2010 (KING): 1st ≥ 0.177, 2nd ≥ 0.0884, 3rd ≥ 0.0442. Embedding the thresholds in the file lets the aggregator pin them at build time.",
+      "properties": {
+        "1st_degree":  { "type": "number", "default": 0.177 },
+        "2nd_degree":  { "type": "number", "default": 0.0884 },
+        "3rd_degree":  { "type": "number", "default": 0.0442 }
+      }
+    },
+    "_provenance": {
+      "type": "object",
+      "description": "Free-form provenance block — typically carries source tool, run id, sample-set id, and aggregator version. Not analysis-relevant; analysis modules ignore it.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
 }

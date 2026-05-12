@@ -55,6 +55,24 @@ UNITS=(
   test_shared_candidate_predicates.js
   test_shared_sample_color.js
   test_analysis_mendelian.js
+  test_analysis_mendelian_inheritance.js
+  test_relatedness_schema.js
+  test_page1_diag_residuals.js
+  test_shared_cross_page_clusters.js
+  test_shared_q_ancestry.js
+  test_shared_repeat_density.js
+  test_shared_ncrna_density.js
+  test_shared_cheat30_results.js
+  test_shared_cohort_diversity.js
+  test_shared_dxy_per_inversion.js
+  test_shared_te_fragility.js
+  test_shared_synteny_multispecies.js
+  test_shared_classifications.js
+  test_shared_newick.js
+  test_shared_cross_species.js
+  test_shared_dotplot_mashmap.js
+  test_shared_atlas_server.js
+  test_shared_haplotype_vocab.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
