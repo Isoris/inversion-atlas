@@ -108,6 +108,7 @@ UNITS=(
   test_shared_inheritance_gather.js
   test_shared_snp_density.js
   test_shared_haplotype_labels.js
+  test_shared_candidate_mode.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
