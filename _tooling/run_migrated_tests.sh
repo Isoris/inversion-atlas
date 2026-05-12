@@ -73,6 +73,8 @@ UNITS=(
   test_shared_dotplot_mashmap.js
   test_shared_atlas_server.js
   test_shared_haplotype_vocab.js
+  test_shared_candidate_pca_mode.js
+  test_shared_candidate_pca_ordering.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
