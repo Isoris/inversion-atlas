@@ -133,14 +133,18 @@ check('_pageState has activeChrom slot',                 'activeChrom' in stashe
 
 // -----------------------------------------------------------------------------
 group('Smoke: mount() with populated state (loaded negative regions)');
-// Two regions with different statuses — mirrors the per-region_status
-// summary-card grouping the future renderer will implement.
+// Two regions with different statuses — exercises the cartridge renderer
+// that legacy shipped only as an HTML comment.
+_nodes.clear();
+
 const atlasState2 = buildAtlasState({
   inversion: {
     activeChrom: 'LG28',
     negativeRegions: [
-      { chrom: 'LG28', start: 1_000_000, end: 2_000_000, region_status: 'no_detectable_inversion_high_confidence' },
-      { chrom: 'LG28', start: 5_000_000, end: 6_500_000, region_status: 'no_detectable_inversion_low_confidence'  },
+      { region_id: 'r1', chr: 'LG28', start_bp: 1_000_000, end_bp: 2_000_000,
+        region_status: 'no_detectable_inversion_high_confidence' },
+      { region_id: 'r2', chr: 'LG28', start_bp: 5_000_000, end_bp: 6_500_000,
+        region_status: 'no_detectable_inversion_low_power' },
     ],
   },
 });
@@ -152,6 +156,14 @@ check('populated mount() ran without throwing', mount2OK, mount2Err ? mount2Err.
 check('_pageState.activeChrom propagated',     state._pageState.activeChrom === 'LG28');
 check('_pageState.negativeRegions propagated', state._pageState.negativeRegions.length === 2);
 check('atlasState2 stash refreshed',           atlasState2.inversion._page19State === state._pageState);
+
+const summary2 = _ensureNode('nrSummaryCards');
+const slot2    = _ensureNode('nrTableSlot');
+const badge2   = _ensureNode('nrTableBadge');
+check('nrSummaryCards rendered (non-empty)',   summary2.innerHTML.length > 0);
+check('nrTableSlot rendered as table',         slot2.innerHTML.includes('<table'));
+check('nrTableSlot mentions r1',               slot2.innerHTML.includes('r1'));
+check('nrTableBadge shows count 2',            badge2.textContent === '2');
 
 // -----------------------------------------------------------------------------
 group('Smoke: unmount()');

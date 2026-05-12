@@ -96,6 +96,7 @@ UNITS=(
   test_shared_lasso_linkage.js
   test_shared_cross_candidate.js
   test_page9_carousel.js
+  test_page19_negative_regions.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js

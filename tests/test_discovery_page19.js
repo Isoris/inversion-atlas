@@ -38,17 +38,12 @@ check('exports mount',                       typeof page19.mount === 'function')
 check('exports unmount',                     typeof page19.unmount === 'function');
 
 // -----------------------------------------------------------------------------
-group('page19.js: stub-preserving (no renderers)');
-// Per chat-33 BATCH_1_NOTES: 0 functions extracted — pure HTML scaffold.
-// The migration must NOT introduce phantom renderer exports; if a future
-// batch adds them (_nrRender, _nrLoadFile, etc.), tighten this assertion
-// to allow the specific names.
-const exportedNames = Object.keys(page19).sort();
-check('only mount + unmount exported (no phantom renderers)',
-      exportedNames.length === 2 &&
-      exportedNames.includes('mount') &&
-      exportedNames.includes('unmount'),
-      'got: [' + exportedNames.join(', ') + ']');
+group('page19.js: renderer entries (post-cartridge wiring)');
+// Legacy shipped only the HTML shell (BATCH_1_NOTES: 0 functions extracted).
+// The cartridge supplies the renderer + toolbar wiring that legacy's inline
+// HTML comment had stubbed as "_nrRender()".
+check('exports refreshNegativeRegions',      typeof page19.refreshNegativeRegions === 'function');
+check('exports initNegativeRegionsToolbar',  typeof page19.initNegativeRegionsToolbar === 'function');
 check('__MODULE_ID__ NOT exported',          !('__MODULE_ID__' in page19));
 
 // -----------------------------------------------------------------------------
