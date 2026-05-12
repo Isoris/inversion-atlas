@@ -17,6 +17,7 @@ import {
   ariFromTable,
   restrictedConcord,
 } from '../../../shared/contingency.js';
+import { computeBandDiagnostics } from './band_diagnostics.js';
 import {
   escapeHtml,
   fitCanvas,
@@ -1498,27 +1499,19 @@ function focalContentHtml(cl, env, l2idx, options) {
             `(${selKept.size}/${cl.n_per_group.length} kept)</span>`;
   }
   html += `</div>`;
-  // v3.92: band diagnostics — confounder/support per band. Two render paths:
-  //   - mini-chips (always visible when the diagnostics layer has anything to
-  //     report, even just "?" placeholders for missing layers)
-  //   - full table (collapsed by default, click summary to expand)
-  // PENDING: computeBandDiagnostics (legacy 15254-15583, ~330 LOC) +
-  // _bandDiagsMiniChipsHtml (50134) + _bandDiagsPanelHtml (50183). The
-  // diagnostics function reads page1-specific state.data slots (ghsl_panel,
-  // theta_pi_panel, roh_intervals, sample_froh) so it belongs in a page1
-  // sub-module rather than shared/. The typeof guards below correctly skip
-  // when those names aren't bound; rendering degrades gracefully.
-  if (typeof computeBandDiagnostics === 'function') {
-    const _diag = computeBandDiagnostics(cl, env, l2idx);
-    if (_diag) {
-      // Stash on cluster for downstream export hooks
-      cl.__bandDiagnostics = _diag;
-      if (typeof _bandDiagsMiniChipsHtml === 'function') {
-        html += _bandDiagsMiniChipsHtml(_diag, cl.usedK, l2idx);
-      }
-      if (typeof _bandDiagsPanelHtml === 'function') {
-        html += _bandDiagsPanelHtml(_diag, cl.usedK);
-      }
+  // v3.92: band diagnostics — confounder/support per band. The compute
+  // is wired (page1/band_diagnostics.js) and stashed on the cluster for
+  // downstream export hooks. The two HTML renderers (mini-chips +
+  // collapsible table) are still typeof-guarded — they live at legacy
+  // 50134 / 50183 and are a separate extraction round.
+  const _diag = computeBandDiagnostics(_pageState, cl, env, l2idx);
+  if (_diag) {
+    cl.__bandDiagnostics = _diag;
+    if (typeof _bandDiagsMiniChipsHtml === 'function') {
+      html += _bandDiagsMiniChipsHtml(_diag, cl.usedK, l2idx);
+    }
+    if (typeof _bandDiagsPanelHtml === 'function') {
+      html += _bandDiagsPanelHtml(_diag, cl.usedK);
     }
   }
   // Per-cluster top family breakdown (small, mono font)
