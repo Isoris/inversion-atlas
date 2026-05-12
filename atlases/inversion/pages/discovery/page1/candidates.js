@@ -16,7 +16,15 @@
 // Bodies extracted verbatim from the pre-split page1.js (eighth pass).
 
 import { withAlpha } from '../../../shared/page1_utils.js';
-import { getState } from '../../../../../core/atlas_api.js';
+
+// Optional atlas-core bridge. Only present when this cartridge is
+// merged into a full atlas-workspace; cartridge-only checkouts ship
+// without core/. Both call sites already wrap getState() in try/catch,
+// so the no-op stub is functionally equivalent.
+let getState = () => null;
+try {
+  ({ getState } = await import('../../../../../core/atlas_api.js'));
+} catch (_) { /* cartridge-only checkout: no atlas-core present */ }
 
 import { _pageState, _setActiveState } from './_state.js';
 import { drawLinesPanel } from './lines_panel.js';
