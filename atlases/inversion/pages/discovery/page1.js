@@ -44,6 +44,7 @@ import {
   invalidateL2SweepCache,
   autoPromoteFromSweep,
 } from './page1/l2_sweep.js';
+import { idbPersistChrom } from './page1/idb.js';
 import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayers, listLayers, loadViewControls, populateSimScales, reconcileViewControlsForData } from './page1/_data.js';
 import { drawSim, drawSimMini } from './page1/sim_panel.js';
 import { drawZ } from './page1/z_panel.js';
@@ -294,11 +295,9 @@ export function applyData(state, data) {
   if (typeof renderMarkerPage === 'function') renderMarkerPage();
   setCur(state, 0);
   // v4 turn 73f: persist this chromosome to IndexedDB so it survives page
-  // reloads / cross-atlas navigation. Async, fire-and-forget; failures log
-  // to console but don't block the UI.
-  if (typeof _idbPersistChrom === 'function') {
-    try { _idbPersistChrom(data); } catch (_) { /* fail-soft */ }
-  }
+  // reloads / cross-atlas navigation. Async, fire-and-forget; the helper
+  // itself catches IDB errors and logs to console.warn.
+  idbPersistChrom(data);
 }
 
 // =============================================================================
