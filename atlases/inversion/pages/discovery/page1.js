@@ -40,6 +40,23 @@ import { buildTrackPanels, drawTracks, onPCAClick, onSimClick, onZClick, setCur,
 import { attachSidebarHandlers } from './page1/sidebar.js';
 import { attachHotkeys } from './page1/hotkeys.js';
 import { attachPcaLasso } from './page1/pca_panel.js';
+
+// Theta-pi mirror (page12) and GHSL mirror (page15) entry points. These are
+// painted from page1's applyData() because the mirror panels share page1's
+// data envelope (theta_pi_*, ghsl_panel) — they activate when those layers
+// are present in the loaded JSON. The page12/page15 modules also export
+// their own atlas-router lifecycle for when those pages are mounted directly.
+import {
+  _drawThAnchorStripPanel,
+  _drawThCusumHero,
+  _drawThLinesPanel,
+  _drawThPcaPanel,
+  _drawThSimMatPanel,
+  _drawThZPanel,
+  _refreshThetaPiLayerStatus,
+  _refreshThetaPiPanelVisibility,
+} from './page12.js';
+import { _refreshGhslLayerStatus } from './page15.js';
 import { _mgRefreshOnDataLoad } from './page1/manual_groups.js';
 import { attachPanelResize } from './page1/panel_resize.js';
 
@@ -93,49 +110,33 @@ export function applyData(state, data) {
   }
   // v3.99 t14e+ continue: refresh page 12 (θπ scrubber) layer-status
   // indicators in the empty-state. Each row's status flips from ⚪ to 🟢
-  // when that layer is detected.
-  if (typeof _refreshThetaPiLayerStatus === 'function') {
-    try { _refreshThetaPiLayerStatus(); } catch (_) {}
-  }
+  // when that layer is detected. Try/catch is kept because the mirror DOM
+  // (theta-pi / GHSL panel hosts) may not be present under the new shell
+  // when only page1 is mounted; the renders bail safely.
+  try { _refreshThetaPiLayerStatus(state); } catch (_) {}
   // v4 turn 132 Slice 2: also flip panel visibility — empty-state hides
   // and per-layer panels reveal as their required layers arrive.
-  if (typeof _refreshThetaPiPanelVisibility === 'function') {
-    try { _refreshThetaPiPanelVisibility(); } catch (_) {}
-  }
+  try { _refreshThetaPiPanelVisibility(state); } catch (_) {}
   // v4 turn 132 Slice 3: paint the CUSUM hero panel from cusum_theta if
   // present. Visibility wiring above already revealed/hid the panel; this
   // draws into its canvases. Other renderers (sim_mat, |Z|, lines, PCA,
   // L3) ship in later slices.
-  if (typeof _drawThCusumHero === 'function') {
-    try { _drawThCusumHero(); } catch (_) {}
-  }
+  try { _drawThCusumHero(state); } catch (_) {}
   // v4 turn 132 Slice 5: paint the per-sample θπ lines panel from
   // theta_pi_per_window if present. Single-source (no PC1/PC2/GHSL/het
   // stacking like page 1), no lasso, no caching — minimum viable mirror.
-  if (typeof _drawThLinesPanel === 'function') {
-    try { _drawThLinesPanel(); } catch (_) {}
-  }
+  try { _drawThLinesPanel(state); } catch (_) {}
   // v4 turn 132 Slice 6a/6b: paint sim_mat heatmap + |Z| waveform from
   // theta_pi_local_pca if present. Mirrors page 1's drawSim/drawZ
   // minimum-viable subset — no L1/L2 overlays (need theta_pi_envelopes),
   // no click-to-jump, no PDF-style triangle split.
-  if (typeof _drawThSimMatPanel === 'function') {
-    try { _drawThSimMatPanel(); } catch (_) {}
-  }
-  if (typeof _drawThZPanel === 'function') {
-    try { _drawThZPanel(); } catch (_) {}
-  }
+  try { _drawThSimMatPanel(state); } catch (_) {}
+  try { _drawThZPanel(state); } catch (_) {}
   // v4 turn 132 Slice 7a/7b: paint envelope anchor strip + PC1×PC2 scatter
   // from theta_pi_envelopes / theta_pi_local_pca.
-  if (typeof _drawThAnchorStripPanel === 'function') {
-    try { _drawThAnchorStripPanel(); } catch (_) {}
-  }
-  if (typeof _drawThPcaPanel === 'function') {
-    try { _drawThPcaPanel(); } catch (_) {}
-  }
-  if (typeof _refreshGhslLayerStatus === 'function') {
-    try { _refreshGhslLayerStatus(); } catch (_) {}
-  }
+  try { _drawThAnchorStripPanel(state); } catch (_) {}
+  try { _drawThPcaPanel(state); } catch (_) {}
+  try { _refreshGhslLayerStatus(state); } catch (_) {}
   // Load saved candidate list for this chromosome from localStorage.
   // Each chromosome has its own list (cross-chrom labels are meaningless).
   try { loadCandidateList(state); } catch (_) {}
