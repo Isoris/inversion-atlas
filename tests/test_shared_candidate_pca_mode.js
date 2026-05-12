@@ -54,7 +54,11 @@ check('ANCHOR_MODES 3 entries',               CANDIDATE_PCA_ANCHOR_MODES.length 
 check('CENTERINGS includes custom',           CANDIDATE_PCA_CENTERINGS.includes('custom'));
 check('ROW_ORDERS includes pc1_anchor',       CANDIDATE_PCA_ROW_ORDERS.includes('pc1_anchor'));
 check('COL_ORDERS 4 entries',                 CANDIDATE_PCA_COL_ORDERS.length === 4);
-check('SAMPLE_COLOR_MODES has 5 entries',     CANDIDATE_PCA_SAMPLE_COLOR_MODES.length === 5);
+check('SAMPLE_COLOR_MODES has 6 entries',     CANDIDATE_PCA_SAMPLE_COLOR_MODES.length === 6);
+check('SAMPLE_COLOR_MODES includes median_dosage_window',
+      CANDIDATE_PCA_SAMPLE_COLOR_MODES.includes('median_dosage_window'));
+check('ROW_ORDERS includes median_dosage',
+      CANDIDATE_PCA_ROW_ORDERS.includes('median_dosage'));
 check('DISPLAY_MODES includes genotype_state', CANDIDATE_PCA_DISPLAY_MODES.includes('genotype_state'));
 check('DEFAULTS frozen',                      Object.isFrozen(CANDIDATE_PCA_DEFAULTS));
 check('DEFAULTS.view_name = all_pairs',       CANDIDATE_PCA_DEFAULTS.view_name === 'all_pairs');

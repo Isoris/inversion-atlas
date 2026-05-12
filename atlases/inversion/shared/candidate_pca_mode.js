@@ -51,7 +51,8 @@ export const CANDIDATE_PCA_POLARITIES = Object.freeze([
 
 /** Row-order modes for the heatmap sample axis. */
 export const CANDIDATE_PCA_ROW_ORDERS = Object.freeze([
-  'pc1_anchor', 'pc1_view', 'cluster', 'manual', 'mean_dosage',
+  'pc1_anchor', 'pc1_view', 'cluster', 'manual',
+  'mean_dosage', 'median_dosage',
 ]);
 
 /** Column-order modes for the heatmap marker axis. */
@@ -61,7 +62,8 @@ export const CANDIDATE_PCA_COL_ORDERS = Object.freeze([
 
 /** Sample-color modes shared between PCA and heatmap. */
 export const CANDIDATE_PCA_SAMPLE_COLOR_MODES = Object.freeze([
-  'cluster', 'mean_dosage_window', 'pc1_score', 'pc2_score', 'tracked_group',
+  'cluster', 'mean_dosage_window', 'median_dosage_window',
+  'pc1_score', 'pc2_score', 'tracked_group',
 ]);
 
 /** Heatmap display modes for dosage rendering. */

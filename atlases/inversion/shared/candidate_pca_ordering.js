@@ -98,16 +98,56 @@ export function meanDosagePerSample(markers, n_samples) {
 }
 
 /**
+ * Per-sample MEDIAN dosage in the current window. Companion to
+ * meanDosagePerSample — median is more robust to outlier markers,
+ * which the user (atlas owner) called out as the second canonical
+ * summary on the PCA color overlay.
+ *
+ * Returns Float32Array(n_samples). Samples with no finite marker get
+ * NaN so argsort routes them to the end of the order.
+ *
+ * @param {Array<{dosage_centered:Float32Array|Array<number>}>} markers
+ * @param {number} n_samples
+ * @returns {Float32Array}
+ */
+export function medianDosagePerSample(markers, n_samples) {
+  const out = new Float32Array(n_samples);
+  if (!Array.isArray(markers) || markers.length === 0 || !n_samples) {
+    for (let i = 0; i < n_samples; i++) out[i] = NaN;
+    return out;
+  }
+  const buf = new Array(n_samples);
+  for (let i = 0; i < n_samples; i++) buf[i] = [];
+  for (const m of markers) {
+    const d = m && m.dosage_centered;
+    if (!d || d.length !== n_samples) continue;
+    for (let i = 0; i < n_samples; i++) {
+      const v = d[i];
+      if (Number.isFinite(v)) buf[i].push(v);
+    }
+  }
+  for (let i = 0; i < n_samples; i++) {
+    const v = buf[i];
+    if (v.length === 0) { out[i] = NaN; continue; }
+    v.sort((a, b) => a - b);
+    const mid = v.length >> 1;
+    out[i] = (v.length & 1) ? v[mid] : 0.5 * (v[mid - 1] + v[mid]);
+  }
+  return out;
+}
+
+/**
  * Compute the sample-row order for the heatmap based on the active
  * mode + current state. Returns an Array<number> of sample indices.
  *
  * Modes:
- *   - 'pc1_anchor': use the bi_baseline-unweighted-bi_baseline anchored
+ *   - 'pc1_anchor':   use the bi_baseline-unweighted-bi_baseline anchored
  *     PC1 of the current window (canonical reference; same across views)
- *   - 'pc1_view':   use the active view's PC1 for the current window
- *   - 'cluster':    group by current window's cluster_labels
- *   - 'manual':     return state.candidatePCAMode.manual_order verbatim
- *   - 'mean_dosage':argsort mean dosage in current window
+ *   - 'pc1_view':     use the active view's PC1 for the current window
+ *   - 'cluster':      group by current window's cluster_labels
+ *   - 'manual':       return state.candidatePCAMode.manual_order verbatim
+ *   - 'mean_dosage':  argsort mean dosage in current window
+ *   - 'median_dosage': argsort median dosage (outlier-robust variant)
  *
  * When the requested data is missing (e.g. anchor JSON not yet loaded),
  * falls back to identity order [0..n_samples-1] so the heatmap renders
@@ -168,6 +208,11 @@ export function computeSampleOrder(state, opts) {
     const markers = opts && opts.heatmapMarkers;
     if (!markers) return identity();
     return argsort(meanDosagePerSample(markers, n));
+  }
+  if (mode === 'median_dosage') {
+    const markers = opts && opts.heatmapMarkers;
+    if (!markers) return identity();
+    return argsort(medianDosagePerSample(markers, n));
   }
   return identity();
 }
