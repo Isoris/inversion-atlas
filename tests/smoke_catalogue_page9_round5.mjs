@@ -3,24 +3,21 @@
 // Round 5 step 7 (chat 36, 2026-05-07): full mount / render / unmount
 // lifecycle smoke test for page9 (confirmed candidates carousel).
 //
-// Page9 is a catalogue-stage page that's a stub even in legacy: the HTML
-// shell (#confirmedNavBar, #confirmedNavPrev, #confirmedNavNext,
-// #confirmedNavInfo, #confirmedCandidateMeta, #confirmedEmpty) has no JS
-// handlers in legacy/Inversion_atlas.html. Migration preserves the
-// behaviour: empty-state placeholder shown when no confirmed candidates;
-// "carousel not yet wired" message when there are confirmed candidates.
+// Page9 is the confirmed-candidates carousel. Legacy shipped only the
+// HTML shell (#confirmedNavBar, #confirmedNavPrev, #confirmedNavNext,
+// #confirmedNavInfo, #confirmedCandidateMeta, #confirmedEmpty) with no JS.
+// The cartridge ships the carousel implementation (page9/carousel.js).
 //
 // What this smoke verifies:
 //   - module loads cleanly, lifecycle exports + 2 public entries present
 //   - mount() empty-state (no candidateList): #confirmedEmpty shown,
 //     #confirmedNavBar + #confirmedCandidateMeta hidden
-//   - mount() empty-state (candidateList=[]): same behaviour
-//   - mount() with confirmed candidates: empty-state still shown but
-//     repopulated with "N confirmed candidates" + "Carousel rendering
-//     is not yet wired" placeholder text (verbatim legacy stub behaviour)
+//   - mount() with confirmed candidates: #confirmedEmpty hidden,
+//     #confirmedNavBar + #confirmedCandidateMeta visible + populated;
+//     nav-info shows "1 / N" position
 //   - _pageState live-binding observed across module boundaries
 //   - refreshConfirmedCarousel(state) callable directly
-//   - unmount() clears _pageState
+//   - unmount() clears _pageState + tears down handlers
 
 const WORKSPACE = process.env.WORKSPACE || '/home/claude/workspace/atlas-workspace';
 const page9 = await import(`${WORKSPACE}/atlases/inversion/pages/catalogue/page9.js`);
@@ -129,16 +126,16 @@ check('_pageState has candidateList',                    Array.isArray(stashedSt
 check('_pageState has confirmedCarouselIndex',           'confirmedCarouselIndex' in stashedState);
 
 // -----------------------------------------------------------------------------
-group('Smoke: mount() with confirmed candidates (verbatim legacy stub)');
-// 2 confirmed + 1 unconfirmed candidate. Legacy stub still shows the empty
-// element but populates it with "N confirmed candidates" + "Carousel
-// rendering is not yet wired" message.
+group('Smoke: mount() with confirmed candidates (carousel renders)');
+// 2 confirmed + 1 unconfirmed candidate. Cartridge ships the carousel:
+// expect empty-state hidden, nav-bar + meta visible + populated, info
+// showing "1 / 2" (first of two confirmed).
 const atlasState2 = buildAtlasState({
   inversion: {
     candidateList: [
-      { id: 'A', confirmed: true },
+      { id: 'A', confirmed: true,  chrom: 'LG28', start_bp: 1, end_bp: 2 },
       { id: 'B', confirmed: false },
-      { id: 'C', confirmed: true },
+      { id: 'C', confirmed: true,  chrom: 'LG14', start_bp: 5, end_bp: 6 },
     ],
   },
 });
@@ -153,14 +150,13 @@ check('populated mount() ran without throwing', mount2OK, mount2Err ? mount2Err.
 const empty2  = _ensureNode('confirmedEmpty');
 const navBar2 = _ensureNode('confirmedNavBar');
 const meta2   = _ensureNode('confirmedCandidateMeta');
-check('confirmedEmpty still visible (carousel not wired)',  empty2.style.display === 'block');
-check('confirmedEmpty innerHTML mentions count "2"',        empty2.innerHTML.includes('2'));
-check('confirmedEmpty innerHTML mentions "confirmed candidate"',
-      empty2.innerHTML.includes('confirmed candidate'));
-check('confirmedEmpty innerHTML notes carousel not wired',
-      empty2.innerHTML.toLowerCase().includes('not yet wired'));
-check('confirmedNavBar still hidden (carousel not wired)',  navBar2.style.display === 'none');
-check('confirmedCandidateMeta still hidden',                meta2.style.display   === 'none');
+const info2   = _ensureNode('confirmedNavInfo');
+check('confirmedEmpty hidden (carousel renders)',           empty2.style.display === 'none');
+check('confirmedNavBar visible',                            navBar2.style.display !== 'none');
+check('confirmedCandidateMeta visible',                     meta2.style.display !== 'none');
+check('nav-info shows "1 / 2"',                             info2.textContent === '1 / 2');
+check('meta innerHTML mentions first confirmed (A)',        meta2.innerHTML.includes('>A<'));
+check('meta does not mention unconfirmed (B)',              !meta2.innerHTML.includes('>B<'));
 
 // -----------------------------------------------------------------------------
 group('Smoke: refreshConfirmedCarousel(state) called directly');
