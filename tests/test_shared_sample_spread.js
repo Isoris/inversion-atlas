@@ -96,6 +96,96 @@ check('no envelopes → null',
 check('null state → null',                  SS.sampleSpreadL2(null, 0) === null);
 
 // -----------------------------------------------------------------------------
+group('sampleSpreadRangeAxis: per-axis σ');
+// Use the same fixture but extend windows with pc3/pc4 to test other axes.
+const state4PC = {
+  data: {
+    n_samples: 2,
+    windows: [
+      { pc1: [0.1, 0.1], pc2: [0.0, 0.0], pc3: [0.5, 0.0], pc4: [1.0, 0.0] },
+      { pc1: [0.1, 0.4], pc2: [0.1, 0.0], pc3: [0.5, 0.1], pc4: [0.5, 0.0] },
+      { pc1: [0.1, 0.7], pc2: [0.2, 0.0], pc3: [0.5, 0.2], pc4: [0.0, 0.0] },
+      { pc1: [0.1, 1.0], pc2: [0.3, 0.0], pc3: [0.5, 0.3], pc4: [0.0, 0.0] },
+    ],
+  },
+};
+
+// Default axis = PC1 → matches legacy behavior
+const axDefault = SS.sampleSpreadRangeAxis(state4PC, 0, 3);
+check('default axis PC1: returns Float64Array',  axDefault instanceof Float64Array);
+check('default axis PC1: sample 0 stable',       axDefault[0] < 1e-9);
+check('default axis PC1: sample 1 drifting',     axDefault[1] > 0.3);
+
+// PC2: sample 0 drifts 0.0→0.3, sample 1 stays at 0
+const axPC2 = SS.sampleSpreadRangeAxis(state4PC, 0, 3, 'pc2');
+check('PC2: sample 0 sd > 0',           axPC2[0] > 0.1);
+check('PC2: sample 1 sd ≈ 0',           axPC2[1] < 1e-9);
+
+// PC3: sample 0 stable at 0.5, sample 1 drifts
+const axPC3 = SS.sampleSpreadRangeAxis(state4PC, 0, 3, 'pc3');
+check('PC3: sample 0 sd ≈ 0',           axPC3[0] < 1e-9);
+check('PC3: sample 1 sd > 0',           axPC3[1] > 0.1);
+
+// PC4: sample 0 drops 1.0→0.5→0.0→0.0, sample 1 stays at 0
+const axPC4 = SS.sampleSpreadRangeAxis(state4PC, 0, 3, 'pc4');
+check('PC4: sample 0 sd > 0',           axPC4[0] > 0.3);
+check('PC4: sample 1 sd ≈ 0',           axPC4[1] < 1e-9);
+
+// Sign-flip applies only to PC1 — flipping doesn't change PC2 output
+const stateFlipPC2 = Object.assign({}, state4PC, {
+  flipPC1: true,
+  pc1Sign: [1, -1, 1, -1],
+});
+const pc2Same = SS.sampleSpreadRangeAxis(stateFlipPC2, 0, 3, 'pc2');
+check('sign-flip ignored for PC2',
+      Math.abs(pc2Same[0] - axPC2[0]) < 1e-9);
+
+// Missing axis on the window → null
+const stateNoP3 = {
+  data: {
+    n_samples: 1,
+    windows: [{ pc1: [0.1] }, { pc1: [0.2] }],
+  },
+};
+check('missing PC3 → null',
+      SS.sampleSpreadRangeAxis(stateNoP3, 0, 1, 'pc3') === null);
+
+// -----------------------------------------------------------------------------
+group('sampleSpreadRangeAxes: Euclidean-combined σ across axes');
+// Default ['pc1'] → matches axis-only PC1
+const combinedPC1 = SS.sampleSpreadRangeAxes(state4PC, 0, 3);
+check('default axes ["pc1"]: matches axis path',
+      Math.abs(combinedPC1[1] - axDefault[1]) < 1e-9);
+
+// PC1+PC2: sqrt(σ_pc1² + σ_pc2²) per sample
+const combined12 = SS.sampleSpreadRangeAxes(state4PC, 0, 3, ['pc1', 'pc2']);
+const expected = new Float64Array([
+  Math.sqrt(axDefault[0]*axDefault[0] + axPC2[0]*axPC2[0]),
+  Math.sqrt(axDefault[1]*axDefault[1] + axPC2[1]*axPC2[1]),
+]);
+check('PC1+PC2 Euclidean: sample 0 matches',  Math.abs(combined12[0] - expected[0]) < 1e-9);
+check('PC1+PC2 Euclidean: sample 1 matches',  Math.abs(combined12[1] - expected[1]) < 1e-9);
+
+// NPC=4: all 4 axes
+const combined1234 = SS.sampleSpreadRangeAxes(state4PC, 0, 3, ['pc1', 'pc2', 'pc3', 'pc4']);
+check('NPC=4 combine: returns Float64Array(2)',  combined1234.length === 2);
+// Sample 0: only PC2+PC4 contribute
+check('NPC=4: sample 0 σ > σ_PC2 alone',
+      combined1234[0] > axPC2[0] + 1e-9);
+// Sample 1: PC1+PC3 contribute, PC2+PC4 are ~0
+check('NPC=4: sample 1 σ ≥ σ_PC1 alone',
+      combined1234[1] > axDefault[1] - 1e-9);
+
+// Empty axes / null axes default to ['pc1']
+const axEmpty = SS.sampleSpreadRangeAxes(state4PC, 0, 3, []);
+check('empty axes defaults to PC1',
+      Math.abs(axEmpty[1] - axDefault[1]) < 1e-9);
+
+// Any missing axis → null
+check('any missing axis → null',
+      SS.sampleSpreadRangeAxes(stateNoP3, 0, 1, ['pc1', 'pc3']) === null);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');
