@@ -81,6 +81,8 @@ UNITS=(
   test_shared_schema_layers.js
   test_shared_session_io.js
   test_shared_divergence_network.js
+  test_shared_relatedness.js
+  test_shared_ghsl_panel.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
