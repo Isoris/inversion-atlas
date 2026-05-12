@@ -5,7 +5,7 @@
 // Run:  node tests/test_shared_contingency.js
 
 import {
-  buildContingency, detectFuseEvents,
+  buildContingency, detectFuseEvents, detectSplitEvents,
   computeARI, computeNMI,
   cramersV, chiSqSurvival, lnGamma,
   scaleStabilityVerdict,
@@ -74,6 +74,43 @@ console.log('\n--- detectFuseEvents ---');
   check('higher thresh excludes fine 1',    fuses2.length === 0);
   check('default thresh is 0.80',           detectFuseEvents(ct).length === 1);
   check('null input → []',                  detectFuseEvents(null).length === 0);
+}
+
+console.log('\n--- detectSplitEvents ---');
+{
+  // Symmetric to the fuse test, but TRANSPOSED. Fine cluster 0
+  // distributes its samples across BOTH coarse clusters at ≥20%:
+  //   [6, 4] → 60% to coarse 0, 40% to coarse 1 (split)
+  //   [9, 1] → 90% to coarse 0, 10% to coarse 1 (NOT split at thresh=0.20)
+  //   [0, 8] → 100% to coarse 1 (NOT split)
+  const ct = {
+    M: [
+      [6, 4],
+      [9, 1],
+      [0, 8],
+    ],
+    KA: 3, KB: 2, n: 28,
+  };
+  const splits = detectSplitEvents(ct, { thresh: 0.20 });
+  check('one split event detected',         splits.length === 1);
+  check('split fine cluster = 0',           splits[0].fine_cluster === 0);
+  check('split coarse clusters = [0, 1]',
+        splits[0].coarse_clusters.length === 2
+        && splits[0].coarse_clusters.includes(0)
+        && splits[0].coarse_clusters.includes(1));
+  // Lower threshold catches fine 1 too (10% slice qualifies)
+  const splits2 = detectSplitEvents(ct, { thresh: 0.05 });
+  check('lower thresh catches more',        splits2.length === 2);
+  // Higher threshold filters fine 0 (60/40 doesn't clear 50%)
+  // Actually 60% is still >= 50%, so both clusters qualify. Use 0.70.
+  const splits3 = detectSplitEvents(ct, { thresh: 0.70 });
+  check('thresh > major split share excludes',  splits3.length === 0);
+  check('default thresh is 0.20',           detectSplitEvents(ct).length === 1);
+  check('null input → []',                  detectSplitEvents(null).length === 0);
+  // Empty row (rowS = 0) is skipped, not crashed
+  const ctEmpty = { M: [[0, 0], [5, 5]], KA: 2, KB: 2, n: 10 };
+  const splitsE = detectSplitEvents(ctEmpty);
+  check('empty row skipped',                splitsE.length === 1 && splitsE[0].fine_cluster === 1);
 }
 
 console.log('\n--- computeARI ---');
@@ -154,12 +191,14 @@ console.log('\n--- scaleStabilityVerdict ---');
     [{ari:0.92, fuseEvents:[], splitEvents:[]}, {ari:0.90, fuseEvents:[], splitEvents:[]}],
   );
   check('STABLE_6BAND',                     stable6 === 'STABLE_6BAND');
-  // NESTED_3IN6: K=[3,6,3], 3 fuses each side, no splits
+  // NESTED_3IN6: legacy convention is Ks[0]=6 (fine) AND Ks[2]=3 (coarse),
+  // with the 6→3 collapse landing on the gap that crosses the K-change.
+  // K=[6,6,3] → collapse at 2↔3 with 3 fuses + 0 splits.
   const nested = scaleStabilityVerdict(
-    [{K:3, ok:true}, {K:6, ok:true}, {K:3, ok:true}],
+    [{K:6, ok:true}, {K:6, ok:true}, {K:3, ok:true}],
     [
-      {ari:0.6, fuseEvents:[{},{},{}], splitEvents:[]},
-      {ari:0.6, fuseEvents:[{},{},{}], splitEvents:[]},
+      {ari:0.9, fuseEvents:[],         splitEvents:[]},
+      {ari:0.4, fuseEvents:[{},{},{}], splitEvents:[]},
     ],
   );
   check('NESTED_3IN6',                      nested === 'NESTED_3IN6');
