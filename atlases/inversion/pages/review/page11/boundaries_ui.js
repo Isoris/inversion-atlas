@@ -31,6 +31,7 @@
 import {
   BOUNDARY_DEFAULTS,
   BOUNDARY_TRACK_WEIGHTS,
+  SUPPORT_CLASS_COLORS,
   ensureBoundariesState,
   bndFindCandidate,
   bndCloneRecord,
@@ -282,6 +283,236 @@ export function bndAutoPropose(state, opts) {
 }
 
 // =====================================================================
+// Track stack — SVG visual feedback for auto-propose
+// =====================================================================
+
+function _trackLineSvg(arr, drawW, trackH, stroke) {
+  if (!arr || arr.length === 0) return '';
+  let minV = Infinity, maxV = -Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const v = arr[i];
+    if (Number.isFinite(v)) { if (v < minV) minV = v; if (v > maxV) maxV = v; }
+  }
+  if (!Number.isFinite(minV) || !Number.isFinite(maxV) || minV === maxV) {
+    const pts = [];
+    for (let i = 0; i < arr.length; i++) {
+      const x = (i / Math.max(1, arr.length - 1)) * drawW;
+      pts.push(x.toFixed(2) + ',' + (trackH / 2).toFixed(2));
+    }
+    return '<polyline points="' + pts.join(' ')
+      + '" fill="none" stroke="var(--ink-dim)" stroke-width="0.8" />';
+  }
+  const pts = [];
+  for (let i = 0; i < arr.length; i++) {
+    const v = arr[i];
+    if (!Number.isFinite(v)) continue;
+    const x = (i / Math.max(1, arr.length - 1)) * drawW;
+    const y = (trackH - 4) - ((v - minV) / (maxV - minV)) * (trackH - 6);
+    pts.push(x.toFixed(2) + ',' + y.toFixed(2));
+  }
+  return '<polyline points="' + pts.join(' ')
+    + '" fill="none" stroke="' + stroke + '" stroke-width="1.0" stroke-linejoin="round" />';
+}
+
+function _bpToPx(bp, scan, labelW, drawW) {
+  const fr = (bp - scan.start_bp) / Math.max(1, scan.end_bp - scan.start_bp);
+  return labelW + Math.max(0, Math.min(1, fr)) * drawW;
+}
+
+function _zoneBg(rec, fallbackColors) {
+  const cls = (fallbackColors && fallbackColors[rec.support_class])
+    || (fallbackColors && fallbackColors.ambiguous)
+    || { hex: '#BDBDBD', opacity: 0.10 };
+  const alpha = Math.round(cls.opacity * 255).toString(16).padStart(2, '0');
+  return cls.hex + alpha;
+}
+
+/**
+ * Build the inner HTML for #bndTracks. Pure: returns a string.
+ *
+ * Empty / error states render an inline message; the populated state
+ * renders one `.bnd-track` row per present track (with weight in the
+ * label) plus a combined-score row at the bottom, plus overlay divs
+ * for cand anchors, staging zones, and the cursor marker.
+ *
+ * @param {Object} state
+ * @param {{wrapWidth?:number, trackHeight?:number, labelWidth?:number}} opts
+ * @returns {string}
+ */
+export function renderBoundaryTracksHtml(state, opts) {
+  const o = opts || {};
+  const wrapW = o.wrapWidth || 800;
+  const trackH = o.trackHeight || 28;
+  const labelW = o.labelWidth || 110;
+  const drawW = Math.max(20, wrapW - labelW - 12);
+
+  const empty = (h, p) => '<div class="bnd-empty">'
+    + '<div class="bnd-empty-h">' + _escape(h) + '</div>'
+    + _escape(p) + '</div>';
+
+  const bs = ensureBoundariesState(state);
+  if (!bs || bs.active_cand_id == null) {
+    return empty('No candidate selected',
+      'Pick a promoted candidate from the toolbar to refine its boundary zones.');
+  }
+  const cand = bndFindCandidate(state, bs.active_cand_id);
+  if (!cand) {
+    return empty('Candidate not found',
+      'The selected candidate is no longer in the registry.');
+  }
+
+  const data = (state && state.data) || {};
+  const windows = data.windows || null;
+  if (!windows) {
+    return empty('No window grid loaded',
+      'state.data.windows is required to draw the boundary track stack.');
+  }
+  const chromLen = data.n_bp != null ? data.n_bp
+                : data.chrom_length != null ? data.chrom_length : null;
+  const scan = boundaryScanRange(cand, bs.scan_radius_bp, chromLen, windows);
+  if (!scan) {
+    return empty('Scan range invalid',
+      'Cannot compute a scan region for this candidate.');
+  }
+
+  // Use cached trackScores when scanRange matches; else rebuild.
+  let cached = bs.cache && bs.cache.get ? bs.cache.get(bs.active_cand_id) : null;
+  if (!cached || !cached.trackScores
+      || !cached.scanRange
+      || cached.scanRange.start_bp !== scan.start_bp
+      || cached.scanRange.end_bp   !== scan.end_bp) {
+    const ts = buildBoundaryTrackScores(data, cand, scan);
+    cached = { trackScores: ts, scanRange: scan, edges: null };
+    if (bs.cache && bs.cache.set) bs.cache.set(bs.active_cand_id, cached);
+  }
+  const ts = cached.trackScores;
+  const present = Object.keys(ts.tracks);
+  if (present.length === 0) {
+    return empty('No evidence layers loaded',
+      'Auto-propose needs at least one of: precomp PVE1, band-continuity, GHSL panel, '
+      + 'dosage_chunks, candidate_marker_polarity, or boundary_evidence. '
+      + 'Use manual override (E / F at cursor) to annotate from PCA alone.');
+  }
+  if (!cached.edges) {
+    cached.edges = computeBoundaryEdges(ts, BOUNDARY_TRACK_WEIGHTS);
+  }
+
+  // Track stack: weight-descending order from BOUNDARY_TRACK_WEIGHTS.
+  const trackOrder = [];
+  for (const k of Object.keys(BOUNDARY_TRACK_WEIGHTS)) {
+    if (present.indexOf(k) >= 0) trackOrder.push(k);
+  }
+  // Tracks that are present but not weighted: append at the end.
+  for (const k of present) {
+    if (trackOrder.indexOf(k) < 0) trackOrder.push(k);
+  }
+
+  const _trackLabel = (t) => {
+    const w = (BOUNDARY_TRACK_WEIGHTS[t] != null) ? BOUNDARY_TRACK_WEIGHTS[t] : 0;
+    return t + ' (w=' + w.toFixed(2) + ')';
+  };
+
+  let html = '';
+  for (const t of trackOrder) {
+    const arr = ts.tracks[t];
+    const line = _trackLineSvg(arr, drawW, trackH, 'var(--accent)');
+    html += '<div class="bnd-track" style="position:relative; height:' + trackH + 'px;">'
+      + '<span class="bnd-track-label">' + _escape(_trackLabel(t)) + '</span>'
+      + '<svg width="' + wrapW + '" height="' + trackH + '" viewBox="0 0 ' + wrapW + ' ' + trackH
+      + '" preserveAspectRatio="none" style="position:absolute;left:0;top:0;">'
+      + '<g transform="translate(' + labelW + ',0)">' + line + '</g>'
+      + '</svg></div>';
+  }
+
+  if (cached.edges && cached.edges.combined_left && cached.edges.combined_left.length > 0) {
+    const cl = cached.edges.combined_left;
+    const cr = cached.edges.combined_right;
+    let maxC = 0;
+    for (let i = 0; i < cl.length; i++) {
+      if (cl[i] > maxC) maxC = cl[i];
+      if (cr[i] > maxC) maxC = cr[i];
+    }
+    if (maxC <= 0) maxC = 1;
+    const _line = (arr, color) => {
+      const pts = [];
+      for (let i = 0; i < arr.length; i++) {
+        const x = (i / Math.max(1, arr.length - 1)) * drawW;
+        const y = (trackH - 3) - (arr[i] / maxC) * (trackH - 5);
+        pts.push(x.toFixed(2) + ',' + y.toFixed(2));
+      }
+      return '<polyline points="' + pts.join(' ')
+        + '" fill="none" stroke="' + color + '" stroke-width="1.1" />';
+    };
+    html += '<div class="bnd-track" style="position:relative; height:' + trackH + 'px;">'
+      + '<span class="bnd-track-label">combined (L=#3cc08a R=#e0555c)</span>'
+      + '<svg width="' + wrapW + '" height="' + trackH + '" viewBox="0 0 ' + wrapW + ' ' + trackH
+      + '" preserveAspectRatio="none" style="position:absolute;left:0;top:0;">'
+      + '<g transform="translate(' + labelW + ',0)">'
+      + _line(cl, '#3cc08a') + _line(cr, '#e0555c')
+      + '</g></svg></div>';
+  }
+
+  // Overlay divs: cand anchors, staging zones, cursor
+  const overlayCount = trackOrder.length + (cached.edges ? 1 : 0);
+  const totalH = overlayCount * trackH;
+  let overlays = '';
+  const anchorAt = (bp, title) => {
+    if (!(bp >= scan.start_bp && bp <= scan.end_bp)) return '';
+    const x = _bpToPx(bp, scan, labelW, drawW);
+    return '<div class="bnd-anchor" style="position:absolute; top:0; left:'
+      + x.toFixed(2) + 'px; height:' + totalH + 'px; width:1px; '
+      + 'background:rgba(140,140,140,0.5);" title="' + _escape(title) + '"></div>';
+  };
+  overlays += anchorAt(cand.start_bp, 'cand.start_bp');
+  overlays += anchorAt(cand.end_bp,   'cand.end_bp');
+
+  const _zoneDiv = (rec, label) => {
+    if (!rec) return '';
+    const x0 = _bpToPx(rec.zone_start_bp, scan, labelW, drawW);
+    const x1 = _bpToPx(rec.zone_end_bp,   scan, labelW, drawW);
+    const wPx = Math.max(2, x1 - x0);
+    const bg = _zoneBg(rec, SUPPORT_CLASS_COLORS);
+    const score = Number.isFinite(rec.score) ? rec.score.toFixed(2) : '?';
+    return '<div class="bnd-zone" style="position:absolute; top:0; left:'
+      + x0.toFixed(2) + 'px; width:' + wPx.toFixed(2) + 'px; height:'
+      + totalH + 'px; background:' + bg + ';">'
+      + '<span class="bnd-zone-label">' + _escape(label) + ': '
+      + _escape(rec.support_class || '?') + ' (' + score + ')</span></div>';
+  };
+  overlays += _zoneDiv(bs.staging && bs.staging.boundary_left,  'L');
+  overlays += _zoneDiv(bs.staging && bs.staging.boundary_right, 'R');
+
+  // Cursor marker (state.cur is the active window index from page1)
+  if (state && Number.isInteger(state.cur) && windows.start_bp && windows.end_bp) {
+    const wi = state.cur;
+    if (wi >= 0 && wi < windows.start_bp.length) {
+      const cBp = (windows.start_bp[wi] + windows.end_bp[wi]) / 2;
+      if (cBp >= scan.start_bp && cBp <= scan.end_bp) {
+        const x = _bpToPx(cBp, scan, labelW, drawW);
+        overlays += '<div class="bnd-cur" style="position:absolute; top:0; left:'
+          + x.toFixed(2) + 'px; height:' + totalH + 'px; width:2px; '
+          + 'background:var(--accent);" title="state.cur (window ' + wi + ')"></div>';
+      }
+    }
+  }
+
+  // Wrap everything in a relative container so overlays position correctly
+  return '<div style="position:relative;">' + html + overlays + '</div>';
+}
+
+/**
+ * Paint the boundary tracks panel against the active document. Reads
+ * #bndTracks and writes its innerHTML. Headless-tolerant.
+ */
+export function renderBoundaryTracks(state, opts) {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById('bndTracks');
+  if (!el) return;
+  const wrapW = (opts && opts.wrapWidth) || el.clientWidth || 800;
+  el.innerHTML = renderBoundaryTracksHtml(state, Object.assign({}, opts, { wrapWidth: wrapW }));
+}
+
+// =====================================================================
 // Orchestrator
 // =====================================================================
 
@@ -292,6 +523,7 @@ export function refreshBoundariesUi(state) {
   updateRadiusButtons(state);
   updateSaveButton(state);
   updateStatusSelect(state);
+  renderBoundaryTracks(state);
 
   // Info line
   const info = document.getElementById('bndInfo');

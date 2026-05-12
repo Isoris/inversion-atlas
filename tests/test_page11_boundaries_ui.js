@@ -394,6 +394,63 @@ try { UI.teardownBoundariesToolbar(); } catch (_) { teardown2OK = false; }
 check('teardown: idempotent', teardown2OK);
 
 // -----------------------------------------------------------------------------
+group('renderBoundaryTracksHtml + renderBoundaryTracks');
+// Empty state
+const sT0 = buildState();
+const htmlEmpty = UI.renderBoundaryTracksHtml(sT0);
+check('tracks empty: shows "No candidate selected"',
+      htmlEmpty.includes('No candidate selected'));
+
+// Candidate but no window grid → window grid empty message
+const sT1 = buildState();
+UI.selectCandidate(sT1, 'cand_A');
+sT1.data.windows = null;
+const htmlNoWin = UI.renderBoundaryTracksHtml(sT1);
+check('tracks: missing windows → message',
+      htmlNoWin.includes('No window grid loaded'));
+
+// Populated state — fixture has pve1 transitions, so present tracks > 0
+const sT2 = buildState();
+UI.selectCandidate(sT2, 'cand_A');
+const html2 = UI.renderBoundaryTracksHtml(sT2, { wrapWidth: 600 });
+check('tracks: contains pca_drop track',     html2.includes('pca_drop'));
+check('tracks: includes weight in label',    html2.includes('w='));
+check('tracks: combined row rendered',       html2.includes('combined'));
+check('tracks: cand anchor overlay present', html2.includes('bnd-anchor'));
+check('tracks: SVG polyline rendered',       html2.includes('<polyline'));
+
+// With staging boundary set → zone overlay
+const bsT = ensureBoundariesState(sT2);
+bsT.staging.boundary_left = {
+  zone_start_bp: 500_000, zone_end_bp: 700_000,
+  score: 0.7, support: ['pca_drop'], support_class: 'weak',
+  source: 'auto', sv_anchors_in_zone: [], notes: '',
+  set_at: '2025', set_by: 'scrubber_auto',
+};
+const htmlZone = UI.renderBoundaryTracksHtml(sT2, { wrapWidth: 600 });
+check('tracks: zone overlay rendered',       htmlZone.includes('bnd-zone'));
+check('tracks: zone label shows L: weak',    htmlZone.includes('L: weak'));
+
+// Cursor marker
+sT2.cur = 7;
+const htmlCur = UI.renderBoundaryTracksHtml(sT2, { wrapWidth: 600 });
+check('tracks: cursor marker present',       htmlCur.includes('bnd-cur'));
+
+// HTML escape
+const sT3 = buildState();
+sT3.candidateList.push({ id: 'cand_<bad>', chrom: '<x>', start_bp: 0, end_bp: 1, K: 1 });
+UI.selectCandidate(sT3, 'cand_<bad>');
+const htmlEsc = UI.renderBoundaryTracksHtml(sT3);
+check('tracks: escapes < in id',  !htmlEsc.includes('<bad>') || htmlEsc.includes('&lt;bad&gt;'));
+
+// renderBoundaryTracks DOM mutator
+const sT4 = buildState();
+UI.selectCandidate(sT4, 'cand_A');
+UI.renderBoundaryTracks(sT4);
+check('renderBoundaryTracks: #bndTracks populated',
+      _ensure('bndTracks').innerHTML.length > 0);
+
+// -----------------------------------------------------------------------------
 group('Headless tolerance');
 const savedDoc = global.document;
 delete global.document;
