@@ -13,7 +13,7 @@ import {
   sigmaProfileL2,
   clusterL2, clusterL2AtK,
   clusterCacheKey, ClusterCache,
-} from '../shared/per_l2_cluster.js';
+} from '../atlases/inversion/shared/per_l2_cluster.js';
 
 let pass = 0, fail = 0;
 function check(name, cond, detail = '') {

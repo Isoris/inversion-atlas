@@ -14,10 +14,23 @@
 // Bodies extracted verbatim from the pre-split page1.js (eighth pass).
 
 import { fitCanvas, niceTicks, themeColor } from '../../../shared/page1_utils.js';
+import { karyoColor } from '../../../shared/color_helpers.js';
 
 import { _lineageColor, _pageState, _setActiveState } from './_state.js';
 import { currentMbRange, getL2Cluster } from './_data.js';
 import { _assignCandidateLanes, _drawWRow, _drawWinNavLane, _ensureCsOverlayIndex, _wRowBand, _winNavBand, drawCandidateBar } from './candidates.js';
+import { bandTraceGetOrCompute } from './band_trace_state.js';
+import { BTRACE_REGIME_COLOR } from '../../../shared/band_trace.js';
+import {
+  gatherActiveCandidatesForInheritance,
+  inheritanceCacheKey,
+  runInheritanceCompute,
+  formatInheritanceLabel,
+  INH_LABEL_FONT_PX,
+  INH_LABEL_STRIP_HEIGHT,
+  INH_LABEL_STRIP_GAP_BELOW,
+  INH_LABEL_MIN_BAND_PX,
+} from './inheritance.js';
 
 // --- STATUS_COLOR — legacy line 9805 ---
 // Color palette for L2 boundary validation_status markers drawn in the Z panel.
@@ -319,7 +332,7 @@ export function _drawLineageStrip(ctx, pad, plotW, plotH, mbMin, mbMax) {
     }
 
     // Find the dominant lineage among the fish in this L2's largest band.
-    const cl = (typeof getL2Cluster === 'function') ? getL2Cluster(l2idx) : null;
+    const cl = getL2Cluster(l2idx);
     if (!cl || !cl.fixedKLabels) continue;
     const labels = cl.fixedKLabels;
     const K = cl.K || (_state.k || 3);
@@ -470,11 +483,11 @@ export function _drawInheritanceLabelsStrip(ctx, pad, plotW, plotH, mbMin, mbMax
 
   // Auto-trigger compute if needed
   let result = _state.inheritanceResult;
-  const items = _gatherActiveCandidatesForInheritance();
+  const items = gatherActiveCandidatesForInheritance(_state);
   if (items.length < 2) return;   // nothing to label
 
   const mode = _state.activeMode || 'default';
-  const expectedKey = _inheritanceCacheKey(items, mode);
+  const expectedKey = inheritanceCacheKey(items, mode);
   if (!result || _state.inheritanceCacheKey !== expectedKey) {
     // Schedule deferred compute. Use requestIdleCallback if available;
     // fallback to setTimeout. We do NOT block this frame.
@@ -482,7 +495,7 @@ export function _drawInheritanceLabelsStrip(ctx, pad, plotW, plotH, mbMin, mbMax
       _state._inheritanceComputeScheduled = true;
       const fire = () => {
         _state._inheritanceComputeScheduled = false;
-        try { runInheritanceCompute(); } catch (_) {}
+        try { runInheritanceCompute(_state); } catch (_) {}
         // Trigger a redraw if the atlas has a paint scheduler hook
         if (typeof window.requestRepaint === 'function') {
           try { window.requestRepaint(); } catch (_) {}
@@ -496,12 +509,12 @@ export function _drawInheritanceLabelsStrip(ctx, pad, plotW, plotH, mbMin, mbMax
     }
     // While waiting, draw a faint placeholder so the user knows compute is in flight
     ctx.save();
-    ctx.font = `${_INH_LABEL_FONT_PX}px sans-serif`;
+    ctx.font = `${INH_LABEL_FONT_PX}px sans-serif`;
     ctx.fillStyle = 'rgba(140, 150, 165, 0.55)';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     const stripY = Math.max(0,
-      pad.t - _INH_LABEL_STRIP_HEIGHT - _INH_LABEL_STRIP_GAP_BELOW - 6
+      pad.t - INH_LABEL_STRIP_HEIGHT - INH_LABEL_STRIP_GAP_BELOW - 6
     );
     ctx.fillText('inheritance: computing…', pad.l + 2, stripY);
     ctx.restore();
@@ -510,11 +523,11 @@ export function _drawInheritanceLabelsStrip(ctx, pad, plotW, plotH, mbMin, mbMax
 
   // Strip drawn ABOVE the regime-breadth strip (which sits at pad.t - 6 area).
   // Place the inheritance labels strip 12px above plot top to leave room.
-  const stripH = _INH_LABEL_STRIP_HEIGHT;
+  const stripH = INH_LABEL_STRIP_HEIGHT;
   const stripY = Math.max(0, pad.t - stripH - 8);
 
   ctx.save();
-  ctx.font = `${_INH_LABEL_FONT_PX}px sans-serif`;
+  ctx.font = `${INH_LABEL_FONT_PX}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -530,9 +543,9 @@ export function _drawInheritanceLabelsStrip(ctx, pad, plotW, plotH, mbMin, mbMax
     const xLoVis = pad.l + Math.max(0, ((mbLo - mbMin) / (mbMax - mbMin)) * plotW);
     const xHiVis = pad.l + Math.min(plotW, ((mbHi - mbMin) / (mbMax - mbMin)) * plotW);
     const w = xHiVis - xLoVis;
-    if (w < _INH_LABEL_MIN_BAND_PX) continue;
+    if (w < INH_LABEL_MIN_BAND_PX) continue;
 
-    const label = _formatInheritanceLabel(m.seq_num, m.seq_num, n_groups);
+    const label = formatInheritanceLabel(m.seq_num, m.seq_num, n_groups);
     const xMid = (xLoVis + xHiVis) / 2;
     const yMid = stripY + stripH / 2;
 
@@ -637,7 +650,7 @@ export function _drawBandTraceStrip(ctx, pad, plotW, plotH, mbMin, mbMax) {
   const d = _state.data;
   if (!d || !Array.isArray(d.l2_envelopes)) return;
 
-  const trace = _bandTraceGetOrCompute();
+  const trace = bandTraceGetOrCompute(_state);
   if (!trace || !Array.isArray(trace.per_l2) || trace.per_l2.length === 0) return;
 
   const stripH = 7;
@@ -662,15 +675,9 @@ export function _drawBandTraceStrip(ctx, pad, plotW, plotH, mbMin, mbMax) {
   ctx.fillStyle = 'rgba(60, 40, 70, 0.14)';
   ctx.fillRect(pad.l, stripY, plotW, stripH);
 
-  // Get the band-color palette. Use existing _gpKaryoColor if available
-  // (matches the karyotype tab and cockpit), else fall back to a
-  // hardcoded 6-color cycle so headless tests don't blow up.
-  const bandColor = (typeof _gpKaryoColor === 'function')
-    ? _gpKaryoColor
-    : function (k) {
-        const PAL = ['#3b6fb6', '#ffd866', '#d97a2c', '#7ad394', '#a76de2', '#e85a5a'];
-        return PAL[k % PAL.length];
-      };
+  // Band-colour palette — shared with the karyotype tab and cockpit
+  // via shared/color_helpers.js (legacy _gpKaryoColor at line 42894).
+  const bandColor = karyoColor;
 
   // Index per_l2 by l2_idx for O(1) lookup
   const byL2 = {};
@@ -728,7 +735,7 @@ export function _drawBandTraceStrip(ctx, pad, plotW, plotH, mbMin, mbMax) {
     // Top stripe: regime color. Even when no_valid, paint the dark
     // sentinel so the user can distinguish "computed but empty" from
     // "outside view range."
-    const regimeC = _BTRACE_REGIME_COLOR[e.regime] || _BTRACE_REGIME_COLOR.no_valid;
+    const regimeC = BTRACE_REGIME_COLOR[e.regime] || BTRACE_REGIME_COLOR.no_valid;
     ctx.fillStyle = regimeC;
     ctx.fillRect(xLo, stripY, w, borderH);
 
@@ -799,8 +806,7 @@ export function drawZ(state) {
     // same per-lane height as the single-lane case.
     const candBarH = 5;
     const candGap  = 1;
-    const _candLanes = (typeof _assignCandidateLanes === 'function')
-      ? _assignCandidateLanes(state.candidateList || []).n_lanes : 1;
+    const _candLanes = _assignCandidateLanes(state.candidateList || []).n_lanes;
     const candBarTotal = candBarH * _candLanes;
     const zoneTop  = pad.t + candBarTotal + candGap;
     const plotW = w - pad.l - pad.r;
@@ -977,8 +983,7 @@ export function drawZ(state) {
   // same per-lane height as the single-lane case. zoneTop and plotH both
   // adjust to keep L1/L2/W-row/peaks/scatter visually in the same place
   // relative to the cand bar's BOTTOM.
-  const _candLanes = (typeof _assignCandidateLanes === 'function')
-    ? _assignCandidateLanes(state.candidateList || []).n_lanes : 1;
+  const _candLanes = _assignCandidateLanes(state.candidateList || []).n_lanes;
   const candBarTotal = candBarH * _candLanes;
   // Effective top of L1 bar shifts down by (candBarTotal + candGap)
   const zoneTop = pad.t + candBarTotal + candGap;
@@ -1347,8 +1352,7 @@ export function drawZ(state) {
   // Source data: state.crossSpecies.breakpoints filtered by chrom (built
   // by _ensureCsOverlayIndex).
   try {
-    const csIdx = (typeof _ensureCsOverlayIndex === 'function')
-      ? _ensureCsOverlayIndex() : null;
+    const csIdx = _ensureCsOverlayIndex();
     if (csIdx && csIdx.bps.length > 0) {
       ctx.save();
       ctx.strokeStyle = '#e85a5a';

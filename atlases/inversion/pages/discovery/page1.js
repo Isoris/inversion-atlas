@@ -28,7 +28,24 @@
 import { escapeHtml } from '../../shared/page1_utils.js';
 import { resolve as _registryResolve, getState as _getState } from '../../../../core/atlas_api.js';
 
-import { _setActiveState } from './page1/_state.js';
+import {
+  _setActiveState,
+  _linesCacheInvalidate,
+  invalidateLineageCache,
+  _bandTraceClearCache,
+} from './page1/_state.js';
+import {
+  loadActiveSamples,
+  refreshActiveSamplesBadge,
+} from './page1/active_samples.js';
+import { loadBandTraceState } from './page1/band_trace_state.js';
+import {
+  runL2SweepInheritance,
+  invalidateL2SweepCache,
+  autoPromoteFromSweep,
+} from './page1/l2_sweep.js';
+import { idbPersistChrom } from './page1/idb.js';
+import { replayEnrichmentsFromIdb } from './page1/idb_restore.js';
 import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayers, listLayers, loadViewControls, populateSimScales, reconcileViewControlsForData } from './page1/_data.js';
 import { drawSim, drawSimMini } from './page1/sim_panel.js';
 import { drawZ } from './page1/z_panel.js';
@@ -40,6 +57,23 @@ import { buildTrackPanels, drawTracks, onPCAClick, onSimClick, onZClick, setCur,
 import { attachSidebarHandlers } from './page1/sidebar.js';
 import { attachHotkeys } from './page1/hotkeys.js';
 import { attachPcaLasso } from './page1/pca_panel.js';
+
+// Theta-pi mirror (page12) and GHSL mirror (page15) entry points. These are
+// painted from page1's applyData() because the mirror panels share page1's
+// data envelope (theta_pi_*, ghsl_panel) — they activate when those layers
+// are present in the loaded JSON. The page12/page15 modules also export
+// their own atlas-router lifecycle for when those pages are mounted directly.
+import {
+  _drawThAnchorStripPanel,
+  _drawThCusumHero,
+  _drawThLinesPanel,
+  _drawThPcaPanel,
+  _drawThSimMatPanel,
+  _drawThZPanel,
+  _refreshThetaPiLayerStatus,
+  _refreshThetaPiPanelVisibility,
+} from './page12.js';
+import { _refreshGhslLayerStatus } from './page15.js';
 import { _mgRefreshOnDataLoad } from './page1/manual_groups.js';
 import { attachPanelResize } from './page1/panel_resize.js';
 
@@ -74,15 +108,13 @@ export function applyData(state, data) {
   // matrix and lineage labels only mean something within one chrom). When
   // data swaps, drop the cached result so the next paint re-triggers
   // compute on the new chromosome's L2 inventory.
-  if (typeof invalidateLineageCache === 'function') {
-    try { invalidateLineageCache(); } catch (_) {}
-  }
-  // turn 161: same for the band-trace cache (per-chromosome, per-fish-set).
-  // Also drop the fish-set itself — sample indices are per-chrom and
-  // generally don't transfer to a new chromosome's data shape.
-  if (typeof _bandTraceClearCache === 'function') {
-    try { _bandTraceClearCache(); } catch (_) {}
-  }
+  invalidateLineageCache(state);
+  // turn 161: clear the band-trace cache (per-chromosome, per-fish-set)
+  // and re-hydrate the on/off toggle + fish-set from localStorage. The
+  // fish-set is cohort-wide so it survives chrom changes, but the
+  // compute cache is per-chrom.
+  _bandTraceClearCache(state);
+  loadBandTraceState(state);
   state.bandTraceFishSet = null;
   state._lineageComputeScheduled = false;
   // v3.99 turn 14e: if simInMinimap was restored from localStorage at
@@ -93,49 +125,33 @@ export function applyData(state, data) {
   }
   // v3.99 t14e+ continue: refresh page 12 (θπ scrubber) layer-status
   // indicators in the empty-state. Each row's status flips from ⚪ to 🟢
-  // when that layer is detected.
-  if (typeof _refreshThetaPiLayerStatus === 'function') {
-    try { _refreshThetaPiLayerStatus(); } catch (_) {}
-  }
+  // when that layer is detected. Try/catch is kept because the mirror DOM
+  // (theta-pi / GHSL panel hosts) may not be present under the new shell
+  // when only page1 is mounted; the renders bail safely.
+  try { _refreshThetaPiLayerStatus(state); } catch (_) {}
   // v4 turn 132 Slice 2: also flip panel visibility — empty-state hides
   // and per-layer panels reveal as their required layers arrive.
-  if (typeof _refreshThetaPiPanelVisibility === 'function') {
-    try { _refreshThetaPiPanelVisibility(); } catch (_) {}
-  }
+  try { _refreshThetaPiPanelVisibility(state); } catch (_) {}
   // v4 turn 132 Slice 3: paint the CUSUM hero panel from cusum_theta if
   // present. Visibility wiring above already revealed/hid the panel; this
   // draws into its canvases. Other renderers (sim_mat, |Z|, lines, PCA,
   // L3) ship in later slices.
-  if (typeof _drawThCusumHero === 'function') {
-    try { _drawThCusumHero(); } catch (_) {}
-  }
+  try { _drawThCusumHero(state); } catch (_) {}
   // v4 turn 132 Slice 5: paint the per-sample θπ lines panel from
   // theta_pi_per_window if present. Single-source (no PC1/PC2/GHSL/het
   // stacking like page 1), no lasso, no caching — minimum viable mirror.
-  if (typeof _drawThLinesPanel === 'function') {
-    try { _drawThLinesPanel(); } catch (_) {}
-  }
+  try { _drawThLinesPanel(state); } catch (_) {}
   // v4 turn 132 Slice 6a/6b: paint sim_mat heatmap + |Z| waveform from
   // theta_pi_local_pca if present. Mirrors page 1's drawSim/drawZ
   // minimum-viable subset — no L1/L2 overlays (need theta_pi_envelopes),
   // no click-to-jump, no PDF-style triangle split.
-  if (typeof _drawThSimMatPanel === 'function') {
-    try { _drawThSimMatPanel(); } catch (_) {}
-  }
-  if (typeof _drawThZPanel === 'function') {
-    try { _drawThZPanel(); } catch (_) {}
-  }
+  try { _drawThSimMatPanel(state); } catch (_) {}
+  try { _drawThZPanel(state); } catch (_) {}
   // v4 turn 132 Slice 7a/7b: paint envelope anchor strip + PC1×PC2 scatter
   // from theta_pi_envelopes / theta_pi_local_pca.
-  if (typeof _drawThAnchorStripPanel === 'function') {
-    try { _drawThAnchorStripPanel(); } catch (_) {}
-  }
-  if (typeof _drawThPcaPanel === 'function') {
-    try { _drawThPcaPanel(); } catch (_) {}
-  }
-  if (typeof _refreshGhslLayerStatus === 'function') {
-    try { _refreshGhslLayerStatus(); } catch (_) {}
-  }
+  try { _drawThAnchorStripPanel(state); } catch (_) {}
+  try { _drawThPcaPanel(state); } catch (_) {}
+  try { _refreshGhslLayerStatus(state); } catch (_) {}
   // Load saved candidate list for this chromosome from localStorage.
   // Each chromosome has its own list (cross-chrom labels are meaningless).
   try { loadCandidateList(state); } catch (_) {}
@@ -148,15 +164,11 @@ export function applyData(state, data) {
   // auto-promotes land in candidateList. Without this hook, switching
   // chrom with the toggle on would leave the sweep stale until the user
   // toggled it off-and-on.
-  if (typeof invalidateL2SweepCache === 'function') {
-    try { invalidateL2SweepCache(); } catch (_) {}
-  }
-  if (state.l2SweepEnabled
-      && typeof runL2SweepInheritance === 'function'
-      && typeof _autoPromoteFromSweep === 'function') {
+  invalidateL2SweepCache(state);
+  if (state.l2SweepEnabled) {
     try {
-      const sweepRes = runL2SweepInheritance({ force: true });
-      if (sweepRes) _autoPromoteFromSweep(sweepRes);
+      const sweepRes = runL2SweepInheritance(state, { force: true });
+      if (sweepRes) autoPromoteFromSweep(state, sweepRes);
     } catch (e) {
       console.warn('[l2sweep] applyData hook failed:', e && e.message);
     }
@@ -175,8 +187,8 @@ export function applyData(state, data) {
   }
   // Load saved view controls (PCA axis selection etc.) and reconcile against
   // the data we just loaded — drops PC3/PC4 if not available, keeps PC1×PC2.
-  if (typeof loadViewControls === 'function')             loadViewControls(state);
-  if (typeof reconcileViewControlsForData === 'function') reconcileViewControlsForData(state);
+  loadViewControls(state);
+  reconcileViewControlsForData(state);
   state.cur = 0;
   state.tracked = [];
   state.ancestryPalette = {};
@@ -184,40 +196,38 @@ export function applyData(state, data) {
   state.cacheKey = null;
   // v3.99 turn 7 perf: clear render caches whenever a new dataset loads
   _l3CacheInvalidate();
-  if (typeof _linesCacheInvalidate === 'function') _linesCacheInvalidate();
-  // 2026-05-06 round 3: most of these helpers were extracted in step 3
-  // (buildIndexes, computePC1Signs, populateSimScales, buildFamilyPalette,
-  // refreshBandPickBar — all module-level above). Three remain reference-
-  // but-never-defined-in-legacy: refreshColorModeBar, refreshPcaAxisBar,
-  // refreshPinUI. The typeof guards stay so missing-but-future helpers
-  // and the never-defined trio behave identically (silent no-op).
-  if (typeof buildIndexes === 'function')         buildIndexes(state);
-  if (typeof computePC1Signs === 'function')      computePC1Signs(state);
-  if (typeof populateSimScales === 'function')    populateSimScales(state);
-  if (typeof buildFamilyPalette === 'function')   buildFamilyPalette(state);
+  _linesCacheInvalidate(state);
+  // 2026-05-06 round 3: these helpers were extracted in step 3 and are now
+  // imported at the top of this file — calling them directly is safe.
+  // refreshColorModeBar / refreshPcaAxisBar / refreshPinUI are never-defined-
+  // in-legacy hooks and stay try/caught (silent no-op).
+  buildIndexes(state);
+  computePC1Signs(state);
+  populateSimScales(state);
+  buildFamilyPalette(state);
   try { refreshColorModeBar(state); } catch (_) {}
-  if (typeof refreshBandPickBar === 'function')   refreshBandPickBar(state);
+  refreshBandPickBar(state);
   try { refreshPcaAxisBar(state); } catch (_) {}
   // Manual groups: reload from localStorage now that we know the chrom
   try { _mgRefreshOnDataLoad(); } catch (_) {}
   // v4 turn 128 (AS1): active samples — restore the saved CGA list for
   // this cohort and refresh the badge text. AS1 is purely scaffolding;
   // no other atlas function reads state.activeSampleSet yet.
-  if (typeof loadActiveSamples === 'function') loadActiveSamples();
-  if (typeof refreshActiveSamplesBadge === 'function') refreshActiveSamplesBadge();
-  if (typeof buildLinesPanelCheckboxes === 'function') buildLinesPanelCheckboxes(state);
-  if (typeof buildLinesPanel === 'function') buildLinesPanel(state);
+  loadActiveSamples(state);
+  refreshActiveSamplesBadge(state);
+  buildLinesPanelCheckboxes(state);
+  buildLinesPanel(state);
   // v3.99 turn 14e+ continue: revalidate the lines coloring mode against
   // the layers we just discovered. If the user previously selected, e.g.,
   // 'theta_pi' on a different JSON that had the layer, but this JSON
   // doesn't, the picker falls back to 'kmeans' silently.
-  if (typeof refreshLinesColorMode === 'function') refreshLinesColorMode(state);
+  refreshLinesColorMode(state);
   state.secondaryL2 = null;
   try { refreshPinUI(state); } catch (_) {}
   state.lockedLabels = null;
   state.lockedRefL2 = null;
   try { refreshLockBtn(state); } catch (_) {}
-  if (typeof buildTrackPanels === 'function')     buildTrackPanels(state);
+  buildTrackPanels(state);
   const _scrubEl = document.getElementById('scrubber');
   if (_scrubEl) {
     _scrubEl.max = data.n_windows - 1;
@@ -270,27 +280,25 @@ export function applyData(state, data) {
   // Schema badge
   const schemaBadge = document.getElementById('schemaBadge');
   if (schemaBadge) {
-    const layerNames = (typeof listLayers === 'function') ? listLayers(state) : [];
+    const layerNames = listLayers(state);
     schemaBadge.textContent = `schema v${state.schemaVersion} · ${layerNames.length} layer${layerNames.length === 1 ? '' : 's'}`;
     schemaBadge.title = `Schema version: v${state.schemaVersion}\nLayers: ${layerNames.join(', ')}\n\nUse + load enrichment to add layers from cluster phases 6+`;
     schemaBadge.className = 'v' + state.schemaVersion;
     schemaBadge.style.display = 'inline-block';
   }
-  if (typeof renderTrackedList === 'function') renderTrackedList(state);
-  if (typeof refreshCandidateUI === 'function') refreshCandidateUI(state);
+  renderTrackedList(state);
+  refreshCandidateUI(state);
   if (typeof refreshCandidateListUI === 'function') refreshCandidateListUI();
   // v3.90: activate (or hide) the marker page based on whether a phase-13
   // marker layer was loaded. Re-render its content after activation so it
   // reflects whatever subset of {summary, catalogue, primers} arrived.
   if (typeof _refreshMarkerPageActivation === 'function') _refreshMarkerPageActivation();
   if (typeof renderMarkerPage === 'function') renderMarkerPage();
-  if (typeof setCur === 'function') setCur(state, 0);
+  setCur(state, 0);
   // v4 turn 73f: persist this chromosome to IndexedDB so it survives page
-  // reloads / cross-atlas navigation. Async, fire-and-forget; failures log
-  // to console but don't block the UI.
-  if (typeof _idbPersistChrom === 'function') {
-    try { _idbPersistChrom(data); } catch (_) { /* fail-soft */ }
-  }
+  // reloads / cross-atlas navigation. Async, fire-and-forget; the helper
+  // itself catches IDB errors and logs to console.warn.
+  idbPersistChrom(data);
 }
 
 // =============================================================================
@@ -351,6 +359,12 @@ export async function mount(root, atlasState, registry) {
   // Apply data through the legacy entry point. This populates state.data,
   // state.tracks, state.windows, etc. — everything the draw functions need.
   applyData(legacyState, data);
+
+  // Replay any enrichments the user dropped in a prior session. Async,
+  // fire-and-forget; matching enrichments merge onto state.data and
+  // mark new layersPresent before the user touches anything. Failures
+  // are logged inside the helper; we never block mount on this.
+  replayEnrichmentsFromIdb(legacyState);
 
   // Initial render. Each call may throw if it hits a TODO_MISSING; we
   // catch and log so one broken panel doesn't hide the others.

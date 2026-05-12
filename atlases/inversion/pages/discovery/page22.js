@@ -37,11 +37,10 @@
 
 import { contextFromState, ClusterCache } from '../../shared/per_l2_cluster.js';
 
-// Atlas-side bridge to page1's state slot for sample colouring. The
-// regimes panels import _resolveSampleScopeColor from './page1/_state.js'
-// directly; this file only needs to ensure activeState is set on page1's
-// _pageState shim so those imports return real data.
-import { _setActiveState as _setPage1ActiveState } from './page1/_state.js';
+// Sample-color resolution is now in shared/sample_color.js. The regimes
+// panels pass their own page22 state to resolveSampleScopeColor, so this
+// module no longer needs to set page1's _pageState as a side effect.
+// Page-isolation per specs_todo/SPEC_registry_write_and_page_isolation.md.
 
 // Pipeline core (audited v3.4)
 import { runBandingPipeline, BANDING_PIPELINE_DEFAULTS }
@@ -72,12 +71,6 @@ export async function mount(root, atlasState, registry) {
   const state = _buildLegacyState(atlasState);
   _pageState = state;
 
-  // Page22 borrows _resolveSampleScopeColor from page1/_state.js, which
-  // reads from page1's _pageState. Set page1's active state so colour
-  // lookups work on this page too. (TODO: hoist _resolveSampleScopeColor
-  // into a shared module so this cross-page dependency goes away.)
-  _setPage1ActiveState(state);
-
   const chrom = atlasState.shared && atlasState.shared.activeChrom;
   if (!chrom) {
     _setStatus(root, 'no chromosome selected — pick one from the toolbar');
@@ -106,7 +99,6 @@ export async function mount(root, atlasState, registry) {
 
 export async function unmount(root) {
   _pageState = null;
-  _setPage1ActiveState(null);
   // Note: arrow-key handlers attached by initRegimesPage are document-level.
   // initRegimesPage returns a teardown closure but we don't currently
   // capture it — TODO: capture the unsubscribe and call it here.

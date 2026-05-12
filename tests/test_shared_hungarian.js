@@ -4,7 +4,7 @@ import {
   alignLabels, permutations,
   hungarianChainProjection, concordanceMatrix,
   LINEAGE_CHAIN_BREAK_AGREEMENT,
-} from '../shared/hungarian.js';
+} from '../atlases/inversion/shared/hungarian.js';
 
 let pass = 0, fail = 0;
 function check(name, cond, detail = '') {

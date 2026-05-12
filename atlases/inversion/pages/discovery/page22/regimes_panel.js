@@ -41,7 +41,7 @@
 // =====================================================================
 
 import { fitCanvas, formatTrackVal, themeColor, withAlpha } from '../../../shared/page1_utils.js';
-import { _resolveSampleScopeColor } from '../page1/_state.js';
+import { resolveSampleScopeColor } from '../../../shared/sample_color.js';
 import { currentMbRange } from '../../../shared/page1_data_helpers.js';
 
 // ---------------------------------------------------------------------
@@ -584,12 +584,12 @@ export function drawRegimesPanel(state) {
   for (const si of trackedSet) {
     if (voterSet.has(si)) continue;
     let col = '#aab2c0';
-    if (typeof _resolveSampleScopeColor === 'function') {
-      const c = _resolveSampleScopeColor(si, state.linesColorMode || 'kmeans');
+    {
+      const c = resolveSampleScopeColor(state, si, state.linesColorMode || 'kmeans');
       if (c) col = c;
     }
     ctx.lineWidth = 1.0;
-    ctx.strokeStyle = (typeof withAlpha === 'function') ? withAlpha(col, 0.45) : col;
+    ctx.strokeStyle = withAlpha(col, 0.45);
     strokePath(si);
   }
 

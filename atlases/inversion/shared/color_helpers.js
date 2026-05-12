@@ -97,3 +97,39 @@ export function zColorPDF(z, z_max) {
   if (t <= 0.5) return lerpRGB(Z_LOW, Z_MID, t * 2);
   return lerpRGB(Z_MID, Z_HIGH, (t - 0.5) * 2);
 }
+
+// =====================================================================
+// Karyotype band colours (legacy lines 42891-42897)
+// =====================================================================
+// Six-entry palette used by the g-panel karyo-glyph renderer and the
+// z-panel candidate bars to colour band membership. The palette wraps
+// (bandIdx % 6) for K > 6 cases. bandIdx == null or < 0 returns the
+// neutral "ungrouped" grey #666.
+
+export const KARYO_PALETTE = Object.freeze([
+  '#4fa3ff', '#b8b8b8', '#f5a524',
+  '#3cc08a', '#e0555c', '#b07cf7',
+]);
+
+export function karyoColor(bandIdx) {
+  if (bandIdx == null || bandIdx < 0) return '#666';
+  return KARYO_PALETTE[bandIdx % KARYO_PALETTE.length];
+}
+
+// =====================================================================
+// Inheritance-group palette (legacy lines 46716-46719)
+// =====================================================================
+// Ten-entry palette used by the I·g pill tooltips, tracked-list panel
+// overlays, and any other consumer that visualises group_id_per_band.
+// Wraps for K > 10. groupId == null or < 0 returns the same neutral
+// grey the rest of the dim-text UI uses.
+
+export const INH_GROUP_PALETTE = Object.freeze([
+  '#4fa3ff', '#f5a524', '#3cc08a', '#e0555c', '#b07cf7',
+  '#5fc8d8', '#d97f5c', '#88c45e', '#ce5fb5', '#7c8fff',
+]);
+
+export function inhGroupColor(groupId) {
+  if (groupId == null || groupId < 0) return '#7a8398';
+  return INH_GROUP_PALETTE[groupId % INH_GROUP_PALETTE.length];
+}

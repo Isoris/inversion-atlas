@@ -28,42 +28,14 @@ import { getL2Cluster, groupColor } from './_data.js';
 import { setCur } from './events.js';
 import { drawZ } from './z_panel.js';
 import { renderL3Panel } from './l3_panel.js';
+import { assignCandidateLanes as _sharedAssignCandidateLanes }
+  from '../../../shared/page1_utils.js';
 
-// --- _assignCandidateLanes — legacy lines 32503-32536 ---
-export function _assignCandidateLanes(candList) {
-  if (!Array.isArray(candList) || candList.length === 0) {
-    return { assignments: new Map(), n_lanes: 1 };
-  }
-  // Sort a copy by start_w (then by id for stable order on ties)
-  const sorted = candList.slice().filter(c => c && c.start_w != null && c.end_w != null)
-    .sort((a, b) => {
-      if (a.start_w !== b.start_w) return a.start_w - b.start_w;
-      return String(a.id || '').localeCompare(String(b.id || ''));
-    });
-  // lanes[i] = end_w of last candidate placed in lane i; -Infinity = lane unused
-  const lanes = [];
-  const assignments = new Map();
-  for (const c of sorted) {
-    let placed = -1;
-    for (let i = 0; i < lanes.length; i++) {
-      // Strict overlap test: this candidate's start_w must be > last lane's
-      // end_w. If start_w === end_w of previous, they touch but don't overlap;
-      // we reuse the lane (same as L1/L2 rendering convention which uses _s0
-      // and _e0 as inclusive endpoints).
-      if (c.start_w > lanes[i]) {
-        lanes[i] = c.end_w;
-        placed = i;
-        break;
-      }
-    }
-    if (placed < 0) {
-      lanes.push(c.end_w);
-      placed = lanes.length - 1;
-    }
-    assignments.set(c.id, placed);
-  }
-  return { assignments, n_lanes: Math.max(1, lanes.length) };
-}
+// --- _assignCandidateLanes — re-exported from shared/page1_utils.js ---
+// The canonical implementation (legacy lines 32503-32536) lives in shared.
+// The underscore-prefixed name is preserved so existing imports in z_panel,
+// lines_panel, and this file's own draw helpers keep working unchanged.
+export const _assignCandidateLanes = _sharedAssignCandidateLanes;
 
 // --- _paintCandidateBands — legacy lines 33945-33992 ---
 export function _paintCandidateBands(ctx, opts) {
@@ -252,7 +224,7 @@ export function drawCandidateBar(ctx, d, toX, y0, h, opts) {
     if (!c || !Array.isArray(c.tracks) || !c.tracks[trackIdx]) return null;
     const t = c.tracks[trackIdx];
     if (!Array.isArray(t.active_bands) || t.active_bands.length === 0) return null;
-    return (typeof groupColor === 'function') ? groupColor(t.active_bands[0]) : null;
+    return groupColor(t.active_bands[0]);
   };
 
   // Pass 1: pending (grey)
@@ -692,9 +664,7 @@ export function refreshCandidateUI(state) {
   // v3.84: refresh the candidate overlay badge in the per-sample-lines header
   if (typeof _refreshCandOverlayBadge === 'function') _refreshCandOverlayBadge();
   // v3.84: redraw the lines panel so the candidate-span overlay updates
-  if (typeof drawLinesPanel === 'function') {
-    try { drawLinesPanel(state); } catch (e) {}
-  }
+  try { drawLinesPanel(state); } catch (e) {}
 }
 
 // =============================================================================

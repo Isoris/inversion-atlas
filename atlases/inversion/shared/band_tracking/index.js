@@ -26,59 +26,52 @@
 // nothing here rewrites the L3 contingency core.
 // =====================================================================
 
-export {
-  bandMembers, bandJaccard,
-  single_band_score_continuity,
-  single_band_track_from_seed,
-} from './single_band.js';
-
-export {
-  meanPc1PerBand,
-  het_detect_candidate_band,
-  het_track_skeleton,
-  het_define_interval,
-  iv_merge_het_tracks,
-} from './het.js';
-
-export {
-  hom_anchor_in_window,
-  hom_anchor_to_het,
-} from './hom.js';
-
-export {
-  iv_call_samples_from_skeleton,
-} from './iv.js';
-
 // ---------------------------------------------------------------------
-// LAYER 1 — Trajectory similarity (fast macro-grouping aid)
+// TODO (legacy-merge gap): the following re-export blocks point at
+// upstream pipeline modules that were never extracted from the legacy
+// Inversion_atlas.html monolith. The file shapes are documented in the
+// header comment above; the implementations still live in legacy and
+// need to be carved out the same way other shared/ modules were. Until
+// then, the index loads only the consensus tail of the pipeline.
+//
+// Missing (legacy extraction pending):
+//   ./single_band.js       — bandMembers, bandJaccard,
+//                            single_band_score_continuity,
+//                            single_band_track_from_seed
+//   ./het.js               — meanPc1PerBand, het_detect_candidate_band,
+//                            het_track_skeleton, het_define_interval,
+//                            iv_merge_het_tracks
+//   ./hom.js               — hom_anchor_in_window, hom_anchor_to_het
+//   ./iv.js                — iv_call_samples_from_skeleton
+//   ./trajectory.js        — pickPc1OrientationReferenceSamples,
+//                            computePc1SignAnchors,
+//                            band_compute_pc1_trajectory,
+//                            band_pairwise_trajectory_correlation,
+//                            band_group_by_trajectory_similarity
+//   ./karyotype_model.js   — kt_combine_trajectory_and_projection_evidence,
+//                            kt_infer_macro_band_groups,
+//                            kt_resolve_karyotype_model
 // ---------------------------------------------------------------------
-export {
-  pickPc1OrientationReferenceSamples,
-  computePc1SignAnchors,
-  band_compute_pc1_trajectory,
-  band_pairwise_trajectory_correlation,
-  band_group_by_trajectory_similarity,
-} from './trajectory.js';
 
 // ---------------------------------------------------------------------
 // LAYER 2 — BandSet Projection (set-based authority)
+//
+// Note: legacy aspirational names (bp_compute_projection_vector,
+// bp_detect_visited_excluded_bands, bp_classify_projection_pattern,
+// bp_project_bandset_to_target_bands) were never implemented under
+// those identifiers; the working surface in projection.js uses
+// classifyProjection / classifyProjectionWithStability. If the
+// bp_* identifiers ever materialise (legacy extraction), re-add
+// them to this block.
 // ---------------------------------------------------------------------
 export {
   PATTERN_CLASS,
-  bp_compute_projection_vector,
-  bp_detect_visited_excluded_bands,
-  bp_classify_projection_pattern,
-  bp_project_bandset_to_target_bands,
+  PROJECTION_DEFAULTS,
+  classifyProjection,
+  classifyProjectionWithStability,
 } from './projection.js';
 
-// ---------------------------------------------------------------------
-// COMBINER — Layer 1 + Layer 2 → macro-band groups → karyotype model
-// ---------------------------------------------------------------------
-export {
-  kt_combine_trajectory_and_projection_evidence,
-  kt_infer_macro_band_groups,
-  kt_resolve_karyotype_model,
-} from './karyotype_model.js';
+// COMBINER (karyotype_model.js): pending legacy extraction — see TODO above.
 
 // ---------------------------------------------------------------------
 // VOTE EVIDENCE — raw vote extraction + co-association matrix

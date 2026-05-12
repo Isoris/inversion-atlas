@@ -918,7 +918,7 @@ export function candidateHaplotypeAnnotationsHtml(c) {
 
   // Helper: render the per-band cell
   function bandCell(b) {
-    const swatch = (typeof groupColor === 'function') ? groupColor(b) : '#888';
+    const swatch = groupColor(b);
     const userVal = labels[b] != null ? String(labels[b]) : '';
     const sugId = suggestions[b];
     const inhText = (sugId != null) ? `inh${sugId}` : '';
@@ -1238,8 +1238,7 @@ export function candidateRegimeRowHtml(c) {
       // Use the track's primary band color as a thin prefix so the user
       // visually distinguishes track 1's row from track 2's.
       const primaryBand = c.tracks[ti].active_bands[0];
-      const tColor = (typeof groupColor === 'function')
-        ? groupColor(primaryBand) : '#888';
+      const tColor = groupColor(primaryBand);
       const tStyle = 'border-color:' + tColor + ';color:' + tColor + ';';
       html += '<span class="cand-regime-track-prefix" style="' + tStyle + '">t' + (ti + 1) + '/2</span>';
       const trackIds = trackClaimed[ti];
