@@ -39,7 +39,7 @@ import {
   RESOLVING_POWER_CLASS,
   // for vote-record construction
   PATTERN_CLASS,
-} from '../shared/band_tracking/index.js';
+} from '../atlases/inversion/shared/band_tracking/index.js';
 
 let pass = 0, fail = 0;
 function check(name, cond, detail = '') {

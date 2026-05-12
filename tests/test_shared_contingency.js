@@ -9,7 +9,12 @@ import {
   computeARI, computeNMI,
   cramersV, chiSqSurvival, lnGamma,
   scaleStabilityVerdict,
-} from '../shared/contingency.js';
+  // table-based metrics (extracted from legacy 30915–31178, 2026-05-12)
+  chiSquare, normalCDF,
+  nmiFromTable, amiFromTable, ariFromTable,
+  restrictedConcord,
+  fisher2x2,
+} from '../atlases/inversion/shared/contingency.js';
 
 let pass = 0, fail = 0;
 function check(name, cond, detail = '') {
@@ -178,6 +183,169 @@ console.log('\n--- scaleStabilityVerdict ---');
   check('UNSTABLE on wrong arity',          scaleStabilityVerdict(
         [{K:3, ok:true}, {K:3, ok:true}], []) === 'UNSTABLE');
 }
+
+// =====================================================================
+// Table-based metrics (chiSquare / normalCDF / nmiFromTable /
+// amiFromTable / ariFromTable / restrictedConcord / fisher2x2)
+// Extracted from legacy 30915–31178 on 2026-05-12.
+// =====================================================================
+console.log('\n--- normalCDF ---');
+check('normalCDF(0) ≈ 0.5',          approx(normalCDF(0), 0.5, 1e-3));
+check('normalCDF(1.96) ≈ 0.975',     approx(normalCDF(1.96), 0.975, 5e-3));
+check('normalCDF(-1.96) ≈ 0.025',    approx(normalCDF(-1.96), 0.025, 5e-3));
+check('normalCDF(5) ≈ 1',            normalCDF(5) > 0.9999);
+check('normalCDF(-5) ≈ 0',           normalCDF(-5) < 0.0001);
+
+console.log('\n--- chiSquare ---');
+// Perfectly independent 2×2 table — all rows and cols equal — chi² = 0
+{
+  const T = [[10, 10], [10, 10]];
+  const cs = chiSquare(T, 2);
+  check('independent table: chi2 = 0',     approx(cs.chi2, 0));
+  check('independent table: df = 1',       cs.df === 1);
+  check('independent table: n = 40',       cs.n === 40);
+  // Wilson–Hilferty is approximate at the boundary chi²=0; the legacy
+  // implementation returns ~0.95 here (the analytic answer is 1.0). Keep
+  // the looser bound to match legacy behaviour.
+  check('independent table: p_approx > 0.9', cs.p_approx > 0.9);
+}
+// Perfectly associated 2×2 diagonal — high chi²
+{
+  const T = [[20, 0], [0, 20]];
+  const cs = chiSquare(T, 2);
+  check('diagonal table: chi2 > 0',        cs.chi2 > 30);
+  check('diagonal table: p_approx tiny',   cs.p_approx < 0.01);
+}
+// 3×3 known case: pure diagonal n=30
+{
+  const T = [[10,0,0],[0,10,0],[0,0,10]];
+  const cs = chiSquare(T, 3);
+  check('3×3 diagonal: chi2 ≈ 60',         approx(cs.chi2, 60, 1e-6));
+  check('3×3 diagonal: df = 4',            cs.df === 4);
+}
+
+console.log('\n--- nmiFromTable ---');
+// Perfect agreement (diagonal) → NMI = 1
+{
+  const T = [[10,0,0],[0,10,0],[0,0,10]];
+  check('perfect diagonal: NMI = 1',       approx(nmiFromTable(T, 3), 1, 1e-9));
+}
+// Independent uniform → NMI ≈ 0
+{
+  const T = [[10,10,10],[10,10,10],[10,10,10]];
+  check('uniform table: NMI ≈ 0',          approx(nmiFromTable(T, 3), 0, 1e-9));
+}
+check('empty table: NMI = 0',              nmiFromTable([[0,0],[0,0]], 2) === 0);
+
+console.log('\n--- amiFromTable ---');
+// Perfect agreement — AMI close to 1 (slightly less due to chance correction)
+{
+  const T = [[10,0,0],[0,10,0],[0,0,10]];
+  const ami = amiFromTable(T, 3);
+  check('perfect diagonal: AMI ≈ 1',       ami > 0.95);
+}
+// Uniform table — AMI is small but non-zero. AMI corrects MI for chance:
+// MI=0 on a strictly uniform table, but E[MI] under the hypergeometric null
+// is positive, so the adjusted value is slightly negative. The legacy
+// implementation produces ~-0.15 for a 3×3 uniform-30 table.
+{
+  const T = [[10,10,10],[10,10,10],[10,10,10]];
+  const ami = amiFromTable(T, 3);
+  check('uniform table: AMI in [-0.3, 0.05]',
+                                            ami >= -0.3 && ami <= 0.05);
+}
+
+console.log('\n--- ariFromTable ---');
+// Perfect diagonal → ARI = 1
+{
+  const T = [[10,0,0],[0,10,0],[0,0,10]];
+  check('perfect diagonal: ARI = 1',       approx(ariFromTable(T, 3), 1, 1e-9));
+}
+// Uniform → ARI ≈ 0 (small negative bias under finite-N hypergeometric
+// adjustment is expected; ~-0.023 on a 3×3 uniform-90 table).
+{
+  const T = [[10,10,10],[10,10,10],[10,10,10]];
+  check('uniform table: |ARI| < 0.1',      Math.abs(ariFromTable(T, 3)) < 0.1);
+}
+// Edge case: n ≤ 1 → 0
+check('ARI on n=1 table = 0',              ariFromTable([[1,0],[0,0]], 2) === 0);
+check('ARI on empty table = 0',            ariFromTable([[0,0],[0,0]], 2) === 0);
+
+console.log('\n--- table-based ARI vs label-array ARI ---');
+// Sanity: build a contingency from two label arrays, then compare ariFromTable
+// to computeARI. The two metrics share the Hubert-Arabie definition so they
+// should agree to numerical tolerance.
+{
+  const labelsA = [0,0,0,1,1,1,2,2,2];
+  const labelsB = [0,0,0,1,1,1,2,2,2];
+  const ct = buildContingency(labelsA, labelsB, 3, 3);
+  const ariTable = ariFromTable(ct.M, 3);
+  const ariLabel = computeARI(labelsA, labelsB);
+  check('perfect: table ARI = label ARI',  approx(ariTable, ariLabel, 1e-9));
+}
+{
+  const labelsA = [0,0,0,1,1,1,2,2,2];
+  const labelsB = [0,0,1,1,1,2,2,2,0];   // shifted
+  const ct = buildContingency(labelsA, labelsB, 3, 3);
+  const ariTable = ariFromTable(ct.M, 3);
+  const ariLabel = computeARI(labelsA, labelsB);
+  check('shifted: table ARI = label ARI',  approx(ariTable, ariLabel, 1e-9));
+}
+
+console.log('\n--- restrictedConcord ---');
+// Diagonal table, keep all rows → concord = 1, verdict = MERGE
+{
+  const cmp = { table: [[10,0,0],[0,10,0],[0,0,10]] };
+  const rc = restrictedConcord(cmp, [0,1,2]);
+  check('diag, keep all: concord = 1',     approx(rc.concord, 1, 1e-9));
+  check('diag, keep all: verdict MERGE',   rc.verdict === 'MERGE');
+  check('diag, keep all: n = 30',          rc.n === 30);
+  check('diag, keep all: kept_set = [0,1,2]',
+                                            rc.kept_set.length === 3
+                                            && rc.kept_set.includes(0) && rc.kept_set.includes(2));
+}
+// Off-diagonal, keep one row → low concord, SEPARATE
+{
+  const cmp = { table: [[2, 8, 0], [0, 10, 0], [0, 0, 10]] };
+  const rc = restrictedConcord(cmp, [0]);
+  check('off-diag row 0: concord = 0.2',   approx(rc.concord, 0.2));
+  check('off-diag row 0: verdict SEPARATE',rc.verdict === 'SEPARATE');
+}
+// Custom mergeThr — diagonal with threshold above concord → SEPARATE
+{
+  const cmp = { table: [[7, 3], [0, 10]] };
+  // row 0 only: concord = 7/10 = 0.7. mergeThr 0.8 → SEPARATE.
+  const rc = restrictedConcord(cmp, [0], 0.8);
+  check('threshold 0.8 → SEPARATE',        rc.verdict === 'SEPARATE');
+  // mergeThr 0.65 → MERGE
+  const rc2 = restrictedConcord(cmp, [0], 0.65);
+  check('threshold 0.65 → MERGE',          rc2.verdict === 'MERGE');
+}
+// All-zero kept rows → LOW_POWER verdict
+{
+  const cmp = { table: [[0,0,0],[0,10,0],[0,0,10]] };
+  const rc = restrictedConcord(cmp, [0]);
+  check('all-zero kept: verdict LOW_POWER',rc.verdict === 'LOW_POWER');
+  check('all-zero kept: n = 0',            rc.n === 0);
+}
+// Bad inputs return null
+check('null cmp → null',                   restrictedConcord(null, [0]) === null);
+check('no keep → null',                    restrictedConcord({ table: [[1]] }, []) === null);
+check('out-of-range keep → null',          restrictedConcord({ table: [[1,0],[0,1]] }, [5,10]) === null);
+
+console.log('\n--- fisher2x2 ---');
+// Independent 2×2 (every cell ≈ row*col/n) → p close to 1
+{
+  const p = fisher2x2([[10, 10], [10, 10]]);
+  check('independent 2×2: p close to 1',   p > 0.5);
+}
+// Pure diagonal — strong association, p tiny
+{
+  const p = fisher2x2([[20, 0], [0, 20]]);
+  check('diagonal 2×2: p < 0.001',         p < 0.001);
+}
+// p ∈ [0, 1]
+check('fisher2x2: p ≤ 1',                  fisher2x2([[5, 5], [5, 5]]) <= 1);
 
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);

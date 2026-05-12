@@ -317,6 +317,287 @@ export function scaleStabilityVerdict(panes, pairwise, opts) {
   return 'UNSTABLE';
 }
 
+// =====================================================================
+// Table-based primitives (input: K×K contingency table)
+// =====================================================================
+// The functions below take a K×K array of arrays (table[r][c] = count)
+// rather than two label arrays. They mirror the legacy entry points that
+// the L3 panel computes directly off a precomputed contingency.
+//
+// Source line refs in the legacy file:
+//   restrictedConcord     line 30915
+//   logFact, logChoose    lines 30950, 30957
+//   fisher2x2             line 30958
+//   chiSquare             line 30978
+//   normalCDF             line 30998
+//   _miFromTable          line 31026
+//   _entropyMarginal      line 31048
+//   nmiFromTable          line 31061
+//   amiFromTable          line 31089
+//   ariFromTable          line 31148
+// =====================================================================
+
+/**
+ * Restricted concord between two clusterings over a kept subset of rows.
+ *
+ * Given a comparison object `cmp` carrying a K×K contingency table, and
+ * a `keep` array of row indices to include, compute the fraction of
+ * kept-sample pairs whose left-label and right-label agree (diagonal /
+ * total). Returns null on bad inputs.
+ *
+ * @param {{table: number[][]}} cmp
+ * @param {number[]} keep
+ * @param {number} [mergeThr=0.85]
+ * @returns {{concord: number, n: number, n_kept_samples: number, kept_set: number[], verdict: string} | null}
+ */
+export function restrictedConcord(cmp, keep, mergeThr) {
+  if (!cmp || !cmp.table || !Array.isArray(keep) || keep.length === 0) return null;
+  const T = cmp.table;
+  const K = T.length;
+  if (K === 0) return null;
+  const keepSet = new Set();
+  for (const r of keep) {
+    const ri = +r | 0;
+    if (ri >= 0 && ri < K) keepSet.add(ri);
+  }
+  if (keepSet.size === 0) return null;
+  let kept = 0, diag = 0;
+  for (const r of keepSet) {
+    if (!T[r]) continue;
+    for (let c = 0; c < K; c++) {
+      const v = T[r][c] | 0;
+      kept += v;
+      if (r === c) diag += v;
+    }
+  }
+  if (kept === 0) {
+    return { concord: 0, n: 0, n_kept_samples: 0, kept_set: Array.from(keepSet),
+             verdict: 'LOW_POWER' };
+  }
+  const concord = diag / kept;
+  const thr = (typeof mergeThr === 'number') ? mergeThr : 0.85;
+  const verdict = (concord >= thr) ? 'MERGE' : 'SEPARATE';
+  return { concord, n: kept, n_kept_samples: kept, kept_set: Array.from(keepSet), verdict };
+}
+
+/**
+ * Log-factorial with internal cache. Pure helper for fisher2x2/AMI.
+ */
+export function logFact(n) {
+  if (logFact._cache === undefined) logFact._cache = [0, 0];
+  const c = logFact._cache;
+  while (c.length <= n) c.push(c[c.length - 1] + Math.log(c.length));
+  return c[n];
+}
+
+export function logChoose(n, k) {
+  return logFact(n) - logFact(k) - logFact(n - k);
+}
+
+/**
+ * Two-tailed Fisher's exact test for a 2×2 table.
+ *
+ * @param {number[][]} table  Shape [[a, b], [c, d]]
+ * @returns {number}          Two-tailed p-value clamped to [0, 1]
+ */
+export function fisher2x2(table) {
+  const a = table[0][0], b = table[0][1], cv = table[1][0], dv = table[1][1];
+  const n = a + b + cv + dv;
+  const r1 = a + b, r2 = cv + dv, c1 = a + cv;
+  function lp(x) {
+    return logChoose(r1, x) + logChoose(r2, c1 - x) - logChoose(n, c1);
+  }
+  const lpObs = lp(a);
+  let p = 0;
+  const lo = Math.max(0, c1 - r2), hi = Math.min(c1, r1);
+  for (let x = lo; x <= hi; x++) {
+    const lpx = lp(x);
+    if (lpx <= lpObs + 1e-12) p += Math.exp(lpx);
+  }
+  return Math.min(1, p);
+}
+
+/**
+ * Chi-square statistic for a K×K contingency table.
+ * p_approx uses a Wilson–Hilferty approximation (no gamma lib needed).
+ *
+ * @param {number[][]} table
+ * @param {number} K
+ * @returns {{chi2: number, df: number, p_approx: number, n: number}}
+ */
+export function chiSquare(table, K) {
+  let n = 0;
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) n += table[r][c];
+  const rowSum = new Array(K).fill(0), colSum = new Array(K).fill(0);
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) {
+    rowSum[r] += table[r][c]; colSum[c] += table[r][c];
+  }
+  let chi2 = 0;
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) {
+    const E = (rowSum[r] * colSum[c]) / (n || 1);
+    if (E > 0) chi2 += (table[r][c] - E) ** 2 / E;
+  }
+  const df = (K - 1) * (K - 1);
+  const z = ((chi2 / df) ** (1 / 3) - (1 - 2 / (9 * df))) / Math.sqrt(2 / (9 * df));
+  const p_approx = 1 - normalCDF(z);
+  return { chi2, df, p_approx, n };
+}
+
+/**
+ * Standard-normal CDF via the Abramowitz & Stegun 7.1.26 approximation.
+ */
+export function normalCDF(z) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(z));
+  const d = 0.3989422804 * Math.exp(-z * z / 2);
+  let p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return z >= 0 ? 1 - p : p;
+}
+
+// Mutual information from contingency table (raw, in nats). Internal
+// helper shared by nmiFromTable / amiFromTable.
+function _miFromTable(table, K) {
+  let n = 0;
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) n += table[r][c];
+  if (n <= 0) return 0;
+  const rowSum = new Array(K).fill(0), colSum = new Array(K).fill(0);
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) {
+    rowSum[r] += table[r][c]; colSum[c] += table[r][c];
+  }
+  let mi = 0;
+  for (let r = 0; r < K; r++) {
+    for (let c = 0; c < K; c++) {
+      const nij = table[r][c];
+      if (nij > 0 && rowSum[r] > 0 && colSum[c] > 0) {
+        mi += (nij / n) * Math.log((n * nij) / (rowSum[r] * colSum[c]));
+      }
+    }
+  }
+  return mi;
+}
+
+function _entropyMarginal(sums, n) {
+  if (n <= 0) return 0;
+  let h = 0;
+  for (let i = 0; i < sums.length; i++) {
+    const p = sums[i] / n;
+    if (p > 0) h -= p * Math.log(p);
+  }
+  return h;
+}
+
+/**
+ * Normalized Mutual Information (Strehl–Ghosh, geometric-mean variant).
+ * Range [0, 1].
+ *
+ * @param {number[][]} table
+ * @param {number} K
+ * @returns {number}
+ */
+export function nmiFromTable(table, K) {
+  let n = 0;
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) n += table[r][c];
+  if (n <= 0) return 0;
+  const rowSum = new Array(K).fill(0), colSum = new Array(K).fill(0);
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) {
+    rowSum[r] += table[r][c]; colSum[c] += table[r][c];
+  }
+  const mi = _miFromTable(table, K);
+  const hX = _entropyMarginal(rowSum, n);
+  const hY = _entropyMarginal(colSum, n);
+  const denom = Math.sqrt(hX * hY);
+  if (denom <= 0) return 0;
+  return Math.max(0, Math.min(1, mi / denom));
+}
+
+/**
+ * Adjusted Mutual Information (Vinh, Epps & Bailey 2010).
+ * Uses exact hypergeometric expectation — O(K²·N) per call. Adequate
+ * for K≤6 and N a few hundred.
+ *
+ * @param {number[][]} table
+ * @param {number} K
+ * @returns {number}  approximately [0, 1]
+ */
+export function amiFromTable(table, K) {
+  let n = 0;
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) n += table[r][c];
+  if (n <= 0) return 0;
+  const rowSum = new Array(K).fill(0), colSum = new Array(K).fill(0);
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) {
+    rowSum[r] += table[r][c]; colSum[c] += table[r][c];
+  }
+  const mi = _miFromTable(table, K);
+  const hX = _entropyMarginal(rowSum, n);
+  const hY = _entropyMarginal(colSum, n);
+
+  const lgamma_cache = new Float64Array(n + 2);
+  for (let v = 2; v <= n + 1; v++) {
+    lgamma_cache[v] = lgamma_cache[v - 1] + Math.log(v - 1);
+  }
+  const lfact = (v) => (v <= 1) ? 0 : lgamma_cache[v];
+
+  let emi = 0;
+  for (let r = 0; r < K; r++) {
+    const a = rowSum[r];
+    if (a === 0) continue;
+    for (let c = 0; c < K; c++) {
+      const b = colSum[c];
+      if (b === 0) continue;
+      const nij_min = Math.max(1, a + b - n);
+      const nij_max = Math.min(a, b);
+      for (let nij = nij_min; nij <= nij_max; nij++) {
+        const logP = lfact(a) - lfact(nij) - lfact(a - nij)
+                   + lfact(n - a) - lfact(b - nij) - lfact(n - a - b + nij)
+                   - lfact(n) + lfact(b) + lfact(n - b);
+        const P = Math.exp(logP);
+        const term = (nij / n) * Math.log((n * nij) / (a * b));
+        emi += term * P;
+      }
+    }
+  }
+
+  const denom = Math.max(hX, hY) - emi;
+  if (Math.abs(denom) < 1e-12) return 0;
+  return Math.max(-1, Math.min(1, (mi - emi) / denom));
+}
+
+/**
+ * Adjusted Rand Index from a K×K contingency table (Hubert & Arabie 1985).
+ * Range [-1, 1] (0 = chance, 1 = perfect agreement).
+ *
+ * @param {number[][]} table
+ * @param {number} K
+ * @returns {number}
+ */
+export function ariFromTable(table, K) {
+  let n = 0;
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) n += table[r][c];
+  if (n <= 1) return 0;
+  const rowSum = new Array(K).fill(0), colSum = new Array(K).fill(0);
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) {
+    rowSum[r] += table[r][c]; colSum[c] += table[r][c];
+  }
+  let sumC2cells = 0;
+  for (let r = 0; r < K; r++) for (let c = 0; c < K; c++) {
+    const v = table[r][c];
+    if (v >= 2) sumC2cells += (v * (v - 1)) / 2;
+  }
+  let sumC2rows = 0, sumC2cols = 0;
+  for (let i = 0; i < K; i++) {
+    if (rowSum[i] >= 2) sumC2rows += (rowSum[i] * (rowSum[i] - 1)) / 2;
+    if (colSum[i] >= 2) sumC2cols += (colSum[i] * (colSum[i] - 1)) / 2;
+  }
+  const totalC2 = (n * (n - 1)) / 2;
+  if (totalC2 <= 0) return 0;
+  const expectedIdx = (sumC2rows * sumC2cols) / totalC2;
+  const maxIdx = (sumC2rows + sumC2cols) / 2;
+  const denom = maxIdx - expectedIdx;
+  if (Math.abs(denom) < 1e-12) {
+    return (sumC2cells === maxIdx) ? 1 : 0;
+  }
+  return Math.max(-1, Math.min(1, (sumC2cells - expectedIdx) / denom));
+}
+
 // ---------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------
@@ -337,4 +618,11 @@ if (typeof window !== 'undefined') {
   window._chiSqSurvival         = chiSqSurvival;
   window._lnGamma               = lnGamma;
   window._scaleStabilityVerdict = scaleStabilityVerdict;
+  window._restrictedConcord     = restrictedConcord;
+  window._chiSquare             = chiSquare;
+  window._normalCDF             = normalCDF;
+  window._nmiFromTable          = nmiFromTable;
+  window._amiFromTable          = amiFromTable;
+  window._ariFromTable          = ariFromTable;
+  window._fisher2x2             = fisher2x2;
 }

@@ -16,6 +16,9 @@
 
 import { _pageState } from './_state.js';
 import { refreshCandidateUI } from '../page2.js';
+import { persistActiveCandidateId } from '../../../shared/active_candidate.js';
+import { isAutoCandidate } from '../../../shared/candidate_predicates.js';
+import { groupColor } from '../../../shared/page1_data_helpers.js';
 
 // ---------------------------------------------------------------------------
 // Module-private constants (extracted from legacy)
@@ -218,8 +221,8 @@ export function refreshCandidateListUI() {
   // visual treatment + 🤖 prefix so they're immediately distinguishable
   // from user-confirmed ones. (turn 130 follow-up — review-surfaces spec.)
   const sorted = state.candidateList.slice().sort((a, b) => {
-    const aAuto = (typeof _isAutoCandidate === 'function') ? _isAutoCandidate(a) : false;
-    const bAuto = (typeof _isAutoCandidate === 'function') ? _isAutoCandidate(b) : false;
+    const aAuto = isAutoCandidate(a);
+    const bAuto = isAutoCandidate(b);
     if (aAuto !== bAuto) return aAuto ? 1 : -1;   // non-auto first
     return b.created_at - a.created_at;
   });
@@ -234,8 +237,7 @@ export function refreshCandidateListUI() {
   function _trackPrimaryBandColor(track) {
     if (!track || !Array.isArray(track.active_bands) ||
         track.active_bands.length === 0) return null;
-    return (typeof groupColor === 'function')
-      ? groupColor(track.active_bands[0]) : null;
+    return groupColor(track.active_bands[0]);
   }
   // Format a track's active_bands as compact chips. Returns '' when the
   // track has all K bands active (= today's "use every cluster" semantics);
@@ -247,7 +249,7 @@ export function refreshCandidateListUI() {
     if (ab.length === 0) return '';
     if (ab.length === K) return '';
     return ab.map(b => {
-      const col = (typeof groupColor === 'function') ? groupColor(b) : '#888';
+      const col = groupColor(b);
       return `<span class="cli-band-chip" style="background:${col};border-color:${col};">g${b}</span>`;
     }).join('');
   }
@@ -267,7 +269,7 @@ export function refreshCandidateListUI() {
     // turn 130 follow-up: auto-promoted candidates wear a dashed outline
     // and 🤖 prefix so the user can scan the list and know which entries
     // are user-confirmed vs algorithm-proposed awaiting review.
-    const isAuto = (typeof _isAutoCandidate === 'function') ? _isAutoCandidate(c) : false;
+    const isAuto = isAutoCandidate(c);
     const autoPrefix = isAuto ? '<span class="cli-auto-prefix" title="Algorithm-proposed candidate (auto-promoted from L2-sweep). Review and Confirm to add to your saved list, or Dismiss to drop.">🤖&nbsp;</span>' : '';
     let twoTrackBadge = '';
     let perTrackMeta = '';
@@ -324,9 +326,7 @@ export function refreshCandidateListUI() {
         state.candidate = candidateFromJSON(candidateToJSON(cand));
         // v4 turn 56: persist the active candidate ID so reloads remember
         // which one the user was last working on from the sidebar list.
-        if (typeof _persistActiveCandidate === 'function') {
-          _persistActiveCandidate(cand.id || '');
-        }
+        persistActiveCandidateId(cand.id || '');
         refreshCandidateUI(state);
         refreshCandidateListUI(state);
         renderCandidateKaryotype();

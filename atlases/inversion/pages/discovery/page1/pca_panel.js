@@ -578,7 +578,7 @@ export function autoPickRadial(state, n) {
   n = Math.max(0, Math.min(state.data.n_samples, n | 0));
   if (n === 0) {
     state.tracked = [];
-    if (typeof renderTrackedList === 'function') renderTrackedList(state);
+    renderTrackedList(state);
     try { drawLinesPanel(state); } catch (_) {}
     try { drawPCA(state); }        catch (_) {}
     if (typeof renderL3Panel === 'function') { try { renderL3Panel(state); } catch (_) {} }
@@ -588,12 +588,10 @@ export function autoPickRadial(state, n) {
   // Defensive try/catch is kept because state.data.windows[i].pc1 may be
   // missing on slim precomp JSONs (has_pc2 === false path).
   let pcRes;
-  if (typeof getPC === 'function') {
-    try { pcRes = getPC(state, state.cur); } catch (_) { pcRes = null; }
-  }
+  try { pcRes = getPC(state, state.cur); } catch (_) { pcRes = null; }
   if (!pcRes) {
     state.tracked = [];
-    if (typeof renderTrackedList === 'function') renderTrackedList(state);
+    renderTrackedList(state);
     try { drawLinesPanel(state); } catch (_) {}
     try { drawPCA(state); }        catch (_) {}
     if (typeof renderL3Panel === 'function') { try { renderL3Panel(state); } catch (_) {} }
@@ -621,7 +619,7 @@ export function autoPickRadial(state, n) {
     if (bestI >= 0) { picks.push(bestI); used.add(bestI); }
   }
   state.tracked = picks;
-  if (typeof renderTrackedList === 'function') renderTrackedList(state);
+  renderTrackedList(state);
   try { drawPCA(state); } catch (_) {}
   if (typeof renderL3Panel === 'function') { try { renderL3Panel(state); } catch (_) {} }
 }
