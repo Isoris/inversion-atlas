@@ -59,6 +59,7 @@ UNITS=(
   test_relatedness_schema.js
   test_page1_diag_residuals.js
   test_shared_cross_page_clusters.js
+  test_shared_q_ancestry.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js

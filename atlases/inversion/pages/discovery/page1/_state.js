@@ -51,6 +51,7 @@ import {
 } from '../../../shared/sample_color.js';
 import { diagSampleColor } from './diag_residuals.js';
 import { xpSampleColor } from '../../../shared/cross_page_clusters.js';
+import { qaSampleColor } from '../../../shared/q_ancestry.js';
 
 // =====================================================================
 // Cache-invalidation helpers (legacy 34321 / 39362 / 39973)
@@ -206,7 +207,7 @@ export function getSampleColor(si, mode, groupLabels) {
   // v4 turn 86: Q-association ancestry mode — color by per-fish Q-vector at
   // the user-selected K. Two sub-modes (hard / blend) selected via
   // state.qDisplayMode. Falls through to grey if no Q-vectors are loaded.
-  if (mode === 'q_ancestry') return _qaSampleColor(si);
+  if (mode === 'q_ancestry') return qaSampleColor(state, si);
   if (mode === 'family')   return familyColor(si);
   if (mode === 'ancestry') return ancestryColor(si);
   if (mode === 'manual')   return manualGroupColor(si);
