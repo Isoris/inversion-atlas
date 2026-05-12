@@ -20,6 +20,16 @@ import { _lineageColor, _pageState, _setActiveState } from './_state.js';
 import { currentMbRange, getL2Cluster } from './_data.js';
 import { _assignCandidateLanes, _drawWRow, _drawWinNavLane, _ensureCsOverlayIndex, _wRowBand, _winNavBand, drawCandidateBar } from './candidates.js';
 import { bandTraceGetOrCompute } from './band_trace_state.js';
+import {
+  gatherActiveCandidatesForInheritance,
+  inheritanceCacheKey,
+  runInheritanceCompute,
+  formatInheritanceLabel,
+  INH_LABEL_FONT_PX,
+  INH_LABEL_STRIP_HEIGHT,
+  INH_LABEL_STRIP_GAP_BELOW,
+  INH_LABEL_MIN_BAND_PX,
+} from './inheritance.js';
 
 // --- STATUS_COLOR — legacy line 9805 ---
 // Color palette for L2 boundary validation_status markers drawn in the Z panel.
@@ -472,11 +482,11 @@ export function _drawInheritanceLabelsStrip(ctx, pad, plotW, plotH, mbMin, mbMax
 
   // Auto-trigger compute if needed
   let result = _state.inheritanceResult;
-  const items = _gatherActiveCandidatesForInheritance();
+  const items = gatherActiveCandidatesForInheritance(_state);
   if (items.length < 2) return;   // nothing to label
 
   const mode = _state.activeMode || 'default';
-  const expectedKey = _inheritanceCacheKey(items, mode);
+  const expectedKey = inheritanceCacheKey(items, mode);
   if (!result || _state.inheritanceCacheKey !== expectedKey) {
     // Schedule deferred compute. Use requestIdleCallback if available;
     // fallback to setTimeout. We do NOT block this frame.
@@ -484,7 +494,7 @@ export function _drawInheritanceLabelsStrip(ctx, pad, plotW, plotH, mbMin, mbMax
       _state._inheritanceComputeScheduled = true;
       const fire = () => {
         _state._inheritanceComputeScheduled = false;
-        try { runInheritanceCompute(); } catch (_) {}
+        try { runInheritanceCompute(_state); } catch (_) {}
         // Trigger a redraw if the atlas has a paint scheduler hook
         if (typeof window.requestRepaint === 'function') {
           try { window.requestRepaint(); } catch (_) {}
@@ -498,12 +508,12 @@ export function _drawInheritanceLabelsStrip(ctx, pad, plotW, plotH, mbMin, mbMax
     }
     // While waiting, draw a faint placeholder so the user knows compute is in flight
     ctx.save();
-    ctx.font = `${_INH_LABEL_FONT_PX}px sans-serif`;
+    ctx.font = `${INH_LABEL_FONT_PX}px sans-serif`;
     ctx.fillStyle = 'rgba(140, 150, 165, 0.55)';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     const stripY = Math.max(0,
-      pad.t - _INH_LABEL_STRIP_HEIGHT - _INH_LABEL_STRIP_GAP_BELOW - 6
+      pad.t - INH_LABEL_STRIP_HEIGHT - INH_LABEL_STRIP_GAP_BELOW - 6
     );
     ctx.fillText('inheritance: computing…', pad.l + 2, stripY);
     ctx.restore();
@@ -512,11 +522,11 @@ export function _drawInheritanceLabelsStrip(ctx, pad, plotW, plotH, mbMin, mbMax
 
   // Strip drawn ABOVE the regime-breadth strip (which sits at pad.t - 6 area).
   // Place the inheritance labels strip 12px above plot top to leave room.
-  const stripH = _INH_LABEL_STRIP_HEIGHT;
+  const stripH = INH_LABEL_STRIP_HEIGHT;
   const stripY = Math.max(0, pad.t - stripH - 8);
 
   ctx.save();
-  ctx.font = `${_INH_LABEL_FONT_PX}px sans-serif`;
+  ctx.font = `${INH_LABEL_FONT_PX}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -532,9 +542,9 @@ export function _drawInheritanceLabelsStrip(ctx, pad, plotW, plotH, mbMin, mbMax
     const xLoVis = pad.l + Math.max(0, ((mbLo - mbMin) / (mbMax - mbMin)) * plotW);
     const xHiVis = pad.l + Math.min(plotW, ((mbHi - mbMin) / (mbMax - mbMin)) * plotW);
     const w = xHiVis - xLoVis;
-    if (w < _INH_LABEL_MIN_BAND_PX) continue;
+    if (w < INH_LABEL_MIN_BAND_PX) continue;
 
-    const label = _formatInheritanceLabel(m.seq_num, m.seq_num, n_groups);
+    const label = formatInheritanceLabel(m.seq_num, m.seq_num, n_groups);
     const xMid = (xLoVis + xHiVis) / 2;
     const yMid = stripY + stripH / 2;
 
