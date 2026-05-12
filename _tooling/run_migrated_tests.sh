@@ -75,6 +75,7 @@ UNITS=(
   test_shared_haplotype_vocab.js
   test_shared_candidate_pca_mode.js
   test_shared_candidate_pca_ordering.js
+  test_shared_karyotype_lineage.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
