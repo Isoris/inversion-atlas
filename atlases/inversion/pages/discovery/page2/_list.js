@@ -18,6 +18,7 @@ import { _pageState } from './_state.js';
 import { refreshCandidateUI } from '../page2.js';
 import { persistActiveCandidateId } from '../../../shared/active_candidate.js';
 import { isAutoCandidate } from '../page1/inheritance.js';
+import { groupColor } from '../../../shared/page1_data_helpers.js';
 
 // ---------------------------------------------------------------------------
 // Module-private constants (extracted from legacy)
@@ -236,8 +237,7 @@ export function refreshCandidateListUI() {
   function _trackPrimaryBandColor(track) {
     if (!track || !Array.isArray(track.active_bands) ||
         track.active_bands.length === 0) return null;
-    return (typeof groupColor === 'function')
-      ? groupColor(track.active_bands[0]) : null;
+    return groupColor(track.active_bands[0]);
   }
   // Format a track's active_bands as compact chips. Returns '' when the
   // track has all K bands active (= today's "use every cluster" semantics);
@@ -249,7 +249,7 @@ export function refreshCandidateListUI() {
     if (ab.length === 0) return '';
     if (ab.length === K) return '';
     return ab.map(b => {
-      const col = (typeof groupColor === 'function') ? groupColor(b) : '#888';
+      const col = groupColor(b);
       return `<span class="cli-band-chip" style="background:${col};border-color:${col};">g${b}</span>`;
     }).join('');
   }

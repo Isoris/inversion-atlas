@@ -756,7 +756,7 @@ export function renderL3PanelSlab(state) {
       // applies to L2 envelopes in active draft context).
       if (isFocal) {
         const clFocal = getSlabClusterAt(range[0], range[1], K);
-        if (typeof _kSpecificMetaInlineHtml === 'function') {
+        {
           const chipsHtml = _kSpecificMetaInlineHtml(clFocal, null);
           if (chipsHtml) {
             const focalChipsAbove = document.createElement('div');
@@ -1398,7 +1398,7 @@ function focalContentHtml(cl, env, l2idx, options) {
   // chips themselves ABOVE the mini-PCA (smaller, tight font). Skipping
   // here prevents duplication.
   const skipKSpecificMeta = !!(options && options.skipKSpecificMeta);
-  if (!skipKSpecificMeta && typeof _kSpecificMetaInlineHtml === 'function') {
+  if (!skipKSpecificMeta) {
     html += _kSpecificMetaInlineHtml(cl, l2idx);
   }
   html += `<div class="ct-row"><span class="lbl">power</span><span class="val">${cl.ok ? 'OK' : (cl.reason || 'WEAK')}</span></div>`;

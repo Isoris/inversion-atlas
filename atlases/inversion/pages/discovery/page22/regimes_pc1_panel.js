@@ -250,13 +250,12 @@ export function drawRegimesPC1Panel(state) {
   for (const si of trackedSet) {
     if (voterSet.has(si)) continue;
     let col = '#aab2c0';
-    if (typeof _resolveSampleScopeColor === 'function') {
+    {
       const c = _resolveSampleScopeColor(si, state.linesColorMode || 'kmeans');
       if (c) col = c;
     }
     ctx.lineWidth = 1.0;
-    ctx.strokeStyle = (typeof withAlpha === 'function')
-      ? withAlpha(col, 0.45) : col;
+    ctx.strokeStyle = withAlpha(col, 0.45);
     strokePath(si);
   }
 
