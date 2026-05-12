@@ -45,6 +45,251 @@ export const SCALE_STABILITY_DEFAULTS = Object.freeze({
   ari_edge:   0.70,    // (reserved for future edge-verdicts; not used in v1)
 });
 
+/**
+ * Default 3-pane configuration: fine 5w / medium L2 / coarse candidate.
+ * Frozen. Callers `slice()` it (Object.freeze on the outer array means
+ * push() throws; the inner objects are intentionally NOT frozen so the
+ * user's K-knob picker can mutate them in place).
+ */
+export const SCALE_STABILITY_PANE_DEFAULTS = Object.freeze([
+  Object.freeze({ scale: '5w',        K: 6, custom_n: null }),
+  Object.freeze({ scale: 'L2',        K: 6, custom_n: null }),
+  Object.freeze({ scale: 'candidate', K: 3, custom_n: null }),
+]);
+
+// =====================================================================
+// State lifecycle
+// =====================================================================
+
+/**
+ * Ensure state has the scale-stability slots. Lazily fills in unset
+ * fields only — never clobbers anything the user previously set.
+ * Idempotent.
+ *
+ * Slots:
+ *   state.l3Mode                ('contingency' | other; default 'contingency')
+ *   state.scaleStabilityPanes   default 3-pane config
+ *   state.scaleStabilityCache   null (reset on every recompute)
+ *
+ * @param {Object} state
+ */
+export function ensureScaleStabilityState(state) {
+  if (!state) return;
+  if (state.l3Mode == null) state.l3Mode = 'contingency';
+  if (!Array.isArray(state.scaleStabilityPanes)) {
+    // Deep-copy the defaults so user mutations don't escape into the
+    // frozen constant.
+    state.scaleStabilityPanes = SCALE_STABILITY_PANE_DEFAULTS.map(p => ({ ...p }));
+  }
+  if (!state.scaleStabilityCache) state.scaleStabilityCache = null;
+}
+
+// =====================================================================
+// Range converters
+// =====================================================================
+// All return [s, e] inclusive window indices, or null when no resolution
+// is possible (missing data / no active candidate / focal outside an
+// envelope, etc.).
+
+/**
+ * Symmetric SNP-band: smallest contiguous range centered on focalW
+ * whose total n_snps ≥ targetSnps. Expands one window at a time on
+ * whichever side has fewer SNPs absorbed so far (to keep coverage
+ * roughly symmetric).
+ *
+ * Edge cases:
+ *   - focalW out of bounds                        → null
+ *   - sum of all windows' n_snps < targetSnps     → returns max range
+ *                                                    with target_met=false
+ *   - hits chromosome boundary mid-expansion      → returns asymmetric
+ *                                                    range (asymmetric=true,
+ *                                                    edgeForced)
+ *
+ * @param {Object} state
+ * @param {number} focalW
+ * @param {number} targetSnps
+ * @returns {Object|null}
+ */
+export function snpBandRange(state, focalW, targetSnps) {
+  if (!state || !state.data || !Array.isArray(state.data.windows)) return null;
+  const windows = state.data.windows;
+  const n = windows.length;
+  if (focalW < 0 || focalW >= n || targetSnps == null || targetSnps <= 0) return null;
+  const wSnps = (i) => {
+    const w = windows[i];
+    return (w && w.n_snps != null && Number.isFinite(w.n_snps)) ? +w.n_snps : 0;
+  };
+  let s = focalW, e = focalW, total = wSnps(focalW);
+  let leftAbsorbed = 0, rightAbsorbed = 0;
+  let edgeForced = false;
+  while (total < targetSnps) {
+    const canL = s > 0;
+    const canR = e < n - 1;
+    if (!canL && !canR) break;
+    let pickLeft;
+    if (canL && !canR)      { pickLeft = true;  edgeForced = true; }
+    else if (canR && !canL) { pickLeft = false; edgeForced = true; }
+    else                    { pickLeft = (leftAbsorbed <= rightAbsorbed); }
+    if (pickLeft) {
+      s--;
+      const v = wSnps(s); total += v; leftAbsorbed += v;
+    } else {
+      e++;
+      const v = wSnps(e); total += v; rightAbsorbed += v;
+    }
+  }
+  return {
+    s, e,
+    total_snps: total,
+    target: targetSnps,
+    asymmetric: edgeForced,
+    target_met: total >= targetSnps,
+    left_absorbed: leftAbsorbed,
+    right_absorbed: rightAbsorbed,
+  };
+}
+
+/**
+ * Symmetric kb-band: same algorithm as snpBandRange but on
+ * sum(span_bp). When span_bp is absent, falls back to
+ * max(0, end_bp - start_bp). targetKb is the target span in
+ * kilobases; the result's target_bp echoes targetKb * 1000.
+ *
+ * @param {Object} state
+ * @param {number} focalW
+ * @param {number} targetKb
+ * @returns {Object|null}
+ */
+export function kbBandRange(state, focalW, targetKb) {
+  if (!state || !state.data || !Array.isArray(state.data.windows)) return null;
+  const windows = state.data.windows;
+  const n = windows.length;
+  if (focalW < 0 || focalW >= n || targetKb == null || targetKb <= 0) return null;
+  const wSpan = (i) => {
+    const w = windows[i];
+    if (!w) return 0;
+    if (w.span_bp != null && Number.isFinite(w.span_bp)) return +w.span_bp;
+    if (w.start_bp != null && w.end_bp != null) return Math.max(0, +w.end_bp - +w.start_bp);
+    return 0;
+  };
+  const targetBp = targetKb * 1000;
+  let s = focalW, e = focalW, total = wSpan(focalW);
+  let leftAbsorbed = 0, rightAbsorbed = 0;
+  let edgeForced = false;
+  while (total < targetBp) {
+    const canL = s > 0;
+    const canR = e < n - 1;
+    if (!canL && !canR) break;
+    let pickLeft;
+    if (canL && !canR)      { pickLeft = true;  edgeForced = true; }
+    else if (canR && !canL) { pickLeft = false; edgeForced = true; }
+    else                    { pickLeft = (leftAbsorbed <= rightAbsorbed); }
+    if (pickLeft) {
+      s--;
+      const v = wSpan(s); total += v; leftAbsorbed += v;
+    } else {
+      e++;
+      const v = wSpan(e); total += v; rightAbsorbed += v;
+    }
+  }
+  return {
+    s, e,
+    total_bp: total,
+    target_bp: targetBp,
+    asymmetric: edgeForced,
+    target_met: total >= targetBp,
+    left_absorbed: leftAbsorbed,
+    right_absorbed: rightAbsorbed,
+  };
+}
+
+/**
+ * Resolve a pane's scale string to a [s, e] window range.
+ *
+ * Supported scales:
+ *   - '1w' / '5w' / '10w' / '25w'    → centered window-count band
+ *   - 'Nw'                            → centered band, custom_n or
+ *                                       state.compareUnitN (≥ 1)
+ *   - '100SNPs' / '500SNPs' / '1000SNPs'  → symmetric SNP-band
+ *   - '100kb' / '500kb'                    → symmetric kb-band
+ *   - 'L2' / 'L1' → envelope containing focalW
+ *                  (via state.windowToL2 / state.windowToL1)
+ *   - 'candidate' → state.candidate's window span
+ *
+ * Even-N windows: focal sits at floor((N-1)/2) from the left so the
+ * range biases right when forced to choose. Edge focal positions
+ * clip to the chromosome panel.
+ *
+ * Returns null when:
+ *   - state.data.windows is missing
+ *   - paneCfg has no scale
+ *   - 'L2' / 'L1' requested but focalW isn't inside one
+ *   - 'candidate' requested but state.candidate is missing
+ *   - any unknown scale string
+ *
+ * The returned object always carries a `kind` tag matching
+ * scale_stability_pane_label's expected shape.
+ *
+ * @param {Object} state
+ * @param {number} focalW
+ * @param {{scale:string, K:number, custom_n:?number}} paneCfg
+ * @returns {Object|null}
+ */
+export function resolvePaneRange(state, focalW, paneCfg) {
+  if (!state || !state.data || !Array.isArray(state.data.windows)) return null;
+  if (!paneCfg || !paneCfg.scale) return null;
+  const windows = state.data.windows;
+  const n = windows.length;
+  const scale = paneCfg.scale;
+  const clamp = (v) => Math.max(0, Math.min(n - 1, v | 0));
+
+  function nWindowsRange(N) {
+    if (N <= 0) return null;
+    if (N === 1) return { s: focalW, e: focalW, kind: 'windows', n: 1 };
+    const halfL = Math.floor((N - 1) / 2);
+    const halfR = N - 1 - halfL;
+    return { s: clamp(focalW - halfL), e: clamp(focalW + halfR), kind: 'windows', n: N };
+  }
+
+  if (scale === '1w')  return nWindowsRange(1);
+  if (scale === '5w')  return nWindowsRange(5);
+  if (scale === '10w') return nWindowsRange(10);
+  if (scale === '25w') return nWindowsRange(25);
+  if (scale === 'Nw') {
+    const N = (paneCfg.custom_n != null && paneCfg.custom_n > 0)
+      ? paneCfg.custom_n : ((state.compareUnitN | 0) || 0);
+    return nWindowsRange(Math.max(1, N));
+  }
+
+  if (scale === '100SNPs'  || scale === '100 SNPs')  { const r = snpBandRange(state, focalW, 100);  return r ? Object.assign({ kind: 'snps' }, r) : null; }
+  if (scale === '500SNPs'  || scale === '500 SNPs')  { const r = snpBandRange(state, focalW, 500);  return r ? Object.assign({ kind: 'snps' }, r) : null; }
+  if (scale === '1000SNPs' || scale === '1000 SNPs') { const r = snpBandRange(state, focalW, 1000); return r ? Object.assign({ kind: 'snps' }, r) : null; }
+
+  if (scale === '100kb' || scale === '100 kb') { const r = kbBandRange(state, focalW, 100); return r ? Object.assign({ kind: 'kb' }, r) : null; }
+  if (scale === '500kb' || scale === '500 kb') { const r = kbBandRange(state, focalW, 500); return r ? Object.assign({ kind: 'kb' }, r) : null; }
+
+  if (scale === 'L2') {
+    const l2Idx = state.windowToL2 ? state.windowToL2[focalW] : -1;
+    if (l2Idx == null || l2Idx < 0) return null;
+    const env = (state.data.l2_envelopes || [])[l2Idx];
+    if (!env) return null;
+    return { s: env._s0, e: env._e0, kind: 'L2', l2idx: l2Idx };
+  }
+  if (scale === 'L1') {
+    const l1Idx = state.windowToL1 ? state.windowToL1[focalW] : -1;
+    if (l1Idx == null || l1Idx < 0) return null;
+    const env = (state.data.l1_envelopes || [])[l1Idx];
+    if (!env) return null;
+    return { s: env._s0, e: env._e0, kind: 'L1', l1idx: l1Idx };
+  }
+  if (scale === 'candidate') {
+    const c = state.candidate;
+    if (!c || c.start_w == null || c.end_w == null) return null;
+    return { s: c.start_w, e: c.end_w, kind: 'candidate', cand_id: c.id };
+  }
+  return null;
+}
+
 // =====================================================================
 // Verdict
 // =====================================================================
