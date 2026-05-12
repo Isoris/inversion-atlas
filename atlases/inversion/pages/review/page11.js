@@ -84,6 +84,54 @@
 // =============================================================================
 
 import { _pageState, _setActiveState } from './page11/_state.js';
+import {
+  refreshBoundariesUi,
+  wireBoundariesToolbar,
+  teardownBoundariesToolbar,
+  selectCandidate as _bndSelectCandidate,
+  bndAutoPropose as _bndAutoProposeImpl,
+  bndOverrideLeft as _bndOverrideLeftImpl,
+  bndOverrideRight as _bndOverrideRightImpl,
+  bndReset as _bndResetImpl,
+  bndSave as _bndSaveImpl,
+  populateCandidateSelect as _bndPopulateCandidateSelect,
+  updateRadiusButtons as _bndUpdateRadiusButtons,
+  updateSaveButton as _bndUpdateSaveButton,
+  updateStatusSelect as _bndUpdateStatusSelect,
+} from './page11/boundaries_ui.js';
+import {
+  ensureBoundariesState as _ensureBoundariesState,
+  bndFmtBp as _bndFmtBp,
+  bndFindCandidate as _bndFindCandidate,
+  boundaryScanRange as _boundaryScanRange,
+  buildBoundaryRecord as _buildBoundaryRecord,
+  buildBoundaryTrackScores as _buildBoundaryTrackScores,
+  computeBoundaryEdges as _computeBoundaryEdges,
+  findSVAnchorsInZone as _findSVAnchorsInZone,
+  supportClass as _supportClass,
+  bndCloneRecord as _bndCloneRecord,
+  bndStageFromCandidate as _bndStageFromCandidate,
+  BOUNDARY_DEFAULTS,
+  BOUNDARY_TRACK_WEIGHTS,
+  BOUNDARY_TRACK_POLARITY,
+  BOUNDARY_TRACK_NAMES,
+  SUPPORT_CLASS_COLORS,
+} from './page11/boundaries.js';
+
+// Re-export the public surface so downstream consumers don't need to know
+// about the split. Match legacy naming where possible (underscore-prefixed
+// for page-private legacy helpers).
+export {
+  refreshBoundariesUi, wireBoundariesToolbar, teardownBoundariesToolbar,
+} from './page11/boundaries_ui.js';
+export {
+  ensureBoundariesState, boundaryScanRange, computeBoundaryEdges,
+  buildBoundaryTrackScores, buildBoundaryRecord, findSVAnchorsInZone,
+  supportClass, bndFindCandidate, bndFmtBp, bndCloneRecord,
+  bndStageFromCandidate, resampleBoundaryEvidenceTrack,
+  BOUNDARY_DEFAULTS, BOUNDARY_TRACK_WEIGHTS, BOUNDARY_TRACK_POLARITY,
+  BOUNDARY_TRACK_NAMES, SUPPORT_CLASS_COLORS,
+} from './page11/boundaries.js';
 
 // -----------------------------------------------------------------------------
 // Unresolved external deps — to be filled by the merge chat.
@@ -144,23 +192,30 @@ import { _pageState, _setActiveState } from './page11/_state.js';
 export function renderBoundariesPage() {
   const slot = document.getElementById('page11Content');
   if (!slot) return;
-  const bs = _ensureBoundariesState();
+  const bs = _ensureBoundariesState(_pageState);
   // v3.99 turn 13 ask 1: candidate-nav bar above the existing toolbar. Always
   // re-rendered so prev/next button state stays in sync. Boundaries page also
   // has its own #bndCandSelect dropdown, but the prev/next buttons are
   // faster for stepping through; both stay in sync via _navigateToCandidate.
-  const page11 = document.getElementById('page11');
-  if (page11) {
-    const oldNav = page11.querySelector('.cand-nav-inline');
-    if (oldNav) oldNav.remove();
-    const navBar = _renderCandidateNavInline({ idPrefix: 'bnd' });
-    navBar.style.margin = '12px 32px 0';
-    // Insert AFTER the page11Header so the nav sits between title and content
-    const header = document.getElementById('page11Header');
-    if (header && header.nextSibling) {
-      page11.insertBefore(navBar, header.nextSibling);
-    } else {
-      page11.appendChild(navBar);
+  // Candidate-nav inline bar (page-shared helper). The legacy implementation
+  // of _renderCandidateNavInline is still TODO_MISSING; once it lands the
+  // block below activates the prev/next chevrons between the header and
+  // toolbar. Until then it's a silent no-op.
+  if (typeof _renderCandidateNavInline === 'function') {
+    const page11 = document.getElementById('page11');
+    if (page11) {
+      const oldNav = page11.querySelector && page11.querySelector('.cand-nav-inline');
+      if (oldNav && typeof oldNav.remove === 'function') oldNav.remove();
+      const navBar = _renderCandidateNavInline({ idPrefix: 'bnd' });
+      if (navBar) {
+        navBar.style.margin = '12px 32px 0';
+        const header = document.getElementById('page11Header');
+        if (header && header.nextSibling) {
+          page11.insertBefore(navBar, header.nextSibling);
+        } else {
+          page11.appendChild(navBar);
+        }
+      }
     }
   }
   // Build toolbar + structure once; populate dynamic parts each time
@@ -220,50 +275,17 @@ export function renderBoundariesPage() {
       <!-- turn 117: focal-vs-background widget -->
       <div class="bnd-focal-vs-bg" id="bndFocalVsBg"></div>
     `;
-    // Wire events
-    const candSel = document.getElementById('bndCandSelect');
-    if (candSel) {
-      candSel.addEventListener('change', () => {
-        const v = candSel.value;
-        const id = (v === '' || v == null) ? null : (Number.isFinite(parseInt(v, 10)) ? parseInt(v, 10) : v);
-        _bndSelectCandidate(id);
-      });
-    }
-    const radiusBtns = document.querySelectorAll('#page11 .bnd-radius-btn');
-    radiusBtns.forEach(b => {
-      b.addEventListener('click', () => {
-        const r = parseInt(b.getAttribute('data-radius'), 10);
-        if (Number.isFinite(r) && r > 0) {
-          const bs2 = _ensureBoundariesState();
-          bs2.scan_radius_bp = r;
-          if (bs2.active_cand_id != null) bs2.cache.delete(bs2.active_cand_id);
-          _bndRefreshUI();
-        }
-      });
+    // Wire events via the boundaries_ui module. Cursor-window-idx
+    // getter is supplied by the caller of mount() when the page-1
+    // cursor is wired up; here we default to null so override-left/
+    // right is a no-op until the cursor wire arrives.
+    wireBoundariesToolbar(_pageState, {
+      getCursorWindowIdx: () => (_pageState && _pageState.cur),
+      onChange: () => refreshBoundariesUi(_pageState),
     });
-    const autoBtn = document.getElementById('bndAutoProposeBtn');
-    if (autoBtn) autoBtn.addEventListener('click', _bndAutoPropose);
-    const lBtn = document.getElementById('bndOverrideLBtn');
-    if (lBtn) lBtn.addEventListener('click', _bndOverrideLeft);
-    const rBtn = document.getElementById('bndOverrideRBtn');
-    if (rBtn) rBtn.addEventListener('click', _bndOverrideRight);
-    const resBtn = document.getElementById('bndResetBtn');
-    if (resBtn) resBtn.addEventListener('click', _bndReset);
-    const saveBtn = document.getElementById('bndSaveBtn');
-    if (saveBtn) saveBtn.addEventListener('click', _bndSave);
-    const statSel = document.getElementById('bndStatusSel');
-    if (statSel) {
-      statSel.addEventListener('change', () => {
-        const bs2 = _ensureBoundariesState();
-        bs2.staging.breakpoint_status = statSel.value;
-        bs2.staging.dirty = true;
-        _bndUpdateSaveButton();
-      });
-    }
     slot.__bndBuilt = true;
   }
-  _bndPopulateCandidateSelect();
-  _bndRefreshUI();
+  refreshBoundariesUi(_pageState);
 }
 
 
@@ -282,11 +304,12 @@ export function _bndKeyHandler(e) {
   // Don't trigger on Ctrl/Meta/Alt combos (those are reserved for browser shortcuts)
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = (e.key || '').toLowerCase();
-  if      (k === 'e') { e.preventDefault(); _bndOverrideLeft(); }
-  else if (k === 'f') { e.preventDefault(); _bndOverrideRight(); }
-  else if (k === 'b') { e.preventDefault(); _bndSave(); }
-  else if (k === 'r') { e.preventDefault(); _bndReset(); }
-  else if (k === 'a') { e.preventDefault(); _bndAutoPropose(); }
+  const cur = _pageState && _pageState.cur;
+  if      (k === 'e') { e.preventDefault(); if (Number.isFinite(cur)) _bndOverrideLeftImpl(_pageState, cur); refreshBoundariesUi(_pageState); }
+  else if (k === 'f') { e.preventDefault(); if (Number.isFinite(cur)) _bndOverrideRightImpl(_pageState, cur); refreshBoundariesUi(_pageState); }
+  else if (k === 'b') { e.preventDefault(); _bndSaveImpl(_pageState); refreshBoundariesUi(_pageState); }
+  else if (k === 'r') { e.preventDefault(); _bndResetImpl(_pageState); refreshBoundariesUi(_pageState); }
+  else if (k === 'a') { e.preventDefault(); _bndAutoProposeImpl(_pageState); refreshBoundariesUi(_pageState); }
 }
 
 export function _bndAttachHotkeys() {
@@ -401,6 +424,8 @@ export async function mount(root, atlasState, registry) {
 export async function unmount(root) {
   try { _bndDetachHotkeys(); }
   catch (e) { console.warn('page11.unmount: _bndDetachHotkeys threw —', e); }
+  try { teardownBoundariesToolbar(); }
+  catch (e) { console.warn('page11.unmount: teardownBoundariesToolbar threw —', e); }
   _setActiveState(null);
 }
 

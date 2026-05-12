@@ -101,6 +101,7 @@ UNITS=(
   test_page3_catalogue.js
   test_page4_karyotype.js
   test_page11_boundaries.js
+  test_page11_boundaries_ui.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
