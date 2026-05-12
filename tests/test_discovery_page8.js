@@ -36,18 +36,12 @@ check('exports mount',                       typeof page8.mount === 'function');
 check('exports unmount',                     typeof page8.unmount === 'function');
 
 // -----------------------------------------------------------------------------
-group('page8.js: stub-preserving (no renderers)');
-// Per chat-33 BATCH_1_NOTES: 0 functions extracted — pure HTML scaffold.
-// The migration must NOT introduce phantom renderer exports; if a future
-// batch adds them (winSumTable, winSumStripCanvas, etc.), tighten this
-// assertion to allow the specific names.
-const exportedNames = Object.keys(page8).sort();
-check('only mount + unmount exported (no phantom renderers)',
-      exportedNames.length === 2 &&
-      exportedNames.includes('mount') &&
-      exportedNames.includes('unmount'),
-      'got: [' + exportedNames.join(', ') + ']');
-check('__MODULE_ID__ NOT exported',          !('__MODULE_ID__' in page8));
+group('page8.js: renderer entries (post-cartridge wiring)');
+// Legacy shipped only the HTML shell (BATCH_1_NOTES: 0 functions extracted).
+// The cartridge supplies the table + strip + toolbar implementation.
+check('exports refreshWinSummary',         typeof page8.refreshWinSummary === 'function');
+check('exports initWinSummaryToolbar',     typeof page8.initWinSummaryToolbar === 'function');
+check('__MODULE_ID__ NOT exported',        !('__MODULE_ID__' in page8));
 
 // -----------------------------------------------------------------------------
 group('_state.js: live-binding pattern');

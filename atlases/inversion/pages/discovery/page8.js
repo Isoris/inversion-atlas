@@ -55,42 +55,71 @@ import { buildContingency, computeARI, computeNMI, cramersV } from '../../shared
 import { kmeans1D, kmeans2D, silhouette1D, adaptiveK1D } from '../../shared/kmeans.js';
 
 import { _pageState, _setActiveState } from './page8/_state.js';
+import {
+  renderPage8 as _renderPage8,
+  wireWinSumToolbar,
+  teardownWinSumToolbar,
+} from './page8/window_summary.js';
+
+/**
+ * Public entry — state-aware wrapper. Sets _pageState before delegating.
+ */
+export function refreshWinSummary(state) {
+  if (state) _setActiveState(state);
+  return _renderPage8(_pageState);
+}
+
+/**
+ * Wire toolbar filters + sortable header + go-button clicks. Idempotent.
+ */
+export function initWinSummaryToolbar() {
+  wireWinSumToolbar(_pageState, {
+    onChange: () => _renderPage8(_pageState),
+  });
+}
 
 // ---------------------------------------------------------------------------
-// Atlas-router lifecycle (chat 38 round 5 step 13, 2026-05-07).
+// Atlas-router lifecycle.
 // ---------------------------------------------------------------------------
 
 /**
  * Mount: called by atlas_router when the user navigates to page8.
  *
- * Builds a legacy-shape state with the slots page8 will eventually need
- * (activeChrom for "which chromosome are we summarising", precomp for the
- * per-window data source). No render call yet — the legacy page is pure
- * HTML scaffold; the empty-state #winSumNoChrom message remains visible
- * until renderers are authored.
+ * Builds a legacy-shape state with activeChrom + precomp + filter slots
+ * (winSumFilters, winSumColorMode, winSumSortKey, winSumSortDir), renders
+ * the table + strip canvas, and wires toolbar handlers.
  */
 export async function mount(root, atlasState, registry) {
   const legacyState = _buildLegacyState(atlasState);
   _setActiveState(legacyState);
 
-  // No render. Page8 is a pure-HTML-scaffold stub even in legacy
-  // (see header comment). Leaving _pageState set lets future renderers
-  // observe a non-null state via the live-binding pattern.
+  try { refreshWinSummary(legacyState); }
+  catch (e) { console.warn('page8.mount: refreshWinSummary threw —', e); }
+
+  try { initWinSummaryToolbar(); }
+  catch (e) { console.warn('page8.mount: initWinSummaryToolbar threw —', e); }
 
   if (atlasState.inversion) atlasState.inversion._page8State = legacyState;
 }
 
 /**
- * Unmount: clear _pageState so post-unmount callbacks see null.
+ * Unmount: remove wired handlers, clear _pageState so post-unmount
+ * callbacks see null.
  */
 export async function unmount(root) {
+  try { teardownWinSumToolbar(); }
+  catch (e) { console.warn('page8.unmount: teardown threw —', e); }
   _setActiveState(null);
 }
 
 function _buildLegacyState(atlasState) {
   const inv = atlasState.inversion || {};
   const legacy = Object.assign({}, inv);
-  legacy.activeChrom = inv.activeChrom || null;
-  legacy.precomp     = inv.precomp     || null;
+  legacy.activeChrom      = inv.activeChrom      || null;
+  legacy.precomp          = inv.precomp          || null;
+  legacy.winSumFilters    = inv.winSumFilters    || { l2: '', zMin: 0 };
+  legacy.winSumColorMode  = inv.winSumColorMode  || 'z';
+  legacy.winSumSortKey    = inv.winSumSortKey    || 'idx';
+  legacy.winSumSortDir    = inv.winSumSortDir    || 'asc';
   return legacy;
 }
