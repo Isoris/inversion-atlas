@@ -24,6 +24,7 @@ import { _ensureCsOverlayIndex, _paintCandidateBands } from './candidates.js';
 import { setCur } from './events.js';
 import { wireBandTraceTooltip } from './band_trace_tooltip.js';
 import { wireInheritancePillTooltip } from './inheritance_tooltip.js';
+import { maybeShowFishInspectPopover } from './fish_inspect_popover.js';
 
 // --- drawLinesPanel(state) — legacy lines 34894-35744 ---
 export function drawLinesPanel(state) {
@@ -1072,9 +1073,7 @@ export function buildLinesPanel(state) {
           if (Number.isFinite(bestM.jump_win_idx) && bestM.jump_win_idx >= 0) {
             setCur(state, bestM.jump_win_idx);
           }
-          if (typeof _showFishInspectPopover === 'function') {
-            _showFishInspectPopover(e, cv, bestM.si);
-          }
+          maybeShowFishInspectPopover(e, cv, state, bestM.si);
           e.preventDefault();
           e.stopPropagation();
           return;
@@ -1085,9 +1084,8 @@ export function buildLinesPanel(state) {
       // regime, confidence, and subband_stability. No-op when no candidate
       // is active or the click misses all tracked-fish lines. Without shift,
       // falls through to the existing click-to-jump behavior.
-      if (e.shiftKey && cv.dataset.linesSource === 'pc1' &&
-          typeof _showFishInspectPopover === 'function') {
-        const handled = _showFishInspectPopover(e, cv);
+      if (e.shiftKey && cv.dataset.linesSource === 'pc1') {
+        const handled = maybeShowFishInspectPopover(e, cv, state);
         if (handled) {
           e.preventDefault();
           e.stopPropagation();
