@@ -95,6 +95,18 @@ UNITS=(
   test_shared_k_bands.js
   test_shared_lasso_linkage.js
   test_shared_cross_candidate.js
+  test_shared_candidate_nav.js
+  test_shared_diamond_detection.js
+  test_shared_transition_graph.js
+  test_shared_band_reach.js
+  test_shared_tracked_linkage.js
+  test_shared_band_divergence.js
+  test_shared_candidate_display_name.js
+  test_shared_cheat30_render.js
+  test_shared_band_composition.js
+  test_shared_inheritance_cache_key.js
+  test_shared_inheritance_gather.js
+  test_shared_snp_density.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js

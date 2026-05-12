@@ -446,6 +446,64 @@ check('view-as-cand: onPromote NOT fired when empty', onPromoteResult === null);
 CAT.teardownCatalogueToolbar();
 
 // -----------------------------------------------------------------------------
+group('Diamond column + strictness mode');
+check('CAT_DIAMOND_MODES frozen',
+      Object.isFrozen(CAT.CAT_DIAMOND_MODES) && CAT.CAT_DIAMOND_MODES.length === 3);
+check('CAT_COLUMNS includes diamond',
+      CAT.CAT_COLUMNS.some(c => c.key === 'diamond' && c.kind === 'diamond'));
+
+// buildCatalogueRows propagates diamond_summary
+const rowsWithSummary = CAT.buildCatalogueRows({
+  catalogueRows: [{
+    id: 'L2_a', chr: 'LG28', start_bp: 0, end_bp: 100,
+    diamond_summary: { n_loose: 2, n_strict: 1, n_strict2: 0, n_diamonds: 2 },
+  }],
+});
+check('build: diamond_summary propagated',  rowsWithSummary[0].diamond_summary.n_loose === 2);
+check('build: missing summary → null',
+      CAT.buildCatalogueRows({ catalogueRows: [{ id: 'X', chr: 'Y', start_bp: 0, end_bp: 1 }] })[0].diamond_summary === null);
+
+// renderCatBodyHtml renders the diamond cell per mode
+const rowsForDiamond = [{
+  id: 'L2_a', chr: 'LG28', start_bp: 0, end_bp: 100,
+  diamond_summary: { n_loose: 3, n_strict: 2, n_strict2: 1, n_diamonds: 3 },
+}];
+const htmlLoose = CAT.renderCatBodyHtml(rowsForDiamond, 'detailed', new Set(), new Set(), 'loose');
+check('body: loose mode shows 3',           htmlLoose.includes('◇ 3') || htmlLoose.includes(' 3<'));
+const htmlStrict = CAT.renderCatBodyHtml(rowsForDiamond, 'detailed', new Set(), new Set(), 'strict');
+check('body: strict mode shows ◆ 2',         htmlStrict.includes('◆ 2'));
+const htmlStrict2 = CAT.renderCatBodyHtml(rowsForDiamond, 'detailed', new Set(), new Set(), 'strict2');
+check('body: strict2 mode shows ◆◆ 1',       htmlStrict2.includes('◆◆ 1'));
+
+// No diamonds → em-dash
+const noDiaRow = [{ id: 'L2_b', chr: 'X', start_bp: 0, end_bp: 1, diamond_summary: null }];
+const htmlNoDia = CAT.renderCatBodyHtml(noDiaRow, 'detailed', new Set(), new Set(), 'loose');
+check('body: no diamonds shows —',           htmlNoDia.includes('—'));
+
+// Wire toolbar: diamond-mode buttons mutate state.catDiamondMode
+const sD = {
+  catalogueRows: rowsForDiamond,
+  catSelection: new Set(),
+  catFavorites: new Set(),
+  catDiamondMode: 'loose',
+};
+CAT.wireCatalogueToolbar(sD, {});
+const diaStrict = _ensure('catDiamondStrict');
+diaStrict.fire('click', {});
+check('wire: strict button → state.catDiamondMode = strict',
+      sD.catDiamondMode === 'strict');
+
+const diaStrict2 = _ensure('catDiamondStrict2');
+diaStrict2.fire('click', {});
+check('wire: strict2 button',                sD.catDiamondMode === 'strict2');
+
+const diaLoose = _ensure('catDiamondLoose');
+diaLoose.fire('click', {});
+check('wire: loose button',                  sD.catDiamondMode === 'loose');
+
+CAT.teardownCatalogueToolbar();
+
+// -----------------------------------------------------------------------------
 group('teardownCatalogueToolbar');
 CAT.teardownCatalogueToolbar();
 check('teardown: filter handler removed',

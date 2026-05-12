@@ -59,6 +59,7 @@ export {
 export {
   CAT_COLUMNS,
   CAT_VIEW_MODES,
+  CAT_DIAMOND_MODES,
   buildCatalogueRows,
   filterCatalogueRows,
   sortCatalogueRows,
