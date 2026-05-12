@@ -536,18 +536,12 @@ export function renderZoneBlock(state) {
   el.innerHTML = html;
 }
 
-// --- _persistActiveCandidate(candId) — legacy lines 57399-57407 ---
-// Save/clear the active candidate id in localStorage so candidate-focus
-// survives reloads. Fail-soft on storage exceptions.
-export function _persistActiveCandidate(candId) {
-  try {
-    if (candId) {
-      localStorage.setItem('pca_scrubber_v3.activeCandidateId', candId);
-    } else {
-      localStorage.removeItem('pca_scrubber_v3.activeCandidateId');
-    }
-  } catch (_) { /* fail-soft */ }
-}
+// --- _persistActiveCandidate — re-exported from shared/active_candidate.js ---
+// The canonical implementation (legacy line 57399) lives in shared so
+// page1 + page2 don't need cross-page imports. The underscore alias is
+// preserved so existing callers don't break.
+export { persistActiveCandidateId as _persistActiveCandidate }
+  from '../../../shared/active_candidate.js';
 
 // --- _csBpJumpToWindow(bp) — legacy lines 23887-23900 ---
 // Cross-panel "jump to breakpoint" action. Centers the scrubber on the

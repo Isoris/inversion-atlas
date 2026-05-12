@@ -47,6 +47,7 @@ UNITS=(
   test_page1_idb.js
   test_page1_fish_inspect_popover.js
   test_page1_enrichment.js
+  test_shared_active_candidate.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js

@@ -35,6 +35,7 @@
 // because those reads happen inside the per-panel draw functions.)
 
 import { escapeHtml } from '../../shared/page1_utils.js';
+import { persistActiveCandidateId } from '../../shared/active_candidate.js';
 import { resolve as _registryResolve, getState as _getState } from '../../../../core/atlas_api.js';
 
 import { _setActiveState, _pageState } from './page2/_state.js';
@@ -222,8 +223,8 @@ export function _navigateToCandidate(state, targetCand) {
   state.candidate = candidateFromJSON(candidateToJSON(targetCand));
   // v4 turn 56: persist the active candidate ID so reloads can restore
   // focus to whichever candidate the user was last navigated to.
-  if (typeof _persistActiveCandidate === 'function' && targetCand) {
-    _persistActiveCandidate(targetCand.id || '');
+  if (targetCand) {
+    persistActiveCandidateId(targetCand.id || '');
   }
   refreshCandidateUI(state);
   refreshCandidateListUI(state);

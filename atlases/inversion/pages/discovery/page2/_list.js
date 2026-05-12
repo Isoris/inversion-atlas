@@ -16,6 +16,7 @@
 
 import { _pageState } from './_state.js';
 import { refreshCandidateUI } from '../page2.js';
+import { persistActiveCandidateId } from '../../../shared/active_candidate.js';
 
 // ---------------------------------------------------------------------------
 // Module-private constants (extracted from legacy)
@@ -324,9 +325,7 @@ export function refreshCandidateListUI() {
         state.candidate = candidateFromJSON(candidateToJSON(cand));
         // v4 turn 56: persist the active candidate ID so reloads remember
         // which one the user was last working on from the sidebar list.
-        if (typeof _persistActiveCandidate === 'function') {
-          _persistActiveCandidate(cand.id || '');
-        }
+        persistActiveCandidateId(cand.id || '');
         refreshCandidateUI(state);
         refreshCandidateListUI(state);
         renderCandidateKaryotype();
