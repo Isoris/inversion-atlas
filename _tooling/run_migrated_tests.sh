@@ -90,6 +90,8 @@ UNITS=(
   test_shared_regimes_registry.js
   test_shared_scale_stability.js
   test_shared_ancestry_confound.js
+  test_shared_dbscan.js
+  test_shared_uv_rotation.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
