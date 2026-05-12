@@ -84,6 +84,7 @@
 // =============================================================================
 
 import { _pageState, _setActiveState } from './page11/_state.js';
+import { renderCandidateNavInline as _renderCandidateNavInline } from '../../shared/candidate_nav.js';
 import {
   refreshBoundariesUi,
   wireBoundariesToolbar,
@@ -197,24 +198,33 @@ export function renderBoundariesPage() {
   // re-rendered so prev/next button state stays in sync. Boundaries page also
   // has its own #bndCandSelect dropdown, but the prev/next buttons are
   // faster for stepping through; both stay in sync via _navigateToCandidate.
-  // Candidate-nav inline bar (page-shared helper). The legacy implementation
-  // of _renderCandidateNavInline is still TODO_MISSING; once it lands the
-  // block below activates the prev/next chevrons between the header and
-  // toolbar. Until then it's a silent no-op.
-  if (typeof _renderCandidateNavInline === 'function') {
-    const page11 = document.getElementById('page11');
-    if (page11) {
-      const oldNav = page11.querySelector && page11.querySelector('.cand-nav-inline');
-      if (oldNav && typeof oldNav.remove === 'function') oldNav.remove();
-      const navBar = _renderCandidateNavInline({ idPrefix: 'bnd' });
-      if (navBar) {
-        navBar.style.margin = '12px 32px 0';
-        const header = document.getElementById('page11Header');
-        if (header && header.nextSibling) {
-          page11.insertBefore(navBar, header.nextSibling);
-        } else {
-          page11.appendChild(navBar);
-        }
+  // Candidate-nav inline bar — prev/next/whole-genome chevrons between
+  // the header and toolbar. The shared cartridge implementation lives
+  // in shared/candidate_nav.js. Wired with onNavigate that sets
+  // state.candidate (the page-router's setActivePage flow takes over
+  // from there).
+  const page11 = document.getElementById('page11');
+  if (page11) {
+    const oldNav = page11.querySelector && page11.querySelector('.cand-nav-inline');
+    if (oldNav && typeof oldNav.remove === 'function') oldNav.remove();
+    const navBar = _renderCandidateNavInline(_pageState, {
+      idPrefix: 'bnd',
+      onNavigate: (st, target) => {
+        if (st) st.candidate = target;
+        renderBoundariesPage();
+      },
+      onClearActive: (st) => {
+        if (st) st.candidate = null;
+        renderBoundariesPage();
+      },
+    });
+    if (navBar) {
+      navBar.style.margin = '12px 32px 0';
+      const header = document.getElementById('page11Header');
+      if (header && header.nextSibling) {
+        page11.insertBefore(navBar, header.nextSibling);
+      } else {
+        page11.appendChild(navBar);
       }
     }
   }
