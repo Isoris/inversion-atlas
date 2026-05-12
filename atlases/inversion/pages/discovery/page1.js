@@ -175,8 +175,8 @@ export function applyData(state, data) {
   }
   // Load saved view controls (PCA axis selection etc.) and reconcile against
   // the data we just loaded — drops PC3/PC4 if not available, keeps PC1×PC2.
-  if (typeof loadViewControls === 'function')             loadViewControls(state);
-  if (typeof reconcileViewControlsForData === 'function') reconcileViewControlsForData(state);
+  loadViewControls(state);
+  reconcileViewControlsForData(state);
   state.cur = 0;
   state.tracked = [];
   state.ancestryPalette = {};
@@ -185,18 +185,16 @@ export function applyData(state, data) {
   // v3.99 turn 7 perf: clear render caches whenever a new dataset loads
   _l3CacheInvalidate();
   if (typeof _linesCacheInvalidate === 'function') _linesCacheInvalidate();
-  // 2026-05-06 round 3: most of these helpers were extracted in step 3
-  // (buildIndexes, computePC1Signs, populateSimScales, buildFamilyPalette,
-  // refreshBandPickBar — all module-level above). Three remain reference-
-  // but-never-defined-in-legacy: refreshColorModeBar, refreshPcaAxisBar,
-  // refreshPinUI. The typeof guards stay so missing-but-future helpers
-  // and the never-defined trio behave identically (silent no-op).
-  if (typeof buildIndexes === 'function')         buildIndexes(state);
-  if (typeof computePC1Signs === 'function')      computePC1Signs(state);
-  if (typeof populateSimScales === 'function')    populateSimScales(state);
-  if (typeof buildFamilyPalette === 'function')   buildFamilyPalette(state);
+  // 2026-05-06 round 3: these helpers were extracted in step 3 and are now
+  // imported at the top of this file — calling them directly is safe.
+  // refreshColorModeBar / refreshPcaAxisBar / refreshPinUI are never-defined-
+  // in-legacy hooks and stay try/caught (silent no-op).
+  buildIndexes(state);
+  computePC1Signs(state);
+  populateSimScales(state);
+  buildFamilyPalette(state);
   try { refreshColorModeBar(state); } catch (_) {}
-  if (typeof refreshBandPickBar === 'function')   refreshBandPickBar(state);
+  refreshBandPickBar(state);
   try { refreshPcaAxisBar(state); } catch (_) {}
   // Manual groups: reload from localStorage now that we know the chrom
   try { _mgRefreshOnDataLoad(); } catch (_) {}
@@ -205,13 +203,13 @@ export function applyData(state, data) {
   // no other atlas function reads state.activeSampleSet yet.
   if (typeof loadActiveSamples === 'function') loadActiveSamples();
   if (typeof refreshActiveSamplesBadge === 'function') refreshActiveSamplesBadge();
-  if (typeof buildLinesPanelCheckboxes === 'function') buildLinesPanelCheckboxes(state);
-  if (typeof buildLinesPanel === 'function') buildLinesPanel(state);
+  buildLinesPanelCheckboxes(state);
+  buildLinesPanel(state);
   // v3.99 turn 14e+ continue: revalidate the lines coloring mode against
   // the layers we just discovered. If the user previously selected, e.g.,
   // 'theta_pi' on a different JSON that had the layer, but this JSON
   // doesn't, the picker falls back to 'kmeans' silently.
-  if (typeof refreshLinesColorMode === 'function') refreshLinesColorMode(state);
+  refreshLinesColorMode(state);
   state.secondaryL2 = null;
   try { refreshPinUI(state); } catch (_) {}
   state.lockedLabels = null;
@@ -270,14 +268,14 @@ export function applyData(state, data) {
   // Schema badge
   const schemaBadge = document.getElementById('schemaBadge');
   if (schemaBadge) {
-    const layerNames = (typeof listLayers === 'function') ? listLayers(state) : [];
+    const layerNames = listLayers(state);
     schemaBadge.textContent = `schema v${state.schemaVersion} · ${layerNames.length} layer${layerNames.length === 1 ? '' : 's'}`;
     schemaBadge.title = `Schema version: v${state.schemaVersion}\nLayers: ${layerNames.join(', ')}\n\nUse + load enrichment to add layers from cluster phases 6+`;
     schemaBadge.className = 'v' + state.schemaVersion;
     schemaBadge.style.display = 'inline-block';
   }
-  if (typeof renderTrackedList === 'function') renderTrackedList(state);
-  if (typeof refreshCandidateUI === 'function') refreshCandidateUI(state);
+  renderTrackedList(state);
+  refreshCandidateUI(state);
   if (typeof refreshCandidateListUI === 'function') refreshCandidateListUI();
   // v3.90: activate (or hide) the marker page based on whether a phase-13
   // marker layer was loaded. Re-render its content after activation so it
