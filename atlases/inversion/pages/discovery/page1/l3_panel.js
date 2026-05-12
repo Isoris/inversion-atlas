@@ -19,6 +19,10 @@ import {
 } from '../../../shared/contingency.js';
 import { computeBandDiagnostics } from './band_diagnostics.js';
 import {
+  bandDiagsMiniChipsHtml,
+  bandDiagsPanelHtml,
+} from './band_diagnostics_html.js';
+import {
   escapeHtml,
   fitCanvas,
   fmt,
@@ -1499,20 +1503,14 @@ function focalContentHtml(cl, env, l2idx, options) {
             `(${selKept.size}/${cl.n_per_group.length} kept)</span>`;
   }
   html += `</div>`;
-  // v3.92: band diagnostics — confounder/support per band. The compute
-  // is wired (page1/band_diagnostics.js) and stashed on the cluster for
-  // downstream export hooks. The two HTML renderers (mini-chips +
-  // collapsible table) are still typeof-guarded — they live at legacy
-  // 50134 / 50183 and are a separate extraction round.
+  // v3.92: band diagnostics — confounder/support per band. Two render
+  // paths: mini-chip pills (always visible when there's anything to
+  // report) + a collapsible full table (15 columns + flags).
   const _diag = computeBandDiagnostics(_pageState, cl, env, l2idx);
   if (_diag) {
     cl.__bandDiagnostics = _diag;
-    if (typeof _bandDiagsMiniChipsHtml === 'function') {
-      html += _bandDiagsMiniChipsHtml(_diag, cl.usedK, l2idx);
-    }
-    if (typeof _bandDiagsPanelHtml === 'function') {
-      html += _bandDiagsPanelHtml(_diag, cl.usedK);
-    }
+    html += bandDiagsMiniChipsHtml(_pageState, _diag, cl.usedK, l2idx);
+    html += bandDiagsPanelHtml(_diag, cl.usedK);
   }
   // Per-cluster top family breakdown (small, mono font)
   if (cl.fam_per_cluster) {
