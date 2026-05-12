@@ -34,6 +34,10 @@ import {
   invalidateLineageCache,
   _bandTraceClearCache,
 } from './page1/_state.js';
+import {
+  loadActiveSamples,
+  refreshActiveSamplesBadge,
+} from './page1/active_samples.js';
 import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayers, listLayers, loadViewControls, populateSimScales, reconcileViewControlsForData } from './page1/_data.js';
 import { drawSim, drawSimMini } from './page1/sim_panel.js';
 import { drawZ } from './page1/z_panel.js';
@@ -203,8 +207,8 @@ export function applyData(state, data) {
   // v4 turn 128 (AS1): active samples — restore the saved CGA list for
   // this cohort and refresh the badge text. AS1 is purely scaffolding;
   // no other atlas function reads state.activeSampleSet yet.
-  if (typeof loadActiveSamples === 'function') loadActiveSamples();
-  if (typeof refreshActiveSamplesBadge === 'function') refreshActiveSamplesBadge();
+  loadActiveSamples(state);
+  refreshActiveSamplesBadge(state);
   buildLinesPanelCheckboxes(state);
   buildLinesPanel(state);
   // v3.99 turn 14e+ continue: revalidate the lines coloring mode against
