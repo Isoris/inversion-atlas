@@ -49,6 +49,7 @@ import {
   lineageColor as _sharedLineageColor,
   resolveSampleScopeColor as _sharedResolveSampleScopeColor,
 } from '../../../shared/sample_color.js';
+import { diagSampleColor } from './diag_residuals.js';
 
 // =====================================================================
 // Cache-invalidation helpers (legacy 34321 / 39362 / 39973)
@@ -190,8 +191,9 @@ export function getSampleColor(si, mode, groupLabels) {
   // v4 turn 83: residual mode — recolor by per-fish residual_z from the
   // focal-window K-means band centroid. Cool blue = clean homozygote;
   // amber = intermediate; red = suspicious (≥2.5σ from band centroid).
+  // Compute lives in page1/diag_residuals.js.
   if (mode === 'residual') {
-    return _diagSampleColor(si, state.cur);
+    return diagSampleColor(state, si, state.cur);
   }
   // v4 turn 84: cross-page cluster modes — color by another page's clusters
   // for the active candidate. When the requested source has no clusters
