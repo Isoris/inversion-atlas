@@ -5,6 +5,19 @@
 //
 // CANONICAL ANALYSIS MODULE SHAPE — copy this pattern for new analysis.
 //
+// SPEC_v2 NOTE (_handoff_docs/SPEC_registry_v2.md item 7):
+//   The orchestrator that wraps this module (mendelian_inheritance.js,
+//   not yet written) will:
+//     - take candidate_id + version_id + selectedFamilies + selectedSamples
+//     - resolve inputs via registry.resolve()
+//     - compute dependency_hash from (candidate_version_id, callset_id,
+//       relatedness_result_id, sample_set_id, analysis_version, thresholds)
+//     - call this module's pure compute for the math
+//     - write the result via registry.write('mendelian_inheritance_block',
+//       { candidate_id, version_id }, payload) — currently a stub-call
+//       to reg.set() below; the swap is mechanical once Registry.write
+//       lands in atlas-core.
+//
 // Contract:
 //   - Receives `reg` (Registry instance) and `ctx` (call context).
 //   - Asks `reg` for the data it needs (candidate karyotypes, relatedness).
@@ -20,6 +33,8 @@
 //   - No `window.X = ...` anywhere. This module does not pollute globals.
 //
 // =====================================================================
+
+import { chiSqSurvival } from '../shared/contingency.js';
 
 // --------------------------------------------------------------------
 // Module-private constants. Not visible outside this file.
@@ -230,8 +245,10 @@ function _chiSqGof(observed, expected) {
 }
 
 function _chiSqPValue(chi_sq, df) {
-  // IMPLEMENTATION_NOTE: needs a real chi-sq survival function.
-  // Options: ship a small `jstat`-like helper, or precompute lookup.
-  // For now this is a placeholder that returns NaN.
-  return NaN;
+  // Right-tail p-value: 1 - CDF(chi_sq; df). Uses chiSqSurvival from
+  // shared/contingency.js (Lanczos-backed gamma regularised incomplete
+  // function, ~10-digit accuracy for df up to ~200). Returns NaN on
+  // non-finite inputs to preserve the legacy "insufficient data" path.
+  if (!Number.isFinite(chi_sq) || !Number.isFinite(df) || df <= 0) return NaN;
+  return chiSqSurvival(chi_sq, df);
 }

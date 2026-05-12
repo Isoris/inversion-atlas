@@ -1,11 +1,21 @@
-# SPEC — Registry.write() + page-isolation principle
+# SPEC — Page-isolation principle (companion to SPEC_registry_v2)
 
 **Filed:** 2026-05-12.
-**Status:** design — `Registry.write()` not implemented yet (lives in
-atlas-core, deferred from chat-36 step-11 handoff "Piece δ").
-**Why now:** Quentin pushed back on the legacy-style cross-page wiring
-that the verbatim extractions reintroduce. This SPEC captures the
-target shape so future rounds don't keep coupling pages together.
+**Status:** the page-isolation half is enforced in the cartridge as of
+commit `4e695f7` (zero cross-page imports). The Registry.write half
+defers to `_handoff_docs/SPEC_registry_v2.md` which is the canonical
+design.
+**Why this file still exists:** SPEC_registry_v2.md describes the
+atlas-core Registry.write contract. This file captures the
+*cartridge-side* page-isolation discipline that lets the Registry
+swap work mechanically when v2 lands.
+
+**Canonical reference for Registry.write semantics, layer
+`writable: true` flag, server transport, schema validation, cache
+invalidation: `_handoff_docs/SPEC_registry_v2.md`.** Read that first.
+
+This SPEC is **complementary**, not parallel. It says: regardless of
+how persistence works, pages must not import from each other.
 
 ---
 
@@ -91,51 +101,56 @@ When a future round picks up a new feature, the checklist is:
    `shared/` too (e.g. an SVG builder, a tooltip positioner). Page-
    specific renderers stay under the page.
 
-## Registry.write() — proposed contract
+## Registry.write() — see SPEC_registry_v2
 
-(This goes in atlas-core, not the cartridge, but the cartridge call
-sites will compose against it.)
+The full contract — signature `registry.write(key, args, payload)`,
+`writable: true` flag on layer entries, path templating, schema
+validation before send, `POST /file/{path:path}` transport, cache
+invalidation on success, transitive invalidation on candidate_change
+— is specified in `_handoff_docs/SPEC_registry_v2.md` items 4 + 5.
+Don't duplicate it here.
 
-```javascript
-// Synchronous (cache-write only, server-write fire-and-forget)
-registry.write(layerName, key, value)
-  // Triggers:
-  //  - In-memory cache update on the current page
-  //  - Background fetch to server's PUT /atlas/state/<layer>/<key>
-  //  - Broadcast to other open pages via BroadcastChannel
-  // Returns: void
+The signature I sketched in an earlier revision of this file
+(`registry.write(layerName, key, value)` with broadcast / subscribe)
+was not aligned with SPEC_v2. The canonical surface is:
 
-// Async (waits for server-write confirmation)
-registry.writeSync(layerName, key, value)
-  // Same as write() but resolves the Promise after server-write.
-  // Returns: Promise<void>
-
-// Subscribe to changes from other pages / tabs / sessions
-registry.subscribe(layerName, key, handler)
-  // handler receives (value, meta) on changes from any source.
-  // Returns: unsubscribe function
+```
+registry.resolve(key, args)        — read cached/fresh
+registry.write(key, args, payload) — write through to canonical store
+registry.invalidate(key, args)     — drop one cache entry
+registry.invalidateAllForCandidate(cid) — drop all candidate-scoped entries
 ```
 
-The first two satisfy "persist state". The third satisfies "page B
-sees page A's update without a reload" — replaces the legacy pattern
-of pages directly calling each other's `refresh*` UI functions.
+No `subscribe`, no `BroadcastChannel`. SPEC_v2 §11 explicitly rules
+those out for v2.
 
-## Acceptance criteria
+## Acceptance criteria (cartridge half)
 
-A future round implementing Registry.write() and refactoring the cart-
-ridge to use it can call this SPEC done when:
+The page-isolation half is **already met** in the cartridge as of
+commit `4e695f7`:
 
-- [ ] `registry.write(layer, key, value)` exists in atlas-core with the
-      semantics above
-- [ ] `registry.subscribe(layer, key, handler)` exists
-- [ ] Every existing `persist*` helper (active_candidate.js, idb.js,
-      band_trace_state.js, l2_sweep.js, active_samples.js) gets a
-      one-line swap from localStorage/IDB to `registry.write`
-- [ ] No page module imports from another page module. Cross-page
-      state flows exclusively through registry layers.
-- [ ] An audit grep `from '\.\./page[0-9]+\b'` in
-      `atlases/inversion/pages/` returns zero hits (except within-page
-      sub-module imports like `./z_panel.js`).
+- [x] No page module imports from another page module. Cross-page
+      state flows exclusively through `shared/` (pure compute /
+      predicates) and persistence helpers (localStorage / IDB).
+- [x] Audit grep `from '\.\./page[0-9]'` in
+      `atlases/inversion/pages/` returns zero hits.
+- [x] Audit grep `from '\./page1/'` in
+      `atlases/inversion/pages/` (excluding `page1.js` itself) returns
+      zero hits.
+
+The Registry.write half (depends on atlas-core changes per SPEC_v2):
+
+- [ ] `registry.write(key, args, payload)` exists in
+      `core/registry_core.js` per SPEC_v2 §5
+- [ ] `registry.invalidateAllForCandidate(cid)` exists per SPEC_v2 §6
+- [ ] Server-side path allowlist on `POST /file/{path}` per SPEC_v2 §9
+- [ ] Every existing `persist*` helper (`shared/active_candidate.js`,
+      `page1/idb.js`, `page1/band_trace_state.js`, `page1/l2_sweep.js`,
+      `page1/active_samples.js`) gets a one-line swap from localStorage
+      / IDB to `registry.write`. The call signatures I built were
+      designed for this swap — each helper takes the same arguments
+      `registry.write` will need, so the change is mechanical per
+      module.
 
 ## What this SPEC does NOT say
 
