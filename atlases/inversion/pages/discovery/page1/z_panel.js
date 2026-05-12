@@ -14,6 +14,7 @@
 // Bodies extracted verbatim from the pre-split page1.js (eighth pass).
 
 import { fitCanvas, niceTicks, themeColor } from '../../../shared/page1_utils.js';
+import { karyoColor } from '../../../shared/color_helpers.js';
 
 import { _lineageColor, _pageState, _setActiveState } from './_state.js';
 import { currentMbRange, getL2Cluster } from './_data.js';
@@ -662,15 +663,9 @@ export function _drawBandTraceStrip(ctx, pad, plotW, plotH, mbMin, mbMax) {
   ctx.fillStyle = 'rgba(60, 40, 70, 0.14)';
   ctx.fillRect(pad.l, stripY, plotW, stripH);
 
-  // Get the band-color palette. Use existing _gpKaryoColor if available
-  // (matches the karyotype tab and cockpit), else fall back to a
-  // hardcoded 6-color cycle so headless tests don't blow up.
-  const bandColor = (typeof _gpKaryoColor === 'function')
-    ? _gpKaryoColor
-    : function (k) {
-        const PAL = ['#3b6fb6', '#ffd866', '#d97a2c', '#7ad394', '#a76de2', '#e85a5a'];
-        return PAL[k % PAL.length];
-      };
+  // Band-colour palette — shared with the karyotype tab and cockpit
+  // via shared/color_helpers.js (legacy _gpKaryoColor at line 42894).
+  const bandColor = karyoColor;
 
   // Index per_l2 by l2_idx for O(1) lookup
   const byL2 = {};
@@ -977,8 +972,7 @@ export function drawZ(state) {
   // same per-lane height as the single-lane case. zoneTop and plotH both
   // adjust to keep L1/L2/W-row/peaks/scatter visually in the same place
   // relative to the cand bar's BOTTOM.
-  const _candLanes = (typeof _assignCandidateLanes === 'function')
-    ? _assignCandidateLanes(state.candidateList || []).n_lanes : 1;
+  const _candLanes = _assignCandidateLanes(state.candidateList || []).n_lanes;
   const candBarTotal = candBarH * _candLanes;
   // Effective top of L1 bar shifts down by (candBarTotal + candGap)
   const zoneTop = pad.t + candBarTotal + candGap;

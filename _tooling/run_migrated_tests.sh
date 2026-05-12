@@ -30,6 +30,8 @@ UNITS=(
   test_shared_kmeans.js
   test_shared_state.js
   test_shared_per_l2_cluster.js
+  test_shared_page1_utils.js
+  test_shared_color_helpers.js
   test_band_consensus.js
   test_modular_smoke.js
   # page modules (cartridge-only — independent of atlas-core)

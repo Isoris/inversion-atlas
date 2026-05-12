@@ -154,3 +154,45 @@ export function fitCanvas(canvas) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return { ctx, w: rect.width, h: rect.height };
 }
+
+// ---------------------------------------------------------------------
+// Candidate-lane layout (legacy lines 32503-32536)
+// ---------------------------------------------------------------------
+
+/**
+ * Assign candidates to non-overlapping lanes for the z-panel candidate
+ * bar. Greedy first-fit on start_w, sorted ascending. Touch
+ * (start_w === prev.end_w) counts as non-overlapping — matches the
+ * L1/L2 rendering convention which uses _s0/_e0 as inclusive endpoints.
+ *
+ * @param {Array<{id?: string, start_w: number, end_w: number}>} candList
+ * @returns {{assignments: Map<string, number>, n_lanes: number}}
+ */
+export function assignCandidateLanes(candList) {
+  if (!Array.isArray(candList) || candList.length === 0) {
+    return { assignments: new Map(), n_lanes: 1 };
+  }
+  const sorted = candList.slice().filter(c => c && c.start_w != null && c.end_w != null)
+    .sort((a, b) => {
+      if (a.start_w !== b.start_w) return a.start_w - b.start_w;
+      return String(a.id || '').localeCompare(String(b.id || ''));
+    });
+  const lanes = [];
+  const assignments = new Map();
+  for (const c of sorted) {
+    let placed = -1;
+    for (let i = 0; i < lanes.length; i++) {
+      if (c.start_w > lanes[i]) {
+        lanes[i] = c.end_w;
+        placed = i;
+        break;
+      }
+    }
+    if (placed < 0) {
+      lanes.push(c.end_w);
+      placed = lanes.length - 1;
+    }
+    assignments.set(c.id, placed);
+  }
+  return { assignments, n_lanes: Math.max(1, lanes.length) };
+}

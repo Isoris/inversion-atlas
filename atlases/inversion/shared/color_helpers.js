@@ -97,3 +97,21 @@ export function zColorPDF(z, z_max) {
   if (t <= 0.5) return lerpRGB(Z_LOW, Z_MID, t * 2);
   return lerpRGB(Z_MID, Z_HIGH, (t - 0.5) * 2);
 }
+
+// =====================================================================
+// Karyotype band colours (legacy lines 42891-42897)
+// =====================================================================
+// Six-entry palette used by the g-panel karyo-glyph renderer and the
+// z-panel candidate bars to colour band membership. The palette wraps
+// (bandIdx % 6) for K > 6 cases. bandIdx == null or < 0 returns the
+// neutral "ungrouped" grey #666.
+
+export const KARYO_PALETTE = Object.freeze([
+  '#4fa3ff', '#b8b8b8', '#f5a524',
+  '#3cc08a', '#e0555c', '#b07cf7',
+]);
+
+export function karyoColor(bandIdx) {
+  if (bandIdx == null || bandIdx < 0) return '#666';
+  return KARYO_PALETTE[bandIdx % KARYO_PALETTE.length];
+}
