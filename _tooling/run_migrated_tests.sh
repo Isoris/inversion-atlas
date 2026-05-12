@@ -131,6 +131,7 @@ UNITS=(
   test_shared_band_mode_detect.js
   test_shared_k6_parent_map.js
   test_shared_candidate_pca_sample_color.js
+  test_shared_similarity_matrix.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
