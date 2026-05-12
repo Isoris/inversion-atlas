@@ -274,6 +274,22 @@ invalidateAllForCandidate(candidate_id) {
 }
 ```
 
+> **Implementation note.** `atlas_state.js` has no `this.registry` reference
+> today (see `core/atlas_state.js` constructor — only `serverBaseUrl` is
+> stashed). Two options when wiring this: (a) inject the registry into
+> `AtlasState` at bootstrap, or (b) have the registry subscribe to
+> `shared.activeCandidate.changed` itself and call `invalidateAllForCandidate`
+> in the subscriber. (b) matches the existing pattern — the prewarm
+> scheduler already subscribes to the same event — and keeps AtlasState
+> from holding a reference to the registry.
+>
+> **Prerequisite.** This whole section assumes `setActiveCandidate(cand)` is
+> actually called when the user promotes a candidate. The migrated page1
+> path (`pages/discovery/page1/candidates.js setCandidate()` +
+> `loadCandidateList()`) now bridges into atlas-core's setter; before that
+> bridge landed, the event never fired and this invalidation would have
+> been a no-op for the only code path that matters.
+
 ~30 LOC including the warm-tier walk.
 
 ### What it does NOT do

@@ -16,6 +16,7 @@
 // Bodies extracted verbatim from the pre-split page1.js (eighth pass).
 
 import { withAlpha } from '../../../shared/page1_utils.js';
+import { getState } from '../../../../../core/atlas_api.js';
 
 import { _pageState, _setActiveState } from './_state.js';
 import { drawLinesPanel } from './lines_panel.js';
@@ -759,6 +760,14 @@ export function loadCandidateList(state) {
           // Deep clone via JSON round-trip so the saved-list entry stays
           // separate from the active candidate.
           state.candidate = candidateFromJSON(candidateToJSON(hit));
+          // Same atlas-core bridge as setCandidate(): on cold-start the
+          // page restores its private state from localStorage, but every
+          // other page reads atlasState.shared.activeCandidate. Without
+          // this call they'd see null until the user re-promotes.
+          try {
+            const sh = getState();
+            if (sh && typeof sh.setActiveCandidate === 'function') sh.setActiveCandidate(state.candidate);
+          } catch (_) {}
         }
       }
     } catch (_) { /* fail-soft */ }
@@ -869,6 +878,15 @@ export function setCandidate(state, cand) {
   _setActiveState(state);
   if (!cand) return;
   state.candidate = cand;
+  // Bridge into atlas-core so the registry's prewarm scheduler and every
+  // other page subscribed to shared.activeCandidate.changed see the
+  // selection. Without this call the choice is page1-private and the rest
+  // of the system only learns about it on the next page mount + reload.
+  // See atlas-core/docs/ARCHITECTURE.md and REGISTRY_GUIDE.md.
+  try {
+    const sh = getState();
+    if (sh && typeof sh.setActiveCandidate === 'function') sh.setActiveCandidate(cand);
+  } catch (_) {}
   // Persist the active candidate id so reloads can restore focus.
   // _persistActiveCandidate lives in events.js but the localStorage write
   // here is idempotent — duplicating it avoids a circular import.
