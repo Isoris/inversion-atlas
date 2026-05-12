@@ -378,8 +378,184 @@ export function buildBoundaryRecord(edge, side, source, opts) {
 }
 
 // =====================================================================
-// Candidate registry helpers
+// Edge detection — combined boundary peak finder
 // =====================================================================
+
+// Internal MAD that treats only NaN/null as missing — step arrays
+// computed inside computeBoundaryEdges are floating-point derivatives
+// where -1 is a legitimate value, not the source-layer NA sentinel.
+function _madFiniteOnly(arr) {
+  if (!arr) return 0;
+  const finite = [];
+  for (let i = 0; i < arr.length; i++) {
+    const v = arr[i];
+    if (v != null && Number.isFinite(v)) finite.push(v);
+  }
+  if (finite.length < 2) return 0;
+  finite.sort((a, b) => a - b);
+  const med = finite[(finite.length - 1) >> 1];
+  const abs = finite.map(v => Math.abs(v - med));
+  abs.sort((a, b) => a - b);
+  return abs[(abs.length - 1) >> 1];
+}
+
+function _normalizeFiniteOnly(arr, mad) {
+  const len = arr ? arr.length : 0;
+  const out = new Float64Array(len);
+  if (!mad || !Number.isFinite(mad) || mad === 0) return out;
+  for (let i = 0; i < len; i++) {
+    const v = arr[i];
+    out[i] = (v != null && Number.isFinite(v)) ? (v / mad) : 0;
+  }
+  return out;
+}
+
+
+/**
+ * Combine per-track score arrays into left/right edge candidates.
+ * Algorithm (legacy lines 18127-18255):
+ *
+ *   1. Renormalize weights over present tracks so they sum to 1.0.
+ *      Equal-weight fallback when the present tracks have no defined
+ *      weight.
+ *   2. Per track: rollingMedian smooth → forward step (b - a) →
+ *      polarity flip (BOUNDARY_TRACK_POLARITY) → MAD normalize.
+ *      Smoothing the score (not the step) preserves clean transitions
+ *      while suppressing single-window noise.
+ *   3. Sum positive steps into combined_left[i] and absolute negative
+ *      steps into combined_right[i], weighted by the per-track normW.
+ *   4. Argmax left half (with outer-pct exclusion) → left edge.
+ *      Argmax right half → right edge.
+ *   5. Build per-edge support[] by including tracks whose contribution
+ *      at the chosen window is ≥ inclusion_threshold × median nonzero.
+ *
+ * Returns { left, right, combined_left, combined_right } where each
+ * edge (when present) is shaped:
+ *   { window_idx, window_idx_local, score, support, by_track }
+ *
+ * Pure: doesn't touch document or state. All inputs explicit.
+ *
+ * @param {{tracks:Object<string,Float64Array>, len:number, win_lo:number}} trackScores
+ * @param {Object<string,number>?} weights      defaults to BOUNDARY_TRACK_WEIGHTS
+ * @param {{smooth_window?:number, support_inclusion?:number,
+ *         exclude_outer_pct?:number}?} opts
+ * @returns {{left:Object|null, right:Object|null,
+ *           combined_left:Float64Array, combined_right:Float64Array}}
+ */
+export function computeBoundaryEdges(trackScores, weights, opts) {
+  const o = opts || {};
+  const w = weights || BOUNDARY_TRACK_WEIGHTS;
+  const smoothW = o.smooth_window != null ? o.smooth_window : BOUNDARY_DEFAULTS.SMOOTH_WINDOW;
+  const inclTh  = o.support_inclusion != null ? o.support_inclusion : BOUNDARY_DEFAULTS.SUPPORT_INCLUSION;
+  const excPct  = o.exclude_outer_pct != null ? o.exclude_outer_pct : BOUNDARY_DEFAULTS.EXCLUDE_OUTER_PCT;
+
+  const emptyResult = () => ({
+    left: null, right: null,
+    combined_left:  new Float64Array(0),
+    combined_right: new Float64Array(0),
+  });
+
+  if (!trackScores || !trackScores.tracks) return emptyResult();
+  const presentTracks = Object.keys(trackScores.tracks);
+  const n = trackScores.len | 0;
+  if (presentTracks.length === 0 || n < 4) return emptyResult();
+
+  // Renormalize weights over present tracks
+  let weightSum = 0;
+  for (const t of presentTracks) weightSum += (w[t] || 0);
+  const normW = {};
+  if (weightSum > 0) {
+    for (const t of presentTracks) normW[t] = (w[t] || 0) / weightSum;
+  } else {
+    for (const t of presentTracks) normW[t] = 1 / presentTracks.length;
+  }
+
+  // Per-track: smooth → step → polarity flip → MAD-normalize.
+  // The MAD + normalize here use NaN-only (not -1 sentinel) checks
+  // because step values are floating-point derivatives where -1 is a
+  // legitimate negative value, not a missing-data marker.
+  const stepNorm = {};
+  for (const t of presentTracks) {
+    const arr = trackScores.tracks[t];
+    const smoothed = rollingMedian(arr, smoothW);
+    const polarity = (BOUNDARY_TRACK_POLARITY[t] != null)
+      ? BOUNDARY_TRACK_POLARITY[t] : 1;
+    const step = new Float64Array(n);
+    for (let i = 0; i < n - 1; i++) {
+      const a = smoothed[i], b = smoothed[i + 1];
+      step[i] = (Number.isFinite(a) && Number.isFinite(b))
+        ? polarity * (b - a) : 0;
+    }
+    step[n - 1] = 0;
+    const mad = _madFiniteOnly(step);
+    stepNorm[t] = _normalizeFiniteOnly(step, mad || 1);
+  }
+
+  // Combine per side (positive step → left, negative → right)
+  const combined_left  = new Float64Array(n);
+  const combined_right = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    let cl = 0, cr = 0;
+    for (const t of presentTracks) {
+      const s = stepNorm[t][i];
+      const ww = normW[t];
+      if (s > 0)      cl += ww * s;
+      else if (s < 0) cr += ww * (-s);
+    }
+    combined_left[i]  = cl;
+    combined_right[i] = cr;
+  }
+
+  // Argmax in left/right halves with outer-pct exclusion
+  const half  = Math.floor(n / 2);
+  const excLo = Math.floor(n * excPct);
+  const excHi = n - excLo;
+
+  let argL = -1, valL = -1;
+  for (let i = excLo; i < half; i++) {
+    if (combined_left[i] > valL) { valL = combined_left[i]; argL = i; }
+  }
+  let argR = -1, valR = -1;
+  for (let i = half; i < excHi; i++) {
+    if (combined_right[i] > valR) { valR = combined_right[i]; argR = i; }
+  }
+
+  const winLo = trackScores.win_lo | 0;
+  const emitEdge = (argIdx, val, side) => {
+    if (argIdx < 0) return null;
+    const contribs = {};
+    for (const t of presentTracks) {
+      const s = stepNorm[t][argIdx];
+      const signed = (side === 'left') ? s : -s;
+      contribs[t] = (signed > 0) ? normW[t] * signed : 0;
+    }
+    const nonZero = [];
+    for (const t of presentTracks) if (contribs[t] > 0) nonZero.push(contribs[t]);
+    if (nonZero.length === 0) return null;
+    nonZero.sort((a, b) => a - b);
+    const med = nonZero[(nonZero.length - 1) >> 1];
+    const thr = med * inclTh;
+    const support = [];
+    for (const t of presentTracks) {
+      if (contribs[t] >= thr) support.push(t);
+    }
+    support.sort();
+    return {
+      window_idx: winLo + argIdx,
+      window_idx_local: argIdx,
+      score: Math.min(1, val),
+      support,
+      by_track: contribs,
+    };
+  };
+
+  return {
+    left:  emitEdge(argL, valL, 'left'),
+    right: emitEdge(argR, valR, 'right'),
+    combined_left,
+    combined_right,
+  };
+}
 
 /**
  * Find a candidate by its registry id (checks both .id and .candidate_id).

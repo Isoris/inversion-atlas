@@ -331,6 +331,90 @@ check('stage null cand: defaults set',
       stagingNull.dirty === false);
 
 // -----------------------------------------------------------------------------
+group('computeBoundaryEdges');
+// Build a synthetic per-window score for a single track. A clean "inside-high"
+// pattern: zero for 5 windows, then steps up to 1.0 for 5 windows, then drops
+// back to zero. With +1 polarity, the rising edge is at index 4→5 and the
+// falling edge at index 9→10. Left edge should land near 4, right near 9.
+const n = 16;
+function _makeBoxScore(insideLo, insideHi, val) {
+  const a = new Float64Array(n);
+  for (let i = 0; i < n; i++) a[i] = (i >= insideLo && i <= insideHi) ? val : 0;
+  return a;
+}
+const ts1 = {
+  tracks: {
+    pca_drop: _makeBoxScore(5, 10, 1.0),  // +1 polarity (rises inside)
+  },
+  len: n,
+  win_lo: 100,
+};
+const edges1 = B.computeBoundaryEdges(ts1, B.BOUNDARY_TRACK_WEIGHTS);
+check('edges: left edge present',           !!edges1.left);
+check('edges: right edge present',          !!edges1.right);
+// The smoothed signal's argmax-step lives at the transition. With width=3
+// smoothing the rise sits at index 4 (between [4]→[5]).
+check('edges: left edge near index 4',      edges1.left.window_idx_local === 4);
+check('edges: right edge near index 10',    edges1.right.window_idx_local === 10);
+check('edges: window_idx adds win_lo',      edges1.left.window_idx === 104);
+check('edges: support includes pca_drop',   edges1.left.support.includes('pca_drop'));
+check('edges: by_track[pca_drop] > 0',      edges1.left.by_track.pca_drop > 0);
+check('edges: combined_left len = n',       edges1.combined_left.length === n);
+check('edges: combined_right len = n',      edges1.combined_right.length === n);
+check('edges: score ≤ 1',                   edges1.left.score <= 1);
+
+// Multi-track w/ polarity flip — theta_pi_step has polarity -1 (drops inside).
+// Build a synthetic "drops inside" track. After polarity flip, falling rise
+// becomes a positive step, so left/right detection still works.
+const ts2 = {
+  tracks: {
+    pca_drop:      _makeBoxScore(5, 10, 1.0),
+    theta_pi_step: (() => {
+      // Drops inside: high outside (1.0), low inside (0.0)
+      const a = new Float64Array(n);
+      for (let i = 0; i < n; i++) a[i] = (i >= 5 && i <= 10) ? 0 : 1.0;
+      return a;
+    })(),
+  },
+  len: n,
+  win_lo: 0,
+};
+const edges2 = B.computeBoundaryEdges(ts2, B.BOUNDARY_TRACK_WEIGHTS);
+check('multi-track edges: both present',    !!edges2.left && !!edges2.right);
+check('multi-track edges: left near 4',     edges2.left.window_idx_local === 4);
+check('multi-track edges: support includes both',
+      edges2.left.support.includes('pca_drop') &&
+      edges2.left.support.includes('theta_pi_step'));
+
+// Empty input
+check('edges: null trackScores → no edges', B.computeBoundaryEdges(null, B.BOUNDARY_TRACK_WEIGHTS).left === null);
+check('edges: empty tracks → no edges',
+      B.computeBoundaryEdges({ tracks: {}, len: 0, win_lo: 0 }, B.BOUNDARY_TRACK_WEIGHTS).left === null);
+
+// n < 4 short-circuits
+check('edges: n<4 → no edges',
+      B.computeBoundaryEdges(
+        { tracks: { pca_drop: new Float64Array([0, 1, 0]) }, len: 3, win_lo: 0 },
+        B.BOUNDARY_TRACK_WEIGHTS
+      ).left === null);
+
+// Equal-weight fallback when present tracks have no defined weights
+const tsCustom = {
+  tracks: {
+    custom_a: _makeBoxScore(5, 10, 1.0),
+    custom_b: _makeBoxScore(5, 10, 1.0),
+  },
+  len: n,
+  win_lo: 0,
+};
+const edgesCustom = B.computeBoundaryEdges(tsCustom, {}); // no weight for custom_*
+check('edges: equal-weight fallback finds edges',  !!edgesCustom.left);
+
+// Custom smooth window
+const edgesNoSmooth = B.computeBoundaryEdges(ts1, B.BOUNDARY_TRACK_WEIGHTS, { smooth_window: 1 });
+check('edges: smooth_window=1 still finds edges',  !!edgesNoSmooth.left);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');
