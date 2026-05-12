@@ -23,6 +23,7 @@ import { drawPCA } from './pca_panel.js';
 import { _ensureCsOverlayIndex, _paintCandidateBands } from './candidates.js';
 import { setCur } from './events.js';
 import { wireBandTraceTooltip } from './band_trace_tooltip.js';
+import { wireInheritancePillTooltip } from './inheritance_tooltip.js';
 
 // --- drawLinesPanel(state) — legacy lines 34894-35744 ---
 export function drawLinesPanel(state) {
@@ -1014,8 +1015,8 @@ export function buildLinesPanel(state) {
     // turn 2p: install inheritance-pill tooltip on PC1 canvas. Pills are
     // only ever drawn on the PC1 sub-panel (per turn 2c), so we skip the
     // other sources to keep the handler load minimal.
-    if (src === 'pc1' && typeof _wireInheritancePillTooltip === 'function') {
-      try { _wireInheritancePillTooltip(cv); } catch (_) {}
+    if (src === 'pc1') {
+      try { wireInheritancePillTooltip(cv, state); } catch (_) {}
     }
     // turn 162 — band-trace strip tooltip. Same gating as the inheritance
     // pill (PC1 only), since the strip itself is also PC1-only. Idempotent

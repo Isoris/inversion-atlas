@@ -7,6 +7,7 @@
 import {
   simColor, simColorPDF, zColorPDF,
   KARYO_PALETTE, karyoColor,
+  INH_GROUP_PALETTE, inhGroupColor,
 } from '../atlases/inversion/shared/color_helpers.js';
 
 let pass = 0, fail = 0;
@@ -62,6 +63,25 @@ check('karyoColor(null) = neutral grey',    karyoColor(null) === '#666');
 check('karyoColor(undefined) = neutral grey', karyoColor(undefined) === '#666');
 check('karyoColor(-1) = neutral grey',      karyoColor(-1) === '#666');
 check('karyoColor(-99) = neutral grey',     karyoColor(-99) === '#666');
+
+// =====================================================================
+group('INH_GROUP_PALETTE (10-entry frozen array)');
+check('10 entries',             INH_GROUP_PALETTE.length === 10);
+check('frozen',                 Object.isFrozen(INH_GROUP_PALETTE));
+check('all hex strings',
+      INH_GROUP_PALETTE.every(c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)));
+check('first entry = #4fa3ff',  INH_GROUP_PALETTE[0] === '#4fa3ff');
+
+// =====================================================================
+group('inhGroupColor');
+check('inhGroupColor(0) = palette[0]',      inhGroupColor(0) === INH_GROUP_PALETTE[0]);
+check('inhGroupColor(9) = palette[9]',      inhGroupColor(9) === INH_GROUP_PALETTE[9]);
+check('inhGroupColor(10) wraps to palette[0]',
+      inhGroupColor(10) === INH_GROUP_PALETTE[0]);
+check('inhGroupColor(null) = ink-dim grey', inhGroupColor(null) === '#7a8398');
+check('inhGroupColor(undefined) = ink-dim grey',
+      inhGroupColor(undefined) === '#7a8398');
+check('inhGroupColor(-1) = ink-dim grey',   inhGroupColor(-1) === '#7a8398');
 
 // =====================================================================
 console.log('\n=================');

@@ -42,6 +42,7 @@ UNITS=(
   test_shared_inheritance_groups.js
   test_page1_inheritance.js
   test_page1_band_trace_tooltip.js
+  test_page1_inheritance_tooltip.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js

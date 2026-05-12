@@ -115,3 +115,21 @@ export function karyoColor(bandIdx) {
   if (bandIdx == null || bandIdx < 0) return '#666';
   return KARYO_PALETTE[bandIdx % KARYO_PALETTE.length];
 }
+
+// =====================================================================
+// Inheritance-group palette (legacy lines 46716-46719)
+// =====================================================================
+// Ten-entry palette used by the I·g pill tooltips, tracked-list panel
+// overlays, and any other consumer that visualises group_id_per_band.
+// Wraps for K > 10. groupId == null or < 0 returns the same neutral
+// grey the rest of the dim-text UI uses.
+
+export const INH_GROUP_PALETTE = Object.freeze([
+  '#4fa3ff', '#f5a524', '#3cc08a', '#e0555c', '#b07cf7',
+  '#5fc8d8', '#d97f5c', '#88c45e', '#ce5fb5', '#7c8fff',
+]);
+
+export function inhGroupColor(groupId) {
+  if (groupId == null || groupId < 0) return '#7a8398';
+  return INH_GROUP_PALETTE[groupId % INH_GROUP_PALETTE.length];
+}
