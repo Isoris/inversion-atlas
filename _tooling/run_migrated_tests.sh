@@ -94,6 +94,7 @@ UNITS=(
   test_shared_uv_rotation.js
   test_shared_k_bands.js
   test_shared_lasso_linkage.js
+  test_shared_cross_candidate.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
