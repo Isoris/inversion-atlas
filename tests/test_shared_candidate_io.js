@@ -182,6 +182,68 @@ check('round-trip: boundary_left preserved',
       restoredB.boundary_left.zone_start_bp === 100);
 
 // -----------------------------------------------------------------------------
+group('recomputePerTrackAssignments');
+// Two-track candidate: bands 0..1 in track 0, bands 2..3 in track 1.
+const twoTrack = {
+  K: 4,
+  regime_counts: [10, 20, 30, 40],
+  fish_calls: [
+    { fish: 'a', regime: 0 }, { fish: 'b', regime: 1 },
+    { fish: 'c', regime: 2 }, { fish: 'd', regime: 3 },
+    { fish: 'e', regime: -1 },  // ambiguous → dropped from BOTH tracks
+  ],
+  aggregate_concordance: 0.85,
+  band_continuity_pct: 0.90,
+  band_continuity_verdict: 'GOOD',
+  tracks: [
+    { track_idx: 0, active_bands: [0, 1], regime_counts: null, fish_calls: null },
+    { track_idx: 1, active_bands: [2, 3], regime_counts: null, fish_calls: null },
+  ],
+};
+IO.recomputePerTrackAssignments(twoTrack);
+check('track 0: regime_counts derived',
+      twoTrack.tracks[0].regime_counts.join(',') === '10,20,0,0');
+check('track 1: regime_counts derived',
+      twoTrack.tracks[1].regime_counts.join(',') === '0,0,30,40');
+check('track 0: fish_calls filtered to bands 0,1',
+      twoTrack.tracks[0].fish_calls.length === 2
+        && twoTrack.tracks[0].fish_calls.every(f => f.regime === 0 || f.regime === 1));
+check('track 1: fish_calls filtered to bands 2,3',
+      twoTrack.tracks[1].fish_calls.length === 2);
+check('ambiguous fish (regime=-1) dropped from both tracks',
+      !twoTrack.tracks[0].fish_calls.some(f => f.fish === 'e')
+        && !twoTrack.tracks[1].fish_calls.some(f => f.fish === 'e'));
+check('aggregate_concordance copied to track',
+      twoTrack.tracks[0].aggregate_concordance === 0.85);
+check('band_continuity_verdict copied',
+      twoTrack.tracks[1].band_continuity_verdict === 'GOOD');
+
+// Single-track candidate: no-op
+const singleTrack = { K: 3, tracks: [{ active_bands: [0, 1, 2], regime_counts: [10, 20, 30] }] };
+const before = JSON.stringify(singleTrack.tracks[0].regime_counts);
+IO.recomputePerTrackAssignments(singleTrack);
+check('single-track: tracks unchanged',
+      JSON.stringify(singleTrack.tracks[0].regime_counts) === before);
+
+// One track has empty active_bands → not "true two-track" → no-op
+const fakeTwoTrack = {
+  K: 4,
+  regime_counts: [1, 2, 3, 4],
+  tracks: [
+    { active_bands: [0, 1], regime_counts: [99] },  // unchanged
+    { active_bands: [],     regime_counts: [88] },  // empty bands
+  ],
+};
+IO.recomputePerTrackAssignments(fakeTwoTrack);
+check('fake two-track (empty bands): no-op',
+      fakeTwoTrack.tracks[0].regime_counts[0] === 99);
+
+// Null candidate
+let safeNull = true;
+try { IO.recomputePerTrackAssignments(null); } catch (_) { safeNull = false; }
+check('null cand: no-op no-throw',  safeNull);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

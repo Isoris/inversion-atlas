@@ -115,6 +115,55 @@ export function ensureTracks(cand) {
 }
 
 // =====================================================================
+// Per-track assignment recompute
+// =====================================================================
+
+/**
+ * Re-derive per-track regime_counts / fish_calls from each track's
+ * active_bands. Only fires on true two-track candidates (both tracks
+ * have ≥1 active_band). Aggregate-concordance + band-continuity
+ * fields are shared (copied verbatim from top-level) because the
+ * L2 partition isn't track-restricted.
+ *
+ * Mutates `cand` in place. Pure return: the same candidate.
+ *
+ * @param {Object} cand
+ * @returns {Object}
+ */
+export function recomputePerTrackAssignments(cand) {
+  if (!cand || !Array.isArray(cand.tracks) || cand.tracks.length !== 2) {
+    return cand;
+  }
+  const isTwoTrack = cand.tracks.every(t =>
+    t && Array.isArray(t.active_bands) && t.active_bands.length > 0);
+  if (!isTwoTrack) return cand;
+
+  for (let ti = 0; ti < cand.tracks.length; ti++) {
+    const t = cand.tracks[ti];
+    const bandSet = new Set(t.active_bands);
+
+    if (Array.isArray(cand.regime_counts)) {
+      t.regime_counts = cand.regime_counts.map((n, k) =>
+        bandSet.has(k) ? n : 0);
+    }
+    if (Array.isArray(cand.fish_calls)) {
+      t.fish_calls = cand.fish_calls.filter(f =>
+        f && Number.isInteger(f.regime) && bandSet.has(f.regime));
+    }
+    if (Number.isFinite(cand.aggregate_concordance)) {
+      t.aggregate_concordance = cand.aggregate_concordance;
+    }
+    if (Number.isFinite(cand.band_continuity_pct)) {
+      t.band_continuity_pct = cand.band_continuity_pct;
+    }
+    if (cand.band_continuity_verdict != null) {
+      t.band_continuity_verdict = cand.band_continuity_verdict;
+    }
+  }
+  return cand;
+}
+
+// =====================================================================
 // candidateToJSON
 // =====================================================================
 
