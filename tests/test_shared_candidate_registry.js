@@ -237,6 +237,78 @@ check('no LS shim: restore returns null',
       CR.restoreActiveCandidateId({ localStorage: null }) === null);
 
 // -----------------------------------------------------------------------------
+group('removeCandidateFully');
+const sR = {
+  data: { chrom: 'LG28' },
+  candidateList: [{ id: 'cA' }, { id: 'cB' }, { id: 'cC' }],
+  candidate: { id: 'cB' },
+};
+const lsR = _makeLS();
+
+// Remove the active candidate by id
+let refreshCalls = 0;
+const r1 = CR.removeCandidateFully(sR, 'cB', {
+  localStorage: lsR,
+  onUiRefresh: () => { refreshCalls++; },
+});
+check('returns true',                  r1 === true);
+check('candidateList size = 2',        sR.candidateList.length === 2);
+check('state.candidate cleared',       sR.candidate === null);
+check('onUiRefresh fired',             refreshCalls === 1);
+
+// Active id cleared from LS
+lsR.setItem('pca_scrubber_v3.activeCandidateId', 'cB');
+sR.candidateList = [{ id: 'cA' }, { id: 'cB' }];
+sR.candidate = { id: 'cB' };
+CR.removeCandidateFully(sR, 'cB', { localStorage: lsR });
+check('LS active-candidate id cleared',
+      lsR.getItem('pca_scrubber_v3.activeCandidateId') === null);
+
+// Remove a non-active candidate — state.candidate untouched
+const sR2 = {
+  data: { chrom: 'LG14' },
+  candidateList: [{ id: 'cA' }, { id: 'cB' }],
+  candidate: { id: 'cA' },
+};
+CR.removeCandidateFully(sR2, 'cB', { localStorage: _makeLS() });
+check('non-active remove: state.candidate untouched',
+      sR2.candidate && sR2.candidate.id === 'cA');
+
+// Default id = currently-focused candidate
+const sR3 = {
+  data: { chrom: 'LG1' },
+  candidateList: [{ id: 'cX' }, { id: 'cY' }],
+  candidate: { id: 'cY' },
+};
+const r3 = CR.removeCandidateFully(sR3, null, { localStorage: _makeLS() });
+check('null id defaults to active: removed cY',
+      r3 === true && sR3.candidateList.length === 1 && sR3.candidateList[0].id === 'cX');
+check('state.candidate cleared after default-id remove',
+      sR3.candidate === null);
+
+// No active + no id → false (no-op)
+const sR4 = { candidateList: [], candidate: null };
+check('no id + no active → false',
+      CR.removeCandidateFully(sR4, null) === false);
+
+// Null state → false
+check('null state → false',           CR.removeCandidateFully(null, 'x') === false);
+
+// Throwing onUiRefresh: silent
+let safeUiRefresh = true;
+try {
+  CR.removeCandidateFully({
+    data: { chrom: 'LG1' },
+    candidateList: [{ id: 'cZ' }],
+    candidate: { id: 'cZ' },
+  }, 'cZ', {
+    localStorage: _makeLS(),
+    onUiRefresh: () => { throw new Error('boom'); },
+  });
+} catch (_) { safeUiRefresh = false; }
+check('throwing onUiRefresh: silent',  safeUiRefresh);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

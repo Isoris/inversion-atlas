@@ -232,6 +232,53 @@ export function restoreActiveCandidateId(opts) {
   }
 }
 
+// =====================================================================
+// Canonical "fully remove" — drop from list + clear active focus
+// =====================================================================
+
+/**
+ * Canonical "fully remove" entry point (legacy lines 57445-57467
+ * removeCandidateFully). Used by every UI surface that drops a
+ * candidate (page2 ✕ clear, page4 karyotype red ✕, ...).
+ *
+ * Behaviour:
+ *   1. Drop the candidate from state.candidateList (no-op when absent)
+ *   2. If it was the currently-focused candidate, null state.candidate
+ *      AND clear the persisted active-candidate id (so reloads don't
+ *      try to restore something that no longer exists)
+ *   3. Fire opts.onUiRefresh / opts.onPersist callbacks so the
+ *      caller's atlas-router rerenders pages 1 / 2 / karyotype
+ *
+ * `id` may be null/undefined → falls back to "remove the currently
+ * focused candidate" (state.candidate.id).
+ *
+ * Returns true when a removal happened, false when no id resolved.
+ *
+ * @param {Object} state
+ * @param {string?} id
+ * @param {{onPersist?:Function, onChange?:Function, onUiRefresh?:Function,
+ *          localStorage?:Storage}} opts
+ * @returns {boolean}
+ */
+export function removeCandidateFully(state, id, opts) {
+  if (!state) return false;
+  const cid = id || (state.candidate && state.candidate.id);
+  if (!cid) return false;
+
+  const o = opts || {};
+  removeCandidateFromList(state, cid, opts);
+
+  if (state.candidate && state.candidate.id === cid) {
+    state.candidate = null;
+    persistActiveCandidateId(null, opts);
+  }
+
+  if (typeof o.onUiRefresh === 'function') {
+    try { o.onUiRefresh(state); } catch (_) { /* swallow */ }
+  }
+  return true;
+}
+
 /**
  * Clear all candidates for a chromosome — both in memory and in
  * localStorage. Used by full-reset paths.
