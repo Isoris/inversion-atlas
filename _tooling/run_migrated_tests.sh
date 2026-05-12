@@ -85,6 +85,8 @@ UNITS=(
   test_shared_ghsl_panel.js
   test_shared_wilcoxon.js
   test_shared_stats_helpers.js
+  test_shared_window_coords.js
+  test_shared_boundary_evidence.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
