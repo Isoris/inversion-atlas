@@ -22,6 +22,7 @@ import { _drawBandTraceStrip, _drawDiamondOverlay, _drawInheritanceLabelsStrip, 
 import { drawPCA } from './pca_panel.js';
 import { _ensureCsOverlayIndex, _paintCandidateBands } from './candidates.js';
 import { setCur } from './events.js';
+import { wireBandTraceTooltip } from './band_trace_tooltip.js';
 
 // --- drawLinesPanel(state) — legacy lines 34894-35744 ---
 export function drawLinesPanel(state) {
@@ -1021,8 +1022,8 @@ export function buildLinesPanel(state) {
     // via the canvas dataset marker, so re-running drawLinesPanel after
     // each chrom switch (which destroys + recreates these canvases) just
     // re-attaches handlers to fresh nodes.
-    if (src === 'pc1' && typeof _wireBandTraceTooltip === 'function') {
-      try { _wireBandTraceTooltip(cv); } catch (_) {}
+    if (src === 'pc1') {
+      try { wireBandTraceTooltip(cv, state); } catch (_) {}
     }
     const lbl = document.createElement('div');
     lbl.className = 'lines-subpanel-label';

@@ -42,6 +42,26 @@ export const BTRACE_MIN_VALID_FISH = 3;
 /** Minimum length of a co_seg/partial run before it counts as a regime run. */
 export const BTRACE_MIN_RUN_LENGTH = 2;
 
+/**
+ * Regime palette (legacy lines 39703-39709). UI hint colours for the
+ * five regime classes the trace can report. Caller-replaceable: any
+ * consumer can swap in a theme-specific palette.
+ */
+export const BTRACE_REGIME_COLOR = Object.freeze({
+  co_seg:   '#7ad394',    // green — concentrated, co-segregating
+  partial:  '#f5a524',    // amber — clear-but-not-clean
+  fanned:   '#9aa3ad',    // grey  — spread, no signal
+  sparse:   '#5a6068',    // dark grey — too few valid fish
+  no_valid: '#3a3e44',    // very dark — no data
+});
+
+/**
+ * Chain-break tick colour (legacy line 39713). Distinct from any
+ * regime entry so the user reads it as "structural divider" rather
+ * than "another regime."
+ */
+export const BTRACE_CHAIN_BREAK_COLOR = '#e85a5a';
+
 // =====================================================================
 // Helpers
 // =====================================================================

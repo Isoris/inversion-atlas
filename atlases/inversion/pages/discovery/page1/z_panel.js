@@ -20,6 +20,7 @@ import { _lineageColor, _pageState, _setActiveState } from './_state.js';
 import { currentMbRange, getL2Cluster } from './_data.js';
 import { _assignCandidateLanes, _drawWRow, _drawWinNavLane, _ensureCsOverlayIndex, _wRowBand, _winNavBand, drawCandidateBar } from './candidates.js';
 import { bandTraceGetOrCompute } from './band_trace_state.js';
+import { BTRACE_REGIME_COLOR } from '../../../shared/band_trace.js';
 import {
   gatherActiveCandidatesForInheritance,
   inheritanceCacheKey,
@@ -331,7 +332,7 @@ export function _drawLineageStrip(ctx, pad, plotW, plotH, mbMin, mbMax) {
     }
 
     // Find the dominant lineage among the fish in this L2's largest band.
-    const cl = (typeof getL2Cluster === 'function') ? getL2Cluster(l2idx) : null;
+    const cl = getL2Cluster(l2idx);
     if (!cl || !cl.fixedKLabels) continue;
     const labels = cl.fixedKLabels;
     const K = cl.K || (_state.k || 3);
@@ -734,7 +735,7 @@ export function _drawBandTraceStrip(ctx, pad, plotW, plotH, mbMin, mbMax) {
     // Top stripe: regime color. Even when no_valid, paint the dark
     // sentinel so the user can distinguish "computed but empty" from
     // "outside view range."
-    const regimeC = _BTRACE_REGIME_COLOR[e.regime] || _BTRACE_REGIME_COLOR.no_valid;
+    const regimeC = BTRACE_REGIME_COLOR[e.regime] || BTRACE_REGIME_COLOR.no_valid;
     ctx.fillStyle = regimeC;
     ctx.fillRect(xLo, stripY, w, borderH);
 
