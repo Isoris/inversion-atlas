@@ -7,6 +7,7 @@
 
 import {
   restoreFromIdb,
+  replayEnrichmentsFromIdb,
   cachedChromNames,
 } from '../atlases/inversion/pages/discovery/page1/idb_restore.js';
 import {
@@ -280,6 +281,138 @@ group('restore: enrichments only, no chrom → returns metadata anyway');
         && result.active === null);
 
   uninstallDocument();
+  uninstallIndexedDB();
+}
+
+// =====================================================================
+group('replayEnrichmentsFromIdb — headless / empty paths');
+{
+  uninstallIndexedDB();
+  const n = await replayEnrichmentsFromIdb({ data: { chrom: 'LG28' } });
+  check('no indexedDB → 0', n === 0);
+}
+{
+  installIndexedDB();
+  const n = await replayEnrichmentsFromIdb(null);
+  check('null state → 0', n === 0);
+  const n2 = await replayEnrichmentsFromIdb({});
+  check('state without data → 0', n2 === 0);
+  const n3 = await replayEnrichmentsFromIdb({ data: {} });
+  check('state without chrom → 0', n3 === 0);
+  uninstallIndexedDB();
+}
+{
+  installIndexedDB();
+  const n = await replayEnrichmentsFromIdb({ data: { chrom: 'LG28' } });
+  check('empty enrichments store → 0', n === 0);
+  uninstallIndexedDB();
+}
+
+// =====================================================================
+group('replayEnrichmentsFromIdb — chrom filtering');
+{
+  installIndexedDB();
+  // Three enrichments: two for LG28, one for LG07
+  await idbPut(IDB_STORE_ENRICH, {
+    key: 'sv.json', name: 'sv.json', savedAt: 1,
+    data: {
+      schema_version: 2, chrom: 'LG28',
+      _layers_present: ['sv_evidence'],
+      sv_evidence: { confirmed: ['s1'] },
+    },
+  });
+  await idbPut(IDB_STORE_ENRICH, {
+    key: 'cls.json', name: 'cls.json', savedAt: 2,
+    data: {
+      schema_version: 2, chrom: 'LG28',
+      _layers_present: ['classification'],
+      classification: { result: 'PASS' },
+    },
+  });
+  await idbPut(IDB_STORE_ENRICH, {
+    key: 'other.json', name: 'other.json', savedAt: 3,
+    data: {
+      schema_version: 2, chrom: 'LG07',
+      _layers_present: ['gene_cargo'],
+      gene_cargo: { genes: ['X'] },
+    },
+  });
+
+  const state = {
+    data: {
+      schema_version: 2, chrom: 'LG28',
+      _layers_present: ['windows', 'samples'],
+      windows: [{}], n_windows: 1, samples: [{}],
+    },
+    layersPresent: new Set(['windows', 'samples']),
+  };
+  const n = await replayEnrichmentsFromIdb(state);
+  check('LG28 state: 2 enrichments merged',  n === 2);
+  check('sv_evidence merged onto state.data',
+        state.data.sv_evidence && state.data.sv_evidence.confirmed[0] === 's1');
+  check('classification merged onto state.data',
+        state.data.classification && state.data.classification.result === 'PASS');
+  check('LG07-only enrichment NOT merged',
+        !state.data.gene_cargo);
+  check('layersPresent grew by 2',
+        state.layersPresent.has('sv_evidence')
+        && state.layersPresent.has('classification')
+        && !state.layersPresent.has('gene_cargo'));
+
+  uninstallIndexedDB();
+}
+
+// =====================================================================
+group('replayEnrichmentsFromIdb — already-present layer is not re-counted');
+{
+  installIndexedDB();
+  await idbPut(IDB_STORE_ENRICH, {
+    key: 'sv.json', name: 'sv.json', savedAt: 1,
+    data: {
+      schema_version: 2, chrom: 'LG28',
+      _layers_present: ['sv_evidence'],
+      sv_evidence: { confirmed: ['stale'] },
+    },
+  });
+  const state = {
+    data: {
+      chrom: 'LG28', schema_version: 2,
+      _layers_present: ['windows', 'samples', 'sv_evidence'],
+      windows: [{}], n_windows: 1, samples: [{}],
+      sv_evidence: { confirmed: ['original'] },
+    },
+    layersPresent: new Set(['windows', 'samples', 'sv_evidence']),
+  };
+  const n = await replayEnrichmentsFromIdb(state);
+  check('already-present layer: 0 merges counted', n === 0);
+  check('original payload preserved',
+        state.data.sv_evidence.confirmed[0] === 'original');
+  uninstallIndexedDB();
+}
+
+// =====================================================================
+group('replayEnrichmentsFromIdb — chrom-less enrichment is accepted');
+{
+  installIndexedDB();
+  // No chrom field on the enrichment → mergeEnrichmentLayers accepts it.
+  await idbPut(IDB_STORE_ENRICH, {
+    key: 'anycap.json', name: 'anycap.json', savedAt: 1,
+    data: {
+      schema_version: 2,
+      _layers_present: ['ghsl_panel'],
+      ghsl_panel: { samples: ['s1'], div_roll: {} },
+    },
+  });
+  const state = {
+    data: {
+      chrom: 'LG28', schema_version: 2,
+      _layers_present: ['windows', 'samples'],
+      windows: [{}], n_windows: 1, samples: [{}],
+    },
+    layersPresent: new Set(['windows', 'samples']),
+  };
+  const n = await replayEnrichmentsFromIdb(state);
+  check('chrom-less enrichment merged', n === 1 && state.data.ghsl_panel);
   uninstallIndexedDB();
 }
 

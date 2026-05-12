@@ -112,6 +112,52 @@ export function restoreFromIdb(state, opts) {
   });
 }
 
+/**
+ * Replay cached enrichments onto the active chromosome only. Used by
+ * page1.mount() after applyData() has already loaded the chromosome
+ * from the shell's registry — we just need to merge any enrichments
+ * the user dropped in a prior session.
+ *
+ * Each enrichment is filtered against state.data.chrom (the merge
+ * function rejects chrom-mismatch anyway, but pre-filtering avoids
+ * unnecessary work). Returns the number of enrichments that actually
+ * merged. Headless-safe / fail-soft.
+ *
+ * @param {Object} state  page1 _pageState with state.data already loaded
+ * @returns {Promise<number>}  count of enrichments successfully merged
+ */
+export function replayEnrichmentsFromIdb(state) {
+  if (typeof indexedDB === 'undefined') return Promise.resolve(0);
+  if (!state || !state.data || !state.data.chrom) return Promise.resolve(0);
+  const chrom = state.data.chrom;
+  return idbGetAll(IDB_STORE_ENRICH).then(enrichments => {
+    if (!Array.isArray(enrichments) || enrichments.length === 0) return 0;
+    let merged = 0;
+    for (const en of enrichments) {
+      if (!en || !en.data) continue;
+      // Pre-filter: only attempt enrichments whose chrom field matches
+      // (or is absent — those are accepted by the merge function).
+      if (en.data.chrom && en.data.chrom !== chrom) continue;
+      try {
+        const result = mergeEnrichmentLayers(state, en.data);
+        if (result.added && result.added.length > 0) merged++;
+      } catch (e) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn('[idb] replay enrichment failed:',
+                       en.name, e && e.message ? e.message : e);
+        }
+      }
+    }
+    return merged;
+  }).catch(err => {
+    if (typeof console !== 'undefined' && console.warn) {
+      console.warn('[idb] enrichment replay failed:',
+                   err && err.message ? err.message : err);
+    }
+    return 0;
+  });
+}
+
 // Re-export a few commonly-used accessors so callers don't need to
 // import from two modules.
 export { cachedChromNames, refreshChromSelect } from './chrom_cache.js';

@@ -45,6 +45,7 @@ import {
   autoPromoteFromSweep,
 } from './page1/l2_sweep.js';
 import { idbPersistChrom } from './page1/idb.js';
+import { replayEnrichmentsFromIdb } from './page1/idb_restore.js';
 import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayers, listLayers, loadViewControls, populateSimScales, reconcileViewControlsForData } from './page1/_data.js';
 import { drawSim, drawSimMini } from './page1/sim_panel.js';
 import { drawZ } from './page1/z_panel.js';
@@ -358,6 +359,12 @@ export async function mount(root, atlasState, registry) {
   // Apply data through the legacy entry point. This populates state.data,
   // state.tracks, state.windows, etc. — everything the draw functions need.
   applyData(legacyState, data);
+
+  // Replay any enrichments the user dropped in a prior session. Async,
+  // fire-and-forget; matching enrichments merge onto state.data and
+  // mark new layersPresent before the user touches anything. Failures
+  // are logged inside the helper; we never block mount on this.
+  replayEnrichmentsFromIdb(legacyState);
 
   // Initial render. Each call may throw if it hits a TODO_MISSING; we
   // catch and log so one broken panel doesn't hide the others.
