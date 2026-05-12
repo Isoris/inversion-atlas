@@ -365,6 +365,87 @@ check('rewire: filter input still single handler',
       (filt._listeners.input || []).length === 1);
 
 // -----------------------------------------------------------------------------
+group('promoteRowsToCandidates');
+const promoteRows = [
+  { id: 'L2_a', chr: 'LG28', start_bp: 0, end_bp: 100_000, K: 3, verdict: 'TWO_INVERSIONS' },
+  { id: 'L2_b', chr: 'LG14', start_bp: 5_000_000, end_bp: 5_500_000, K: 6, verdict: '' },
+  { id: 'L2_c', chr: 'LG1',  start_bp: 0, end_bp: 100, K: 3, verdict: 'NA' },
+];
+const existingList = [{ id: 'cand_existing', chrom: 'LGZ', start_bp: 0, end_bp: 100 }];
+const promRes = CAT.promoteRowsToCandidates(promoteRows, existingList);
+check('promote: 3 new candidates',          promRes.promoted.length === 3);
+check('promote: list grows from 1 to 4',     promRes.candidateList.length === 4);
+check('promote: original list not mutated',  existingList.length === 1);
+check('promote: each promoted has id',
+      promRes.promoted.every(c => typeof c.id === 'string' && c.id.length > 0));
+check('promote: provisional + not confirmed',
+      promRes.promoted.every(c => c.provisional === true && c.confirmed === false));
+check('promote: promoted_from = catalogue',
+      promRes.promoted.every(c => c.promoted_from === 'catalogue'));
+check('promote: chrom propagated',           promRes.promoted[0].chrom === 'LG28');
+check('promote: bp ranges preserved',
+      promRes.promoted[0].start_bp === 0 && promRes.promoted[0].end_bp === 100_000);
+check('promote: locked_labels init []',      Array.isArray(promRes.promoted[0].locked_labels));
+
+// Duplicate skip
+const promRes2 = CAT.promoteRowsToCandidates(promoteRows, promRes.candidateList);
+check('promote: dupe ids skipped',           promRes2.promoted.length === 0);
+check('promote: list size unchanged',        promRes2.candidateList.length === 4);
+
+// Empty / null inputs
+check('promote: null rows → empty promoted', CAT.promoteRowsToCandidates(null, []).promoted.length === 0);
+check('promote: null list defaults to []',   CAT.promoteRowsToCandidates([{ id: 'X' }]).candidateList.length === 1);
+
+// -----------------------------------------------------------------------------
+group('promoteSelectedToCandidates');
+const promState = {
+  catalogueRows: [
+    { id: 'L2_a', chr: 'LG28', start_bp: 0, end_bp: 100_000, K: 3 },
+    { id: 'L2_b', chr: 'LG14', start_bp: 0, end_bp: 200_000, K: 6 },
+  ],
+  catSelection: new Set(['L2_a']),
+  candidateList: [],
+};
+const promSelRes = CAT.promoteSelectedToCandidates(promState);
+check('promoteSel: only selected row promoted',     promSelRes.promoted.length === 1);
+check('promoteSel: state.candidateList mutated',    promState.candidateList.length === 1);
+check('promoteSel: state.candidate set to active',  promState.candidate.id === 'L2_a');
+check('promoteSel: returned active matches',        promSelRes.active.id === 'L2_a');
+
+// No selection
+const promEmpty = CAT.promoteSelectedToCandidates({ catalogueRows: promoteRows, catSelection: new Set() });
+check('promoteSel: empty selection → 0 promoted',   promEmpty.promoted.length === 0);
+check('promoteSel: active null',                    promEmpty.active === null);
+
+// -----------------------------------------------------------------------------
+group('wireCatalogueToolbar: view-as-candidate button');
+const sP = {
+  catalogueRows: [
+    { id: 'L2_a', chr: 'LG28', start_bp: 0, end_bp: 100_000, K: 3 },
+  ],
+  catSelection: new Set(['L2_a']),
+  candidateList: [],
+};
+let onPromoteResult = null;
+CAT.wireCatalogueToolbar(sP, {
+  onPromote: (_, r) => { onPromoteResult = r; },
+});
+const viewBtn = _ensure('catViewAsCandidate');
+viewBtn.fire('click', {});
+check('view-as-cand: state.candidateList grown',     sP.candidateList.length === 1);
+check('view-as-cand: state.candidate activated',     sP.candidate && sP.candidate.id === 'L2_a');
+check('view-as-cand: onPromote fired with result',   onPromoteResult && onPromoteResult.promoted.length === 1);
+
+// Click again → already promoted, nothing happens
+const beforeLen = sP.candidateList.length;
+onPromoteResult = null;
+viewBtn.fire('click', {});
+check('view-as-cand: idempotent (no dupes)',         sP.candidateList.length === beforeLen);
+check('view-as-cand: onPromote NOT fired when empty', onPromoteResult === null);
+
+CAT.teardownCatalogueToolbar();
+
+// -----------------------------------------------------------------------------
 group('teardownCatalogueToolbar');
 CAT.teardownCatalogueToolbar();
 check('teardown: filter handler removed',

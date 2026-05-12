@@ -69,6 +69,8 @@ export {
   exportCatalogueTSV,
   exportCatalogueMarkdown,
   exportCatalogueJSON,
+  promoteRowsToCandidates,
+  promoteSelectedToCandidates,
   wireCatalogueToolbar,
   teardownCatalogueToolbar,
 } from './page3/catalogue.js';

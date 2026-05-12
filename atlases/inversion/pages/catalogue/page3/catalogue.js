@@ -409,6 +409,89 @@ export function exportCatalogueJSON(rows, disp, meta) {
 }
 
 // =====================================================================
+// Promote-to-candidate
+// =====================================================================
+
+function _candidateIdFromRow(row) {
+  return row && (row.id || row.candidate_id || null);
+}
+
+/**
+ * Promote a set of catalogue rows to provisional candidates. Pure
+ * helpers: takes the row objects + an existing candidateList (Array)
+ * and returns:
+ *   { promoted: Array<Object>, candidateList: Array<Object> }
+ *
+ * - Rows whose id already appears in candidateList are skipped.
+ * - Each promoted entry carries `provisional: true`, `confirmed: false`,
+ *   `promoted_from: 'catalogue'`, and copies chr/start_bp/end_bp/K
+ *   from the row. The returned candidateList is a NEW array (caller
+ *   should assign back); existing entries are preserved.
+ *
+ * @param {Array<Object>} rows           catalogue rows (after build)
+ * @param {Array<Object>?} candidateList existing list (defaults [])
+ * @returns {{promoted:Array<Object>, candidateList:Array<Object>}}
+ */
+export function promoteRowsToCandidates(rows, candidateList) {
+  const list = Array.isArray(candidateList) ? candidateList.slice() : [];
+  const haveIds = new Set();
+  for (const c of list) {
+    if (c && typeof c.id === 'string') haveIds.add(c.id);
+  }
+  const promoted = [];
+  if (!Array.isArray(rows)) return { promoted, candidateList: list };
+  for (const r of rows) {
+    if (!r || typeof r !== 'object') continue;
+    const id = _candidateIdFromRow(r);
+    if (!id || haveIds.has(id)) continue;
+    const cand = {
+      id,
+      chrom:       typeof r.chr === 'string' ? r.chr : (r.chrom || ''),
+      start_bp:    Number.isFinite(r.start_bp) ? r.start_bp : null,
+      end_bp:      Number.isFinite(r.end_bp)   ? r.end_bp   : null,
+      K:           Number.isFinite(r.K) ? r.K : null,
+      verdict:     typeof r.verdict === 'string' ? r.verdict : '',
+      provisional: true,
+      confirmed:   false,
+      promoted_from: 'catalogue',
+      promoted_at:   new Date().toISOString(),
+      locked_labels: [],
+    };
+    promoted.push(cand);
+    haveIds.add(id);
+    list.push(cand);
+  }
+  return { promoted, candidateList: list };
+}
+
+/**
+ * State-aware wrapper around promoteRowsToCandidates. Reads the
+ * currently-selected ids from state.catSelection, finds the matching
+ * rows, promotes them onto state.candidateList, and (when promoted ≥ 1)
+ * sets state.candidate to the first promoted candidate.
+ *
+ * Returns the same shape as promoteRowsToCandidates plus the resolved
+ * candidate that was activated (may be null when nothing promoted).
+ *
+ * @param {Object} state
+ * @returns {{promoted:Array<Object>, candidateList:Array<Object>, active:Object|null}}
+ */
+export function promoteSelectedToCandidates(state) {
+  const all = buildCatalogueRows(state);
+  const sel = (state && state.catSelection instanceof Set) ? state.catSelection : new Set();
+  const rows = all.filter(r => sel.has(r.id));
+  const existing = (state && Array.isArray(state.candidateList)) ? state.candidateList : [];
+  const out = promoteRowsToCandidates(rows, existing);
+  if (state) {
+    state.candidateList = out.candidateList;
+    if (out.promoted.length > 0) {
+      state.candidate = out.promoted[0];
+    }
+  }
+  return Object.assign({}, out, { active: out.promoted[0] || null });
+}
+
+// =====================================================================
 // DOM render orchestrator
 // =====================================================================
 
@@ -490,6 +573,7 @@ let _dispDetailedHandler  = null;
 let _exportTSVHandler     = null;
 let _exportMDHandler      = null;
 let _exportJSONHandler    = null;
+let _viewAsCandHandler    = null;
 
 function _attachBtn(id, handlerSlot, fn, slotName, slotMap) {
   if (typeof document === 'undefined') return;
@@ -529,6 +613,8 @@ export function wireCatalogueToolbar(state, opts) {
   const exportTSV  = document.getElementById('catExportTSV');
   const exportMD   = document.getElementById('catExportMD');
   const exportJSON = document.getElementById('catExportJSON');
+  const viewAsCand = document.getElementById('catViewAsCandidate');
+  const onPromote  = (opts && typeof opts.onPromote === 'function') ? opts.onPromote : null;
 
   const refresh = () => { renderCatalogue(state); if (onChange) { try { onChange(state); } catch (_) {} } };
 
@@ -640,6 +726,13 @@ export function wireCatalogueToolbar(state, opts) {
   _exportTSVHandler  = () => _doExport('tsv');
   _exportMDHandler   = () => _doExport('md');
   _exportJSONHandler = () => _doExport('json');
+  _viewAsCandHandler = () => {
+    const result = promoteSelectedToCandidates(state);
+    refresh();
+    if (onPromote && result.promoted.length > 0) {
+      try { onPromote(state, result); } catch (_) {}
+    }
+  };
 
   if (_canListen(filterIn))  filterIn.addEventListener('input',  _filterInputHandler);
   if (_canListen(verdictIn)) verdictIn.addEventListener('change', _verdictChangeHandler);
@@ -654,6 +747,7 @@ export function wireCatalogueToolbar(state, opts) {
   if (_canListen(exportTSV))  exportTSV.addEventListener('click',  _exportTSVHandler);
   if (_canListen(exportMD))   exportMD.addEventListener('click',   _exportMDHandler);
   if (_canListen(exportJSON)) exportJSON.addEventListener('click', _exportJSONHandler);
+  if (_canListen(viewAsCand)) viewAsCand.addEventListener('click', _viewAsCandHandler);
 }
 
 /** Remove handlers wired by wireCatalogueToolbar. Idempotent. */
@@ -673,12 +767,14 @@ export function teardownCatalogueToolbar() {
     ['catExportTSV',     'click',  '_exportTSVHandler'],
     ['catExportMD',      'click',  '_exportMDHandler'],
     ['catExportJSON',    'click',  '_exportJSONHandler'],
+    ['catViewAsCandidate', 'click', '_viewAsCandHandler'],
   ];
   const handlers = {
     _filterInputHandler,   _verdictChangeHandler, _headClickHandler, _bodyClickHandler,
     _selectAllHandler,     _clearSelHandler,      _viewFavHandler,   _viewL2Handler,
     _dispSimpleHandler,    _dispDetailedHandler,
     _exportTSVHandler,     _exportMDHandler,      _exportJSONHandler,
+    _viewAsCandHandler,
   };
   for (const [id, evt, slot] of pairs) {
     const h = handlers[slot];
@@ -690,6 +786,7 @@ export function teardownCatalogueToolbar() {
   _selectAllHandler   = _clearSelHandler      = _viewFavHandler   = _viewL2Handler = null;
   _dispSimpleHandler  = _dispDetailedHandler  = null;
   _exportTSVHandler   = _exportMDHandler      = _exportJSONHandler = null;
+  _viewAsCandHandler  = null;
 }
 
 function _defaultDownload(filename, content, mime) {
