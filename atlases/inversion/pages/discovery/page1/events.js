@@ -71,7 +71,7 @@ export function setCur(state, i) {
   try { drawLinesPanel(state); }catch (_) {}
   try { drawPCA(state); }       catch (_) {}
   // v3.51: keep the minimap's orange crosshair in sync with the scrubber
-  if (state.simInMinimap && typeof drawSimMini === 'function') {
+  if (state.simInMinimap) {
     try { drawSimMini(state); } catch (_) {}
   }
   // v3.52: anchor concord strip — orange cursor line follows scrubber
@@ -126,7 +126,7 @@ export function onSimClick(state, evt) {
   // x-axis scrub. Tolerance is _CS_BP_HIT_TOL_PX from the centralized
   // helper. Done before the x-axis fallback so a click ON a cross goes
   // to that cross, not to whatever window is at that x-fraction.
-  if (typeof _ensureCsOverlayIndex === 'function') {
+  {
     const csIdx = _ensureCsOverlayIndex();
     if (csIdx && csIdx.bps.length > 0) {
       const Nw = state.data.n_windows;
@@ -193,15 +193,14 @@ export function onZClick(state, evt) {
   const padT     = collapsed ? 2 : 14;
   const candBarH = collapsed ? 5 : 7;
   const candGap  = collapsed ? 1 : 2;
-  const _candLanes = (typeof _assignCandidateLanes === 'function')
-    ? _assignCandidateLanes(state.candidateList || []).n_lanes : 1;
+  const _candLanes = _assignCandidateLanes(state.candidateList || []).n_lanes;
   const candBarTotal = candBarH * _candLanes;
   const zoneTop  = padT + candBarTotal + candGap;
   const zoneH    = 14;
   // Mb→px function matching drawZ's
   const toX_click = (mb) => pad.l + ((mb - mbMin) / (mbMax - mbMin)) * plotW;
   // v4 turn 13: candidate hit-test (lane-aware) — sets active candidate on hit
-  if (typeof _candidateAtClick === 'function') {
+  {
     const hit = _candidateAtClick(x, y, padT, candBarTotal, toX_click, d);
     if (hit) {
       state.candidate = hit;
@@ -210,8 +209,8 @@ export function onZClick(state, evt) {
       _persistActiveCandidate(hit.id || '');
       // Trigger a re-render so the new active candidate's downstream views
       // (candidate-focus tab, scale-stability "candidate" scale) update.
-      if (typeof drawZ === 'function') drawZ(state);
-      if (typeof renderL3Panel === 'function') renderL3Panel(state);
+      drawZ(state);
+      renderL3Panel(state);
       if (typeof renderCandidateMetadata === 'function') renderCandidateMetadata();
       return;
     }
@@ -232,7 +231,7 @@ export function onZClick(state, evt) {
   // Hit-test runs AFTER candidate / nav-lane / W-row tests because those
   // are higher-precedence interactive zones; users dragging a candidate
   // boundary or W-row scrubbing shouldn't be hijacked by a cs-bp click.
-  if (typeof _ensureCsOverlayIndex === 'function') {
+  {
     const csIdx = _ensureCsOverlayIndex();
     if (csIdx && csIdx.bps.length > 0) {
       const _toXBp = (bp) => {
@@ -284,9 +283,7 @@ export function onPCAClick(state, evt) {
   const toX = v => pad.l + ((v - xMin) / (xMax - xMin)) * plotW;
   const toY = v => pad.t + (1 - (v - yMin) / (yMax - yMin)) * plotH;
   let pcCur;
-  if (typeof getPC === 'function') {
-    try { pcCur = getPC(state, cur); } catch (_) { pcCur = null; }
-  }
+  try { pcCur = getPC(state, cur); } catch (_) { pcCur = null; }
   if (!pcCur) return;
   const { pc1, pc2, sign } = pcCur;
   let bestI = -1, bestD = Infinity;
