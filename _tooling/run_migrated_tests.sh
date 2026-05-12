@@ -79,6 +79,7 @@ UNITS=(
   test_shared_json_classify.js
   test_shared_recent_files.js
   test_shared_schema_layers.js
+  test_shared_session_io.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
