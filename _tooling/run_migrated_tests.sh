@@ -123,6 +123,7 @@ UNITS=(
   test_shared_candidate_promote.js
   test_shared_inheritance_compute.js
   test_shared_mendelian_segregation.js
+  test_shared_age_model_suggester.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
