@@ -114,6 +114,7 @@ UNITS=(
   test_shared_pc_accessors.js
   test_shared_sample_spread.js
   test_shared_cohort_export.js
+  test_shared_atlas_export.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
