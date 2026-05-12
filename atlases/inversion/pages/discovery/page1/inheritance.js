@@ -23,6 +23,12 @@ import {
   inheritanceGroupClustering,
   IGC_DEFAULT_DIST_THRESHOLD,
 } from '../../../shared/inheritance_groups.js';
+import { isAutoCandidate } from '../../../shared/candidate_predicates.js';
+
+// Re-export the shared predicate at this module's URL too, so the
+// existing test (tests/test_page1_inheritance.js) keeps working without
+// edits. New callers should import from shared directly.
+export { isAutoCandidate };
 
 // =====================================================================
 // Constants (legacy lines 41064-41069)
@@ -35,23 +41,10 @@ export const INH_LABEL_STRIP_GAP_BELOW  = 1;
 export const INH_LABEL_FONT_PX          = 9;
 export const INH_LABEL_MIN_BAND_PX      = 12;   // skip labels in regions < 12px wide
 
-// =====================================================================
-// Auto-candidate predicate (legacy lines 41184-41190)
-// =====================================================================
-
-/**
- * Is this candidate an unconfirmed auto-promotion? Auto candidates are
- * excluded from inheritance compute until the user confirms them — the
- * I·g pills + cross-candidate matrix should anchor on user-confirmed
- * structure only.
- */
-export function isAutoCandidate(cand) {
-  if (!cand) return false;
-  if (cand.confirmed) return false;
-  const src = cand.source;
-  if (typeof src !== 'string') return false;
-  return src.indexOf('auto_') === 0;
-}
+// isAutoCandidate is now in shared/candidate_predicates.js (one-line
+// pure predicate, library-shaped, page-independent). Re-exported at
+// the top of this module for backward compat with callers that
+// already imported it from here.
 
 // =====================================================================
 // Label fingerprint hash (legacy lines 41252-41261)

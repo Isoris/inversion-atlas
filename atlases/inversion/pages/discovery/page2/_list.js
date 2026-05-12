@@ -17,7 +17,7 @@
 import { _pageState } from './_state.js';
 import { refreshCandidateUI } from '../page2.js';
 import { persistActiveCandidateId } from '../../../shared/active_candidate.js';
-import { isAutoCandidate } from '../page1/inheritance.js';
+import { isAutoCandidate } from '../../../shared/candidate_predicates.js';
 import { groupColor } from '../../../shared/page1_data_helpers.js';
 
 // ---------------------------------------------------------------------------
