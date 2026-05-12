@@ -279,52 +279,65 @@ export function summarizeRegionStatuses(regions) {
 // CSV export
 // =====================================================================
 
-function _csvCell(v) {
+function _tsvCell(v) {
   if (v == null) return '';
-  const s = String(v);
-  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
-    return '"' + s.replace(/"/g, '""') + '"';
-  }
-  return s;
+  // TSV: strip tab + newline (matches the page3 / page4 export hygiene
+  // convention). Tabs and newlines are illegal in TSV cells; the legacy
+  // page3 / page4 / page8 exporters all use this strip-not-quote pattern.
+  return String(v).replace(/[\t\r\n]/g, ' ');
 }
 
 /**
- * Render the loaded regions as a CSV string. One header line +
+ * Render the loaded regions as a TSV string. One header line +
  * per-region rows. Includes a column for every evidence layer
- * (empty when missing). Newline = '\n'; quoted when needed.
+ * (empty when missing). Newline = '\n'; embedded tabs / newlines
+ * are stripped (no quoting needed in TSV).
+ *
+ * Preferred over CSV across the inversion atlas — matches the
+ * page3 catalogue / page4 karyotype / page8 export convention.
  *
  * @param {Array<Object>} regions
  * @returns {string}
  */
-export function regionsToCSV(regions) {
+export function regionsToTSV(regions) {
   const cols = [
     'region_id', 'chr', 'start_bp', 'end_bp', 'region_status',
     ...EVIDENCE_LAYERS.map(l => 'evidence_' + l),
     'snp_density', 'callable_fraction', 'n_samples',
     'notes', 'citation',
   ];
-  const out = [cols.join(',')];
+  const out = [cols.join('\t')];
   if (!Array.isArray(regions)) return out.join('\n');
   for (const r of regions) {
     if (!r) continue;
     const row = [];
-    row.push(_csvCell(r.region_id));
-    row.push(_csvCell(r.chr));
-    row.push(_csvCell(r.start_bp));
-    row.push(_csvCell(r.end_bp));
-    row.push(_csvCell(r.region_status));
+    row.push(_tsvCell(r.region_id));
+    row.push(_tsvCell(r.chr));
+    row.push(_tsvCell(r.start_bp));
+    row.push(_tsvCell(r.end_bp));
+    row.push(_tsvCell(r.region_status));
     for (const layer of EVIDENCE_LAYERS) {
-      row.push(_csvCell(r.evidence && r.evidence[layer]));
+      row.push(_tsvCell(r.evidence && r.evidence[layer]));
     }
-    row.push(_csvCell(r.snp_density));
-    row.push(_csvCell(r.callable_fraction));
-    row.push(_csvCell(r.n_samples));
-    row.push(_csvCell(r.notes));
-    row.push(_csvCell(r.citation));
-    out.push(row.join(','));
+    row.push(_tsvCell(r.snp_density));
+    row.push(_tsvCell(r.callable_fraction));
+    row.push(_tsvCell(r.n_samples));
+    row.push(_tsvCell(r.notes));
+    row.push(_tsvCell(r.citation));
+    out.push(row.join('\t'));
   }
   return out.join('\n');
 }
+
+/**
+ * Back-compat alias. Existing call sites that imported `regionsToCSV`
+ * still work, but the implementation now emits TSV (per user
+ * preference — TSV is the canonical inversion-atlas export format).
+ * Prefer `regionsToTSV` for new code.
+ *
+ * @deprecated use regionsToTSV
+ */
+export const regionsToCSV = regionsToTSV;
 
 // =====================================================================
 // HTML builders
@@ -459,11 +472,11 @@ export function renderRegionsTableHtml(regions) {
 
 /**
  * Build a CSV filename for the loaded regions.
- *   buildExportFilename(state, now?) → 'negative_regions_2026-05-12T10-30-45.csv'
+ *   buildExportFilename(state, now?) → 'negative_regions_2026-05-12T10-30-45.tsv'
  */
 export function buildExportFilename(state, now) {
   const stamp = (now || new Date()).toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  return 'negative_regions_' + stamp + '.csv';
+  return 'negative_regions_' + stamp + '.tsv';
 }
 
 // =====================================================================
@@ -554,8 +567,8 @@ export function wireNegativeRegionsToolbar(state, opts) {
   };
   _exportHandler = () => {
     if (!state || !Array.isArray(state.negativeRegions) || state.negativeRegions.length === 0) return;
-    const csv = regionsToCSV(state.negativeRegions);
-    _downloadBlob(csv, buildExportFilename(state), 'text/csv');
+    const tsv = regionsToTSV(state.negativeRegions);
+    _downloadBlob(tsv, buildExportFilename(state), 'text/tab-separated-values');
   };
   _resetHandler = () => {
     if (!state) return;
