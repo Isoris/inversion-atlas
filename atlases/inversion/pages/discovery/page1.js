@@ -39,6 +39,11 @@ import {
   refreshActiveSamplesBadge,
 } from './page1/active_samples.js';
 import { loadBandTraceState } from './page1/band_trace_state.js';
+import {
+  runL2SweepInheritance,
+  invalidateL2SweepCache,
+  autoPromoteFromSweep,
+} from './page1/l2_sweep.js';
 import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayers, listLayers, loadViewControls, populateSimScales, reconcileViewControlsForData } from './page1/_data.js';
 import { drawSim, drawSimMini } from './page1/sim_panel.js';
 import { drawZ } from './page1/z_panel.js';
@@ -157,15 +162,11 @@ export function applyData(state, data) {
   // auto-promotes land in candidateList. Without this hook, switching
   // chrom with the toggle on would leave the sweep stale until the user
   // toggled it off-and-on.
-  if (typeof invalidateL2SweepCache === 'function') {
-    try { invalidateL2SweepCache(); } catch (_) {}
-  }
-  if (state.l2SweepEnabled
-      && typeof runL2SweepInheritance === 'function'
-      && typeof _autoPromoteFromSweep === 'function') {
+  invalidateL2SweepCache(state);
+  if (state.l2SweepEnabled) {
     try {
-      const sweepRes = runL2SweepInheritance({ force: true });
-      if (sweepRes) _autoPromoteFromSweep(sweepRes);
+      const sweepRes = runL2SweepInheritance(state, { force: true });
+      if (sweepRes) autoPromoteFromSweep(state, sweepRes);
     } catch (e) {
       console.warn('[l2sweep] applyData hook failed:', e && e.message);
     }
