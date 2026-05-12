@@ -19,6 +19,7 @@ import { karyoColor } from '../../../shared/color_helpers.js';
 import { _lineageColor, _pageState, _setActiveState } from './_state.js';
 import { currentMbRange, getL2Cluster } from './_data.js';
 import { _assignCandidateLanes, _drawWRow, _drawWinNavLane, _ensureCsOverlayIndex, _wRowBand, _winNavBand, drawCandidateBar } from './candidates.js';
+import { bandTraceGetOrCompute } from './band_trace_state.js';
 
 // --- STATUS_COLOR — legacy line 9805 ---
 // Color palette for L2 boundary validation_status markers drawn in the Z panel.
@@ -638,7 +639,7 @@ export function _drawBandTraceStrip(ctx, pad, plotW, plotH, mbMin, mbMax) {
   const d = _state.data;
   if (!d || !Array.isArray(d.l2_envelopes)) return;
 
-  const trace = _bandTraceGetOrCompute();
+  const trace = bandTraceGetOrCompute(_state);
   if (!trace || !Array.isArray(trace.per_l2) || trace.per_l2.length === 0) return;
 
   const stripH = 7;

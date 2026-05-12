@@ -38,6 +38,7 @@ import {
   loadActiveSamples,
   refreshActiveSamplesBadge,
 } from './page1/active_samples.js';
+import { loadBandTraceState } from './page1/band_trace_state.js';
 import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayers, listLayers, loadViewControls, populateSimScales, reconcileViewControlsForData } from './page1/_data.js';
 import { drawSim, drawSimMini } from './page1/sim_panel.js';
 import { drawZ } from './page1/z_panel.js';
@@ -101,10 +102,12 @@ export function applyData(state, data) {
   // data swaps, drop the cached result so the next paint re-triggers
   // compute on the new chromosome's L2 inventory.
   invalidateLineageCache(state);
-  // turn 161: same for the band-trace cache (per-chromosome, per-fish-set).
-  // Also drop the fish-set itself — sample indices are per-chrom and
-  // generally don't transfer to a new chromosome's data shape.
+  // turn 161: clear the band-trace cache (per-chromosome, per-fish-set)
+  // and re-hydrate the on/off toggle + fish-set from localStorage. The
+  // fish-set is cohort-wide so it survives chrom changes, but the
+  // compute cache is per-chrom.
   _bandTraceClearCache(state);
+  loadBandTraceState(state);
   state.bandTraceFishSet = null;
   state._lineageComputeScheduled = false;
   // v3.99 turn 14e: if simInMinimap was restored from localStorage at
