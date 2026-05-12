@@ -89,6 +89,7 @@ UNITS=(
   test_shared_boundary_evidence.js
   test_shared_regimes_registry.js
   test_shared_scale_stability.js
+  test_shared_ancestry_confound.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
