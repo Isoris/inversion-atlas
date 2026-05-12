@@ -136,7 +136,9 @@ const selInfo = _ensureNode('catSelInfo');
 check('catEmpty has empty-state text',
       empty.textContent && empty.textContent.startsWith('Load a JSON to populate'));
 check('catEmpty visible (display:block)',     empty.style.display === 'block');
-check('catHead innerHTML is empty',            head.innerHTML === '');
+// Cartridge now renders the header row (column labels) even on empty
+// catalogue — body stays empty since there are no rows.
+check('catHead renders column headers',        head.innerHTML.includes('data-sort="id"'));
 check('catBody innerHTML is empty',            body.innerHTML === '');
 check('catSelInfo shows zero-selected',        selInfo.textContent === '0 selected of 0');
 

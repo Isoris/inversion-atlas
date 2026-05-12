@@ -98,6 +98,7 @@ UNITS=(
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
+  test_page3_catalogue.js
   # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
