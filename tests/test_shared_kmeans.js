@@ -1,6 +1,6 @@
 // tests/test_shared_kmeans.js
 
-import { kmeans1D, kmeans2D, silhouette1D, adaptiveK1D } from '../shared/kmeans.js';
+import { kmeans1D, kmeans2D, silhouette1D, adaptiveK1D } from '../atlases/inversion/shared/kmeans.js';
 
 let pass = 0, fail = 0;
 function check(name, cond, detail = '') {

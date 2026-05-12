@@ -16,16 +16,27 @@
 # **First loader pattern wired** as of step 23 (post-step22 design round).
 # **Master config wired** as of step 24 (post-step23 master_config round).
 set -u
-WS=/home/claude/workspace/atlas-workspace
+# Locate repo root (one dir up from this script's _tooling/ folder).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WS="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$WS"
 export WORKSPACE="$WS"
 
 UNITS=(
-  test_discovery_page1.js
-  test_discovery_page2.js
+  # foundation (shared/ modules — locked, must stay green)
+  test_shared_contingency.js
+  test_shared_hungarian.js
+  test_shared_het_rate.js
+  test_shared_kmeans.js
+  test_shared_state.js
+  test_shared_per_l2_cluster.js
+  test_band_consensus.js
+  test_modular_smoke.js
+  # page modules (cartridge-only — independent of atlas-core)
   test_discovery_page8.js
   test_discovery_page15.js
   test_discovery_page19.js
+  test_discovery_page22.js
   test_catalogue_page3.js
   test_catalogue_page9.js
   test_catalogue_page10.js
@@ -42,13 +53,22 @@ UNITS=(
   test_comparative_page16b.js
   test_review_page4.js
   test_review_page11.js
+)
+
+# Tests that depend on atlas-core (core/ modules) — only runnable
+# inside an assembled atlas-workspace where atlas-core has been merged
+# in. Run these by checking out atlas-core to ../atlas-core/ and
+# symlinking ./core -> ../atlas-core/core. Until then they fail with
+# ERR_MODULE_NOT_FOUND on core/atlas_api.js / core/layer_router.js /
+# core/registry_core.js / core/master_config.js.
+CORE_DEPENDENT_UNITS=(
+  test_discovery_page1.js
+  test_discovery_page2.js
   test_master_config.js
   test_registry_master_config.js
 )
 
 SMOKES=(
-  smoke_discovery_page1_round4.mjs
-  smoke_discovery_page2_round5.mjs
   smoke_discovery_page8_round5.mjs
   smoke_discovery_page15_round5.mjs
   smoke_discovery_page19_round5.mjs
@@ -68,6 +88,12 @@ SMOKES=(
   smoke_comparative_page16b_round5.mjs
   smoke_review_page4_round5.mjs
   smoke_review_page11_round5.mjs
+)
+
+# Smokes that depend on atlas-core — see CORE_DEPENDENT_UNITS above.
+CORE_DEPENDENT_SMOKES=(
+  smoke_discovery_page1_round4.mjs
+  smoke_discovery_page2_round5.mjs
   smoke_qopt_loader.mjs
   smoke_qopt_wiring.mjs
 )
@@ -92,5 +118,37 @@ for f in "${UNITS[@]}" "${SMOKES[@]}"; do
     TOTAL_F=$((TOTAL_F + fa))
   fi
 done
+
+# Core-dependent tests: only run if a sibling atlas-core/ provides
+# core/ at the workspace root. Detected via existence of core/atlas_api.js.
+if [ -f "$WS/core/atlas_api.js" ]; then
+  echo
+  echo "--- core-dependent tests (atlas-core detected at $WS/core) ---"
+  for f in "${CORE_DEPENDENT_UNITS[@]}" "${CORE_DEPENDENT_SMOKES[@]}"; do
+    out=$(node "tests/$f" 2>&1)
+    p=$(echo "$out" | grep -oP 'pass:\s*\K\d+' | tail -1)
+    fa=$(echo "$out" | grep -oP 'fail:\s*\K\d+' | tail -1)
+    if [ -z "$p" ]; then
+      echo "  ✗ $f -> NO_RESULT"
+      echo "$out" | tail -10
+      TOTAL_F=$((TOTAL_F + 1))
+    else
+      if [ "$fa" != "0" ]; then
+        echo "  ✗ $f -> $p/$fa"
+      else
+        printf "  ✓ %-50s %3d\n" "$f" "$p"
+      fi
+      TOTAL_P=$((TOTAL_P + p))
+      TOTAL_F=$((TOTAL_F + fa))
+    fi
+  done
+else
+  echo
+  echo "--- core-dependent tests SKIPPED (atlas-core not present at $WS/core) ---"
+  for f in "${CORE_DEPENDENT_UNITS[@]}" "${CORE_DEPENDENT_SMOKES[@]}"; do
+    echo "  ⊘ $f"
+  done
+fi
+
 echo "==================="
 echo "TOTAL: pass=$TOTAL_P fail=$TOTAL_F"

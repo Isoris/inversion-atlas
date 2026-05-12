@@ -4,7 +4,7 @@ import {
   SLOT_REGISTRY, CROSS_ATLAS_SLOTS, PERSISTED_SLOTS,
   makeState, serializeState, deserializeState, mergeStateFromSession,
   readPersistedSlots, writePersistedSlot,
-} from '../shared/state.js';
+} from '../atlases/inversion/shared/state.js';
 
 let pass = 0, fail = 0;
 function check(name, cond, detail = '') {

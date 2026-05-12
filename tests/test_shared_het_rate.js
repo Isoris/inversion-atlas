@@ -1,6 +1,6 @@
 // tests/test_shared_het_rate.js
 
-import { HET_RAMP, hetRateColor } from '../shared/het_rate.js';
+import { HET_RAMP, hetRateColor } from '../atlases/inversion/shared/het_rate.js';
 
 let pass = 0, fail = 0;
 function check(name, cond, detail = '') {

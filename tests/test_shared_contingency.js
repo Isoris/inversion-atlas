@@ -9,7 +9,7 @@ import {
   computeARI, computeNMI,
   cramersV, chiSqSurvival, lnGamma,
   scaleStabilityVerdict,
-} from '../shared/contingency.js';
+} from '../atlases/inversion/shared/contingency.js';
 
 let pass = 0, fail = 0;
 function check(name, cond, detail = '') {

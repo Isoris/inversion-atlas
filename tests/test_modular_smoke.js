@@ -30,7 +30,7 @@ function check(name, cond, detail = '') {
 }
 
 console.log('--- imports ---');
-const sio = await import(resolve(ROOT, 'shared/state_io.js'));
+const sio = await import(resolve(ROOT, 'atlases/inversion/shared/state_io.js'));
 check('shared/state_io.js loads', !!sio);
 check('exports KNOWN_LAYERS',     typeof sio.KNOWN_LAYERS === 'object');
 check('exports parseTsv',         typeof sio.parseTsv === 'function');
