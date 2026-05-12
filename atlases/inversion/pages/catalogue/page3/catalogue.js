@@ -1,3 +1,4 @@
+import { diamondCountFor } from '../../../shared/diamond_detection.js';
 // pages/catalogue/page3/catalogue.js
 //
 // Catalogue rendering pipeline — the implementation legacy referenced
@@ -72,6 +73,7 @@ export const CAT_COLUMNS = Object.freeze([
   Object.freeze({ key: 'span_kb',    label: 'span kb',    kind: 'float2', simple: true,  align: 'right' }),
   Object.freeze({ key: 'K',          label: 'K',          kind: 'int',    simple: true,  align: 'right' }),
   Object.freeze({ key: 'verdict',    label: 'verdict',    kind: 'string', simple: true,  align: 'left'  }),
+  Object.freeze({ key: 'diamond',    label: 'Diamond',    kind: 'diamond',simple: true,  align: 'center' }),
   Object.freeze({ key: 'n_windows',  label: 'n windows',  kind: 'int',    simple: false, align: 'right' }),
   Object.freeze({ key: 'n_samples',  label: 'n samples',  kind: 'int',    simple: true,  align: 'right' }),
   Object.freeze({ key: 'silhouette', label: 'silhouette', kind: 'float3', simple: false, align: 'right' }),
@@ -79,6 +81,10 @@ export const CAT_COLUMNS = Object.freeze([
   Object.freeze({ key: 'fam_purity', label: 'fam purity', kind: 'float2', simple: false, align: 'right' }),
   Object.freeze({ key: 'cluster_ok', label: 'cluster ok', kind: 'bool',   simple: false, align: 'center' }),
 ]);
+
+/** Diamond strictness vocab — drives the diamond-mode toolbar buttons
+ *  and the count rendered in the Diamond column. */
+export const CAT_DIAMOND_MODES = Object.freeze(['loose', 'strict', 'strict2']);
 
 const _COL_BY_KEY = (() => {
   const m = new Map();
@@ -124,6 +130,8 @@ export function buildCatalogueRows(state) {
       coherence:  Number.isFinite(r.coherence)  ? r.coherence  : null,
       fam_purity: Number.isFinite(r.fam_purity) ? r.fam_purity : null,
       cluster_ok: typeof r.cluster_ok === 'boolean' ? r.cluster_ok : null,
+      diamond_summary: (r.diamond_summary && typeof r.diamond_summary === 'object')
+        ? r.diamond_summary : null,
     });
   }
   return out;
@@ -271,10 +279,22 @@ export function renderCatHeaderHtml(disp, sortKey, sortDir) {
   return out.join('');
 }
 
+function _diamondCellHtml(row, mode) {
+  const summary = row && row.diamond_summary;
+  const n = diamondCountFor(summary, mode);
+  if (n === 0) {
+    return '<span style="color: var(--ink-dimmer);">—</span>';
+  }
+  const glyph = mode === 'strict2' ? '◆◆' : (mode === 'strict' ? '◆' : '◇');
+  return '<span style="color: var(--accent); font-weight: 600;" '
+    + 'title="' + _escape(n + ' ' + mode + ' diamond' + (n === 1 ? '' : 's')) + '">'
+    + glyph + ' ' + n + '</span>';
+}
+
 /**
  * Build the <tr> contents for #catBody.
  */
-export function renderCatBodyHtml(rows, disp, selection, favorites) {
+export function renderCatBodyHtml(rows, disp, selection, favorites, diamondMode) {
   if (!Array.isArray(rows) || rows.length === 0) {
     const cols = visibleColumns(disp);
     return '<tr><td colspan="' + cols.length + '" '
@@ -307,6 +327,11 @@ export function renderCatBodyHtml(rows, disp, selection, favorites) {
           '<input type="checkbox" class="cat-sel" data-sel="' + _escape(r.id) + '"' +
           (selected ? ' checked' : '') + '></td>'
         );
+        continue;
+      }
+      if (col.kind === 'diamond') {
+        out.push('<td style="text-align: center;">'
+          + _diamondCellHtml(r, diamondMode || 'loose') + '</td>');
         continue;
       }
       const raw = r[col.key];
@@ -506,6 +531,10 @@ function _ensureCatalogueState(state) {
   if (typeof state.catDispMode !== 'string')      state.catDispMode = 'detailed';
   if (typeof state.catSortKey !== 'string')       state.catSortKey = 'id';
   if (typeof state.catSortDir !== 'string')       state.catSortDir = 'asc';
+  if (typeof state.catDiamondMode !== 'string'
+      || CAT_DIAMOND_MODES.indexOf(state.catDiamondMode) < 0) {
+    state.catDiamondMode = 'loose';
+  }
 }
 
 /**
@@ -533,7 +562,8 @@ export function renderCatalogue(state) {
     // "No rows match" stub only when rows exist but filters drop them all.
     body.innerHTML = (all.length === 0)
       ? ''
-      : renderCatBodyHtml(sorted, state.catDispMode, state.catSelection, state.catFavorites);
+      : renderCatBodyHtml(sorted, state.catDispMode, state.catSelection,
+                          state.catFavorites, state.catDiamondMode);
   }
 
   if (empty) {
@@ -574,6 +604,9 @@ let _exportTSVHandler     = null;
 let _exportMDHandler      = null;
 let _exportJSONHandler    = null;
 let _viewAsCandHandler    = null;
+let _diamondLooseHandler  = null;
+let _diamondStrictHandler = null;
+let _diamondStrict2Handler = null;
 
 function _attachBtn(id, handlerSlot, fn, slotName, slotMap) {
   if (typeof document === 'undefined') return;
@@ -613,8 +646,11 @@ export function wireCatalogueToolbar(state, opts) {
   const exportTSV  = document.getElementById('catExportTSV');
   const exportMD   = document.getElementById('catExportMD');
   const exportJSON = document.getElementById('catExportJSON');
-  const viewAsCand = document.getElementById('catViewAsCandidate');
-  const onPromote  = (opts && typeof opts.onPromote === 'function') ? opts.onPromote : null;
+  const viewAsCand    = document.getElementById('catViewAsCandidate');
+  const onPromote     = (opts && typeof opts.onPromote === 'function') ? opts.onPromote : null;
+  const diaLoose      = document.getElementById('catDiamondLoose');
+  const diaStrict     = document.getElementById('catDiamondStrict');
+  const diaStrict2    = document.getElementById('catDiamondStrict2');
 
   const refresh = () => { renderCatalogue(state); if (onChange) { try { onChange(state); } catch (_) {} } };
 
@@ -733,6 +769,14 @@ export function wireCatalogueToolbar(state, opts) {
       try { onPromote(state, result); } catch (_) {}
     }
   };
+  const _setDiamondMode = (m) => {
+    if (!state) return;
+    state.catDiamondMode = m;
+    refresh();
+  };
+  _diamondLooseHandler   = () => _setDiamondMode('loose');
+  _diamondStrictHandler  = () => _setDiamondMode('strict');
+  _diamondStrict2Handler = () => _setDiamondMode('strict2');
 
   if (_canListen(filterIn))  filterIn.addEventListener('input',  _filterInputHandler);
   if (_canListen(verdictIn)) verdictIn.addEventListener('change', _verdictChangeHandler);
@@ -748,6 +792,9 @@ export function wireCatalogueToolbar(state, opts) {
   if (_canListen(exportMD))   exportMD.addEventListener('click',   _exportMDHandler);
   if (_canListen(exportJSON)) exportJSON.addEventListener('click', _exportJSONHandler);
   if (_canListen(viewAsCand)) viewAsCand.addEventListener('click', _viewAsCandHandler);
+  if (_canListen(diaLoose))   diaLoose.addEventListener('click',   _diamondLooseHandler);
+  if (_canListen(diaStrict))  diaStrict.addEventListener('click',  _diamondStrictHandler);
+  if (_canListen(diaStrict2)) diaStrict2.addEventListener('click', _diamondStrict2Handler);
 }
 
 /** Remove handlers wired by wireCatalogueToolbar. Idempotent. */
@@ -768,6 +815,9 @@ export function teardownCatalogueToolbar() {
     ['catExportMD',      'click',  '_exportMDHandler'],
     ['catExportJSON',    'click',  '_exportJSONHandler'],
     ['catViewAsCandidate', 'click', '_viewAsCandHandler'],
+    ['catDiamondLoose',    'click', '_diamondLooseHandler'],
+    ['catDiamondStrict',   'click', '_diamondStrictHandler'],
+    ['catDiamondStrict2',  'click', '_diamondStrict2Handler'],
   ];
   const handlers = {
     _filterInputHandler,   _verdictChangeHandler, _headClickHandler, _bodyClickHandler,
@@ -775,6 +825,7 @@ export function teardownCatalogueToolbar() {
     _dispSimpleHandler,    _dispDetailedHandler,
     _exportTSVHandler,     _exportMDHandler,      _exportJSONHandler,
     _viewAsCandHandler,
+    _diamondLooseHandler,  _diamondStrictHandler, _diamondStrict2Handler,
   };
   for (const [id, evt, slot] of pairs) {
     const h = handlers[slot];
@@ -787,6 +838,7 @@ export function teardownCatalogueToolbar() {
   _dispSimpleHandler  = _dispDetailedHandler  = null;
   _exportTSVHandler   = _exportMDHandler      = _exportJSONHandler = null;
   _viewAsCandHandler  = null;
+  _diamondLooseHandler = _diamondStrictHandler = _diamondStrict2Handler = null;
 }
 
 function _defaultDownload(filename, content, mime) {
