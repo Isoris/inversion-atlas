@@ -194,6 +194,49 @@ export function drawTrackedLinkageStrip(ctx, pad, plotW, plotH, mbMin, mbMax, pr
   if (typeof ctx.restore === 'function') ctx.restore();
 }
 
+// =====================================================================
+// Per-candidate inheritance-group lookup
+// =====================================================================
+
+/**
+ * Map a single candidate's bands → inheritance group_ids, using the
+ * inheritance result's `band_index` + `cut.group_id_per_band` arrays.
+ * Returns `{ [band_idx]: group_id }`.
+ *
+ * Empty object when:
+ *   - candidate is null / has no id
+ *   - inheritance result is null / lacks items_meta+rtab
+ *   - candidate's id is not in items_meta
+ *   - band_index / cut is missing
+ *
+ * Pure: caller passes inh explicitly (legacy reads state.inheritanceResult).
+ *
+ * @param {Object?} cand
+ * @param {Object?} inh   inheritance result with shape:
+ *   { items_meta: [{id}], rtab?, band_index: [{item_idx, band}],
+ *     cut: { group_id_per_band: ArrayLike<number> } }
+ * @returns {Object<number, number>}
+ */
+export function inheritanceSuggestionsForCandidate(cand, inh) {
+  if (!cand) return {};
+  if (!inh || !Array.isArray(inh.items_meta) || !inh.rtab) return {};
+  const candId = String(cand.id);
+  const itemIdx = inh.items_meta.findIndex(m => m && String(m.id) === candId);
+  if (itemIdx < 0) return {};
+  const out = {};
+  if (inh.band_index && inh.cut && inh.cut.group_id_per_band) {
+    const bi = inh.band_index;
+    const gpb = inh.cut.group_id_per_band;
+    for (let n = 0; n < bi.length; n++) {
+      const row = bi[n];
+      if (row && row.item_idx === itemIdx) {
+        out[row.band] = gpb[n];
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Filter the projection to candidates whose purity ≥ floor (for the
  * PC1-panel shading layer that the legacy uses). Pure: returns a new

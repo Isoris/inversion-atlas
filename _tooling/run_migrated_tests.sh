@@ -107,6 +107,24 @@ UNITS=(
   test_shared_inheritance_cache_key.js
   test_shared_inheritance_gather.js
   test_shared_snp_density.js
+  test_shared_haplotype_labels.js
+  test_shared_candidate_mode.js
+  test_shared_candidate_io.js
+  test_shared_candidate_registry.js
+  test_shared_pc_accessors.js
+  test_shared_sample_spread.js
+  test_shared_cohort_export.js
+  test_shared_atlas_export.js
+  test_shared_sigma_profile.js
+  test_shared_candidate_export_record.js
+  test_shared_lineage_clustering.js
+  test_shared_candidate_lanes.js
+  test_shared_dosage_chunks.js
+  test_shared_candidate_promote.js
+  test_shared_inheritance_compute.js
+  test_shared_mendelian_segregation.js
+  test_shared_age_model_suggester.js
+  test_shared_band_haplotype_assign.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js

@@ -197,6 +197,43 @@ try {
 check('drawStrip: headless safety',  headlessOK);
 
 // -----------------------------------------------------------------------------
+group('inheritanceSuggestionsForCandidate');
+const inhFixture = {
+  rtab: {},
+  items_meta: [{ id: 'c1' }, { id: 'c2' }],
+  band_index: [
+    { item_idx: 0, band: 0 }, { item_idx: 0, band: 1 }, { item_idx: 0, band: 2 },
+    { item_idx: 1, band: 0 }, { item_idx: 1, band: 1 }, { item_idx: 1, band: 2 },
+  ],
+  cut: { group_id_per_band: [3, 1, 1, 1, 5, 5] },
+};
+const c1Sugg = TLP.inheritanceSuggestionsForCandidate({ id: 'c1' }, inhFixture);
+check('c1 band 0 → group 3',   c1Sugg[0] === 3);
+check('c1 band 1 → group 1',   c1Sugg[1] === 1);
+check('c1 band 2 → group 1',   c1Sugg[2] === 1);
+
+const c2Sugg = TLP.inheritanceSuggestionsForCandidate({ id: 'c2' }, inhFixture);
+check('c2 band 0 → group 1',   c2Sugg[0] === 1);
+check('c2 band 1 → group 5',   c2Sugg[1] === 5);
+
+const unknownSugg = TLP.inheritanceSuggestionsForCandidate({ id: 'cZ' }, inhFixture);
+check('unknown candidate → {}',  Object.keys(unknownSugg).length === 0);
+
+check('null candidate → {}',
+      Object.keys(TLP.inheritanceSuggestionsForCandidate(null, inhFixture)).length === 0);
+check('null inh → {}',
+      Object.keys(TLP.inheritanceSuggestionsForCandidate({ id: 'c1' }, null)).length === 0);
+check('inh missing items_meta → {}',
+      Object.keys(TLP.inheritanceSuggestionsForCandidate({ id: 'c1' }, { rtab: {} })).length === 0);
+check('inh missing rtab → {}',
+      Object.keys(TLP.inheritanceSuggestionsForCandidate({ id: 'c1' }, { items_meta: [] })).length === 0);
+
+// inh with items_meta + rtab but missing band_index → empty object
+const inhMinimal = { items_meta: [{ id: 'c1' }], rtab: {} };
+check('inh missing band_index → {}',
+      Object.keys(TLP.inheritanceSuggestionsForCandidate({ id: 'c1' }, inhMinimal)).length === 0);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

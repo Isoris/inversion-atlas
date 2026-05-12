@@ -12,7 +12,7 @@
 //   - parseNegativeRegionsTSV: header detection, missing required col,
 //     evidence_<layer> columns, # comment + blank-line skipping
 //   - summarizeRegionStatuses: known statuses present, _other bucket
-//   - regionsToCSV: header + CSV escaping (commas, quotes, newlines)
+//   - regionsToTSV / regionsToCSV alias: header + tab-strip hygiene
 //   - renderSummaryCardsHtml: HTML escape + zero/non-zero counts
 //   - renderRegionsTableHtml: empty-state, populated rendering, evidence chips
 //   - buildExportFilename: deterministic timestamp slot
@@ -176,23 +176,30 @@ check('summary non-array: returns zeros',
       NR.summarizeRegionStatuses(null)._other === 0);
 
 // -----------------------------------------------------------------------------
-group('regionsToCSV: escaping');
-const csv = NR.regionsToCSV([
+group('regionsToTSV: header + strip-not-quote hygiene');
+const tsv = NR.regionsToTSV([
   { region_id: 'r1', chr: 'LG1', start_bp: 0, end_bp: 100, region_status: 'x',
     notes: 'commas, here', evidence: { local_pca: 'pass' } },
   { region_id: 'r2', chr: 'LG1', start_bp: 0, end_bp: 100, region_status: 'x',
-    notes: 'quotes "here"' },
+    notes: 'has\ttab' },
   { region_id: 'r3', chr: 'LG1', start_bp: 0, end_bp: 100, region_status: 'x',
     notes: 'newline\ninside' },
 ]);
-const csvLines = csv.split('\n');
-check('CSV: header row present', csvLines[0].startsWith('region_id,'));
-check('CSV: includes evidence_local_pca header', csvLines[0].includes('evidence_local_pca'));
-check('CSV: comma cell is quoted', csvLines[1].includes('"commas, here"'));
-check('CSV: quotes doubled',       csvLines[2].includes('"quotes ""here"""'));
-check('CSV: newline cell quoted',  csvLines[3].includes('"newline'));
-check('CSV: empty array → header only',
-      NR.regionsToCSV([]).split('\n').length === 1);
+const tsvLines = tsv.split('\n');
+check('TSV: header tab-delimited',  tsvLines[0].startsWith('region_id\t'));
+check('TSV: includes evidence_local_pca header', tsvLines[0].includes('evidence_local_pca'));
+check('TSV: commas in cell are NOT quoted (TSV preserves commas as-is)',
+      tsvLines[1].includes('commas, here') && !tsvLines[1].includes('"commas'));
+check('TSV: embedded tab stripped to space',
+      tsvLines[2].includes('has tab') && !tsvLines[2].includes('has\ttab'));
+check('TSV: embedded newline stripped to space',
+      tsvLines[3].includes('newline inside') && !tsvLines[3].includes('newline\n'));
+check('TSV: empty array → header only',
+      NR.regionsToTSV([]).split('\n').length === 1);
+
+// Back-compat alias
+check('regionsToCSV is an alias for regionsToTSV',
+      NR.regionsToCSV === NR.regionsToTSV);
 
 // -----------------------------------------------------------------------------
 group('renderSummaryCardsHtml');
@@ -251,7 +258,7 @@ group('buildExportFilename');
 const fixedNow = new Date(Date.UTC(2026, 4, 12, 10, 30, 45));
 const fname = NR.buildExportFilename({}, fixedNow);
 check('filename: starts with negative_regions_', fname.startsWith('negative_regions_'));
-check('filename: ends with .csv',                fname.endsWith('.csv'));
+check('filename: ends with .tsv',                fname.endsWith('.tsv'));
 check('filename: contains date stamp',           fname.includes('2026-05-12'));
 check('filename: no colons (safe path)',         !fname.includes(':'));
 

@@ -1,0 +1,192 @@
+// tests/test_shared_sample_spread.js
+//
+// Unit coverage for shared/sample_spread.js — per-sample σ of
+// sign-aligned PC1 across a window range (legacy lines 10294-10330).
+
+import * as SS from '../atlases/inversion/shared/sample_spread.js';
+
+let pass = 0, fail = 0;
+function check(label, cond, extra) {
+  if (cond) { pass++; console.log('  ✓', label); }
+  else      { fail++; console.log('  ✗', label, extra ? ' — ' + extra : ''); }
+}
+function group(name) { console.log('\n--- ' + name + ' ---'); }
+
+// -----------------------------------------------------------------------------
+group('sampleSpreadRange: 3-sample fixture');
+// 3 samples, 4 windows. Sample 0 is stable (pc1≈0.1 across), sample 1
+// drifts (0.1 → 0.4 → 0.7 → 1.0), sample 2 is constant 0.5.
+const state = {
+  data: {
+    n_samples: 3,
+    windows: [
+      { pc1: [0.1, 0.1, 0.5], pc2: [0, 0, 0] },
+      { pc1: [0.1, 0.4, 0.5], pc2: [0, 0, 0] },
+      { pc1: [0.1, 0.7, 0.5], pc2: [0, 0, 0] },
+      { pc1: [0.1, 1.0, 0.5], pc2: [0, 0, 0] },
+    ],
+  },
+};
+
+const sd = SS.sampleSpreadRange(state, 0, 3);
+check('returns Float64Array',          sd instanceof Float64Array);
+check('length matches n_samples',      sd.length === 3);
+// Sample 0 perfectly stable → sd ≈ 0
+check('stable sample (0): sd ≈ 0',     sd[0] < 1e-9);
+// Sample 1 drifting → sd > 0 (much larger than sample 0)
+check('drifting sample (1): sd > 0.3', sd[1] > 0.3);
+// Sample 2 perfectly stable → sd ≈ 0
+check('stable sample (2): sd ≈ 0',     sd[2] < 1e-9);
+
+// -----------------------------------------------------------------------------
+group('sampleSpreadRange: sign flip');
+// With state.flipPC1 + state.pc1Sign, sample-0's pc1 gets negated
+// in windows whose sign is -1.
+//
+// 4 windows, all sample 0 has pc1 = 0.5. signs = [1, -1, 1, -1] ⇒
+// sign-aligned values = [0.5, -0.5, 0.5, -0.5] ⇒ mean=0, var > 0.
+const stateFlip = {
+  flipPC1: true,
+  pc1Sign: [1, -1, 1, -1],
+  data: {
+    n_samples: 1,
+    windows: [
+      { pc1: [0.5] }, { pc1: [0.5] }, { pc1: [0.5] }, { pc1: [0.5] },
+    ],
+  },
+};
+const sdFlip = SS.sampleSpreadRange(stateFlip, 0, 3);
+check('sign-flip applied → non-zero sd',  sdFlip[0] > 0.4);
+
+// -----------------------------------------------------------------------------
+group('sampleSpreadRange: edge cases');
+check('null state → null',             SS.sampleSpreadRange(null, 0, 3) === null);
+check('no data → null',                SS.sampleSpreadRange({}, 0, 3) === null);
+check('nW < 2 → null',                 SS.sampleSpreadRange(state, 0, 0) === null);
+check('non-integer indices → null',    SS.sampleSpreadRange(state, 0, 1.5) === null);
+check('missing n_samples → null',
+      SS.sampleSpreadRange({ data: { windows: state.data.windows } }, 0, 1) === null);
+
+// Out-of-range window → getPC returns null → sampleSpreadRange returns null
+check('out-of-range end window → null',  SS.sampleSpreadRange(state, 0, 99) === null);
+
+// -----------------------------------------------------------------------------
+group('sampleSpreadL2');
+const stateL2 = {
+  data: Object.assign({}, state.data, {
+    l2_envelopes: [
+      { _s0: 0, _e0: 3 },
+      { _s0: 1, _e0: 2 },   // narrower range
+      { /* missing _s0/_e0 */ },
+    ],
+  }),
+};
+const sdL2_0 = SS.sampleSpreadL2(stateL2, 0);
+check('L2 0: full-range sd matches sampleSpreadRange',
+      sdL2_0 && Math.abs(sdL2_0[1] - sd[1]) < 1e-9);
+
+const sdL2_1 = SS.sampleSpreadL2(stateL2, 1);
+check('L2 1: narrower-range sd computed',  sdL2_1 instanceof Float64Array);
+
+check('L2 with missing _s0/_e0 → null',
+      SS.sampleSpreadL2(stateL2, 2) === null);
+check('out-of-range L2 idx → null',         SS.sampleSpreadL2(stateL2, 99) === null);
+check('no envelopes → null',
+      SS.sampleSpreadL2({ data: { n_samples: 3, windows: state.data.windows } }, 0) === null);
+check('null state → null',                  SS.sampleSpreadL2(null, 0) === null);
+
+// -----------------------------------------------------------------------------
+group('sampleSpreadRangeAxis: per-axis σ');
+// Use the same fixture but extend windows with pc3/pc4 to test other axes.
+const state4PC = {
+  data: {
+    n_samples: 2,
+    windows: [
+      { pc1: [0.1, 0.1], pc2: [0.0, 0.0], pc3: [0.5, 0.0], pc4: [1.0, 0.0] },
+      { pc1: [0.1, 0.4], pc2: [0.1, 0.0], pc3: [0.5, 0.1], pc4: [0.5, 0.0] },
+      { pc1: [0.1, 0.7], pc2: [0.2, 0.0], pc3: [0.5, 0.2], pc4: [0.0, 0.0] },
+      { pc1: [0.1, 1.0], pc2: [0.3, 0.0], pc3: [0.5, 0.3], pc4: [0.0, 0.0] },
+    ],
+  },
+};
+
+// Default axis = PC1 → matches legacy behavior
+const axDefault = SS.sampleSpreadRangeAxis(state4PC, 0, 3);
+check('default axis PC1: returns Float64Array',  axDefault instanceof Float64Array);
+check('default axis PC1: sample 0 stable',       axDefault[0] < 1e-9);
+check('default axis PC1: sample 1 drifting',     axDefault[1] > 0.3);
+
+// PC2: sample 0 drifts 0.0→0.3, sample 1 stays at 0
+const axPC2 = SS.sampleSpreadRangeAxis(state4PC, 0, 3, 'pc2');
+check('PC2: sample 0 sd > 0',           axPC2[0] > 0.1);
+check('PC2: sample 1 sd ≈ 0',           axPC2[1] < 1e-9);
+
+// PC3: sample 0 stable at 0.5, sample 1 drifts
+const axPC3 = SS.sampleSpreadRangeAxis(state4PC, 0, 3, 'pc3');
+check('PC3: sample 0 sd ≈ 0',           axPC3[0] < 1e-9);
+check('PC3: sample 1 sd > 0',           axPC3[1] > 0.1);
+
+// PC4: sample 0 drops 1.0→0.5→0.0→0.0, sample 1 stays at 0
+const axPC4 = SS.sampleSpreadRangeAxis(state4PC, 0, 3, 'pc4');
+check('PC4: sample 0 sd > 0',           axPC4[0] > 0.3);
+check('PC4: sample 1 sd ≈ 0',           axPC4[1] < 1e-9);
+
+// Sign-flip applies only to PC1 — flipping doesn't change PC2 output
+const stateFlipPC2 = Object.assign({}, state4PC, {
+  flipPC1: true,
+  pc1Sign: [1, -1, 1, -1],
+});
+const pc2Same = SS.sampleSpreadRangeAxis(stateFlipPC2, 0, 3, 'pc2');
+check('sign-flip ignored for PC2',
+      Math.abs(pc2Same[0] - axPC2[0]) < 1e-9);
+
+// Missing axis on the window → null
+const stateNoP3 = {
+  data: {
+    n_samples: 1,
+    windows: [{ pc1: [0.1] }, { pc1: [0.2] }],
+  },
+};
+check('missing PC3 → null',
+      SS.sampleSpreadRangeAxis(stateNoP3, 0, 1, 'pc3') === null);
+
+// -----------------------------------------------------------------------------
+group('sampleSpreadRangeAxes: Euclidean-combined σ across axes');
+// Default ['pc1'] → matches axis-only PC1
+const combinedPC1 = SS.sampleSpreadRangeAxes(state4PC, 0, 3);
+check('default axes ["pc1"]: matches axis path',
+      Math.abs(combinedPC1[1] - axDefault[1]) < 1e-9);
+
+// PC1+PC2: sqrt(σ_pc1² + σ_pc2²) per sample
+const combined12 = SS.sampleSpreadRangeAxes(state4PC, 0, 3, ['pc1', 'pc2']);
+const expected = new Float64Array([
+  Math.sqrt(axDefault[0]*axDefault[0] + axPC2[0]*axPC2[0]),
+  Math.sqrt(axDefault[1]*axDefault[1] + axPC2[1]*axPC2[1]),
+]);
+check('PC1+PC2 Euclidean: sample 0 matches',  Math.abs(combined12[0] - expected[0]) < 1e-9);
+check('PC1+PC2 Euclidean: sample 1 matches',  Math.abs(combined12[1] - expected[1]) < 1e-9);
+
+// NPC=4: all 4 axes
+const combined1234 = SS.sampleSpreadRangeAxes(state4PC, 0, 3, ['pc1', 'pc2', 'pc3', 'pc4']);
+check('NPC=4 combine: returns Float64Array(2)',  combined1234.length === 2);
+// Sample 0: only PC2+PC4 contribute
+check('NPC=4: sample 0 σ > σ_PC2 alone',
+      combined1234[0] > axPC2[0] + 1e-9);
+// Sample 1: PC1+PC3 contribute, PC2+PC4 are ~0
+check('NPC=4: sample 1 σ ≥ σ_PC1 alone',
+      combined1234[1] > axDefault[1] - 1e-9);
+
+// Empty axes / null axes default to ['pc1']
+const axEmpty = SS.sampleSpreadRangeAxes(state4PC, 0, 3, []);
+check('empty axes defaults to PC1',
+      Math.abs(axEmpty[1] - axDefault[1]) < 1e-9);
+
+// Any missing axis → null
+check('any missing axis → null',
+      SS.sampleSpreadRangeAxes(stateNoP3, 0, 1, ['pc1', 'pc3']) === null);
+
+// -----------------------------------------------------------------------------
+console.log('\n=================');
+console.log(`pass: ${pass}   fail: ${fail}`);
+console.log('=================');
+process.exit(fail > 0 ? 1 : 0);
