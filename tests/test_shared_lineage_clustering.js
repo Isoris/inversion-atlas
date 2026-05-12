@@ -107,6 +107,81 @@ const kNonArr = LC.lineageCacheKey(null, 3, 0.5, 'default', 'LGZ');
 check('null l2_indices: same as empty',  kNonArr === kEmpty);
 
 // -----------------------------------------------------------------------------
+group('lineageColor');
+check('lineage 0 → hsl(...)',          LC.lineageColor(0).startsWith('hsl('));
+check('lineage 5 → hsl(...)',          LC.lineageColor(5).startsWith('hsl('));
+check('different lineages → different colors',
+      LC.lineageColor(0) !== LC.lineageColor(1));
+check('lineage -1 → neutral grey',      LC.lineageColor(-1).includes('120, 128, 140'));
+check('NaN → neutral grey',             LC.lineageColor(NaN).includes('120, 128, 140'));
+
+// -----------------------------------------------------------------------------
+group('drawLineageStrip');
+class FakeCtx {
+  constructor() {
+    this.calls = [];
+    this.fillStyle = '';
+    this.strokeStyle = '';
+    this.lineWidth = 1;
+  }
+  save()    { this.calls.push(['save']); }
+  restore() { this.calls.push(['restore']); }
+  fillRect(x, y, w, h)   { this.calls.push(['fillRect', x, y, w, h, this.fillStyle]); }
+  strokeRect(x, y, w, h) { this.calls.push(['strokeRect', x, y, w, h]); }
+}
+
+const envs = [
+  { start_bp: 0,         end_bp: 1_000_000 },
+  { start_bp: 1_000_000, end_bp: 2_000_000 },
+  { start_bp: 2_000_000, end_bp: 3_000_000 },
+];
+
+// All in chain: 3 colored bars
+const lineageRes = {
+  lineage_id_per_sample: [0, 0, 1, 1, 2, 2, 0, 0, 1, 1],
+  chains: [{ l2_indices: [0, 1, 2] }],
+};
+const getCluster = (idx) => ({ fixedKLabels: [0, 0, 0, 1, 1, 1, 0, 0, 1, 1], K: 3 });
+
+const ctx = new FakeCtx();
+LC.drawLineageStrip(ctx, { l: 50, t: 30 }, 600, 200, 0, 3, lineageRes, envs, getCluster);
+check('drawStrip: save/restore',
+      ctx.calls[0][0] === 'save' && ctx.calls[ctx.calls.length - 1][0] === 'restore');
+const fills = ctx.calls.filter(c => c[0] === 'fillRect');
+check('drawStrip: 1 backdrop + 3 per-L2 fillRects',  fills.length === 4);
+const frame = ctx.calls.filter(c => c[0] === 'strokeRect');
+check('drawStrip: frame strokeRect',  frame.length === 1);
+
+// Chain-break L2: grey overlay instead of color
+const lineageBreak = {
+  lineage_id_per_sample: [0, 0, 1, 1],
+  chains: [{ l2_indices: [0, 2] }],   // L2 idx 1 is the break
+};
+const ctxBreak = new FakeCtx();
+LC.drawLineageStrip(ctxBreak, { l: 0, t: 30 }, 600, 200, 0, 3, lineageBreak, envs, getCluster);
+const breakFills = ctxBreak.calls.filter(c => c[0] === 'fillRect');
+const greyFills = breakFills.filter(c => c[5] && c[5].includes('120, 128, 140'));
+check('chain-break: grey overlay drawn',
+      greyFills.length >= 1);
+
+// Outside visible range
+const ctxOut = new FakeCtx();
+LC.drawLineageStrip(ctxOut, { l: 0, t: 30 }, 600, 200, 100, 200, lineageRes, envs, getCluster);
+const fillsOut = ctxOut.calls.filter(c => c[0] === 'fillRect');
+check('outside visible: only backdrop drawn',  fillsOut.length === 1);
+
+// Headless safety
+let safeHeadless = true;
+try {
+  LC.drawLineageStrip(null, { l: 0, t: 0 }, 100, 100, 0, 1, lineageRes, envs, getCluster);
+  LC.drawLineageStrip({}, { l: 0, t: 0 }, 100, 100, 0, 1, lineageRes, envs, getCluster);
+  LC.drawLineageStrip(ctx, { l: 0, t: 0 }, 100, 100, 0, 1, null, envs, getCluster);
+  LC.drawLineageStrip(ctx, { l: 0, t: 0 }, 100, 100, 0, 1, lineageRes, null, getCluster);
+  LC.drawLineageStrip(ctx, { l: 0, t: 0 }, 100, 100, 0, 1, lineageRes, envs, null);
+} catch (_) { safeHeadless = false; }
+check('headless safety',  safeHeadless);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');
