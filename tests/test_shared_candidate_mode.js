@@ -198,6 +198,82 @@ check('multiple violations counted',     audMulti.violations.length === 2);
 check('null state: ok = true (no-op)',   PCR.mergeIsolationAudit(null).ok === true);
 
 // -----------------------------------------------------------------------------
+group('pcrDeepCloneCandidate');
+// Plain object
+const orig = {
+  id: 'cA', K: 3,
+  locked_labels: new Int8Array([0, 1, 2]),
+  l3_cuts: [50, 75],
+  nested: { foo: 'bar', list: [1, 2, 3] },
+};
+const cloned = PCR.pcrDeepCloneCandidate(orig);
+check('clone: id preserved',              cloned.id === 'cA');
+check('clone: typed array re-wrapped',
+      cloned.locked_labels instanceof Int8Array && cloned.locked_labels !== orig.locked_labels);
+check('clone: typed array values match',  cloned.locked_labels[2] === 2);
+check('clone: regular array cloned',      cloned.l3_cuts !== orig.l3_cuts);
+check('clone: nested object cloned',      cloned.nested !== orig.nested);
+check('clone: nested.list cloned',        cloned.nested.list !== orig.nested.list);
+
+// Mutating clone doesn't change orig
+cloned.l3_cuts.push(99);
+cloned.locked_labels[0] = 9;
+check('clone mutation: orig unchanged',
+      orig.l3_cuts.length === 2 && orig.locked_labels[0] === 0);
+
+// Typed array variants
+check('clone Uint8Array',
+      PCR.pcrDeepCloneCandidate(new Uint8Array([1, 2])) instanceof Uint8Array);
+check('clone Int32Array',
+      PCR.pcrDeepCloneCandidate(new Int32Array([1, 2])) instanceof Int32Array);
+check('clone Float32Array',
+      PCR.pcrDeepCloneCandidate(new Float32Array([1.5])) instanceof Float32Array);
+check('clone Float64Array',
+      PCR.pcrDeepCloneCandidate(new Float64Array([1.5])) instanceof Float64Array);
+
+// Scalars pass through unchanged
+check('null → null',           PCR.pcrDeepCloneCandidate(null) === null);
+check('number → same',         PCR.pcrDeepCloneCandidate(42) === 42);
+check('string → same',         PCR.pcrDeepCloneCandidate('x') === 'x');
+
+// -----------------------------------------------------------------------------
+group('initDetailedFromDefault');
+const sInit = {
+  candidate: { id: 'active', K: 3 },
+  candidateList: [{ id: 'a', K: 3 }, { id: 'b', K: 3 }],
+  candidates: { a: { id: 'a', K: 3 }, b: { id: 'b', K: 3 } },
+};
+const count = PCR.initDetailedFromDefault(sInit);
+check('returns count of duplicated candidates',  count === 2);
+check('candidate_detailed populated',            sInit.candidate_detailed.id === 'active');
+check('candidate_detailed tagged _system',
+      sInit.candidate_detailed._system === 'detailed');
+check('candidateList_detailed populated',
+      sInit.candidateList_detailed.length === 2);
+check('candidateList_detailed entries tagged',
+      sInit.candidateList_detailed.every(c => c._system === 'detailed'));
+check('candidates_detailed populated',
+      Object.keys(sInit.candidates_detailed).length === 2);
+check('candidates_detailed entries tagged',
+      Object.values(sInit.candidates_detailed).every(c => c._system === 'detailed'));
+
+// Clones are independent
+sInit.candidate_detailed.K = 99;
+check('detailed clone: independent from default',
+      sInit.candidate.K === 3);
+
+// Empty state: zero duplicated
+const sEmpty = {};
+PCR.pcrEnsureState(sEmpty, { localStorage: _makeLS() });
+const countEmpty = PCR.initDetailedFromDefault(sEmpty);
+check('empty state: count = 0',  countEmpty === 0);
+
+// Null state: no-throw
+let safeInit = true;
+try { PCR.initDetailedFromDefault(null); } catch (_) { safeInit = false; }
+check('null state: no-throw',  safeInit);
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

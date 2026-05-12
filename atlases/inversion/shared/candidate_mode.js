@@ -150,6 +150,83 @@ export function clearDetailedState(state) {
 }
 
 // =====================================================================
+// Deep-clone
+// =====================================================================
+
+/**
+ * Cross-realm-safe deep clone for candidate objects. Handles typed
+ * arrays (Int8/16/32, Uint8/32, Float32/64), regular arrays, and
+ * plain-object recursion. Non-object scalars pass through unchanged.
+ *
+ * @param {*} c
+ * @returns {*}
+ */
+export function pcrDeepCloneCandidate(c) {
+  if (!c || typeof c !== 'object') return c;
+  const ctorName = c.constructor && c.constructor.name;
+  if (ctorName === 'Int8Array')    return new Int8Array(c);
+  if (ctorName === 'Uint8Array')   return new Uint8Array(c);
+  if (ctorName === 'Int16Array')   return new Int16Array(c);
+  if (ctorName === 'Int32Array')   return new Int32Array(c);
+  if (ctorName === 'Uint32Array')  return new Uint32Array(c);
+  if (ctorName === 'Float32Array') return new Float32Array(c);
+  if (ctorName === 'Float64Array') return new Float64Array(c);
+  if (Array.isArray(c)) {
+    return c.map(item => pcrDeepCloneCandidate(item));
+  }
+  const out = {};
+  for (const key of Object.keys(c)) {
+    out[key] = pcrDeepCloneCandidate(c[key]);
+  }
+  return out;
+}
+
+// =====================================================================
+// Detailed-system initialiser
+// =====================================================================
+
+/**
+ * Populate the detailed-system slots by cloning the default-system
+ * candidates 1:1. Each clone is tagged with `_system='detailed'`.
+ * Idempotent — running again on a state with existing detailed
+ * candidates overwrites them with fresh clones (the legacy behavior).
+ *
+ * Returns the number of candidates duplicated into
+ * state.candidates_detailed.
+ *
+ * @param {Object} state
+ * @returns {number}
+ */
+export function initDetailedFromDefault(state) {
+  pcrEnsureState(state);
+  if (!state) return 0;
+  let count = 0;
+
+  if (state.candidates && typeof state.candidates === 'object') {
+    for (const id of Object.keys(state.candidates)) {
+      const c = state.candidates[id];
+      if (!c) continue;
+      const cloned = pcrDeepCloneCandidate(c);
+      cloned._system = 'detailed';
+      state.candidates_detailed[id] = cloned;
+      count++;
+    }
+  }
+  if (Array.isArray(state.candidateList)) {
+    state.candidateList_detailed = state.candidateList.map(c => {
+      const cloned = pcrDeepCloneCandidate(c);
+      cloned._system = 'detailed';
+      return cloned;
+    });
+  }
+  if (state.candidate) {
+    state.candidate_detailed = pcrDeepCloneCandidate(state.candidate);
+    state.candidate_detailed._system = 'detailed';
+  }
+  return count;
+}
+
+// =====================================================================
 // Mode guards
 // =====================================================================
 
