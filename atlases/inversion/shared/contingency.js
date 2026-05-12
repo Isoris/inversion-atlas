@@ -72,6 +72,41 @@ export function detectFuseEvents(ct, opts) {
 }
 
 /**
+ * Symmetric counterpart to detectFuseEvents: a 1→many SPLIT event,
+ * where one fine cluster `a` distributes its samples across ≥2
+ * coarse clusters, each receiving ≥ thresh fraction of f's samples.
+ *
+ * Returns array of { fine_cluster: int, coarse_clusters: int[] }.
+ * Empty array on null/invalid ct.
+ *
+ * Default thresh = 0.20 (a coarse cluster receiving ≥20% of a fine
+ * cluster's samples is a "destination" for the split). Tune via
+ * `opts.thresh`.
+ *
+ * Legacy origin: _detectSplitEvents at line 12299 of legacy/
+ * Inversion_atlas.html.
+ *
+ * @param {{M:number[][], KA:number, KB:number}} ct
+ * @param {{thresh?:number}} [opts]
+ * @returns {Array<{fine_cluster:number, coarse_clusters:number[]}>}
+ */
+export function detectSplitEvents(ct, opts) {
+  if (!ct || !ct.M) return [];
+  const t = (opts && opts.thresh != null) ? +opts.thresh : 0.20;
+  const { M, KA, KB } = ct;
+  const splits = [];
+  for (let a = 0; a < KA; a++) {
+    let rowS = 0;
+    for (let b = 0; b < KB; b++) rowS += M[a][b];
+    if (rowS === 0) continue;
+    const coarseList = [];
+    for (let b = 0; b < KB; b++) if (M[a][b] / rowS >= t) coarseList.push(b);
+    if (coarseList.length >= 2) splits.push({ fine_cluster: a, coarse_clusters: coarseList });
+  }
+  return splits;
+}
+
+/**
  * Adjusted Rand Index between two label arrays. Returns NaN on bad
  * input, 1 on identical partitions.
  *
@@ -276,46 +311,11 @@ export function lnGamma(x) {
  * @param {{ari_stable?: number, ari_edge?: number}} [opts]
  * @returns {string}
  */
-export function scaleStabilityVerdict(panes, pairwise, opts) {
-  const t = Object.assign({ ari_stable: 0.85, ari_edge: 0.70 }, opts || {});
-  if (!Array.isArray(panes) || panes.length !== 3) return 'UNSTABLE';
-  if (!Array.isArray(pairwise) || pairwise.length !== 2) return 'UNSTABLE';
-  const allOk = panes.every(p => p && p.ok !== false);
-  if (!allOk) return 'UNSTABLE';
-  const Ks = panes.map(p => p.K | 0);
-  const ari12 = pairwise[0] && isFinite(pairwise[0].ari) ? pairwise[0].ari : NaN;
-  const ari23 = pairwise[1] && isFinite(pairwise[1].ari) ? pairwise[1].ari : NaN;
-  const nFuse12  = (pairwise[0] && pairwise[0].fuseEvents)  ? pairwise[0].fuseEvents.length  : 0;
-  const nFuse23  = (pairwise[1] && pairwise[1].fuseEvents)  ? pairwise[1].fuseEvents.length  : 0;
-  const nSplit12 = (pairwise[0] && pairwise[0].splitEvents) ? pairwise[0].splitEvents.length : 0;
-  const nSplit23 = (pairwise[1] && pairwise[1].splitEvents) ? pairwise[1].splitEvents.length : 0;
-
-  const stableEdges = (ari12 >= t.ari_stable) && (ari23 >= t.ari_stable)
-                    && nFuse12 + nFuse23 + nSplit12 + nSplit23 === 0;
-  if (stableEdges && Ks[0] === 3 && Ks[1] === 3 && Ks[2] === 3) return 'STABLE_3BAND';
-  if (stableEdges && Ks[0] === 6 && Ks[1] === 6 && Ks[2] === 6) return 'STABLE_6BAND';
-
-  // Nested 3-in-6: middle pane K=6 fine, edges K=3 coarse, exactly 3 fuses each.
-  if (Ks[1] === 6 && Ks[0] === 3 && Ks[2] === 3
-      && nFuse12 === 3 && nFuse23 === 3
-      && nSplit12 === 0 && nSplit23 === 0) {
-    return 'NESTED_3IN6';
-  }
-
-  // Overlap breaks 3: edges agree (K=3, K=3, ARI≥edge), middle (K=6) introduces
-  // fuses+splits relative to both neighbors.
-  if (Ks[0] === 3 && Ks[2] === 3 && Ks[1] === 6
-      && nFuse12 + nSplit12 > 0 && nFuse23 + nSplit23 > 0) {
-    // Approximate the pane1↔pane3 ARI via the chain ari12, ari23 lower bound.
-    // The legacy code may have computed it directly; we keep the looser
-    // proxy (both edge-pair ARIs above ari_edge). If that's too loose for
-    // real data, swap in a direct pane1↔pane3 ARI via ari1_3 in opts.
-    const ari1_3_proxy = Math.min(ari12, ari23);
-    if (ari1_3_proxy >= t.ari_edge) return 'OVERLAP_BREAKS_3';
-  }
-
-  return 'UNSTABLE';
-}
+// scaleStabilityVerdict canonical implementation now lives in
+// shared/scale_stability.js (matches legacy line 12408 exactly). The
+// re-export below preserves contingency.js's export surface so
+// existing imports keep working.
+export { scaleStabilityVerdict } from './scale_stability.js';
 
 // =====================================================================
 // Table-based primitives (input: K×K contingency table)
@@ -612,6 +612,7 @@ function isArrayLike(x) {
 if (typeof window !== 'undefined') {
   window._buildContingency      = buildContingency;
   window._detectFuseEvents      = detectFuseEvents;
+  window._detectSplitEvents     = detectSplitEvents;
   window._computeARI            = computeARI;
   window._computeNMI            = computeNMI;
   window._cramersV              = cramersV;
