@@ -1,0 +1,206 @@
+// shared/dosage_chunks.js
+//
+// Dosage-chunk readers + per-L2 het-rate computation (legacy lines
+// 16540-16800). Reads from the existing dosage_chunks LRU cache to
+// produce per-sample het rates over a bp range. The synchronous-only
+// design matches the legacy convention: when no covering chunk is in
+// cache, the helper returns an all-NaN buffer rather than triggering
+// an async fetch (callers paint dim and rely on the user-driven
+// dosage UI to populate the cache).
+//
+// All compute is pure: caller passes state explicitly and supplies
+// the chunk-fetcher via `opts.getCachedChunk(startBp, endBp)`. The
+// legacy reached `window.popgenDosage.getCachedChunk` as a runtime
+// global — the cartridge port keeps that lookup at the call site.
+
+/**
+ * Read a single dosage cell out of a loaded chunk. Returns null when
+ * the chunk / row / cell is missing or carries the -1 NA sentinel.
+ *
+ * @param {{dosage?:Array<ArrayLike<number>>}} chunk
+ * @param {number} marker_idx
+ * @param {number} sample_idx
+ * @returns {number|null}
+ */
+export function chunkGet(chunk, marker_idx, sample_idx) {
+  if (!chunk || !chunk.dosage) return null;
+  const row = chunk.dosage[marker_idx];
+  if (!row) return null;
+  const v = row[sample_idx];
+  if (v == null || !Number.isFinite(v) || v < 0) return null;
+  return v;
+}
+
+// =====================================================================
+// Per-L2 / per-range het-rate compute
+// =====================================================================
+
+function _emptyNaN(nS) {
+  const out = new Float32Array(nS);
+  for (let si = 0; si < nS; si++) out[si] = NaN;
+  return out;
+}
+
+function _ensureHetRateCache(state) {
+  if (!state.__hetRateCache || !(state.__hetRateCache instanceof Map)) {
+    state.__hetRateCache = new Map();
+  }
+  return state.__hetRateCache;
+}
+
+/**
+ * Invalidate the per-L2 / per-range het-rate cache. Called when the
+ * dosage_chunks layer rotates (new chunk-index, manual reset).
+ * @param {Object} state
+ */
+export function invalidateHetRateCache(state) {
+  if (state && state.__hetRateCache instanceof Map) {
+    state.__hetRateCache.clear();
+  }
+}
+
+/**
+ * Compute per-sample het rates over a bp range. Returns Float32Array
+ * of length n_samples; entries are NaN for samples with no calls in
+ * the range, [0, 1] otherwise.
+ *
+ * Reads dosage cells synchronously from the chunk that
+ * `opts.getCachedChunk(startBp, endBp)` returns. When no chunk is
+ * available (callback missing or returns null), the result is
+ * all-NaN.
+ *
+ * Optional `cacheKey` memoises across calls — pass null to skip
+ * caching. The legacy code keys per-L2 by index and per-slab by
+ * 'slab:start_w:end_w'.
+ *
+ * Chunk contract: `{ samples: [id, ...], markers: [{pos_bp}, ...],
+ * dosage: [[per-sample, ...], ...] }`. The mapping from chunk
+ * sample-index to cohort sample-index is rebuilt from sample ids
+ * (s.id || s.cga || s.ind || s.sample fallback chain — matches the
+ * legacy convention).
+ *
+ * @param {Object} state
+ * @param {number} startBp
+ * @param {number} endBp
+ * @param {{getCachedChunk?:Function, cacheKey?:string|number}} opts
+ * @returns {Float32Array}
+ */
+export function computeHetRateForRange(state, startBp, endBp, opts) {
+  const o = opts || {};
+  const nS = (state && state.data && state.data.n_samples) || 0;
+  const cache = state ? _ensureHetRateCache(state) : null;
+  const cacheKey = o.cacheKey != null ? o.cacheKey : null;
+  if (cacheKey != null && cache && cache.has(cacheKey)) return cache.get(cacheKey);
+
+  const out = _emptyNaN(nS);
+  if (!Number.isFinite(startBp) || !Number.isFinite(endBp) || endBp < startBp) {
+    if (cacheKey != null && cache) cache.set(cacheKey, out);
+    return out;
+  }
+
+  const getCachedChunk = o.getCachedChunk;
+  const chunk = (typeof getCachedChunk === 'function')
+    ? getCachedChunk(startBp, endBp) : null;
+  if (!chunk || !Array.isArray(chunk.markers) || !Array.isArray(chunk.dosage)
+      || !Array.isArray(chunk.samples)) {
+    if (cacheKey != null && cache) cache.set(cacheKey, out);
+    return out;
+  }
+
+  // chunk-sample-id → cohort-index lookup
+  const cohortSamples = (state && state.data && state.data.samples) || [];
+  const idToCohort = new Map();
+  for (let ci = 0; ci < cohortSamples.length; ci++) {
+    const s = cohortSamples[ci];
+    const id = (s && (s.id || s.cga || s.ind || s.sample)) || ('S' + ci);
+    idToCohort.set(id, ci);
+  }
+
+  // Filter markers to bp span
+  const inRange = [];
+  for (let mi = 0; mi < chunk.markers.length; mi++) {
+    const m = chunk.markers[mi];
+    if (!m || !Number.isFinite(m.pos_bp)) continue;
+    if (m.pos_bp < startBp || m.pos_bp > endBp) continue;
+    inRange.push(mi);
+  }
+  if (inRange.length === 0) {
+    if (cacheKey != null && cache) cache.set(cacheKey, out);
+    return out;
+  }
+
+  // Count het + non-NA calls per chunk-sample
+  const nChunkS = chunk.samples.length;
+  const hetCounts = new Int32Array(nChunkS);
+  const nonNaCounts = new Int32Array(nChunkS);
+  for (const mi of inRange) {
+    const row = chunk.dosage[mi];
+    if (!row) continue;
+    for (let ci = 0; ci < nChunkS; ci++) {
+      const v = row[ci];
+      if (v == null || !Number.isFinite(v) || v < 0) continue;
+      nonNaCounts[ci]++;
+      if (v === 1) hetCounts[ci]++;
+    }
+  }
+
+  // Project to cohort space
+  for (let ci = 0; ci < nChunkS; ci++) {
+    const cohortIdx = idToCohort.has(chunk.samples[ci])
+      ? idToCohort.get(chunk.samples[ci]) : -1;
+    if (cohortIdx < 0 || cohortIdx >= nS) continue;
+    out[cohortIdx] = (nonNaCounts[ci] === 0)
+      ? NaN
+      : hetCounts[ci] / nonNaCounts[ci];
+  }
+
+  if (cacheKey != null && cache) cache.set(cacheKey, out);
+  return out;
+}
+
+/**
+ * Per-L2 het rate. Thin wrapper over computeHetRateForRange that
+ * pulls the bp span from state.data.l2_envelopes[l2idx] and uses
+ * `l2idx` as the cache key.
+ *
+ * @param {Object} state
+ * @param {number} l2idx
+ * @param {{getCachedChunk?:Function}} opts
+ * @returns {Float32Array}
+ */
+export function computeHetRateForL2(state, l2idx, opts) {
+  const env = state && state.data && Array.isArray(state.data.l2_envelopes)
+    && state.data.l2_envelopes[l2idx];
+  if (!env) {
+    const nS = (state && state.data && state.data.n_samples) || 0;
+    return _emptyNaN(nS);
+  }
+  return computeHetRateForRange(state, env.start_bp, env.end_bp,
+    Object.assign({}, opts, { cacheKey: l2idx }));
+}
+
+/**
+ * Per-slab (start_w → end_w) het rate. Translates window-indices to
+ * bp via state.data.windows.start_bp / end_bp and delegates to
+ * computeHetRateForRange.
+ *
+ * @param {Object} state
+ * @param {number} startW
+ * @param {number} endW
+ * @param {{getCachedChunk?:Function}} opts
+ * @returns {Float32Array}
+ */
+export function computeHetRateForSlab(state, startW, endW, opts) {
+  const nS = (state && state.data && state.data.n_samples) || 0;
+  const w = state && state.data && state.data.windows;
+  if (!w || !w.start_bp || !w.end_bp
+      || !Number.isInteger(startW) || !Number.isInteger(endW)
+      || startW < 0 || endW >= w.start_bp.length || endW < startW) {
+    return _emptyNaN(nS);
+  }
+  const start_bp = w.start_bp[startW];
+  const end_bp   = w.end_bp[endW];
+  const cacheKey = 'slab:' + startW + ':' + endW;
+  return computeHetRateForRange(state, start_bp, end_bp,
+    Object.assign({}, opts, { cacheKey }));
+}
