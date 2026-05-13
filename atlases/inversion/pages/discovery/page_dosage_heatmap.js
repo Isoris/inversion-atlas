@@ -72,6 +72,7 @@ export function refreshDosageHeatmap(state) {
   _paintHeatmap(_pageState);
   _renderRightPanel(_pageState);
   _renderLegend(_pageState);
+  _updateTooltip(_pageState);
 }
 
 export function initDosageHeatmapToolbar() {
@@ -137,6 +138,7 @@ function _buildPageState(atlasState) {
                               ? buildGroupColorMap(_distinctOf(canonical.sample_k6))
                               : new Map(),
     layout:                null,
+    last_cursor_px:        null,
     view_state:            Object.assign({}, DEFAULT_VIEW_STATE,
                                           (dh && dh.view_state) || {}),
     selection:             createDosageHeatmapSelection(),
@@ -319,8 +321,15 @@ function _wireToolbar(state) {
       ? c.getBoundingClientRect() : { left: 0, top: 0 };
     const x = ((ev && ev.clientX) || 0) - (rect.left || 0);
     const y = ((ev && ev.clientY) || 0) - (rect.top  || 0);
+    state.last_cursor_px = { x, y };
     const cell = findCellAtPixel(state.layout, state.data ? state.data.cellValue : null, x, y);
     state.selection.setHoveredCell(cell);
+    _updateTooltip(state);
+  };
+  const onCanvasLeave = () => {
+    state.last_cursor_px = null;
+    state.selection.setHoveredCell(null);
+    _hideTooltip();
   };
   const onCanvasClick = (ev) => {
     const c = document.getElementById('dosageHeatmapCanvas');
@@ -336,21 +345,25 @@ function _wireToolbar(state) {
     else                   state.selection.toggleSelectedSample(cell.sample_idx);
   };
 
-  const unsubSelection = state.selection.subscribe(() => { repaintAll(); });
+  const unsubSelection = state.selection.subscribe(() => {
+    repaintAll();
+    _updateTooltip(state);
+  });
 
   state._handlers = {
     onSampleOrder, onMarkerOrder,
     onShowGroupTrack, onShowPolarityTrack,
-    onCanvasMove, onCanvasClick,
+    onCanvasMove, onCanvasClick, onCanvasLeave,
     unsubSelection,
   };
 
-  _addListener('dosageHeatmapSampleOrder',        'change',    onSampleOrder);
-  _addListener('dosageHeatmapMarkerOrder',        'change',    onMarkerOrder);
-  _addListener('dosageHeatmapShowGroupTrack',     'change',    onShowGroupTrack);
-  _addListener('dosageHeatmapShowPolarityTrack',  'change',    onShowPolarityTrack);
-  _addListener('dosageHeatmapCanvas',             'mousemove', onCanvasMove);
-  _addListener('dosageHeatmapCanvas',             'click',     onCanvasClick);
+  _addListener('dosageHeatmapSampleOrder',        'change',     onSampleOrder);
+  _addListener('dosageHeatmapMarkerOrder',        'change',     onMarkerOrder);
+  _addListener('dosageHeatmapShowGroupTrack',     'change',     onShowGroupTrack);
+  _addListener('dosageHeatmapShowPolarityTrack',  'change',     onShowPolarityTrack);
+  _addListener('dosageHeatmapCanvas',             'mousemove',  onCanvasMove);
+  _addListener('dosageHeatmapCanvas',             'click',      onCanvasClick);
+  _addListener('dosageHeatmapCanvas',             'mouseleave', onCanvasLeave);
 }
 
 function _teardownToolbar(state) {
@@ -360,10 +373,47 @@ function _teardownToolbar(state) {
   if (h.onMarkerOrder)        _removeListener('dosageHeatmapMarkerOrder',        'change',    h.onMarkerOrder);
   if (h.onShowGroupTrack)     _removeListener('dosageHeatmapShowGroupTrack',     'change',    h.onShowGroupTrack);
   if (h.onShowPolarityTrack)  _removeListener('dosageHeatmapShowPolarityTrack',  'change',    h.onShowPolarityTrack);
-  if (h.onCanvasMove)         _removeListener('dosageHeatmapCanvas',             'mousemove', h.onCanvasMove);
-  if (h.onCanvasClick)        _removeListener('dosageHeatmapCanvas',             'click',     h.onCanvasClick);
+  if (h.onCanvasMove)         _removeListener('dosageHeatmapCanvas',             'mousemove',  h.onCanvasMove);
+  if (h.onCanvasClick)        _removeListener('dosageHeatmapCanvas',             'click',      h.onCanvasClick);
+  if (h.onCanvasLeave)        _removeListener('dosageHeatmapCanvas',             'mouseleave', h.onCanvasLeave);
   if (typeof h.unsubSelection === 'function') { try { h.unsubSelection(); } catch (_) {} }
   state._handlers = {};
+}
+
+function _updateTooltip(state) {
+  if (typeof document === 'undefined' || !document.getElementById) return;
+  const slot = document.getElementById('dosageHeatmapTooltip');
+  if (!slot) return;
+  if (!state) { slot.style.display = 'none'; return; }
+  const hov = state.selection.getHoveredCell();
+  const px  = state.last_cursor_px;
+  if (!hov || !px || !state.data) { slot.style.display = 'none'; return; }
+  slot.innerHTML = summariseHoverCell(hov, state.data);
+  slot.style.display = 'block';
+  // Position the tooltip 12px right + 4px below the cursor, clamped to
+  // the canvas-wrap. We use offsetWidth/Height after toggling display
+  // so the dimensions are known.
+  const canvas = document.getElementById('dosageHeatmapCanvas');
+  const wrap = canvas && canvas.parentElement;
+  if (!wrap) return;
+  const ww = (typeof wrap.clientWidth  === 'number') ? wrap.clientWidth  : 0;
+  const wh = (typeof wrap.clientHeight === 'number') ? wrap.clientHeight : 0;
+  const tw = slot.offsetWidth  || 0;
+  const th = slot.offsetHeight || 0;
+  let left = px.x + 12;
+  let top  = px.y + 4;
+  if (tw > 0 && left + tw > ww - 4) left = px.x - tw - 8;
+  if (left < 4) left = 4;
+  if (th > 0 && top + th > wh - 4) top = px.y - th - 6;
+  if (top < 4) top = 4;
+  slot.style.left = left + 'px';
+  slot.style.top  = top  + 'px';
+}
+
+function _hideTooltip() {
+  if (typeof document === 'undefined' || !document.getElementById) return;
+  const slot = document.getElementById('dosageHeatmapTooltip');
+  if (slot) slot.style.display = 'none';
 }
 
 function _addListener(id, evt, cb) {

@@ -202,7 +202,88 @@ export function bindDosageHeatmapPanelToSlot(panel_state, slot) {
 }
 
 // =====================================================================
-// 5. Top-level convenience: bind everything detectable on atlasState
+// 5. Adapter for the tree panel — leaf-id (string) ↔ sample idx
+// =====================================================================
+
+/**
+ * Bind the tree panel: its selection store uses leaf-id strings
+ * (e.g. '5'), but those map to canonical sample indices via
+ * `parseInt`. When the mgl tree was built with caller-provided
+ * leaf names, the caller should provide an `opts.leafIdToSample`
+ * function to override the default int-parse.
+ *
+ * @param {Object} panel_state    tree-panel page state
+ * @param {Object} slot
+ * @param {Object} [opts]
+ *   leafIdToSample?: (leaf_id:string) => number|null
+ *   sampleToLeafId?: (sample_idx:number) => string|null
+ * @returns {Function}            unsubscribe
+ */
+export function bindTreePanelToSlot(panel_state, slot, opts) {
+  if (!panel_state || !panel_state.selection || !slot || !slot.render_state) {
+    return () => {};
+  }
+  const o = opts || {};
+  const leafToSample = (typeof o.leafIdToSample === 'function')
+    ? o.leafIdToSample
+    : (id) => { const n = parseInt(id, 10); return Number.isFinite(n) ? n : null; };
+  const sampleToLeaf = (typeof o.sampleToLeafId === 'function')
+    ? o.sampleToLeafId
+    : (n) => (Number.isFinite(n) ? String(n) : null);
+
+  const rs = slot.render_state;
+  const sel = panel_state.selection;
+  let applying = false;
+
+  const unsubFromSlot = subscribeMglRenderState(rs, (s, keys) => {
+    applying = true;
+    try {
+      if (keys.indexOf('hover_sample') >= 0) {
+        const v = s.hover_sample;
+        sel.setHovered(Number.isFinite(v) ? sampleToLeaf(v) : null);
+      }
+      if (keys.indexOf('selected_samples') >= 0 && (s.selected_samples instanceof Set)) {
+        // Translate slot Set<number> → leaf-id strings.
+        const desired = new Set();
+        for (const v of s.selected_samples) {
+          const leaf = sampleToLeaf(v);
+          if (leaf != null) desired.add(leaf);
+        }
+        const panelSet = sel.getSelected();
+        // Quick equality check.
+        let sameSize = panelSet.size === desired.size;
+        if (sameSize) {
+          for (const v of desired) if (!panelSet.has(v)) { sameSize = false; break; }
+        }
+        if (!sameSize) {
+          sel.clearSelection();
+          for (const v of desired) sel.toggleSelected(v);
+        }
+      }
+    } finally { applying = false; }
+  });
+
+  const unsubFromPanel = sel.subscribe(() => {
+    if (applying) return;
+    const id = sel.getHovered();
+    const hv = (id != null) ? leafToSample(id) : null;
+    setHover(rs, Number.isFinite(hv) ? hv : null, undefined);
+    // Translate panel Set<leaf_id_string> → numeric Set<sample_idx>.
+    const desired = new Set();
+    for (const leaf of sel.getSelected()) {
+      const v = leafToSample(leaf);
+      if (Number.isFinite(v)) desired.add(v);
+    }
+    if (!_sameSet(rs.selected_samples, desired)) {
+      updateMglRenderState(rs, { selected_samples: desired });
+    }
+  });
+
+  return () => { unsubFromSlot(); unsubFromPanel(); };
+}
+
+// =====================================================================
+// 6. Top-level convenience: bind everything detectable on atlasState
 // =====================================================================
 
 /**
@@ -226,6 +307,9 @@ export function bindAllPanelsToCandidateMode(atlasState, slot) {
   }
   if (inv._page_dosage_heatmap_state) {
     unsubs.push(bindDosageHeatmapPanelToSlot(inv._page_dosage_heatmap_state, slot));
+  }
+  if (inv._page_tree_panel_state) {
+    unsubs.push(bindTreePanelToSlot(inv._page_tree_panel_state, slot));
   }
   return () => { for (const u of unsubs) { try { u(); } catch (_) {} } };
 }

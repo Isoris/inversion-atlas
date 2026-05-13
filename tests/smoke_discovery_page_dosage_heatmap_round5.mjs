@@ -52,6 +52,9 @@ class FakeNode {
   constructor(id) {
     this.id = id; this.innerHTML = ''; this.textContent = ''; this.value = ''; this.checked = false;
     this.style = { display: '' }; this._listeners = {}; this.children = [];
+    this.offsetWidth = 0; this.offsetHeight = 0;
+    this.clientWidth = 600; this.clientHeight = 400;
+    this.parentElement = null;
   }
   addEventListener(evt, cb) { (this._listeners[evt] = this._listeners[evt] || []).push(cb); }
   removeEventListener(evt, cb) {
@@ -169,6 +172,24 @@ group('Smoke: mount with mgl_heatmap_result');
     const fields = _ensureNode('dosageHeatmapSelectedFields').innerHTML;
     check('right panel shows dosage value',       fields.indexOf('Dosage') >= 0);
     check('right panel shows cell summary',       fields.indexOf('Cell') >= 0);
+    check('last_cursor_px stashed on hover',
+          ps.last_cursor_px && Number.isFinite(ps.last_cursor_px.x));
+  }
+
+  // ---
+  group('Smoke: floating tooltip overlay');
+  {
+    const tip = _ensureNode('dosageHeatmapTooltip');
+    check('tooltip element shown after hover',
+          tip.style.display === 'block');
+    check('tooltip text matches cell summary',
+          tip.innerHTML && tip.innerHTML.length > 0);
+    // Move off the canvas → tooltip hides.
+    c.dispatchEvent({ type: 'mouseleave' });
+    check('tooltip hidden on mouseleave',
+          tip.style.display === 'none');
+    check('hovered cell cleared on mouseleave',
+          ps.selection.getHoveredCell() === null);
   }
 
   // ---

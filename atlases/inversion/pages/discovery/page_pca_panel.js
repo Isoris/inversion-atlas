@@ -45,12 +45,22 @@ import {
   summarisePcaResult,
   clusterSizesFromAssignment,
 } from './page_pca_panel/selection.js';
+import { pcaCacheKey } from '../../shared/mgl_candidate_mode.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   color_by:     'cluster',
   axis_choice:  'pc1_pc2',
   show_labels:  false,
 });
+
+// SPEC_0 §10 canonical variant axes. The panel will surface only the
+// options actually present in pca_variants; these arrays drive the
+// dropdown order.
+const PCA_VIEW_OPTIONS = Object.freeze([
+  'all_pairs', 'hom1_vs_hom2', 'hom1_vs_het', 'hom2_vs_het',
+]);
+const PCA_WEIGHTING_OPTIONS = Object.freeze(['weighted', 'unweighted']);
+const PCA_ANCHOR_OPTIONS    = Object.freeze(['bi_baseline', 'view_self', 'none', 'both']);
 
 // =====================================================================
 // Public entry — refresh
@@ -106,10 +116,21 @@ function _buildPageState(atlasState) {
       ? Math.max(1, ..._coerceArr(ps.cluster_assignment)) + 1 : 1),
     ps ? ps.cluster_colors : null,
   );
+  const variants = (ps && ps.pca_variants && typeof ps.pca_variants === 'object')
+    ? ps.pca_variants : null;
+  const variantKeys = variants ? Object.keys(variants) : [];
+  const variant = (ps && ps.variant) ? _normaliseVariantChoice(ps.variant)
+    : (variantKeys.length > 0 ? _parseVariantKey(variantKeys[0]) : null);
+  const initialResults = variants && variant
+    ? (variants[pcaCacheKey(variant.view, variant.weighting, variant.anchor)] || null)
+    : (ps && ps.pca_results) || null;
   return {
-    pca_results:           ps ? (ps.pca_results || null) : null,
+    pca_variants:          variants,
+    variant:               variant,
+    pca_results:           initialResults,
     candidate_label:       ps ? (ps.candidate_label || null) : null,
-    anchor_label:          ps ? (ps.anchor_label || 'view_self') : 'view_self',
+    anchor_label:          ps ? (ps.anchor_label || null)
+                              : (variant ? _variantLabel(variant) : 'view_self'),
     sample_labels:         ps ? (ps.sample_labels || null) : null,
     cluster_assignment:    ps ? (ps.cluster_assignment || null) : null,
     cluster_colors:        cmap,
@@ -121,6 +142,54 @@ function _buildPageState(atlasState) {
     selection:             createPcaPanelSelection(0),
     _handlers:             {},
   };
+}
+
+function _normaliseVariantChoice(v) {
+  if (!v) return null;
+  return {
+    view:      v.view      || 'all_pairs',
+    weighting: v.weighting || 'weighted',
+    anchor:    v.anchor    || 'view_self',
+  };
+}
+
+function _parseVariantKey(k) {
+  if (typeof k !== 'string') return null;
+  const parts = k.split('|');
+  if (parts.length !== 3) return null;
+  return { view: parts[0], weighting: parts[1], anchor: parts[2] };
+}
+
+function _variantLabel(v) {
+  if (!v) return '—';
+  return `${v.view} · ${v.weighting} · ${v.anchor}`;
+}
+
+function _availableAxesFromVariants(variants) {
+  const out = { views: new Set(), weightings: new Set(), anchors: new Set() };
+  if (!variants) return out;
+  for (const k of Object.keys(variants)) {
+    const p = _parseVariantKey(k);
+    if (!p) continue;
+    out.views.add(p.view);
+    out.weightings.add(p.weighting);
+    out.anchors.add(p.anchor);
+  }
+  return out;
+}
+
+function _filterPresent(canonical, present) {
+  const out = [];
+  for (const v of canonical) if (present.has(v)) out.push(v);
+  for (const v of present) if (!canonical.includes(v)) out.push(v);
+  return out;
+}
+
+function _resolveVariantResults(state, variant) {
+  if (!state || !state.pca_variants || !variant) return null;
+  return state.pca_variants[
+    pcaCacheKey(variant.view, variant.weighting, variant.anchor)
+  ] || null;
 }
 
 function _coerceArr(a) {
@@ -158,7 +227,12 @@ function _renderHeader(state) {
   const label = document.getElementById('pcaPanelCandidateLabel');
   if (label) label.textContent = state.candidate_label || '—';
   const badge = document.getElementById('pcaPanelAnchorBadge');
-  if (badge) badge.textContent = state.anchor_label || 'view_self';
+  if (badge) {
+    badge.textContent = state.anchor_label
+      || (state.variant ? _variantLabel(state.variant) : '—');
+  }
+  // Populate variant pickers from the keys present in pca_variants.
+  _populateVariantPickers(state);
   // Reflect view-state on toolbar inputs.
   const col = document.getElementById('pcaPanelColorBy');
   if (col) col.value = state.view_state.color_by || 'cluster';
@@ -171,6 +245,46 @@ function _renderHeader(state) {
     const idx = state.selection.getActiveWindowIdx();
     wLbl.textContent = (idx != null && state.pca_results) ? `window ${idx}` : 'window —';
   }
+}
+
+function _populateVariantPickers(state) {
+  if (typeof document === 'undefined' || !document.getElementById) return;
+  const variants = state.pca_variants;
+  const variant  = state.variant;
+  const vPick = document.getElementById('pcaPanelViewPicker');
+  const wPick = document.getElementById('pcaPanelWeightingPicker');
+  const aPick = document.getElementById('pcaPanelAnchorPicker');
+  if (!variants || Object.keys(variants).length === 0) {
+    // No variants supplied — hide pickers (single-variant mode).
+    if (vPick) vPick.style.display = 'none';
+    if (wPick) wPick.style.display = 'none';
+    if (aPick) aPick.style.display = 'none';
+    return;
+  }
+  const axes = _availableAxesFromVariants(variants);
+  const views      = _filterPresent(PCA_VIEW_OPTIONS,      axes.views);
+  const weightings = _filterPresent(PCA_WEIGHTING_OPTIONS, axes.weightings);
+  const anchors    = _filterPresent(PCA_ANCHOR_OPTIONS,    axes.anchors);
+  _renderOptions(vPick, views,      variant ? variant.view      : null);
+  _renderOptions(wPick, weightings, variant ? variant.weighting : null);
+  _renderOptions(aPick, anchors,    variant ? variant.anchor    : null);
+  if (vPick) vPick.style.display = '';
+  if (wPick) wPick.style.display = '';
+  if (aPick) aPick.style.display = '';
+}
+
+function _renderOptions(select, values, active) {
+  if (!select || !Array.isArray(values)) return;
+  // Build a string of <option> elements — using innerHTML keeps the
+  // logic small even under the fake-DOM smoke (no createElement
+  // needed).
+  let html = '';
+  for (const v of values) {
+    const sel = (v === active) ? ' selected' : '';
+    html += `<option value="${v}"${sel}>${v}</option>`;
+  }
+  select.innerHTML = html;
+  if (active != null && 'value' in select) select.value = String(active);
 }
 
 // =====================================================================
@@ -307,6 +421,27 @@ function _wireToolbar(state) {
     _renderClusterList(state);
   };
 
+  const _setVariantAxis = (axis, value) => {
+    if (!state.variant) state.variant = { view: 'all_pairs', weighting: 'weighted', anchor: 'view_self' };
+    state.variant[axis] = value;
+    const r = _resolveVariantResults(state, state.variant);
+    if (r) {
+      state.pca_results = r;
+      // Keep the active window in-range for the new results.
+      const idx = state.selection.getActiveWindowIdx();
+      if (!(Number.isFinite(idx) && idx >= 0 && idx < r.length)) {
+        state.selection.setActiveWindowIdx(0);
+      }
+    } else {
+      state.pca_results = null;
+    }
+    state.anchor_label = _variantLabel(state.variant);
+    repaintAll();
+  };
+  const onViewPick      = (e) => _setVariantAxis('view',      (e && e.target && e.target.value) || 'all_pairs');
+  const onWeightingPick = (e) => _setVariantAxis('weighting', (e && e.target && e.target.value) || 'weighted');
+  const onAnchorPick    = (e) => _setVariantAxis('anchor',    (e && e.target && e.target.value) || 'view_self');
+
   const onColorBy = (e) => {
     state.view_state.color_by = (e && e.target && e.target.value) || 'cluster';
     repaintScatter();
@@ -361,12 +496,16 @@ function _wireToolbar(state) {
   const unsubSelection = state.selection.subscribe(() => { repaintAll(); });
 
   state._handlers = {
+    onViewPick, onWeightingPick, onAnchorPick,
     onColorBy, onAxisChoice, onShowLabels,
     onScrubberMove, onScrubberClick,
     onScatterMove, onScatterClick,
     unsubSelection,
   };
 
+  _addListener('pcaPanelViewPicker',      'change',    onViewPick);
+  _addListener('pcaPanelWeightingPicker', 'change',    onWeightingPick);
+  _addListener('pcaPanelAnchorPicker',    'change',    onAnchorPick);
   _addListener('pcaPanelColorBy',         'change',    onColorBy);
   _addListener('pcaPanelAxisChoice',      'change',    onAxisChoice);
   _addListener('pcaPanelShowLabels',      'change',    onShowLabels);
@@ -379,6 +518,9 @@ function _wireToolbar(state) {
 function _teardownToolbar(state) {
   if (!state || !state._handlers) return;
   const h = state._handlers;
+  if (h.onViewPick)       _removeListener('pcaPanelViewPicker',     'change',    h.onViewPick);
+  if (h.onWeightingPick)  _removeListener('pcaPanelWeightingPicker','change',    h.onWeightingPick);
+  if (h.onAnchorPick)     _removeListener('pcaPanelAnchorPicker',   'change',    h.onAnchorPick);
   if (h.onColorBy)        _removeListener('pcaPanelColorBy',        'change',    h.onColorBy);
   if (h.onAxisChoice)     _removeListener('pcaPanelAxisChoice',     'change',    h.onAxisChoice);
   if (h.onShowLabels)     _removeListener('pcaPanelShowLabels',     'change',    h.onShowLabels);

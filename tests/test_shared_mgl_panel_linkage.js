@@ -8,8 +8,11 @@ import {
   bindSamplePanelToSlot,
   bindSimilarityPanelToSlot,
   bindDosageHeatmapPanelToSlot,
+  bindTreePanelToSlot,
   bindAllPanelsToCandidateMode,
 } from '../atlases/inversion/shared/mgl_panel_linkage.js';
+import { createTreePanelSelection } from
+  '../atlases/inversion/pages/discovery/page_tree_panel/selection.js';
 import {
   createMglCandidateModeSlot,
 } from '../atlases/inversion/shared/mgl_candidate_mode.js';
@@ -36,6 +39,7 @@ group('module exports');
 check('bindSamplePanelToSlot exported',          typeof bindSamplePanelToSlot === 'function');
 check('bindSimilarityPanelToSlot exported',      typeof bindSimilarityPanelToSlot === 'function');
 check('bindDosageHeatmapPanelToSlot exported',   typeof bindDosageHeatmapPanelToSlot === 'function');
+check('bindTreePanelToSlot exported',            typeof bindTreePanelToSlot === 'function');
 check('bindAllPanelsToCandidateMode exported',   typeof bindAllPanelsToCandidateMode === 'function');
 
 // =====================================================================
@@ -158,6 +162,66 @@ group('bindDosageHeatmapPanelToSlot — selection only');
 }
 
 // =====================================================================
+group('bindTreePanelToSlot');
+{
+  const slot = createMglCandidateModeSlot();
+  const treePanel = { selection: createTreePanelSelection() };
+  const unbind = bindTreePanelToSlot(treePanel, slot);
+
+  // Panel hover (leaf-id string) → slot hover_sample (int).
+  treePanel.selection.setHovered('5');
+  check('panel→slot: hover_sample = 5',
+        slot.render_state.hover_sample === 5);
+
+  // Slot hover → panel sees the leaf id as string.
+  setHover(slot.render_state, 8, undefined);
+  check('slot→panel: hovered leaf = "8"',
+        treePanel.selection.getHovered() === '8');
+
+  // Selection: panel → slot.
+  treePanel.selection.toggleSelected('2');
+  treePanel.selection.toggleSelected('4');
+  check('panel→slot: selected_samples size = 2',
+        slot.render_state.selected_samples.size === 2);
+  check('panel→slot: selected_samples contains 2 and 4',
+        slot.render_state.selected_samples.has(2)
+     && slot.render_state.selected_samples.has(4));
+
+  // Selection: slot → panel.
+  updateMglRenderState(slot.render_state,
+    { selected_samples: new Set([10, 20]) });
+  check('slot→panel: tree sees "10" and "20"',
+        treePanel.selection.getSelected().has('10')
+     && treePanel.selection.getSelected().has('20'));
+
+  unbind();
+  treePanel.selection.setHovered('99');
+  check('after unbind: slot hover does not advance',
+        slot.render_state.hover_sample !== 99);
+}
+
+// =====================================================================
+group('bindTreePanelToSlot — custom leafIdToSample / sampleToLeafId');
+{
+  const slot = createMglCandidateModeSlot();
+  const treePanel = { selection: createTreePanelSelection() };
+  // Use a custom mapping: leaf 'sA' = sample 0, 'sB' = 1, 'sC' = 2.
+  const idToSample = { sA: 0, sB: 1, sC: 2 };
+  const sampleToId = ['sA', 'sB', 'sC'];
+  const unbind = bindTreePanelToSlot(treePanel, slot, {
+    leafIdToSample: (id) => id in idToSample ? idToSample[id] : null,
+    sampleToLeafId: (n) => sampleToId[n] || null,
+  });
+  treePanel.selection.setHovered('sB');
+  check('custom mapping: panel sB → slot 1',
+        slot.render_state.hover_sample === 1);
+  setHover(slot.render_state, 2, undefined);
+  check('custom mapping: slot 2 → panel sC',
+        treePanel.selection.getHovered() === 'sC');
+  unbind();
+}
+
+// =====================================================================
 group('cross-panel propagation: PCA + similarity together');
 {
   const slot = createMglCandidateModeSlot();
@@ -195,11 +259,13 @@ group('bindAllPanelsToCandidateMode');
   const pca = { selection: createPcaPanelSelection() };
   const sim = { selection: createSimilarityPanelSelection() };
   const hm  = { selection: createDosageHeatmapSelection() };
+  const tree = { selection: createTreePanelSelection() };
   const atlasState = {
     inversion: {
       _page_pca_panel_state:        pca,
       _page_similarity_panel_state: sim,
       _page_dosage_heatmap_state:   hm,
+      _page_tree_panel_state:       tree,
     },
   };
   const unbindAll = bindAllPanelsToCandidateMode(atlasState, slot);
@@ -207,11 +273,15 @@ group('bindAllPanelsToCandidateMode');
   pca.selection.setHoveredSample(15);
   check('all-bind: similarity sees PCA hover',
         sim.selection.getHoveredCell() && sim.selection.getHoveredCell().i === 15);
+  check('all-bind: tree sees PCA hover as "15"',
+        tree.selection.getHovered() === '15');
 
   // PCA selecting fires in heatmap too.
   pca.selection.toggleSelectedSample(20);
   check('all-bind: heatmap sees PCA selection',
         hm.selection.getSelectedSamples().has(20));
+  check('all-bind: tree sees selection as "20"',
+        tree.selection.getSelected().has('20'));
 
   unbindAll();
   pca.selection.setHoveredSample(99);
@@ -242,6 +312,8 @@ group('null-input safety');
         typeof bindSimilarityPanelToSlot(null, null) === 'function');
   check('bindDosageHeatmapPanelToSlot(null, slot) → no-op',
         typeof bindDosageHeatmapPanelToSlot(null, slot) === 'function');
+  check('bindTreePanelToSlot(null, slot) → no-op',
+        typeof bindTreePanelToSlot(null, slot) === 'function');
 }
 
 // =====================================================================

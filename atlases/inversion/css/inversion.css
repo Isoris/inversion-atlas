@@ -4828,3 +4828,21 @@ html[data-theme="academic"] #page16 .cs-synteny-sankey {
   margin: 0 0 6px; font-size: 10px; color: var(--ink-dim);
   font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
 }
+
+/* Dosage-heatmap floating tooltip overlay.
+   Positioned absolutely inside .dh2-canvas-wrap (which is
+   position: relative — set by the panel section above). */
+.dh2-tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 5;
+  background: var(--panel-3);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 4px 6px;
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+.dh2-canvas-wrap { position: relative; }
