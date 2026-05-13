@@ -143,6 +143,7 @@ UNITS=(
   test_shared_band_tracking_iv.js
   test_shared_band_tracking_trajectory.js
   test_shared_band_tracking_karyotype_model.js
+  test_shared_band_tracking_haplotype_regime.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js

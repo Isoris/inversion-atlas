@@ -108,6 +108,26 @@ export {
 } from './karyotype_model.js';
 
 // ---------------------------------------------------------------------
+// LAYER 2 — long-range haplotype regime refinement.
+//
+// Consumes het-skeleton intervals (Layer 1b) + HOM consensus sets
+// (Layer 1c) and reconnects skeletons that were broken by analysis
+// artefacts. Emits long-range REGIMES — chains of related intervals
+// across a larger range than any single skeleton spans. Five
+// relationships: EXTENSION / NESTED / SHARED_HET / SWAPPED /
+// UNRELATED.
+// ---------------------------------------------------------------------
+export {
+  HAPLOTYPE_REGIME_RELATIONSHIPS,
+  HAPLOTYPE_REGIME_DEFAULTS,
+  intervalSampleCore,
+  relateIntervals,
+  buildHaplotypeRegimeGraph,
+  clusterHaplotypeRegimes,
+  refineRegimesFromIntervals,
+} from './haplotype_regime.js';
+
+// ---------------------------------------------------------------------
 // LAYER 2 — BandSet Projection (set-based authority)
 //
 // Note: legacy aspirational names (bp_compute_projection_vector,
