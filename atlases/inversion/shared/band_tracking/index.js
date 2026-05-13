@@ -56,9 +56,13 @@ export {
 
 export {
   HET_DEFAULTS,
+  meanSignalPerBand,
   meanPc1PerBand,
+  meanDosagePerBand,
   het_detect_candidate_band,
+  het_detect_candidate_band_by_signal,
   het_track_skeleton,
+  het_track_skeleton_by_signal,
   het_define_interval,
   iv_merge_het_tracks,
 } from './het.js';

@@ -5,11 +5,21 @@
 // All helpers operate on PER-WINDOW K-means labels (the V-driven
 // per-window contract from anchor_signals.js, not L2-envelope-broadcast).
 //
-// A "het band" is the band whose mean PC1 sits between the highest- and
-// lowest-PC1 bands at one window — the geometric heterozygote candidate
-// before any biological confirmation. Stitching het bands across windows
-// gives a het skeleton; per-sample karyotype calls (iv.js) consume that
-// skeleton.
+// TWO signals are supported for het detection:
+//
+//   - 'pc1_midpoint'   (default) — band whose mean PC1 sits between
+//                                   the highest-PC1 and lowest-PC1
+//                                   bands. GEOMETRIC heterozygote
+//                                   candidate; can be skewed by
+//                                   population structure.
+//   - 'dosage_one'                — band whose mean DOSAGE is closest
+//                                   to 1.0. BIOLOGICALLY anchored at
+//                                   a biallelic locus (dosage 1 ≡
+//                                   heterozygote by construction).
+//
+// The skeleton stitcher accepts either signal; the haplotype-regime
+// long-range refinement (downstream consumer) can then collapse het
+// bands across regimes.
 //
 // Five exports:
 //
@@ -45,10 +55,14 @@ import {
 
 /** Defaults for het detection + skeleton stitching. */
 export const HET_DEFAULTS = Object.freeze({
-  // Minimum span-fraction (k_het mean PC1 sits within central
-  // [min + frac*range, max - frac*range] band of the PC1 range)
+  // Minimum span-fraction (k_het mean signal sits within central
+  // [min + frac*range, max - frac*range] band of the signal range)
   // to call a band "het-like" rather than "homozygote-edge".
   min_span_frac: 0.20,
+  // For dosage_one mode: max absolute distance from 1.0 a band's
+  // mean dosage may have to still qualify as the het candidate.
+  // Beyond this the candidate is rejected.
+  max_dosage_dev: 0.35,
   // Forwarded to single_band_track_from_seed.
   min_jaccard: 0.5,
   // Default merge threshold for iv_merge_het_tracks.
@@ -56,24 +70,25 @@ export const HET_DEFAULTS = Object.freeze({
 });
 
 /**
- * Per-band mean PC1 at one window. Bands with zero members get NaN.
+ * Per-band mean of a numeric per-sample signal at one window.
+ * Generic shape used by both meanPc1PerBand and meanDosagePerBand.
  *
  * @param {Int8Array|Array<number>} labels
- * @param {Float32Array|Array<number>} pc1
+ * @param {Float32Array|Array<number>} signal
  * @param {number} K
  * @returns {Float64Array}
  */
-export function meanPc1PerBand(labels, pc1, K) {
+export function meanSignalPerBand(labels, signal, K) {
   const out = new Float64Array(K);
   const counts = new Int32Array(K);
-  if (!labels || !pc1 || !(K > 0)) {
+  if (!labels || !signal || !(K > 0)) {
     for (let k = 0; k < K; k++) out[k] = NaN;
     return out;
   }
   for (let i = 0; i < labels.length; i++) {
     const l = labels[i];
     if (l < 0 || l >= K) continue;
-    const v = pc1[i];
+    const v = signal[i];
     if (!Number.isFinite(v)) continue;
     out[l] += v;
     counts[l]++;
@@ -84,35 +99,63 @@ export function meanPc1PerBand(labels, pc1, K) {
   return out;
 }
 
+/** Per-band mean DOSAGE at one window (alias of meanSignalPerBand). */
+export function meanDosagePerBand(labels, dosage, K) {
+  return meanSignalPerBand(labels, dosage, K);
+}
+
 /**
- * At one window, detect the band whose mean PC1 is closest to the
- * midpoint of (min-mean, max-mean). Returns
- *
- *   {
- *     k_het:          int   the candidate het band index
- *     k_hom_low:      int   band with lowest mean PC1 (HOM_A anchor)
- *     k_hom_high:     int   band with highest mean PC1 (HOM_B anchor)
- *     mean_pc1:       per-band mean PC1 (Float64Array)
- *     het_span_frac:  (k_het mean - min) / (max - min) ∈ [0, 1]
- *   }
- *
- * Returns null when K < 3, all bands have NaN means, or when the
- * candidate het band's `het_span_frac` is outside
- * `[min_span_frac, 1 - min_span_frac]` (i.e. it's actually a
- * homozygote edge).
+ * Per-band mean PC1 at one window — alias of meanSignalPerBand for
+ * source-compat with the legacy PC1-only signature.
  *
  * @param {Int8Array|Array<number>} labels
  * @param {Float32Array|Array<number>} pc1
  * @param {number} K
- * @param {{min_span_frac?:number}} [opts]
+ * @returns {Float64Array}
+ */
+export function meanPc1PerBand(labels, pc1, K) {
+  return meanSignalPerBand(labels, pc1, K);
+}
+
+/**
+ * Generic het-band detector. `signal_kind` switches between:
+ *
+ *   - 'pc1_midpoint' (default) — pick the band whose mean signal is
+ *      closest to the midpoint of (min-mean, max-mean) across bands.
+ *      Reject when `het_span_frac` falls outside
+ *      `[min_span_frac, 1 - min_span_frac]` (homozygote edge).
+ *   - 'dosage_one' — pick the band whose mean signal is closest to
+ *      `het_target` (default 1.0). Reject when `|dev| > max_dosage_dev`.
+ *
+ * Returns:
+ *   {
+ *     k_het, k_hom_low, k_hom_high,
+ *     mean_signal:    Float64Array(K),   per-band mean of the signal
+ *     signal_kind,                       'pc1_midpoint' | 'dosage_one'
+ *     het_span_frac,                     (k_het - min) / (max - min)
+ *     het_dosage_dev,                    |k_het mean - target|  (dosage mode)
+ *   }
+ *
+ * Returns null when K < 3, fewer than two bands have finite means,
+ * or the candidate band fails the signal-specific quality gate.
+ *
+ * @param {Int8Array|Array<number>} labels
+ * @param {Float32Array|Array<number>} signal
+ * @param {number} K
+ * @param {{signal_kind?:string, min_span_frac?:number,
+ *          max_dosage_dev?:number, het_target?:number}} [opts]
  * @returns {Object|null}
  */
-export function het_detect_candidate_band(labels, pc1, K, opts) {
+export function het_detect_candidate_band_by_signal(labels, signal, K, opts) {
   const o = opts || {};
+  const kind = o.signal_kind || 'pc1_midpoint';
   const minSpanFrac = Number.isFinite(o.min_span_frac)
     ? o.min_span_frac : HET_DEFAULTS.min_span_frac;
+  const maxDosageDev = Number.isFinite(o.max_dosage_dev)
+    ? o.max_dosage_dev : HET_DEFAULTS.max_dosage_dev;
+  const hetTarget = Number.isFinite(o.het_target) ? o.het_target : 1.0;
   if (!(K >= 3)) return null;
-  const means = meanPc1PerBand(labels, pc1, K);
+  const means = meanSignalPerBand(labels, signal, K);
   let minVal = Infinity, maxVal = -Infinity;
   let kLow = -1, kHigh = -1;
   for (let k = 0; k < K; k++) {
@@ -124,66 +167,104 @@ export function het_detect_candidate_band(labels, pc1, K, opts) {
   if (kLow < 0 || kHigh < 0 || kLow === kHigh) return null;
   const range = maxVal - minVal;
   if (!(range > 0)) return null;
-  const mid = 0.5 * (minVal + maxVal);
-  // Pick the non-edge band with mean PC1 closest to mid.
+  const target = kind === 'dosage_one' ? hetTarget : 0.5 * (minVal + maxVal);
   let kHet = -1, bestDist = Infinity;
   for (let k = 0; k < K; k++) {
     if (k === kLow || k === kHigh) continue;
     const v = means[k];
     if (!Number.isFinite(v)) continue;
-    const d = Math.abs(v - mid);
+    const d = Math.abs(v - target);
     if (d < bestDist) { bestDist = d; kHet = k; }
   }
   if (kHet < 0) return null;
   const spanFrac = (means[kHet] - minVal) / range;
-  if (spanFrac < minSpanFrac || spanFrac > 1 - minSpanFrac) return null;
+  const dosageDev = Math.abs(means[kHet] - hetTarget);
+  if (kind === 'dosage_one') {
+    if (dosageDev > maxDosageDev) return null;
+  } else {
+    if (spanFrac < minSpanFrac || spanFrac > 1 - minSpanFrac) return null;
+  }
   return {
     k_het: kHet,
     k_hom_low: kLow,
     k_hom_high: kHigh,
-    mean_pc1: means,
+    mean_signal: means,
+    signal_kind: kind,
     het_span_frac: spanFrac,
+    het_dosage_dev: dosageDev,
   };
 }
 
 /**
- * Detect the het band at seed_w, then walk it forward + backward via
- * single_band_track_from_seed. Returns the stitched het skeleton.
+ * Original PC1-midpoint detector. Thin back-compat wrapper around
+ * het_detect_candidate_band_by_signal with signal_kind='pc1_midpoint'.
+ * Returns the same shape as before plus `mean_pc1` aliased to
+ * `mean_signal` and `signal_kind: 'pc1_midpoint'`.
  *
- * Inputs are per-window callbacks identical in shape to
- * single_band_track_from_seed.
+ * @param {Int8Array|Array<number>} labels
+ * @param {Float32Array|Array<number>} pc1
+ * @param {number} K
+ * @param {{min_span_frac?:number}} [opts]
+ * @returns {Object|null}
+ */
+export function het_detect_candidate_band(labels, pc1, K, opts) {
+  const r = het_detect_candidate_band_by_signal(labels, pc1, K,
+    Object.assign({}, opts || {}, { signal_kind: 'pc1_midpoint' }));
+  if (!r) return null;
+  // Preserve the legacy `mean_pc1` field name on the returned record.
+  return {
+    k_het: r.k_het,
+    k_hom_low: r.k_hom_low,
+    k_hom_high: r.k_hom_high,
+    mean_pc1: r.mean_signal,
+    het_span_frac: r.het_span_frac,
+  };
+}
+
+/**
+ * Generic het-skeleton stitcher with pluggable signal source.
+ *
+ * `args.getSignal(w)` produces the per-sample numeric vector to use
+ * for het detection at window `w`. `opts.signal_kind` selects the
+ * detector mode ('pc1_midpoint' default, or 'dosage_one').
  *
  *   {
- *     getLabels(w),  getPc1(w),  getK(w),
+ *     getLabels(w), getSignal(w), getK(w),
  *     chr_s_window, chr_e_window, seed_w,
  *   }
  *
- * The het identity is fixed at the seed window; the walk follows the
- * band whose member-set has the highest Jaccard against the previous
- * step's members. This is the cartridge default (not L2-broadcast).
- *
  * Returns:
  *   {
- *     ok, reason?,
- *     seed_w, s_window, e_window,
- *     windows: [{w, k, members, jaccard_from_prev, het_span_frac}],
+ *     ok, reason?, seed_w, s_window, e_window,
+ *     windows: [{w, k, members, jaccard_from_prev, het_span_frac,
+ *                het_dosage_dev?}],
  *     mean_continuity, min_continuity,
  *     k_hom_low_at_seed, k_hom_high_at_seed,
+ *     signal_kind,
  *   }
  *
+ * The downstream haplotype-regime long-range refinement consumes
+ * either skeleton flavour interchangeably — the het identity
+ * (the band's sample membership) is the cross-signal lingua franca.
+ *
  * @param {Object} args
+ * @param {Object} [opts]
  * @returns {Object}
  */
-export function het_track_skeleton(args, opts) {
+export function het_track_skeleton_by_signal(args, opts) {
   if (!args || typeof args.getLabels !== 'function'
-      || typeof args.getPc1 !== 'function'
+      || typeof args.getSignal !== 'function'
       || typeof args.getK !== 'function') {
     return { ok: false, reason: 'NO_CALLBACKS' };
   }
+  const o = opts || {};
+  const kind = o.signal_kind || 'pc1_midpoint';
   const seedLabels = args.getLabels(args.seed_w);
-  const seedPc1    = args.getPc1(args.seed_w);
+  const seedSignal = args.getSignal(args.seed_w);
   const seedK      = args.getK(args.seed_w);
-  const det = het_detect_candidate_band(seedLabels, seedPc1, seedK, opts);
+  const det = het_detect_candidate_band_by_signal(
+    seedLabels, seedSignal, seedK,
+    Object.assign({}, o, { signal_kind: kind }));
   if (!det) return { ok: false, reason: 'NO_HET_AT_SEED' };
 
   const track = single_band_track_from_seed({
@@ -196,15 +277,15 @@ export function het_track_skeleton(args, opts) {
   }, opts);
   if (!track.ok) return { ok: false, reason: track.reason || 'NO_TRACK' };
 
-  // Annotate each window with its het_span_frac (the band's own
-  // detection at that window — useful diagnostic).
+  // Per-window quality stamps for the kept track: span frac + dosage
+  // dev (whichever applies). Computed in the configured signal.
   const windows = track.windows.map(rec => {
     const lbls = args.getLabels(rec.w);
-    const pc1  = args.getPc1(rec.w);
+    const sig  = args.getSignal(rec.w);
     const K_w  = args.getK(rec.w);
-    let spanFrac = NaN;
-    if (lbls && pc1 && K_w >= 2) {
-      const means = meanPc1PerBand(lbls, pc1, K_w);
+    let spanFrac = NaN, dosageDev = NaN;
+    if (lbls && sig && K_w >= 2) {
+      const means = meanSignalPerBand(lbls, sig, K_w);
       let mn = Infinity, mx = -Infinity;
       for (let k = 0; k < K_w; k++) {
         const v = means[k];
@@ -213,8 +294,14 @@ export function het_track_skeleton(args, opts) {
       }
       const range = mx - mn;
       if (range > 0) spanFrac = (means[rec.k] - mn) / range;
+      if (kind === 'dosage_one' && Number.isFinite(means[rec.k])) {
+        const target = Number.isFinite(o.het_target) ? o.het_target : 1.0;
+        dosageDev = Math.abs(means[rec.k] - target);
+      }
     }
-    return Object.assign({}, rec, { het_span_frac: spanFrac });
+    const extra = { het_span_frac: spanFrac };
+    if (kind === 'dosage_one') extra.het_dosage_dev = dosageDev;
+    return Object.assign({}, rec, extra);
   });
   const cont = single_band_score_continuity(track);
 
@@ -228,7 +315,25 @@ export function het_track_skeleton(args, opts) {
     min_continuity: cont.min_jaccard,
     k_hom_low_at_seed:  det.k_hom_low,
     k_hom_high_at_seed: det.k_hom_high,
+    signal_kind: kind,
   };
+}
+
+/**
+ * Back-compat PC1 skeleton stitcher. Wraps het_track_skeleton_by_signal
+ * with signal_kind='pc1_midpoint' and adapts `getPc1` to `getSignal`.
+ *
+ * @param {Object} args
+ * @param {Object} [opts]
+ * @returns {Object}
+ */
+export function het_track_skeleton(args, opts) {
+  if (!args || typeof args.getPc1 !== 'function') {
+    return { ok: false, reason: 'NO_CALLBACKS' };
+  }
+  return het_track_skeleton_by_signal(
+    Object.assign({}, args, { getSignal: args.getPc1 }),
+    Object.assign({}, opts || {}, { signal_kind: 'pc1_midpoint' }));
 }
 
 /**
