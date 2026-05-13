@@ -128,6 +128,23 @@ export {
 } from './haplotype_regime.js';
 
 // ---------------------------------------------------------------------
+// LAYER 3 — cross-regime topology + chromosome-scale chains +
+// JSON serialiser. Consumes Layer 2's long-range regimes and infers
+// NESTED / ADJACENT / CHAINED / OVERLAPPING_CONFLICT / INDEPENDENT
+// relationships between them; walks CHAINED edges into multi-
+// inversion lineage chains.
+// ---------------------------------------------------------------------
+export {
+  REGIME_TOPOLOGY_RELATIONSHIPS,
+  REGIME_TOPOLOGY_DEFAULTS,
+  regimeBpFootprint,
+  regimePairwiseTopology,
+  buildRegimeTopologyGraph,
+  findChromosomeRegimeChains,
+  serializeRegimesToJson,
+} from './regime_topology.js';
+
+// ---------------------------------------------------------------------
 // LAYER 2 — BandSet Projection (set-based authority)
 //
 // Note: legacy aspirational names (bp_compute_projection_vector,
