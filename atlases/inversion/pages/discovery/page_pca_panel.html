@@ -1,0 +1,66 @@
+  <div id="page_pca_panel" class="page">
+
+    <header id="pcaPanelHeader" class="pca-header">
+      <div class="pca-title">
+        <h2>PCA scatter</h2>
+        <span id="pcaPanelCandidateLabel" class="pca-meta">—</span>
+      </div>
+      <div class="pca-controls">
+        <span id="pcaPanelAnchorBadge"
+              class="pca-anchor-badge"
+              title="Anchor mode of the loaded PCA">—</span>
+        <span class="pca-sep"></span>
+        <label class="pca-toggle">
+          Color by
+          <select id="pcaPanelColorBy" class="pca-select">
+            <option value="cluster">cluster</option>
+            <option value="none">none</option>
+          </select>
+        </label>
+        <label class="pca-toggle">
+          Axes
+          <select id="pcaPanelAxisChoice" class="pca-select">
+            <option value="pc1_pc2">PC1 × PC2</option>
+            <option value="pc2_pc1">PC2 × PC1</option>
+          </select>
+        </label>
+        <label class="pca-toggle">
+          <input id="pcaPanelShowLabels" type="checkbox">
+          Labels
+        </label>
+        <span class="pca-sep"></span>
+        <span id="pcaPanelWindowLabel" class="pca-meta">window —</span>
+      </div>
+    </header>
+
+    <div class="pca-body">
+      <div class="pca-track-wrap">
+        <canvas id="pcaPanelScrubberCanvas" class="pca-scrubber-canvas"></canvas>
+        <div id="pcaPanelScatterWrap" class="pca-scatter-wrap">
+          <canvas id="pcaPanelScatterCanvas" class="pca-scatter-canvas"></canvas>
+          <div id="pcaPanelEmpty" class="pca-empty" style="display:none;">
+            No PCA result loaded. Run computePcaForWindowList on a window
+            grid first.
+          </div>
+        </div>
+      </div>
+      <aside class="pca-right">
+        <header class="pca-panel-head">
+          <h4>Selected window</h4>
+          <span id="pcaPanelSelectedHint" class="pca-hint">(scrub the strip or click the scatter)</span>
+        </header>
+        <dl id="pcaPanelSelectedFields" class="pca-selected-fields"></dl>
+        <section id="pcaPanelClusterList" class="pca-cluster-list">
+          <h5>Clusters</h5>
+          <div id="pcaPanelClusterListBody" class="pca-cluster-list-body"></div>
+        </section>
+      </aside>
+    </div>
+
+    <footer id="pcaPanelFooter" class="pca-footer">
+      ⓘ Per-window PC1/PC2 scatter (SPEC_0 §10). Hover a point to
+      inspect; click to toggle selection. Scrub the strip to load a
+      different window.
+    </footer>
+
+  </div>
