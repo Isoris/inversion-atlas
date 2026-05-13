@@ -12,6 +12,7 @@ import {
   paintScatter,
   findWindowAtPixel,
   findPointAtPixel,
+  findPointsInBox,
   buildClusterColorMap,
   variancetoColor,
   axisRange,
@@ -226,6 +227,36 @@ check('r=0 points cannot be hit',
       findPointAtPixel(nfPaint.point_hit_regions,
                        nfPaint.point_hit_regions[1].x,
                        nfPaint.point_hit_regions[1].y) !== 1);
+
+// =====================================================================
+group('renderer.findPointsInBox');
+
+const boxHits = [
+  { sample_idx: 0, x: 10,  y: 20, r: 4 },
+  { sample_idx: 1, x: 60,  y: 30, r: 4 },
+  { sample_idx: 2, x: 100, y: 50, r: 4 },
+  { sample_idx: 3, x: 200, y: 100, r: 4 },
+  { sample_idx: 4, x: 5,   y: 5,  r: 0 },  // r=0 → never hit
+];
+check('box covers 0-2',
+      findPointsInBox(boxHits, { x0: 0, y0: 0, x1: 120, y1: 60 }).sort().join(',') === '0,1,2');
+check('reversed box still works',
+      findPointsInBox(boxHits, { x0: 120, y0: 60, x1: 0, y1: 0 }).sort().join(',') === '0,1,2');
+check('empty box → []',
+      findPointsInBox(boxHits, { x0: 300, y0: 300, x1: 400, y1: 400 }).length === 0);
+check('r=0 points never selected',
+      !findPointsInBox(boxHits, { x0: 0, y0: 0, x1: 999, y1: 999 }).includes(4));
+check('null hits → []',                          findPointsInBox(null, { x0: 0, y0: 0, x1: 1, y1: 1 }).length === 0);
+check('null box → []',                           findPointsInBox(boxHits, null).length === 0);
+
+// Drag-box overlay drawn on paint.
+const drCanvas = new FakeCanvas();
+paintScatter(drCanvas, pca_results[1], {
+  drag_box: { x0: 50, y0: 50, x1: 150, y1: 150 },
+});
+check('drag-box: extra strokeRect call for overlay',
+      drCanvas._ctx.calls.filter(c => c === 'strokeRect').length
+      > scCanvas._ctx.calls.filter(c => c === 'strokeRect').length);
 
 // =====================================================================
 group('selection.createPcaPanelSelection');

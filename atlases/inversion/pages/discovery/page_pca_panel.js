@@ -38,6 +38,7 @@ import {
   paintScatter,
   findWindowAtPixel,
   findPointAtPixel,
+  findPointsInBox,
   buildClusterColorMap,
 } from './page_pca_panel/renderer.js';
 import {
@@ -139,6 +140,7 @@ function _buildPageState(atlasState) {
                                           (ps && ps.view_state) || {}),
     scrubber_hits:         [],
     scatter_hits:          [],
+    drag_box:              null,  // { x0, y0, x1, y1 } while dragging
     selection:             createPcaPanelSelection(0),
     _handlers:             {},
   };
@@ -341,6 +343,7 @@ function _paintScatterCanvas(state) {
     selected_samples:   state.selection.getSelectedSamples(),
     hovered_sample:     state.selection.getHoveredSample(),
     show_labels:        state.view_state.show_labels,
+    drag_box:           state.drag_box,
   });
   state.scatter_hits = paint.point_hit_regions;
 }
@@ -473,23 +476,65 @@ function _wireToolbar(state) {
     const idx = findWindowAtPixel(state.scrubber_hits, x, y);
     if (idx != null) state.selection.setActiveWindowIdx(idx);
   };
-  const onScatterMove = (ev) => {
+  const _scatterPx = (ev) => {
     const c = document.getElementById('pcaPanelScatterCanvas');
-    if (!c) return;
+    if (!c) return null;
     const rect = typeof c.getBoundingClientRect === 'function'
       ? c.getBoundingClientRect() : { left: 0, top: 0 };
-    const x = ((ev && ev.clientX) || 0) - (rect.left || 0);
-    const y = ((ev && ev.clientY) || 0) - (rect.top  || 0);
-    state.selection.setHoveredSample(findPointAtPixel(state.scatter_hits, x, y));
+    return {
+      x: ((ev && ev.clientX) || 0) - (rect.left || 0),
+      y: ((ev && ev.clientY) || 0) - (rect.top  || 0),
+    };
+  };
+  const onScatterMove = (ev) => {
+    const px = _scatterPx(ev);
+    if (!px) return;
+    if (state.drag_box) {
+      // Update the drag box while a drag is in progress.
+      state.drag_box.x1 = px.x;
+      state.drag_box.y1 = px.y;
+      // Hover suppressed during drag.
+      state.selection.setHoveredSample(null);
+      _paintScatterCanvas(state);
+      return;
+    }
+    state.selection.setHoveredSample(findPointAtPixel(state.scatter_hits, px.x, px.y));
+  };
+  const onScatterDown = (ev) => {
+    const px = _scatterPx(ev);
+    if (!px) return;
+    // If the click landed on a point, leave drag for click toggle.
+    if (findPointAtPixel(state.scatter_hits, px.x, px.y) != null) return;
+    state.drag_box = { x0: px.x, y0: px.y, x1: px.x, y1: px.y, shift: !!(ev && ev.shiftKey) };
+    _paintScatterCanvas(state);
+  };
+  const onScatterUp = (ev) => {
+    if (!state.drag_box) return;
+    const px = _scatterPx(ev);
+    if (px) { state.drag_box.x1 = px.x; state.drag_box.y1 = px.y; }
+    const dx = Math.abs(state.drag_box.x1 - state.drag_box.x0);
+    const dy = Math.abs(state.drag_box.y1 - state.drag_box.y0);
+    // Only commit as a box-select if the drag is non-trivial (> 4 px
+    // each side). Smaller drags fall through to the click handler.
+    if (dx > 4 && dy > 4) {
+      const inside = findPointsInBox(state.scatter_hits, state.drag_box);
+      if (!state.drag_box.shift) state.selection.clearSelection();
+      for (const i of inside) {
+        if (!state.selection.getSelectedSamples().has(i)) {
+          state.selection.toggleSelectedSample(i);
+        }
+      }
+    }
+    state.drag_box = null;
+    _paintScatterCanvas(state);
   };
   const onScatterClick = (ev) => {
-    const c = document.getElementById('pcaPanelScatterCanvas');
-    if (!c) return;
-    const rect = typeof c.getBoundingClientRect === 'function'
-      ? c.getBoundingClientRect() : { left: 0, top: 0 };
-    const x = ((ev && ev.clientX) || 0) - (rect.left || 0);
-    const y = ((ev && ev.clientY) || 0) - (rect.top  || 0);
-    const idx = findPointAtPixel(state.scatter_hits, x, y);
+    // Click handler suppressed when a box-select just fired (the
+    // mouseup cleared drag_box; if the drag was meaningful we'd have
+    // run the box-select logic already, so plain clicks land here).
+    const px = _scatterPx(ev);
+    if (!px) return;
+    const idx = findPointAtPixel(state.scatter_hits, px.x, px.y);
     if (idx != null) state.selection.toggleSelectedSample(idx);
   };
 
@@ -500,6 +545,7 @@ function _wireToolbar(state) {
     onColorBy, onAxisChoice, onShowLabels,
     onScrubberMove, onScrubberClick,
     onScatterMove, onScatterClick,
+    onScatterDown, onScatterUp,
     unsubSelection,
   };
 
@@ -511,7 +557,9 @@ function _wireToolbar(state) {
   _addListener('pcaPanelShowLabels',      'change',    onShowLabels);
   _addListener('pcaPanelScrubberCanvas',  'mousemove', onScrubberMove);
   _addListener('pcaPanelScrubberCanvas',  'click',     onScrubberClick);
+  _addListener('pcaPanelScatterCanvas',   'mousedown', onScatterDown);
   _addListener('pcaPanelScatterCanvas',   'mousemove', onScatterMove);
+  _addListener('pcaPanelScatterCanvas',   'mouseup',   onScatterUp);
   _addListener('pcaPanelScatterCanvas',   'click',     onScatterClick);
 }
 
@@ -526,7 +574,9 @@ function _teardownToolbar(state) {
   if (h.onShowLabels)     _removeListener('pcaPanelShowLabels',     'change',    h.onShowLabels);
   if (h.onScrubberMove)   _removeListener('pcaPanelScrubberCanvas', 'mousemove', h.onScrubberMove);
   if (h.onScrubberClick)  _removeListener('pcaPanelScrubberCanvas', 'click',     h.onScrubberClick);
+  if (h.onScatterDown)    _removeListener('pcaPanelScatterCanvas',  'mousedown', h.onScatterDown);
   if (h.onScatterMove)    _removeListener('pcaPanelScatterCanvas',  'mousemove', h.onScatterMove);
+  if (h.onScatterUp)      _removeListener('pcaPanelScatterCanvas',  'mouseup',   h.onScatterUp);
   if (h.onScatterClick)   _removeListener('pcaPanelScatterCanvas',  'click',     h.onScatterClick);
   if (typeof h.unsubSelection === 'function') { try { h.unsubSelection(); } catch (_) {} }
   state._handlers = {};

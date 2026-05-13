@@ -325,11 +325,51 @@ export function paintScatter(canvas, pca_result, opts) {
     }
     hits[i] = { sample_idx: i, x: px, y: py, r: r + 2 };
   }
+  // Drag-box overlay (when a box-select is in progress).
+  if (o.drag_box
+      && Number.isFinite(o.drag_box.x0) && Number.isFinite(o.drag_box.y0)
+      && Number.isFinite(o.drag_box.x1) && Number.isFinite(o.drag_box.y1)) {
+    const b = o.drag_box;
+    const bx = Math.min(b.x0, b.x1);
+    const by = Math.min(b.y0, b.y1);
+    const bw = Math.abs(b.x1 - b.x0);
+    const bh = Math.abs(b.y1 - b.y0);
+    if (bw > 1 && bh > 1) {
+      ctx.fillStyle = 'rgba(245, 165, 36, 0.10)';
+      if (typeof ctx.fillRect === 'function') ctx.fillRect(bx, by, bw, bh);
+      ctx.strokeStyle = 'rgba(245, 165, 36, 0.95)';
+      ctx.lineWidth = 1;
+      if (typeof ctx.strokeRect === 'function') ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+    }
+  }
+
   return {
     point_hit_regions: hits,
     x_axis_label: xLabel,
     y_axis_label: yLabel,
   };
+}
+
+/**
+ * Return all sample indices whose point hit-region centre falls
+ * inside the axis-aligned rectangle [x0..x1] × [y0..y1] (canvas px).
+ *
+ * @param {Array<{sample_idx:number, x:number, y:number, r:number}>} hits
+ * @param {{x0:number, y0:number, x1:number, y1:number}} box
+ * @returns {number[]}
+ */
+export function findPointsInBox(hits, box) {
+  if (!Array.isArray(hits) || !box) return [];
+  const lx = Math.min(box.x0, box.x1);
+  const hx = Math.max(box.x0, box.x1);
+  const ly = Math.min(box.y0, box.y1);
+  const hy = Math.max(box.y0, box.y1);
+  const out = [];
+  for (const h of hits) {
+    if (h.r <= 0) continue;
+    if (h.x >= lx && h.x <= hx && h.y >= ly && h.y <= hy) out.push(h.sample_idx);
+  }
+  return out;
 }
 
 function _maxOf(arr) {

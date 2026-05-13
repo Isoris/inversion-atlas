@@ -230,6 +230,57 @@ group('Smoke: mount with PCA results');
   }
 
   // -------------------------------------------------------------------
+  group('Smoke: drag-box selects multiple points');
+  {
+    // Compute a bounding rect that covers ALL current scatter hits.
+    if (ps.scatter_hits.length > 0) {
+      let lx = Infinity, hx = -Infinity, ly = Infinity, hy = -Infinity;
+      for (const h of ps.scatter_hits) {
+        if (h.r <= 0) continue;
+        if (h.x < lx) lx = h.x;
+        if (h.x > hx) hx = h.x;
+        if (h.y < ly) ly = h.y;
+        if (h.y > hy) hy = h.y;
+      }
+      ps.selection.clearSelection();
+      // mousedown OFF any point: drag from far above-left of the bbox.
+      // (must land outside all point hit regions so dragstart fires)
+      const startX = Math.max(0, lx - 30);
+      const startY = Math.max(0, ly - 30);
+      const endX   = hx + 30;
+      const endY   = hy + 30;
+      scCanvas.dispatchEvent({ type: 'mousedown', clientX: startX, clientY: startY });
+      check('drag started → drag_box created',
+            ps.drag_box !== null);
+      scCanvas.dispatchEvent({ type: 'mousemove', clientX: endX, clientY: endY });
+      check('drag_box.x1 / y1 update on move',
+            ps.drag_box && ps.drag_box.x1 === endX && ps.drag_box.y1 === endY);
+      scCanvas.dispatchEvent({ type: 'mouseup', clientX: endX, clientY: endY });
+      check('drag committed → drag_box cleared',
+            ps.drag_box === null);
+      check('drag committed → all points now selected',
+            ps.selection.getSelectedSamples().size === ps.scatter_hits.filter(h => h.r > 0).length);
+    } else {
+      check('scatter hits available for drag-select', false, 'no hits');
+    }
+  }
+
+  // -------------------------------------------------------------------
+  group('Smoke: tiny drag suppressed (still treated as click)');
+  {
+    ps.selection.clearSelection();
+    // Start + end within 2 px of each other → suppressed as drag,
+    // but our handler ALSO uses click via the canvas's click event
+    // which fires separately in a real browser. In the fake DOM
+    // we just verify the drag did NOT auto-select.
+    scCanvas.dispatchEvent({ type: 'mousedown', clientX: 5, clientY: 5 });
+    scCanvas.dispatchEvent({ type: 'mousemove', clientX: 6, clientY: 6 });
+    scCanvas.dispatchEvent({ type: 'mouseup',   clientX: 6, clientY: 6 });
+    check('tiny drag does not commit a box-select',
+          ps.selection.getSelectedSamples().size === 0);
+  }
+
+  // -------------------------------------------------------------------
   group('Smoke: toolbar toggles repaint');
   {
     scCanvas._ctx.calls.length = 0;

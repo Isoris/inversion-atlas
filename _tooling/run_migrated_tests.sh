@@ -189,6 +189,7 @@ UNITS=(
   test_discovery_page_nested_detector.js
   test_discovery_page_dosage_cluster.js
   test_shared_mgl_panel_linkage.js
+  test_shared_mgl_stripe_quality.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
