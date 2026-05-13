@@ -37,6 +37,9 @@ import {
 import {
   classifyRecombinationSuppression,
 } from './recombination_suppression.js';
+import {
+  summariseConfoundForCandidate,
+} from './phylogenetic_confound.js';
 
 // =====================================================================
 // Schema
@@ -59,6 +62,8 @@ export const CLASSIFICATION_AXES = Object.freeze([
   'copy_origin_verdict',
   'position_class',
   'arrangement_n',
+  'phylogenetic_confound',     // QC: are our 3-band karyotype calls real
+                               // biology or phylogenetic-structure leakage?
   // STRUCTURE
   'structure_class',
   'age_my_bracket',
@@ -77,7 +82,7 @@ export const CLASSIFICATION_AXES = Object.freeze([
  *  distinction"). Used by axesByGroup() to emit a 4-bucket structured view
  *  alongside the flat axes object. */
 export const CLASSIFICATION_AXIS_GROUPS = Object.freeze({
-  ORIGIN:    ['origin_mechanism', 'copy_origin_verdict', 'position_class', 'arrangement_n'],
+  ORIGIN:    ['origin_mechanism', 'copy_origin_verdict', 'position_class', 'arrangement_n', 'phylogenetic_confound'],
   STRUCTURE: ['structure_class', 'age_my_bracket', 'recombination_suppression'],
   FATE:      ['selection_efficacy', 'divergence', 'xpehh_signal', 'segregation_status_majority'],
   ROLE:      ['pangenome_class', 'evolutionary_role'],
@@ -87,7 +92,7 @@ export const CLASSIFICATION_AXIS_GROUPS = Object.freeze({
 export const AXIS_MISSING = null;
 
 /** Module version for the row schema. */
-export const INVERSION_CLASSIFICATION_VERSION = 'inversion_classification_v1.2';
+export const INVERSION_CLASSIFICATION_VERSION = 'inversion_classification_v1.3';
 
 // =====================================================================
 // Vocab — evolutionary_role + pangenome_class
@@ -401,6 +406,26 @@ export function classifyEvolutionaryRole(axes, opts) {
 }
 
 /**
+ * Phylogenetic-confound QC axis. Compares the per-sample K-means
+ * karyotype calls against an INDEPENDENT phylogenetic clade
+ * assignment per sample. If the karyotype call is highly associated
+ * with the clade, the candidate's "3 bands" are likely
+ * phylogenetic-structure leakage rather than a real inversion
+ * signal — flag it.
+ *
+ * Returns the confound summary {verdict, cramers_v, ari, p_value,
+ * n_overlap} or AXIS_MISSING when both inputs are absent.
+ */
+export function extractPhylogeneticConfound(
+  karyotype_per_sample, clade_per_sample, opts,
+) {
+  if (!karyotype_per_sample && !clade_per_sample) return AXIS_MISSING;
+  return summariseConfoundForCandidate(
+    karyotype_per_sample, clade_per_sample, opts,
+  );
+}
+
+/**
  * Recombination-suppression axis. Bridges the consolidator inputs
  * (regime-linkage summary + karyotype distribution + family rows)
  * into the shape classifyRecombinationSuppression expects.
@@ -505,6 +530,7 @@ export function buildInversionClassificationRow(candidate, inputs, opts) {
     copy_origin_verdict:          extractCopyOriginVerdict(i.copy_origin_summary),
     position_class:               extractPositionClass(i.regime_position),
     arrangement_n:                extractArrangementN(i.arrangement_sizes),
+    phylogenetic_confound:        extractPhylogeneticConfound(i.karyotype_per_sample, i.clade_per_sample, o),
     // STRUCTURE
     structure_class:              extractStructureClass(i.regime_structure),
     age_my_bracket:               extractAgeMyBracket(i.busco_4d_age),

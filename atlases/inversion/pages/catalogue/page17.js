@@ -312,6 +312,38 @@ const SP_DEFAULT_ROWS = [
     karyotype_aware: true,
     interpretation_default: 'In-region pairwise FST significantly higher than genome-background → arrangement clusters are sequence-divergent inside the inversion, beyond what neutral expectation predicts. Combined with K2 (within-arrangement diversity), this is the "between high / within low" signature of an old polymorphism. Combined with K6 (deleterious / tolerated ratio), it points toward heterochromatic / load-rich arrangements that are diverged but degenerating.',
   },
+  // ------ K8. QC: Phylogenetic confound (POD bands vs background tree) -------
+  // CRITICAL STRESS TEST. The "3 bands" we get from K-means on local
+  // PCA can be EITHER genuine karyotype signal OR phylogenetic-
+  // structure leakage. This row compares the per-sample K-means
+  // karyotype calls against a per-sample BACKGROUND clade assignment
+  // from an independent sample-relationship tree (recommended:
+  // PCAngsd cov.tree from genome-wide neutral SNPs EXCLUDING the
+  // candidate POD intervals).
+  //
+  // If the karyotype calls and clade calls are highly associated
+  // (high Cramér's V / ARI / NMI) → "ancestry_like" interpretation;
+  // the candidate likely fails as a real inversion. If they're
+  // orthogonal → "local_haplotype_regime" or, with breakpoint support,
+  // "inversion_supported".
+  //
+  // 4-state interpretation chip per shared/phylogenetic_confound.js:
+  //   ancestry_like / family_ld_suspect           (confounded)
+  //   local_haplotype_regime / inversion_supported (independent)
+  //   unknown                                      (insufficient data)
+  {
+    id: 'phylo_confound_qc',
+    category: 'Population variation',
+    statistic: 'POD bands vs background sample structure (PCAngsd cov.tree)',
+    test: 'χ² of independence + Cramér\'s V + ARI + NMI on (karyotype × clade) contingency',
+    null_comparison: 'background clade labels from a genome-wide cov.tree built EXCLUDING candidate POD intervals',
+    derive_from: 'shared/phylogenetic_confound.summariseConfoundForCandidate',
+    african_hint: 'requires per-sample karyotype call (K-means on local PCA) + per-sample clade label (PCAngsd cov.tree, candidate-excluding background SNPs)',
+    bighead_hint: 'African-only',
+    african_only: true,
+    karyotype_aware: false,
+    interpretation_default: 'QC stress test for whether the "3 bands" are real karyotype signal vs an artefact of underlying sample relationships. High Cramér\'s V (≥ 0.60) or ARI (≥ 0.40) → ancestry_like (or family_ld_suspect if the clade structure traces families); the inversion claim should be downgraded. Low Cramér\'s V (< 0.30) + non-significant p → local_haplotype_regime; with independent breakpoint support → inversion_supported. We use PCAngsd cov.tree as the background-relatedness frame, not a true phylogeny — sufficient for asking "are these fish globally similar?"',
+  },
   // ------ K3. FIS within region vs rest of genome -----------------------------
   // Reference: Table 1 of the same paper — per-region mean FIS,
   // significance from (a) two-sided Wilcoxon vs genome FIS,

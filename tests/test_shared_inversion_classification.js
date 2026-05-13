@@ -48,9 +48,9 @@ function group(name) { console.log('\n--- ' + name + ' ---'); }
 group('schema');
 
 check('CLASSIFICATION_AXES frozen',       Object.isFrozen(CLASSIFICATION_AXES));
-check('13 axes defined',                  CLASSIFICATION_AXES.length === 13);
+check('14 axes defined',                  CLASSIFICATION_AXES.length === 14);
 check('AXIS_MISSING is null',             AXIS_MISSING === null);
-check('module version v1.2',              INVERSION_CLASSIFICATION_VERSION === 'inversion_classification_v1.2');
+check('module version v1.3',              INVERSION_CLASSIFICATION_VERSION === 'inversion_classification_v1.3');
 
 // =====================================================================
 group('extractors — pass-through on populated inputs');
@@ -169,6 +169,12 @@ const candidate = {
   end_bp:   17890000,
   inversion_type: 'paracentric',
 };
+// Phylogenetic-confound fixture: 30 samples with karyotype label
+// orthogonal to clade label → INDEPENDENT verdict, fully populates the
+// axis.
+const phyloKaryo  = new Array(30).fill(0).map((_, i) => Math.floor(i / 3) % 3);
+const phyloClades = new Array(30).fill(0).map((_, i) => 'c' + (i % 6));
+
 const fullInputs = {
   breakpoint_mechanism: { label: 'NAHR-compatible' },
   copy_origin_summary:  { verdict: 'arrangement-specific SD mosaic' },
@@ -180,13 +186,15 @@ const fullInputs = {
   divergence_label:     'strong_divergence',
   xpehh_label:          'no_signal',
   arrangement_sizes:    tab,
+  karyotype_per_sample: phyloKaryo,
+  clade_per_sample:     phyloClades,
 };
 const row = buildInversionClassificationRow(candidate, fullInputs);
 check('row.candidate_id passed through',  row.candidate_id === 'INV_LG28_001');
 check('row.chrom passed through',         row.chrom === 'LG28');
 check('row.start_bp passed through',      row.start_bp === 15030000);
 check('row.inversion_type passed through',row.inversion_type === 'paracentric');
-check('row has all 13 axes',              Object.keys(row.axes).length === 13);
+check('row has all 14 axes',              Object.keys(row.axes).length === 14);
 check('axes.origin_mechanism filled',     row.axes.origin_mechanism === 'NAHR-compatible');
 check('axes.copy_origin_verdict filled',
       row.axes.copy_origin_verdict === 'arrangement-specific SD mosaic');
@@ -214,8 +222,8 @@ check('partial: age missing',             partialRow.axes.age_my_bracket === AXI
 // → with only mechanism filled, expect 2 axes present: origin_mechanism +
 // evolutionary_role.
 check('partial: coverage.n_present = 2',  partialRow.coverage.n_present === 2);
-check('partial: coverage.n_total = 13',   partialRow.coverage.n_total === 13);
-check('partial: fraction = 2/13',         Math.abs(partialRow.coverage.fraction - 2/13) < 1e-9);
+check('partial: coverage.n_total = 14',   partialRow.coverage.n_total === 14);
+check('partial: fraction = 2/14',         Math.abs(partialRow.coverage.fraction - 2/14) < 1e-9);
 
 const emptyRow = buildInversionClassificationRow(candidate, {});
 // evolutionary_role is always set → 1 axis even on empty inputs.
@@ -290,7 +298,7 @@ check('ORIGIN bucket has origin_mechanism',
 check('ROLE bucket has evolutionary_role',
       grouped_row.ROLE && 'evolutionary_role' in grouped_row.ROLE);
 check('flat axes still intact after grouping',
-      Object.keys(row.axes).length === 13);
+      Object.keys(row.axes).length === 14);
 
 check('axesByGroup(null) = {}',     Object.keys(axesByGroup(null)).length === 0);
 
