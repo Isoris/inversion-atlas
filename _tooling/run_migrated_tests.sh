@@ -148,6 +148,7 @@ UNITS=(
   test_shared_band_tracking_regime_mendelian.js
   test_shared_band_tracking_regime_pedigree.js
   test_shared_band_tracking_genome_scale.js
+  test_shared_band_tracking_regime_linkage.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js

@@ -195,6 +195,32 @@ export {
 } from './genome_scale.js';
 
 // ---------------------------------------------------------------------
+// LAYER 4c — cross-regime LD + family-aware recombination test.
+//
+// "These samples behave like this in many chromosomes so probably
+// they are linked, in terms of Mendelian" — formalised as:
+//
+//   COHORT-LEVEL LD     3×3 karyotype contingency table across
+//                       samples → χ² + Cramér's V → LINKED /
+//                       WEAKLY_LINKED / INDEPENDENT verdict.
+//
+//   FAMILY-LEVEL        for families with doubly-heterozygous
+//   RECOMBINATION       parents at both regimes, count parental-
+//                       vs recombinant-type offspring; estimate
+//                       r̂ via estimateRecombinationRate
+//                       (testcross design).
+// ---------------------------------------------------------------------
+export {
+  REGIME_LINKAGE_VERDICTS,
+  REGIME_LINKAGE_DEFAULTS,
+  buildSampleRegimeMatrix,
+  pairwiseRegimeContingency,
+  regimeLD,
+  regimeLinkageMatrix,
+  familyRegimeRecombination,
+} from './regime_linkage.js';
+
+// ---------------------------------------------------------------------
 // LAYER 2 — BandSet Projection (set-based authority)
 //
 // Note: legacy aspirational names (bp_compute_projection_vector,
