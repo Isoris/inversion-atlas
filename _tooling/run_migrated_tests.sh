@@ -175,6 +175,8 @@ UNITS=(
   test_shared_mgl_pca_compute.js
   test_shared_mgl_heatmap_json.js
   test_shared_mgl_nj_tree.js
+  test_shared_mgl_render_state.js
+  test_shared_mgl_candidate_mode.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
