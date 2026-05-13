@@ -166,6 +166,7 @@ UNITS=(
   test_shared_inversion_classification_axes.js
   test_shared_inversion_classification.js
   test_shared_recombination_suppression.js
+  test_shared_inversion_relationships.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
