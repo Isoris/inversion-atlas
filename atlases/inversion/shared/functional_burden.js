@@ -400,3 +400,181 @@ function _emptyPairwise() {
     het_vs_inv: { wilcoxon_p: NaN, delta_median: NaN },
   };
 }
+
+// =====================================================================
+// 7. Homokaryotype-mode π reduction (overdominance disentangler)
+// =====================================================================
+
+/**
+ * Compare π (or πS, or any per-sample diversity metric) between the
+ * MOST-FREQUENT homokaryotype group and the all-karyotype pool.
+ *
+ * Captures the disentangling test from Faria et al. and related
+ * inversion papers: if pooled π is maintained but π within the
+ * most-frequent homokaryotype drops sharply (~40% in the reference
+ * paper for catfish inversions), the cohort-level diversity is
+ * partly carried by heterozygotes — overdominance / associative
+ * overdominance compensating for the depression that low
+ * recombination would otherwise cause.
+ *
+ * @param {Array<number>} per_sample_values    π (or πS) per sample
+ * @param {Array<string|null>} karyotype_per_sample
+ *   one of 'STD/STD' | 'HET' | 'INV/INV' | null/missing
+ * @returns {{
+ *   pi_all:                  number,   // mean across all called samples
+ *   pi_mode_homokaryotype:   number,   // mean in the most-frequent
+ *                                       // homokaryotype group
+ *   mode_karyotype:          string,   // 'STD/STD' or 'INV/INV'
+ *   fraction_reduction:      number,   // 1 - pi_mode / pi_all (NaN-safe)
+ *   n_all:                   number,
+ *   n_mode:                  number,
+ * }|null}
+ *
+ * Returns null when there's no valid mode homokaryotype (e.g. only
+ * heterozygotes present, or no called samples).
+ */
+export function compareHomokaryotypePiToAll(per_sample_values, karyotype_per_sample) {
+  if (!Array.isArray(per_sample_values) || !Array.isArray(karyotype_per_sample)) return null;
+  const N = Math.min(per_sample_values.length, karyotype_per_sample.length);
+  if (N === 0) return null;
+
+  let n_all = 0, sum_all = 0;
+  const counts = { 'STD/STD': 0, 'HET': 0, 'INV/INV': 0 };
+  const sums   = { 'STD/STD': 0, 'HET': 0, 'INV/INV': 0 };
+  for (let i = 0; i < N; i++) {
+    const v = per_sample_values[i];
+    const g = karyotype_per_sample[i];
+    if (!Number.isFinite(v)) continue;
+    if (g !== 'STD/STD' && g !== 'HET' && g !== 'INV/INV') continue;
+    sum_all += v; n_all++;
+    sums[g]   += v; counts[g]++;
+  }
+  if (n_all === 0) return null;
+  // Pick the most-frequent HOMOKARYOTYPE (not HET — HET is the alt class
+  // we're contrasting against).
+  const homAA = counts['STD/STD'];
+  const homBB = counts['INV/INV'];
+  if (homAA === 0 && homBB === 0) return null;
+  const mode = homAA >= homBB ? 'STD/STD' : 'INV/INV';
+  const n_mode = counts[mode];
+  const pi_mode = n_mode > 0 ? sums[mode] / n_mode : NaN;
+  const pi_all  = sum_all / n_all;
+  const fraction_reduction = (Number.isFinite(pi_all) && pi_all !== 0)
+    ? 1 - (pi_mode / pi_all) : NaN;
+  return {
+    pi_all,
+    pi_mode_homokaryotype: pi_mode,
+    mode_karyotype: mode,
+    fraction_reduction,
+    n_all,
+    n_mode,
+  };
+}
+
+/**
+ * Sample-size control for the homokaryotype-mode π reduction
+ * (compareHomokaryotypePiToAll above).
+ *
+ * The reduction observed when restricting to the most-frequent
+ * homokaryotype could mechanically arise from the smaller sample
+ * size, since π estimators are slightly biased downward at small n.
+ * This subsamples the FULL cohort (all karyotypes pooled) down to
+ * n_mode samples, recomputes π, and reports the bootstrap
+ * distribution. If π_mode_homokaryotype is still significantly
+ * below the subsampled distribution, the reduction is real and not
+ * an n-effect (the paper's "we verified that these lower diversity
+ * estimates were not simply a consequence of reduced sample size").
+ *
+ * @param {Array<number>} per_sample_values
+ * @param {Array<string|null>} karyotype_per_sample
+ * @param {{n_reps?:number, seed?:number}} [opts]
+ *   n_reps: number of bootstrap subsamples (default 1000).
+ *   seed:   optional u32 seed for the small mulberry32 PRNG below.
+ *           Default = current Date.now() (non-deterministic; pass a
+ *           seed when reproducibility matters).
+ * @returns {{
+ *   pi_mode_homokaryotype: number,    // copied from the compare fn
+ *   n_mode:                number,
+ *   subsampled_mean_pi:    number,    // mean π across n_reps subsamples
+ *   subsampled_ci95:       [number, number],
+ *   p_one_sided:           number,    // P(subsampled π ≤ pi_mode_homokaryotype)
+ *   verdict:               'real_reduction' | 'consistent_with_sample_size' | 'inconclusive',
+ *   n_reps:                number,
+ * }|null}
+ */
+export function subsampleControlForHomokaryotypePi(per_sample_values, karyotype_per_sample, opts) {
+  const cmp = compareHomokaryotypePiToAll(per_sample_values, karyotype_per_sample);
+  if (!cmp) return null;
+  const o = opts || {};
+  const n_reps = Number.isFinite(o.n_reps) && o.n_reps > 0 ? o.n_reps : 1000;
+  const n_mode = cmp.n_mode;
+  // Pooled finite values across all karyotype groups.
+  const pool = [];
+  const N = Math.min(per_sample_values.length, karyotype_per_sample.length);
+  for (let i = 0; i < N; i++) {
+    const v = per_sample_values[i];
+    const g = karyotype_per_sample[i];
+    if (!Number.isFinite(v)) continue;
+    if (g !== 'STD/STD' && g !== 'HET' && g !== 'INV/INV') continue;
+    pool.push(v);
+  }
+  if (pool.length < 2 || n_mode < 2) {
+    return {
+      pi_mode_homokaryotype: cmp.pi_mode_homokaryotype,
+      n_mode,
+      subsampled_mean_pi: NaN,
+      subsampled_ci95:    [NaN, NaN],
+      p_one_sided:        NaN,
+      verdict:            'inconclusive',
+      n_reps:             0,
+    };
+  }
+  const rng = _mulberry32(
+    Number.isFinite(o.seed) ? (o.seed >>> 0) : (Date.now() >>> 0),
+  );
+  const samples = new Float64Array(n_reps);
+  let countLE = 0;
+  for (let r = 0; r < n_reps; r++) {
+    let sum = 0;
+    for (let i = 0; i < n_mode; i++) {
+      sum += pool[Math.floor(rng() * pool.length)];
+    }
+    const mean = sum / n_mode;
+    samples[r] = mean;
+    if (mean <= cmp.pi_mode_homokaryotype) countLE++;
+  }
+  // CI from sorted subsamples.
+  const sorted = Array.from(samples).sort((a, b) => a - b);
+  const lo_idx = Math.floor(0.025 * n_reps);
+  const hi_idx = Math.min(n_reps - 1, Math.floor(0.975 * n_reps));
+  const ci95 = [sorted[lo_idx], sorted[hi_idx]];
+  let mean = 0;
+  for (let i = 0; i < n_reps; i++) mean += samples[i];
+  mean /= n_reps;
+  const p_one_sided = countLE / n_reps;
+  let verdict;
+  if (p_one_sided < 0.05) verdict = 'real_reduction';
+  else if (p_one_sided > 0.5) verdict = 'consistent_with_sample_size';
+  else verdict = 'inconclusive';
+  return {
+    pi_mode_homokaryotype: cmp.pi_mode_homokaryotype,
+    n_mode,
+    subsampled_mean_pi: mean,
+    subsampled_ci95:    ci95,
+    p_one_sided,
+    verdict,
+    n_reps,
+  };
+}
+
+// Small deterministic PRNG for reproducible bootstrap. Mulberry32.
+function _mulberry32(seed) {
+  let s = seed >>> 0;
+  return function () {
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
