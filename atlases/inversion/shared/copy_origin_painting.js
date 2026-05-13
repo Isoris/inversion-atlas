@@ -25,13 +25,31 @@
 // Vocab + defaults
 // =====================================================================
 
-/** Mechanism-classification labels (spec §"Step D — classify
- *  breakpoint mechanism" table). */
+/** Mechanism-classification labels.
+ *
+ * The four "primary" labels (NAHR, NHEJ_MMEJ, COMPLEX_MOSAIC, NO_MOSAIC)
+ * come from the per-window paint sequence (spec §"Step D" table).
+ *
+ * Two additional labels — TE_MEDIATED and REPLICATION_BASED — are
+ * refinements that require extra evidence beyond the paint sequence:
+ *   - TE_MEDIATED:        a special case of NAHR where breakpoints
+ *                         overlap TE/transposable-element annotation
+ *                         (caller supplies `te_overlap_flag = true`).
+ *                         Returned in place of NAHR when the flag fires.
+ *   - REPLICATION_BASED:  fork-stalling / template-switching signature
+ *                         — complex breakpoint structures associated
+ *                         with fragile sites. Returned in place of
+ *                         COMPLEX_MOSAIC when `fragile_site_flag = true`.
+ *
+ * Both refinements are OFF by default; pass the flags via opts to
+ * `classifyBreakpointMechanism` to enable them. */
 export const COPY_ORIGIN_MECHANISMS = Object.freeze({
-  NAHR:             'NAHR-compatible',
-  NHEJ_MMEJ:        'NHEJ/MMEJ-compatible',
-  COMPLEX_MOSAIC:   'complex paralogue mosaic',
-  NO_MOSAIC:        'no mosaic evidence',
+  NAHR:               'NAHR-compatible',
+  TE_MEDIATED:        'TE-mediated (NAHR special case)',
+  NHEJ_MMEJ:          'NHEJ/MMEJ-compatible',
+  COMPLEX_MOSAIC:     'complex paralogue mosaic',
+  REPLICATION_BASED:  'replication-based (fork-stalling / template-switching)',
+  NO_MOSAIC:          'no mosaic evidence',
 });
 
 /** Arrangement-group integration verdicts (spec §"Step E"
@@ -89,7 +107,9 @@ export const COPY_UNKNOWN = 'unknown';
  * Empty / all-unknown input → NO_MOSAIC (no evidence).
  *
  * @param {Array<string>} calls
- * @param {{scar_window?:number}} [opts]
+ * @param {{scar_window?:number,
+ *          te_overlap_flag?:boolean,
+ *          fragile_site_flag?:boolean}} [opts]
  * @returns {Object}
  */
 export function classifyBreakpointMechanism(calls, opts) {
@@ -144,15 +164,24 @@ export function classifyBreakpointMechanism(calls, opts) {
     }
   }
   // Resolve label per spec §"Step D" table.
+  // Refinements via optional flags:
+  //   - te_overlap_flag       → NAHR  → TE_MEDIATED
+  //   - fragile_site_flag     → COMPLEX_MOSAIC → REPLICATION_BASED
+  const teFlag       = !!o.te_overlap_flag;
+  const fragileFlag  = !!o.fragile_site_flag;
   let label;
   if (transitions.length === 0) {
     label = COPY_ORIGIN_MECHANISMS.NO_MOSAIC;
   } else if (transitions.length >= 2 || distinct.size >= 3) {
-    label = COPY_ORIGIN_MECHANISMS.COMPLEX_MOSAIC;
+    label = fragileFlag
+      ? COPY_ORIGIN_MECHANISMS.REPLICATION_BASED
+      : COPY_ORIGIN_MECHANISMS.COMPLEX_MOSAIC;
   } else if (has_scar) {
     label = COPY_ORIGIN_MECHANISMS.NHEJ_MMEJ;
   } else {
-    label = COPY_ORIGIN_MECHANISMS.NAHR;
+    label = teFlag
+      ? COPY_ORIGIN_MECHANISMS.TE_MEDIATED
+      : COPY_ORIGIN_MECHANISMS.NAHR;
   }
   return {
     label,

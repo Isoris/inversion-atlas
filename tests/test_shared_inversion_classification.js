@@ -11,8 +11,13 @@
 
 import {
   CLASSIFICATION_AXES,
+  CLASSIFICATION_AXIS_GROUPS,
   AXIS_MISSING,
   INVERSION_CLASSIFICATION_VERSION,
+  EVOLUTIONARY_ROLES,
+  PANGENOME_CLASSES,
+  PANGENOME_DEFAULTS,
+  EVOLUTIONARY_ROLE_DEFAULTS,
   extractOriginMechanism,
   extractCopyOriginVerdict,
   extractPositionClass,
@@ -23,10 +28,13 @@ import {
   extractDivergence,
   extractXpehhSignal,
   extractArrangementN,
+  classifyPangenomeClass,
+  classifyEvolutionaryRole,
   buildInversionClassificationRow,
   buildClassificationRows,
   filterByCoverage,
   groupByAxis,
+  axesByGroup,
 } from '../atlases/inversion/shared/inversion_classification.js';
 
 let pass = 0, fail = 0;
@@ -40,9 +48,9 @@ function group(name) { console.log('\n--- ' + name + ' ---'); }
 group('schema');
 
 check('CLASSIFICATION_AXES frozen',       Object.isFrozen(CLASSIFICATION_AXES));
-check('10 axes defined',                  CLASSIFICATION_AXES.length === 10);
+check('12 axes defined',                  CLASSIFICATION_AXES.length === 12);
 check('AXIS_MISSING is null',             AXIS_MISSING === null);
-check('module version v1.0',              INVERSION_CLASSIFICATION_VERSION === 'inversion_classification_v1.0');
+check('module version v1.1',              INVERSION_CLASSIFICATION_VERSION === 'inversion_classification_v1.1');
 
 // =====================================================================
 group('extractors — pass-through on populated inputs');
@@ -178,15 +186,17 @@ check('row.candidate_id passed through',  row.candidate_id === 'INV_LG28_001');
 check('row.chrom passed through',         row.chrom === 'LG28');
 check('row.start_bp passed through',      row.start_bp === 15030000);
 check('row.inversion_type passed through',row.inversion_type === 'paracentric');
-check('row has all 10 axes',              Object.keys(row.axes).length === 10);
+check('row has all 12 axes',              Object.keys(row.axes).length === 12);
 check('axes.origin_mechanism filled',     row.axes.origin_mechanism === 'NAHR-compatible');
 check('axes.copy_origin_verdict filled',
       row.axes.copy_origin_verdict === 'arrangement-specific SD mosaic');
 check('axes.age_my_bracket structured',   row.axes.age_my_bracket && row.axes.age_my_bracket.mu_mid_my === 1.30);
 check('axes.segregation_status_majority filled',
       row.axes.segregation_status_majority && row.axes.segregation_status_majority.status === 'MENDELIAN');
-check('coverage.n_present = 10',          row.coverage.n_present === 10);
-check('coverage.fraction = 1.0',          row.coverage.fraction === 1);
+check('axes.evolutionary_role filled',
+      typeof row.axes.evolutionary_role === 'string');
+check('coverage.n_present ≥ 11',          row.coverage.n_present >= 11);
+check('coverage.fraction ≥ 0.9',          row.coverage.fraction >= 0.9);
 check('module_version set',               row.module_version === INVERSION_CLASSIFICATION_VERSION);
 check('created_at is ISO string',         typeof row.created_at === 'string' && row.created_at.includes('T'));
 
@@ -200,13 +210,19 @@ const partialRow = buildInversionClassificationRow(candidate, {
 check('partial: origin filled',           partialRow.axes.origin_mechanism === 'NHEJ/MMEJ-compatible');
 check('partial: copy origin missing',     partialRow.axes.copy_origin_verdict === AXIS_MISSING);
 check('partial: age missing',             partialRow.axes.age_my_bracket === AXIS_MISSING);
-check('partial: coverage.n_present = 1',  partialRow.coverage.n_present === 1);
-check('partial: coverage.n_total = 10',   partialRow.coverage.n_total === 10);
-check('partial: fraction = 0.1',          Math.abs(partialRow.coverage.fraction - 0.1) < 1e-9);
+// evolutionary_role is always set (UNCLASSIFIED fallback when evidence is thin)
+// → with only mechanism filled, expect 2 axes present: origin_mechanism +
+// evolutionary_role.
+check('partial: coverage.n_present = 2',  partialRow.coverage.n_present === 2);
+check('partial: coverage.n_total = 12',   partialRow.coverage.n_total === 12);
+check('partial: fraction = 2/12',         Math.abs(partialRow.coverage.fraction - 2/12) < 1e-9);
 
 const emptyRow = buildInversionClassificationRow(candidate, {});
-check('empty inputs: 0 present',          emptyRow.coverage.n_present === 0);
+// evolutionary_role is always set → 1 axis even on empty inputs.
+check('empty inputs: 1 present (role UNCLASSIFIED)', emptyRow.coverage.n_present === 1);
 check('empty inputs: no throw',           !!emptyRow);
+check('empty inputs: role = unclassified',
+      emptyRow.axes.evolutionary_role === 'unclassified');
 
 const nullCandidate = buildInversionClassificationRow(null, fullInputs);
 check('null candidate: still produces row',  nullCandidate && nullCandidate.coverage);
@@ -243,6 +259,191 @@ check('group by age (structured): C1 under __object__',
 
 // Unknown axis → empty
 check('unknown axis → empty group',       Object.keys(groupByAxis(rows, 'fake_axis')).length === 0);
+
+// =====================================================================
+group('CLASSIFICATION_AXIS_GROUPS — 4 buckets covering all axes');
+
+check('groups frozen',                Object.isFrozen(CLASSIFICATION_AXIS_GROUPS));
+check('ORIGIN / STRUCTURE / FATE / ROLE keys',
+      'ORIGIN' in CLASSIFICATION_AXIS_GROUPS
+   && 'STRUCTURE' in CLASSIFICATION_AXIS_GROUPS
+   && 'FATE' in CLASSIFICATION_AXIS_GROUPS
+   && 'ROLE' in CLASSIFICATION_AXIS_GROUPS);
+
+const flat = new Set(CLASSIFICATION_AXES);
+const grouped = new Set();
+for (const arr of Object.values(CLASSIFICATION_AXIS_GROUPS)) {
+  for (const k of arr) grouped.add(k);
+}
+check('every grouped axis is in flat',
+      [...grouped].every(k => flat.has(k)));
+check('every flat axis is in some group',
+      [...flat].every(k => grouped.has(k)));
+check('no duplicates across groups',
+      grouped.size === CLASSIFICATION_AXES.length);
+
+const grouped_row = axesByGroup(row);
+check('axesByGroup returns 4 buckets',
+      Object.keys(grouped_row).length === 4);
+check('ORIGIN bucket has origin_mechanism',
+      grouped_row.ORIGIN && 'origin_mechanism' in grouped_row.ORIGIN);
+check('ROLE bucket has evolutionary_role',
+      grouped_row.ROLE && 'evolutionary_role' in grouped_row.ROLE);
+check('flat axes still intact after grouping',
+      Object.keys(row.axes).length === 12);
+
+check('axesByGroup(null) = {}',     Object.keys(axesByGroup(null)).length === 0);
+
+// =====================================================================
+group('vocab — PANGENOME + EVOLUTIONARY_ROLES');
+
+check('PANGENOME_CLASSES frozen',         Object.isFrozen(PANGENOME_CLASSES));
+check('EVOLUTIONARY_ROLES frozen',        Object.isFrozen(EVOLUTIONARY_ROLES));
+check('PANGENOME_DEFAULTS frozen',        Object.isFrozen(PANGENOME_DEFAULTS));
+check('PRIVATE / CO_SHARED / GENERAL / UNKNOWN',
+      'PRIVATE' in PANGENOME_CLASSES
+   && 'CO_SHARED' in PANGENOME_CLASSES
+   && 'GENERAL' in PANGENOME_CLASSES
+   && 'UNKNOWN' in PANGENOME_CLASSES);
+check('7 evolutionary roles (6 + unclassified)',
+      Object.keys(EVOLUTIONARY_ROLES).length === 7);
+
+// =====================================================================
+group('classifyPangenomeClass');
+
+// 10 populations, only 1 carries → private
+const private_freq = [
+  { population: 'P1', freq: 0.30, n: 30 },
+  { population: 'P2', freq: 0.0,  n: 30 },
+  { population: 'P3', freq: 0.0,  n: 30 },
+  { population: 'P4', freq: 0.0,  n: 30 },
+  { population: 'P5', freq: 0.0,  n: 30 },
+  { population: 'P6', freq: 0.0,  n: 30 },
+  { population: 'P7', freq: 0.0,  n: 30 },
+  { population: 'P8', freq: 0.0,  n: 30 },
+  { population: 'P9', freq: 0.0,  n: 30 },
+  { population: 'P10', freq: 0.0, n: 30 },
+];
+const pcPriv = classifyPangenomeClass(private_freq);
+check('1/10 populations → PRIVATE',         pcPriv.class === PANGENOME_CLASSES.PRIVATE);
+check('PRIVATE: n_carrier = 1',             pcPriv.n_carrier === 1);
+check('PRIVATE: fraction = 0.1',            Math.abs(pcPriv.fraction_carrier - 0.1) < 1e-9);
+
+// 5/10 populations carry — co_shared
+const co_freq = [
+  { population: 'P1', freq: 0.40, n: 30 },
+  { population: 'P2', freq: 0.35, n: 30 },
+  { population: 'P3', freq: 0.30, n: 30 },
+  { population: 'P4', freq: 0.45, n: 30 },
+  { population: 'P5', freq: 0.30, n: 30 },
+  { population: 'P6', freq: 0.0,  n: 30 },
+  { population: 'P7', freq: 0.0,  n: 30 },
+  { population: 'P8', freq: 0.0,  n: 30 },
+  { population: 'P9', freq: 0.0,  n: 30 },
+  { population: 'P10', freq: 0.0, n: 30 },
+];
+const pcCo = classifyPangenomeClass(co_freq);
+check('5/10 populations → CO_SHARED',       pcCo.class === PANGENOME_CLASSES.CO_SHARED);
+
+// 9/10 populations at high freq → general
+const gen_freq = Array.from({length: 10}, (_, i) =>
+  ({ population: 'P' + i, freq: i < 9 ? 0.70 : 0.0, n: 30 }));
+const pcGen = classifyPangenomeClass(gen_freq);
+check('9/10 high-freq populations → GENERAL', pcGen.class === PANGENOME_CLASSES.GENERAL);
+
+// Edge: no data
+check('null → missing',           classifyPangenomeClass(null) === AXIS_MISSING);
+check('empty array → missing',    classifyPangenomeClass([]) === AXIS_MISSING);
+
+// Edge: every population has n < 5 → UNKNOWN
+const low_n = [
+  { population: 'P1', freq: 0.50, n: 2 },
+  { population: 'P2', freq: 0.40, n: 3 },
+];
+check('all n<5 → UNKNOWN class',
+      classifyPangenomeClass(low_n).class === PANGENOME_CLASSES.UNKNOWN);
+
+// =====================================================================
+group('classifyEvolutionaryRole — rule-by-rule');
+
+// Rule 1: speciation_barrier — old + strong divergence + DISTORTED
+check('old + strong_div + DISTORTED → speciation_barrier',
+      classifyEvolutionaryRole({
+        age_my_bracket: { mu_mid_my: 5.0 },
+        divergence:     'strong_divergence',
+        segregation_status_majority: { status: 'DISTORTED' },
+      }) === EVOLUTIONARY_ROLES.SPECIATION_BARRIER);
+
+// Rule 2: supergene — load_rich + CO_SHARED + MENDELIAN
+check('load_rich + co_shared + MENDELIAN → supergene',
+      classifyEvolutionaryRole({
+        selection_efficacy: 'load_rich',
+        pangenome_class:    { class: PANGENOME_CLASSES.CO_SHARED },
+        segregation_status_majority: { status: 'MENDELIAN' },
+      }) === EVOLUTIONARY_ROLES.SUPERGENE);
+
+// Rule 3: local_adaptation_container — load_rich + xpehh mild
+check('load_rich + mild xpehh → local_adaptation_container',
+      classifyEvolutionaryRole({
+        selection_efficacy: 'load_rich',
+        xpehh_signal: 'mild_outlier',
+      }) === EVOLUTIONARY_ROLES.LOCAL_ADAPTATION_CONTAINER);
+
+// Rule 4: ecotype_stabilizer — co_shared + simple/dosage structure
+check('co_shared + simple_haplotype_split → ecotype_stabilizer',
+      classifyEvolutionaryRole({
+        pangenome_class: { class: PANGENOME_CLASSES.CO_SHARED },
+        structure_class: 'simple_haplotype_split',
+      }) === EVOLUTIONARY_ROLES.ECOTYPE_STABILIZER);
+
+// Rule 5: recombination_modifier — strong_div but selection != load_rich
+check('strong_div + clean → recombination_modifier',
+      classifyEvolutionaryRole({
+        divergence: 'strong_divergence',
+        selection_efficacy: 'clean',
+      }) === EVOLUTIONARY_ROLES.RECOMBINATION_MODIFIER);
+
+// Rule 6: neutral_passenger
+check('young + clean + no_div + no_xpehh → neutral_passenger',
+      classifyEvolutionaryRole({
+        age_my_bracket: { mu_mid_my: 0.3 },
+        selection_efficacy: 'clean',
+        divergence: 'no_divergence',
+        xpehh_signal: 'no_signal',
+      }) === EVOLUTIONARY_ROLES.NEUTRAL_PASSENGER);
+
+// Default: unclassified
+check('empty axes → unclassified',
+      classifyEvolutionaryRole({}) === EVOLUTIONARY_ROLES.UNCLASSIFIED);
+check('null axes → unclassified',
+      classifyEvolutionaryRole(null) === EVOLUTIONARY_ROLES.UNCLASSIFIED);
+
+// Rule precedence: speciation_barrier wins over recombination_modifier
+check('precedence: speciation_barrier beats recombination_modifier',
+      classifyEvolutionaryRole({
+        age_my_bracket: { mu_mid_my: 5.0 },
+        divergence: 'strong_divergence',
+        selection_efficacy: 'clean',
+        segregation_status_majority: { status: 'DISTORTED' },
+      }) === EVOLUTIONARY_ROLES.SPECIATION_BARRIER);
+
+// =====================================================================
+group('end-to-end with pangenome + role');
+
+// Run the full fixture again WITH pangenome input — should classify as
+// supergene (load_rich + co_shared + MENDELIAN).
+const role_row = buildInversionClassificationRow(
+  { ...candidate, candidate_id: 'INV_SUPERGENE_001' },
+  { ...fullInputs,
+    functional_burden: { summary_tag: 'load_rich' },
+    freq_by_pop: co_freq,
+  },
+);
+check('supergene fixture: pangenome_class = co_shared',
+      role_row.axes.pangenome_class
+   && role_row.axes.pangenome_class.class === PANGENOME_CLASSES.CO_SHARED);
+check('supergene fixture: evolutionary_role = supergene',
+      role_row.axes.evolutionary_role === EVOLUTIONARY_ROLES.SUPERGENE);
 
 // =====================================================================
 console.log('\n=================');

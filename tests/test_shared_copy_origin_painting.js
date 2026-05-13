@@ -213,6 +213,37 @@ check('empty samples: verdict uncallable',
       empty.verdict === ARRANGEMENT_COPY_VERDICTS.UNCALLABLE_LOW_PSV);
 
 // =====================================================================
+group('mechanism extensions — TE_MEDIATED + REPLICATION_BASED');
+
+// NAHR + te_overlap_flag → TE_MEDIATED
+const te = classifyBreakpointMechanism(
+  ['copy1','copy1','copy1','copy2','copy2','copy2'],
+  { te_overlap_flag: true },
+);
+check('clean NAHR + te_overlap → TE_MEDIATED',
+      te.label === COPY_ORIGIN_MECHANISMS.TE_MEDIATED);
+check('te_overlap=false default → still NAHR',
+      classifyBreakpointMechanism(['copy1','copy1','copy2','copy2']).label === COPY_ORIGIN_MECHANISMS.NAHR);
+
+// COMPLEX_MOSAIC + fragile_site_flag → REPLICATION_BASED
+const fragile = classifyBreakpointMechanism(
+  ['copy1','copy2','copy1','copy2'],   // 3 transitions → complex
+  { fragile_site_flag: true },
+);
+check('complex + fragile_site → REPLICATION_BASED',
+      fragile.label === COPY_ORIGIN_MECHANISMS.REPLICATION_BASED);
+check('fragile_site=false default → still COMPLEX_MOSAIC',
+      classifyBreakpointMechanism(['copy1','copy2','copy1','copy2']).label === COPY_ORIGIN_MECHANISMS.COMPLEX_MOSAIC);
+
+// NHEJ_MMEJ unaffected by te_overlap_flag (flag only refines NAHR)
+const nhej_te = classifyBreakpointMechanism(
+  ['copy1','copy1','unknown','copy2','copy2'],
+  { te_overlap_flag: true },
+);
+check('NHEJ unaffected by te_overlap_flag',
+      nhej_te.label === COPY_ORIGIN_MECHANISMS.NHEJ_MMEJ);
+
+// =====================================================================
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');
