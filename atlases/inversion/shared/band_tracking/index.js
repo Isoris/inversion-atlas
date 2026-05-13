@@ -179,6 +179,22 @@ export {
 } from './regime_pedigree.js';
 
 // ---------------------------------------------------------------------
+// LAYER 5 — chromosome-scale wiring. Per-chromosome regime
+// collections (Layer 2 output per chrom) → unified genome-wide
+// collection + cross-chrom CHAINED links + whole-genome pedigree
+// inference. Closes the "scan genomes > find inversions > infer
+// pedigree" loop the user flagged.
+// ---------------------------------------------------------------------
+export {
+  GENOME_SCALE_LINKS,
+  GENOME_SCALE_DEFAULTS,
+  mergePerChromosomeRegimes,
+  crossChromosomeRegimeLinks,
+  genomeWidePedigreeFromRegimes,
+  genomeWideRegimeReport,
+} from './genome_scale.js';
+
+// ---------------------------------------------------------------------
 // LAYER 2 — BandSet Projection (set-based authority)
 //
 // Note: legacy aspirational names (bp_compute_projection_vector,
