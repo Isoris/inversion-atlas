@@ -169,6 +169,7 @@ UNITS=(
   test_shared_inversion_relationships.js
   test_shared_homokaryotype_diversity_pattern.js
   test_shared_phylogenetic_confound.js
+  test_shared_atlas_chrome.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
