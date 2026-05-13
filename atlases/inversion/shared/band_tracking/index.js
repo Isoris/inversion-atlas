@@ -40,10 +40,11 @@
 //           long-range haplotype regime).
 // Layer 1c: HOM_A / HOM_B anchor sample sets from a het skeleton.
 // Layer 1d: per-sample karyotype caller — TAIL of the pipeline.
-//
-// Still to build (separate PR): trajectory.js (per-band pc1
-// trajectories + sign anchors) and karyotype_model.js (combiner
-// that consumes trajectory + projection + vote evidence).
+// Layer 1e: PC1 sign anchoring + per-band trajectories + pairwise
+//           correlation + group-by-trajectory-similarity.
+// Layer 1f: karyotype-model combiner (trajectory + projection +
+//           vote evidence → BIALLELIC / MULTI_ALLELIC / COMPLEX /
+//           AMBIGUOUS).
 // ---------------------------------------------------------------------
 export {
   SINGLE_BAND_DEFAULTS,
@@ -75,6 +76,34 @@ export {
 } from './iv.js';
 
 // ---------------------------------------------------------------------
+// LAYER 1e — PC1 sign anchoring + per-band trajectories + pairwise
+// correlation + trajectory-similarity grouping.
+// ---------------------------------------------------------------------
+export {
+  TRAJECTORY_DEFAULTS,
+  pickPc1OrientationReferenceSamples,
+  computePc1SignAnchors,
+  band_compute_pc1_trajectory,
+  band_pairwise_trajectory_correlation,
+  band_group_by_trajectory_similarity,
+} from './trajectory.js';
+
+// ---------------------------------------------------------------------
+// LAYER 1f — karyotype-model combiner. Folds trajectory + projection
+// + vote evidence into a per-band macro-group assignment and a
+// candidate-level verdict (BIALLELIC / MULTI_ALLELIC / COMPLEX /
+// AMBIGUOUS).
+// ---------------------------------------------------------------------
+export {
+  KARYOTYPE_MODEL_VERDICTS,
+  KT_AGREEMENT_FLAGS,
+  KT_DEFAULTS,
+  kt_combine_trajectory_and_projection_evidence,
+  kt_infer_macro_band_groups,
+  kt_resolve_karyotype_model,
+} from './karyotype_model.js';
+
+// ---------------------------------------------------------------------
 // LAYER 2 — BandSet Projection (set-based authority)
 //
 // Note: legacy aspirational names (bp_compute_projection_vector,
@@ -92,11 +121,9 @@ export {
   classifyProjectionWithStability,
 } from './projection.js';
 
-// COMBINER (karyotype_model.js): still pending — designs against the
-// vote-evidence + trajectory + projection stack. Layer 1d (iv.js)
-// already gives a working per-sample call from het skeleton + HOM
-// anchors; karyotype_model.js will fold that into a multi-evidence
-// verdict once trajectory.js lands.
+// COMBINER (karyotype_model.js): shipped in Layer 1f below. Folds
+// trajectory + projection + vote evidence into a candidate-level
+// verdict (BIALLELIC / MULTI_ALLELIC / COMPLEX / AMBIGUOUS).
 
 // ---------------------------------------------------------------------
 // VOTE EVIDENCE — raw vote extraction + co-association matrix
