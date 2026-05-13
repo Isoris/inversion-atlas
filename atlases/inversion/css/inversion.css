@@ -4337,3 +4337,494 @@ html[data-theme="academic"] #page16 .cs-synteny-sankey {
             font-size: 16px; margin: 0 0 8px; }
 .empty code { background: var(--panel); padding: 2px 6px; border-radius: 2px;
               font-family: var(--mono); font-size: 11px; color: var(--accent); }
+
+/* ====================================================================
+   mgl_adapter panel cartridges — shared layout for the 7 new pages
+   shipped during the HANDOFF_2…10 migration. They follow a common
+   header / body / aside / footer skeleton, so the rules below carry
+   them all with per-panel tweaks where needed.
+   --------------------------------------------------------------------
+   Convention:
+     page#{id}.active  →  flex column, full height
+     header            →  title (h2 + meta) + right-aligned controls
+     body              →  main canvas-wrap + .right aside (250px col)
+     footer            →  one-line caption
+   Class prefixes used (one per panel):
+     .tree-panel-          page_tree_panel
+     .fingerprint-         page_fingerprint_track
+     .similarity-          page_similarity_panel
+     .pca-                 page_pca_panel
+     .dh2-                 page_dosage_heatmap
+     .nested-              page_nested_detector
+     .dc-                  page_dosage_cluster
+   ==================================================================== */
+
+.page#page_tree_panel.active,
+.page#page_fingerprint_track.active,
+.page#page_similarity_panel.active,
+.page#page_pca_panel.active,
+.page#page_dosage_heatmap.active,
+.page#page_nested_detector.active,
+.page#page_dosage_cluster.active {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---- Generic header / body / footer scaffold (one selector per
+   class prefix because the rule's structural targets share the same
+   shape). Kept verbose for grep-ability. ---- */
+.tree-panel-header,
+.fingerprint-header,
+.similarity-header,
+.pca-header,
+.dh2-header,
+.nested-header,
+.dc-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel-2);
+  flex-shrink: 0;
+}
+.tree-panel-title,
+.fingerprint-title,
+.similarity-title,
+.pca-title,
+.dh2-title,
+.nested-title,
+.dc-title {
+  display: flex; align-items: baseline; gap: 12px;
+  min-width: 0;
+}
+.tree-panel-title h2,
+.fingerprint-title h2,
+.similarity-title h2,
+.pca-title h2,
+.dh2-title h2,
+.nested-title h2,
+.dc-title h2 {
+  font-family: var(--serif); font-weight: 500; font-size: 16px;
+  color: var(--ink);
+  margin: 0;
+  white-space: nowrap;
+}
+.tree-panel-meta,
+.fingerprint-meta,
+.similarity-meta,
+.pca-meta,
+.dh2-meta,
+.nested-meta,
+.dc-meta {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.tree-panel-controls,
+.fingerprint-controls,
+.similarity-controls,
+.pca-controls,
+.dh2-controls,
+.nested-controls,
+.dc-controls {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-dim);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.tree-panel-toggle,
+.fingerprint-toggle,
+.similarity-toggle,
+.pca-toggle,
+.dh2-toggle,
+.nested-toggle,
+.dc-toggle {
+  display: inline-flex; align-items: center; gap: 4px;
+  cursor: pointer;
+  color: var(--ink-dim);
+}
+.tree-panel-toggle input[type="checkbox"],
+.fingerprint-toggle input[type="checkbox"],
+.similarity-toggle input[type="checkbox"],
+.pca-toggle input[type="checkbox"],
+.dh2-toggle input[type="checkbox"],
+.nested-toggle input[type="checkbox"],
+.dc-toggle input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+.tree-panel-select,
+.fingerprint-select,
+.similarity-select,
+.pca-select,
+.dh2-select,
+.nested-select,
+.dc-select {
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  font-family: var(--mono); font-size: 10.5px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.tree-panel-sep,
+.fingerprint-sep,
+.similarity-sep,
+.pca-sep,
+.dh2-sep,
+.nested-sep,
+.dc-sep {
+  display: inline-block; width: 1px; height: 14px;
+  background: var(--rule);
+  flex-shrink: 0;
+}
+
+.tree-panel-body,
+.fingerprint-body,
+.similarity-body,
+.pca-body,
+.dh2-body,
+.nested-body,
+.dc-body {
+  display: grid; grid-template-columns: 1fr 260px;
+  gap: 14px;
+  flex: 1; min-height: 0;
+  padding: 12px 16px;
+  overflow: hidden;
+}
+
+.tree-panel-track-wrap,
+.fingerprint-track-wrap,
+.similarity-track-wrap,
+.pca-track-wrap,
+.dh2-canvas-wrap,
+.nested-tracks-wrap,
+.dc-curves-wrap {
+  position: relative;
+  display: flex; flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tree-panel-canvas,
+.fingerprint-track-canvas,
+.similarity-transition-canvas,
+.similarity-matrix-canvas,
+.pca-scrubber-canvas,
+.pca-scatter-canvas,
+.dh2-canvas,
+.nested-tracks-canvas,
+.dc-curves-canvas {
+  display: block;
+  width: 100%;
+  background: var(--panel);
+}
+/* Scrubber / transition strips are short. */
+.fingerprint-track-canvas      { height: 120px; }
+.similarity-transition-canvas  { height: 56px; flex-shrink: 0; border-bottom: 1px solid var(--rule); }
+.similarity-matrix-canvas      { flex: 1; min-height: 240px; }
+.similarity-matrix-wrap        { position: relative; flex: 1; min-height: 0;
+                                  display: flex; flex-direction: column; }
+.pca-scrubber-canvas           { height: 24px; flex-shrink: 0; border-bottom: 1px solid var(--rule); }
+.pca-scatter-canvas            { flex: 1; min-height: 320px; }
+.pca-scatter-wrap              { position: relative; flex: 1; min-height: 0;
+                                  display: flex; flex-direction: column; }
+.tree-panel-canvas             { flex: 1; min-height: 320px; }
+.dh2-canvas                    { flex: 1; min-height: 360px; }
+.nested-tracks-canvas          { height: 220px; }
+.dc-curves-canvas              { flex: 1; min-height: 280px; }
+
+/* Right-side aside panel (uniform). */
+.tree-panel-right,
+.fingerprint-right,
+.similarity-right,
+.pca-right,
+.dh2-right,
+.nested-right,
+.dc-right {
+  display: flex; flex-direction: column;
+  gap: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 10px 12px;
+  overflow: auto;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink);
+}
+.tree-panel-panel-head,
+.fingerprint-panel-head,
+.similarity-panel-head,
+.pca-panel-head,
+.dh2-panel-head,
+.nested-panel-head,
+.dc-panel-head {
+  display: flex; flex-direction: column; gap: 2px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 6px;
+  margin-bottom: 2px;
+}
+.tree-panel-panel-head h4,
+.fingerprint-panel-head h4,
+.similarity-panel-head h4,
+.pca-panel-head h4,
+.dh2-panel-head h4,
+.nested-panel-head h4,
+.dc-panel-head h4 {
+  margin: 0;
+  font-family: var(--mono); font-size: 10px;
+  color: var(--ink-dim);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.tree-panel-hint,
+.fingerprint-hint,
+.similarity-hint,
+.pca-hint,
+.dh2-hint,
+.nested-hint,
+.dc-hint {
+  font-size: 10px; color: var(--ink-dimmer);
+  font-style: italic;
+}
+.tree-panel-selected-fields,
+.fingerprint-selected-fields,
+.similarity-selected-fields,
+.pca-selected-fields,
+.dh2-selected-fields,
+.dc-chosen-fields {
+  display: grid; grid-template-columns: max-content 1fr;
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 11px;
+}
+.tree-panel-selected-fields dt,
+.fingerprint-selected-fields dt,
+.similarity-selected-fields dt,
+.pca-selected-fields dt,
+.dh2-selected-fields dt,
+.dc-chosen-fields dt {
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.tree-panel-selected-fields dd,
+.fingerprint-selected-fields dd,
+.similarity-selected-fields dd,
+.pca-selected-fields dd,
+.dh2-selected-fields dd,
+.dc-chosen-fields dd {
+  color: var(--ink);
+  margin: 0;
+  word-break: break-word;
+}
+.tree-panel-selected-fields dt.empty,
+.fingerprint-selected-fields dt.empty,
+.similarity-selected-fields dt.empty,
+.pca-selected-fields dt.empty,
+.dh2-selected-fields dt.empty,
+.dc-chosen-fields dt.empty {
+  color: var(--ink-dimmer);
+  font-style: italic;
+}
+
+.tree-panel-footer,
+.fingerprint-footer,
+.similarity-footer,
+.pca-footer,
+.dh2-footer,
+.nested-footer,
+.dc-footer {
+  padding: 8px 16px;
+  border-top: 1px solid var(--rule);
+  background: var(--panel-2);
+  font-family: var(--mono); font-size: 10px;
+  color: var(--ink-dimmer);
+  flex-shrink: 0;
+  line-height: 1.5;
+}
+
+.tree-panel-empty,
+.fingerprint-empty,
+.similarity-empty,
+.pca-empty,
+.dh2-empty,
+.nested-empty,
+.dc-empty {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-dimmer);
+  text-align: center;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* ---- Badges ---- */
+.fingerprint-scenario-badge,
+.similarity-metric-badge,
+.pca-anchor-badge,
+.dh2-view-badge,
+.nested-verdict-badge,
+.dc-verdict-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.04em;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+/* ---- Tree-panel legend swatch ---- */
+.tree-legend-swatch {
+  display: inline-block; width: 10px; height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.tree-panel-legend-body { font-size: 10.5px; color: var(--ink); }
+
+/* ---- Fingerprint proportions treemap ---- */
+.fingerprint-proportions {
+  border-top: 1px dashed var(--rule);
+  padding-top: 8px;
+}
+.fingerprint-proportions h5 { margin: 0 0 6px; font-size: 10px; color: var(--ink-dim);
+                              font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.fingerprint-proportions-canvas {
+  display: block;
+  width: 100%;
+  background: var(--panel);
+  border-radius: 2px;
+}
+
+/* ---- Fingerprint switch list ---- */
+.fingerprint-switch-list h5,
+.similarity-block-list h5,
+.pca-cluster-list h5,
+.dh2-legend h5,
+.dc-chosen-section h5 {
+  margin: 0 0 6px; font-size: 10px; color: var(--ink-dim);
+  font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.fingerprint-switch-row,
+.similarity-block-row,
+.pca-cluster-row,
+.dh2-legend-row,
+.nested-stratum-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 2px 0;
+  font-size: 11px;
+}
+.fingerprint-switch-type {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 2px;
+  font-family: var(--mono); font-size: 9px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+}
+.fingerprint-switch-return   { background: rgba(48, 116, 200, 0.18); }
+.fingerprint-switch-terminal { background: rgba(208, 69, 69, 0.18); }
+.fingerprint-switch-brief    { background: rgba(138, 148, 163, 0.18); }
+
+/* ---- Similarity / PCA / DH2 swatches ---- */
+.similarity-block-swatch,
+.pca-cluster-swatch,
+.dh2-legend-swatch,
+.nested-stratum-swatch,
+.dc-cluster-swatch {
+  display: inline-block; width: 10px; height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ---- Nested detector ---- */
+.nested-interval-row {
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  background: var(--panel);
+}
+.nested-interval-row.hovered  { border-color: var(--accent); }
+.nested-interval-row.selected { background: rgba(245, 165, 36, 0.10);
+                                 border-color: var(--accent); }
+.nested-interval-title {
+  display: block; font-family: var(--mono); font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.nested-interval-row dl {
+  display: grid; grid-template-columns: max-content 1fr;
+  gap: 2px 8px;
+  margin: 0;
+}
+.nested-interval-row dt { color: var(--ink-dim); }
+.nested-interval-row dd { color: var(--ink); margin: 0; }
+
+/* ---- Dosage-cluster per-K table ---- */
+.dc-per-k-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono); font-size: 10px;
+  color: var(--ink);
+}
+.dc-per-k-table th,
+.dc-per-k-table td {
+  text-align: right;
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--rule);
+}
+.dc-per-k-table th {
+  color: var(--ink-dim);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.dc-per-k-table tr.chosen  td { color: var(--accent); }
+.dc-per-k-table tr.focused td { background: rgba(245, 165, 36, 0.12); }
+.dc-per-k-table tr:hover  td  { background: var(--panel-3); cursor: pointer; }
+.dc-cluster-size { font-family: var(--mono); color: var(--ink); margin-right: 4px; }
+
+/* ---- Empty-state inner ---- */
+.fingerprint-switch-list-body .empty,
+.similarity-block-list-body .empty,
+.pca-cluster-list-body .empty,
+.dh2-legend-body .empty,
+.nested-cand-list-body .empty,
+.dc-per-k-body .empty,
+.tree-panel-legend-body .empty {
+  color: var(--ink-dimmer); font-style: italic;
+}
+
+/* Sub-section title in the right aside (legend, blocks, etc). */
+.tree-panel-legend,
+.fingerprint-switch-list,
+.fingerprint-proportions,
+.similarity-block-list,
+.pca-cluster-list,
+.dh2-legend,
+.nested-cand-list,
+.dc-chosen-section {
+  border-top: 1px dashed var(--rule);
+  padding-top: 8px;
+}
+.tree-panel-legend h5,
+.fingerprint-switch-list h5,
+.nested-cand-list h5 {
+  margin: 0 0 6px; font-size: 10px; color: var(--ink-dim);
+  font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+}
