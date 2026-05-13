@@ -46,6 +46,10 @@ import {
   SEGREGATION_STATUS,
   EFFECT_DIRECTION,
 } from '../mendelian_segregation.js';
+import {
+  annotateRegimeWithDyads,
+  MEIOTIC_DRIVE_VERDICTS,
+} from './regime_dyad_mendelian.js';
 
 // =====================================================================
 // Vocab
@@ -354,4 +358,297 @@ export function annotateRegimesWithMendelian(regimes, opts) {
     result.para_peri_table = buildParaPeriContingency(allRows);
   }
   return result;
+}
+
+// =====================================================================
+// 5. computeFamilyReliabilityTier — SPEC §4.1 auto-tier
+// =====================================================================
+
+/** Reliability tier vocab (SPEC §4.1). */
+export const FAMILY_RELIABILITY_TIERS = Object.freeze({
+  HIGH: 'high', MEDIUM: 'medium', LOW: 'low',
+});
+
+/** Thresholds per SPEC §4.1 table. */
+export const FAMILY_RELIABILITY_DEFAULTS = Object.freeze({
+  // Offspring count tiers (SPEC §4.1 col 3).
+  offspring_high:  20,
+  offspring_med:   10,
+  // Call-rate tiers (SPEC §4.1 col 4).
+  call_rate_high:  0.90,
+  call_rate_med:   0.80,
+});
+
+/**
+ * Compute the family's reliability tier per SPEC §4.1. The tier is
+ * the MIN across four axes (both-parents-called, offspring n, call
+ * rate, karyotype clarity). A family with strong evidence on all
+ * four axes is `high`; degraded on any axis demotes it.
+ *
+ * Axes:
+ *   1. Both parents called in this regime?  — yes/uncertain/no
+ *   2. Offspring n                          — ≥ 20 / 10-20 / < 10
+ *   3. Call rate (n_called / n_offspring)   — ≥ 90% / ≥ 80% / < 80%
+ *   4. Karyotype clarity                    — 3 / 2 / 1 classes populated
+ *
+ * Returns:
+ *   {
+ *     tier:    HIGH | MEDIUM | LOW,
+ *     axes:    {parents, offspring_n, call_rate, karyotype_clarity},
+ *     limiting_axis: name of the worst axis (the one that capped the tier),
+ *   }
+ *
+ * SPEC §4.1 col 5 (confound check) is caller-supplied via
+ * `opts.confound_tier` ∈ {'high','medium','low'}; defaults to 'high'
+ * (no confound assumed) when omitted.
+ *
+ * @param {{parents:Array<number>, offspring:Array<number>}} family
+ * @param {Object} regime
+ * @param {Object} [opts]
+ * @returns {Object}
+ */
+export function computeFamilyReliabilityTier(family, regime, opts) {
+  const o = opts || {};
+  const offHigh = Number.isFinite(o.offspring_high)
+    ? o.offspring_high : FAMILY_RELIABILITY_DEFAULTS.offspring_high;
+  const offMed  = Number.isFinite(o.offspring_med)
+    ? o.offspring_med  : FAMILY_RELIABILITY_DEFAULTS.offspring_med;
+  const callHigh = Number.isFinite(o.call_rate_high)
+    ? o.call_rate_high : FAMILY_RELIABILITY_DEFAULTS.call_rate_high;
+  const callMed  = Number.isFinite(o.call_rate_med)
+    ? o.call_rate_med  : FAMILY_RELIABILITY_DEFAULTS.call_rate_med;
+
+  // Axis 1 — both parents called
+  let parents_axis;
+  if (!family || !Array.isArray(family.parents) || family.parents.length < 2) {
+    parents_axis = FAMILY_RELIABILITY_TIERS.LOW;
+  } else {
+    const p1 = regimeKaryotypeForSample(regime, family.parents[0]);
+    const p2 = regimeKaryotypeForSample(regime, family.parents[1]);
+    parents_axis = (p1 && p2)
+      ? FAMILY_RELIABILITY_TIERS.HIGH
+      : (p1 || p2)
+        ? FAMILY_RELIABILITY_TIERS.MEDIUM
+        : FAMILY_RELIABILITY_TIERS.LOW;
+  }
+
+  // Axis 2 — offspring count
+  const n_offspring = (family && Array.isArray(family.offspring))
+    ? family.offspring.length : 0;
+  const offspring_axis = n_offspring >= offHigh ? FAMILY_RELIABILITY_TIERS.HIGH
+    : n_offspring >= offMed ? FAMILY_RELIABILITY_TIERS.MEDIUM
+    : FAMILY_RELIABILITY_TIERS.LOW;
+
+  // Axis 3 — call rate
+  let n_called = 0;
+  if (family && Array.isArray(family.offspring)) {
+    for (const idx of family.offspring) {
+      if (regimeKaryotypeForSample(regime, idx) != null) n_called++;
+    }
+  }
+  const call_rate = n_offspring > 0 ? n_called / n_offspring : 0;
+  const call_rate_axis = call_rate >= callHigh ? FAMILY_RELIABILITY_TIERS.HIGH
+    : call_rate >= callMed ? FAMILY_RELIABILITY_TIERS.MEDIUM
+    : FAMILY_RELIABILITY_TIERS.LOW;
+
+  // Axis 4 — karyotype clarity (number of populated classes in the regime)
+  let n_classes = 0;
+  if (regime) {
+    if (regime.hom_a_intersect && regime.hom_a_intersect.size > 0) n_classes++;
+    if (regime.hom_b_intersect && regime.hom_b_intersect.size > 0) n_classes++;
+    if (regime.het_union       && regime.het_union.size > 0)       n_classes++;
+  }
+  const karyotype_axis = n_classes >= 3 ? FAMILY_RELIABILITY_TIERS.HIGH
+    : n_classes >= 2 ? FAMILY_RELIABILITY_TIERS.MEDIUM
+    : FAMILY_RELIABILITY_TIERS.LOW;
+
+  // Optional confound axis (caller supplied)
+  const confound_axis = o.confound_tier || FAMILY_RELIABILITY_TIERS.HIGH;
+
+  // Tier = min across axes
+  const order = { high: 2, medium: 1, low: 0 };
+  const axes = {
+    parents: parents_axis,
+    offspring_n: offspring_axis,
+    call_rate: call_rate_axis,
+    karyotype_clarity: karyotype_axis,
+    confound: confound_axis,
+  };
+  let tier = FAMILY_RELIABILITY_TIERS.HIGH;
+  let limiting_axis = 'parents';
+  for (const [name, ax] of Object.entries(axes)) {
+    if (order[ax] < order[tier]) {
+      tier = ax;
+      limiting_axis = name;
+    }
+  }
+  return {
+    tier,
+    axes,
+    limiting_axis,
+    n_offspring, n_called, call_rate, n_classes,
+  };
+}
+
+// =====================================================================
+// 6. rollupEffectDirection — SPEC §8 Question 3
+// =====================================================================
+
+/**
+ * Aggregate the per-family effect_direction tags across a regime
+ * (or any family-row collection). Answers SPEC §8 Question 3:
+ * "when distorted, is the distortion mostly homozygote deficit,
+ * heterozygote excess, or one-arrangement loss?"
+ *
+ * Returns:
+ *   {
+ *     n_total:           int   total rows
+ *     n_distorted:       int   rows with segregation_status DISTORTED
+ *     by_direction:      {none, AA_deficit, BB_deficit, AB_deficit,
+ *                         heterozygote_excess, heterozygote_deficit,
+ *                         one_parent_transmission_bias}
+ *     dominant_direction:string|null  most-frequent NON-'none' direction
+ *     dominant_frac:     fraction of DISTORTED rows in the dominant
+ *                        direction; NaN when no distorted rows
+ *   }
+ *
+ * @param {Array<Object>} family_rows  output of annotateRegimeWithFamilies
+ * @returns {Object}
+ */
+export function rollupEffectDirection(family_rows) {
+  const directions = ['none', 'AA_deficit', 'BB_deficit', 'AB_deficit',
+    'heterozygote_excess', 'heterozygote_deficit',
+    'one_parent_transmission_bias'];
+  const by_direction = Object.create(null);
+  for (const d of directions) by_direction[d] = 0;
+  let n_total = 0, n_distorted = 0;
+  for (const row of family_rows || []) {
+    if (!row) continue;
+    n_total++;
+    if (row.segregation_status === 'DISTORTED') n_distorted++;
+    const d = row.effect_direction || 'none';
+    if (d in by_direction) by_direction[d]++;
+  }
+  // Pick dominant NON-'none' direction.
+  let dom = null, domCount = 0;
+  for (const d of directions) {
+    if (d === 'none') continue;
+    if (by_direction[d] > domCount) {
+      dom = d;
+      domCount = by_direction[d];
+    }
+  }
+  const dominant_frac = n_distorted > 0 ? domCount / n_distorted : NaN;
+  return {
+    n_total, n_distorted,
+    by_direction,
+    dominant_direction: dom,
+    dominant_frac,
+  };
+}
+
+// =====================================================================
+// 7. annotateRegimeMendelianAll — combined trio + family + dyad
+// =====================================================================
+
+/**
+ * Run Method A (trios), Method B (families), AND Method 4d (dyads)
+ * on one regime — whichever inputs are supplied — and emit a
+ * unified annotation with a cross-method agreement flag.
+ *
+ * Cross-method agreement: a regime is considered "all-methods-agree"
+ * when:
+ *   - Method A (if run): support_status === SUPPORTED
+ *   - Method B (if run): summary.n_DISTORTED / summary.n_total ≤
+ *     `distortion_frac_for_agreement` (default 0.20)
+ *   - Method 4d (if run): meiotic_drive.verdict === MENDELIAN
+ *
+ * When all available methods agree → `methods_agree_mendelian = true`.
+ * When all available methods agree on a non-Mendelian outcome (e.g.
+ * A=CONTRADICTED + B mostly DISTORTED + 4d STRONG_DRIVE) →
+ * `methods_agree_distorted = true`. Mixed → both false (a flag for
+ * paper-quality reviewer attention).
+ *
+ * Returns:
+ *   {
+ *     regime_id,
+ *     method_a?:     output of annotateRegimeWithTrios
+ *     method_b?:     output of annotateRegimeWithFamilies
+ *     method_4d?:    output of annotateRegimeWithDyads
+ *     effect_rollup?: output of rollupEffectDirection (from method_b)
+ *     methods_agree_mendelian: bool
+ *     methods_agree_distorted: bool
+ *     summary_verdict: 'mendelian' | 'distorted' | 'mixed' |
+ *                      'insufficient_data'
+ *   }
+ *
+ * @param {Object} regime
+ * @param {{trios?:Array, families?:Array, dyads?:Array,
+ *          distortion_frac_for_agreement?:number}} args
+ * @param {Object} [opts]
+ * @returns {Object}
+ */
+export function annotateRegimeMendelianAll(regime, args, opts) {
+  const a = args || {};
+  const o = opts || {};
+  const distFracThr = Number.isFinite(a.distortion_frac_for_agreement)
+    ? a.distortion_frac_for_agreement : 0.20;
+
+  const out = { regime_id: regime ? regime.regime_id : null };
+  let agreeMend = [], agreeDist = [];
+
+  // Method A — trios
+  if (Array.isArray(a.trios) && a.trios.length > 0) {
+    out.method_a = annotateRegimeWithTrios(regime, a.trios, o);
+    if (out.method_a.support_status === TRIO_SUPPORT_STATUS.SUPPORTED) {
+      agreeMend.push('A');
+    } else if (out.method_a.support_status === TRIO_SUPPORT_STATUS.CONTRADICTED) {
+      agreeDist.push('A');
+    }
+  }
+  // Method B — families
+  if (Array.isArray(a.families) && a.families.length > 0) {
+    out.method_b = annotateRegimeWithFamilies(regime, a.families, o);
+    out.effect_rollup = rollupEffectDirection(out.method_b.family_rows);
+    const totalCalled = out.method_b.summary.n_MENDELIAN
+                        + out.method_b.summary.n_DISTORTED;
+    if (totalCalled > 0) {
+      const distFrac = out.method_b.summary.n_DISTORTED / totalCalled;
+      if (distFrac <= distFracThr) agreeMend.push('B');
+      else if (distFrac >= 1 - distFracThr) agreeDist.push('B');
+    }
+  }
+  // Method 4d — dyads
+  if (Array.isArray(a.dyads) && a.dyads.length > 0) {
+    out.method_4d = annotateRegimeWithDyads(regime, a.dyads, o);
+    const v = out.method_4d.meiotic_drive.verdict;
+    if (v === MEIOTIC_DRIVE_VERDICTS.MENDELIAN) {
+      agreeMend.push('4d');
+    } else if (v === MEIOTIC_DRIVE_VERDICTS.STRONG_DRIVE
+               || v === MEIOTIC_DRIVE_VERDICTS.INVIABILITY) {
+      agreeDist.push('4d');
+    }
+  }
+
+  // Cross-method agreement flags.
+  const n_methods_run =
+    (out.method_a  ? 1 : 0) +
+    (out.method_b  ? 1 : 0) +
+    (out.method_4d ? 1 : 0);
+  out.n_methods_run = n_methods_run;
+  out.methods_agree_mendelian = n_methods_run > 0
+    && agreeMend.length === n_methods_run;
+  out.methods_agree_distorted = n_methods_run > 0
+    && agreeDist.length === n_methods_run;
+
+  if (n_methods_run === 0) {
+    out.summary_verdict = 'insufficient_data';
+  } else if (out.methods_agree_mendelian) {
+    out.summary_verdict = 'mendelian';
+  } else if (out.methods_agree_distorted) {
+    out.summary_verdict = 'distorted';
+  } else {
+    out.summary_verdict = 'mixed';
+  }
+  return out;
 }

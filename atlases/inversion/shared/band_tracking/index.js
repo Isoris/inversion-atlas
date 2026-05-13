@@ -155,10 +155,15 @@ export {
   TRIO_SUPPORT_STATUS,
   TRIO_SUPPORT_THRESHOLDS,
   REGIME_MENDELIAN_DEFAULTS,
+  FAMILY_RELIABILITY_TIERS,
+  FAMILY_RELIABILITY_DEFAULTS,
   regimeKaryotypeForSample,
   annotateRegimeWithTrios,
   annotateRegimeWithFamilies,
   annotateRegimesWithMendelian,
+  computeFamilyReliabilityTier,
+  rollupEffectDirection,
+  annotateRegimeMendelianAll,
 } from './regime_mendelian.js';
 
 // ---------------------------------------------------------------------
