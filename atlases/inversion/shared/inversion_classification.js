@@ -34,6 +34,9 @@
 import {
   SEGREGATION_STATUS,
 } from './mendelian_family_test.js';
+import {
+  classifyRecombinationSuppression,
+} from './recombination_suppression.js';
 
 // =====================================================================
 // Schema
@@ -59,6 +62,7 @@ export const CLASSIFICATION_AXES = Object.freeze([
   // STRUCTURE
   'structure_class',
   'age_my_bracket',
+  'recombination_suppression',
   // FATE
   'selection_efficacy',
   'divergence',
@@ -74,7 +78,7 @@ export const CLASSIFICATION_AXES = Object.freeze([
  *  alongside the flat axes object. */
 export const CLASSIFICATION_AXIS_GROUPS = Object.freeze({
   ORIGIN:    ['origin_mechanism', 'copy_origin_verdict', 'position_class', 'arrangement_n'],
-  STRUCTURE: ['structure_class', 'age_my_bracket'],
+  STRUCTURE: ['structure_class', 'age_my_bracket', 'recombination_suppression'],
   FATE:      ['selection_efficacy', 'divergence', 'xpehh_signal', 'segregation_status_majority'],
   ROLE:      ['pangenome_class', 'evolutionary_role'],
 });
@@ -83,7 +87,7 @@ export const CLASSIFICATION_AXIS_GROUPS = Object.freeze({
 export const AXIS_MISSING = null;
 
 /** Module version for the row schema. */
-export const INVERSION_CLASSIFICATION_VERSION = 'inversion_classification_v1.1';
+export const INVERSION_CLASSIFICATION_VERSION = 'inversion_classification_v1.2';
 
 // =====================================================================
 // Vocab — evolutionary_role + pangenome_class
@@ -397,6 +401,51 @@ export function classifyEvolutionaryRole(axes, opts) {
 }
 
 /**
+ * Recombination-suppression axis. Bridges the consolidator inputs
+ * (regime-linkage summary + karyotype distribution + family rows)
+ * into the shape classifyRecombinationSuppression expects.
+ *
+ * Returns AXIS_MISSING when all three inputs are absent. Otherwise
+ * returns the classifier's label string — `no_data` here means
+ * inputs were present but didn't carry usable evidence.
+ *
+ * @param {Object|null} regime_linkage_summary
+ * @param {Object|null} karyotype_distribution
+ * @param {Array|null}  family_rows
+ * @returns {string|null}
+ */
+export function extractRecombinationSuppression(
+  regime_linkage_summary,
+  karyotype_distribution,
+  family_rows,
+) {
+  if (!regime_linkage_summary && !karyotype_distribution
+      && (!Array.isArray(family_rows) || family_rows.length === 0)) {
+    return AXIS_MISSING;
+  }
+  let mendelian_summary = null;
+  if (Array.isArray(family_rows) && family_rows.length > 0) {
+    let n_med = 0, n_mendelian = 0, n_distorted = 0, n_other = 0;
+    for (const row of family_rows) {
+      if (!row) continue;
+      if (row.reliability !== 'high' && row.reliability !== 'medium') continue;
+      n_med++;
+      if (row.segregation_status === SEGREGATION_STATUS.MENDELIAN)      n_mendelian++;
+      else if (row.segregation_status === SEGREGATION_STATUS.DISTORTED) n_distorted++;
+      else n_other++;
+    }
+    if (n_med > 0) {
+      mendelian_summary = { n_families: n_med, n_mendelian, n_distorted, n_other };
+    }
+  }
+  return classifyRecombinationSuppression({
+    regime_linkage_summary,
+    mendelian_summary,
+    karyotype_distribution,
+  });
+}
+
+/**
  * Arrangement count from arrangement_calls.tabulateArrangementSizes.
  * Returns {n_arrangements, n_uncalled, fraction_uncalled} or null.
  */
@@ -459,6 +508,7 @@ export function buildInversionClassificationRow(candidate, inputs, opts) {
     // STRUCTURE
     structure_class:              extractStructureClass(i.regime_structure),
     age_my_bracket:               extractAgeMyBracket(i.busco_4d_age),
+    recombination_suppression:    extractRecombinationSuppression(i.regime_linkage_summary, i.karyotype_distribution, i.family_rows),
     // FATE
     selection_efficacy:           extractSelectionEfficacy(i.functional_burden),
     divergence:                   extractDivergence(i.divergence_label),

@@ -48,9 +48,9 @@ function group(name) { console.log('\n--- ' + name + ' ---'); }
 group('schema');
 
 check('CLASSIFICATION_AXES frozen',       Object.isFrozen(CLASSIFICATION_AXES));
-check('12 axes defined',                  CLASSIFICATION_AXES.length === 12);
+check('13 axes defined',                  CLASSIFICATION_AXES.length === 13);
 check('AXIS_MISSING is null',             AXIS_MISSING === null);
-check('module version v1.1',              INVERSION_CLASSIFICATION_VERSION === 'inversion_classification_v1.1');
+check('module version v1.2',              INVERSION_CLASSIFICATION_VERSION === 'inversion_classification_v1.2');
 
 // =====================================================================
 group('extractors — pass-through on populated inputs');
@@ -186,7 +186,7 @@ check('row.candidate_id passed through',  row.candidate_id === 'INV_LG28_001');
 check('row.chrom passed through',         row.chrom === 'LG28');
 check('row.start_bp passed through',      row.start_bp === 15030000);
 check('row.inversion_type passed through',row.inversion_type === 'paracentric');
-check('row has all 12 axes',              Object.keys(row.axes).length === 12);
+check('row has all 13 axes',              Object.keys(row.axes).length === 13);
 check('axes.origin_mechanism filled',     row.axes.origin_mechanism === 'NAHR-compatible');
 check('axes.copy_origin_verdict filled',
       row.axes.copy_origin_verdict === 'arrangement-specific SD mosaic');
@@ -214,8 +214,8 @@ check('partial: age missing',             partialRow.axes.age_my_bracket === AXI
 // → with only mechanism filled, expect 2 axes present: origin_mechanism +
 // evolutionary_role.
 check('partial: coverage.n_present = 2',  partialRow.coverage.n_present === 2);
-check('partial: coverage.n_total = 12',   partialRow.coverage.n_total === 12);
-check('partial: fraction = 2/12',         Math.abs(partialRow.coverage.fraction - 2/12) < 1e-9);
+check('partial: coverage.n_total = 13',   partialRow.coverage.n_total === 13);
+check('partial: fraction = 2/13',         Math.abs(partialRow.coverage.fraction - 2/13) < 1e-9);
 
 const emptyRow = buildInversionClassificationRow(candidate, {});
 // evolutionary_role is always set → 1 axis even on empty inputs.
@@ -290,7 +290,7 @@ check('ORIGIN bucket has origin_mechanism',
 check('ROLE bucket has evolutionary_role',
       grouped_row.ROLE && 'evolutionary_role' in grouped_row.ROLE);
 check('flat axes still intact after grouping',
-      Object.keys(row.axes).length === 12);
+      Object.keys(row.axes).length === 13);
 
 check('axesByGroup(null) = {}',     Object.keys(axesByGroup(null)).length === 0);
 
