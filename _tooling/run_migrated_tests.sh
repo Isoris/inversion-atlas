@@ -160,6 +160,7 @@ UNITS=(
   test_shared_copy_origin_painting.js
   test_shared_arrangement_calls.js
   test_shared_functional_burden.js
+  test_shared_busco_4d_age.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
