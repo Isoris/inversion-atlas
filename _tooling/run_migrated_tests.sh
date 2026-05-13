@@ -173,6 +173,8 @@ UNITS=(
   test_shared_mgl_pca_json.js
   test_shared_mgl_beagle_parser.js
   test_shared_mgl_pca_compute.js
+  test_shared_mgl_heatmap_json.js
+  test_shared_mgl_nj_tree.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
