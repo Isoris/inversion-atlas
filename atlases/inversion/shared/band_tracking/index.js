@@ -27,31 +27,52 @@
 // =====================================================================
 
 // ---------------------------------------------------------------------
-// TODO (legacy-merge gap): the following re-export blocks point at
-// upstream pipeline modules that were never extracted from the legacy
-// Inversion_atlas.html monolith. The file shapes are documented in the
-// header comment above; the implementations still live in legacy and
-// need to be carved out the same way other shared/ modules were. Until
-// then, the index loads only the consensus tail of the pipeline.
+// LAYER 1 — single-band trajectory + het skeleton + HOM anchors +
+// per-sample karyotype caller.
 //
-// Missing (legacy extraction pending):
-//   ./single_band.js       — bandMembers, bandJaccard,
-//                            single_band_score_continuity,
-//                            single_band_track_from_seed
-//   ./het.js               — meanPc1PerBand, het_detect_candidate_band,
-//                            het_track_skeleton, het_define_interval,
-//                            iv_merge_het_tracks
-//   ./hom.js               — hom_anchor_in_window, hom_anchor_to_het
-//   ./iv.js                — iv_call_samples_from_skeleton
-//   ./trajectory.js        — pickPc1OrientationReferenceSamples,
-//                            computePc1SignAnchors,
-//                            band_compute_pc1_trajectory,
-//                            band_pairwise_trajectory_correlation,
-//                            band_group_by_trajectory_similarity
-//   ./karyotype_model.js   — kt_combine_trajectory_and_projection_evidence,
-//                            kt_infer_macro_band_groups,
-//                            kt_resolve_karyotype_model
+// The cartridge is ahead of legacy on this layer — these modules were
+// designed and built to the spec contracts (per-window K-means
+// labels via getLabels/getK callbacks, NEVER L2-broadcast — same
+// per-window upgrade noted in anchor_signals.js header).
+//
+// Layer 1a: single-band trajectory across windows.
+// Layer 1b: het-band detection + skeleton (interval seed for
+//           long-range haplotype regime).
+// Layer 1c: HOM_A / HOM_B anchor sample sets from a het skeleton.
+// Layer 1d: per-sample karyotype caller — TAIL of the pipeline.
+//
+// Still to build (separate PR): trajectory.js (per-band pc1
+// trajectories + sign anchors) and karyotype_model.js (combiner
+// that consumes trajectory + projection + vote evidence).
 // ---------------------------------------------------------------------
+export {
+  SINGLE_BAND_DEFAULTS,
+  bandMembers,
+  bandJaccard,
+  single_band_track_from_seed,
+  single_band_score_continuity,
+} from './single_band.js';
+
+export {
+  HET_DEFAULTS,
+  meanPc1PerBand,
+  het_detect_candidate_band,
+  het_track_skeleton,
+  het_define_interval,
+  iv_merge_het_tracks,
+} from './het.js';
+
+export {
+  HOM_DEFAULTS,
+  hom_anchor_in_window,
+  hom_anchor_to_het,
+} from './hom.js';
+
+export {
+  IV_CALLS,
+  IV_CALL_DEFAULTS,
+  iv_call_samples_from_skeleton,
+} from './iv.js';
 
 // ---------------------------------------------------------------------
 // LAYER 2 — BandSet Projection (set-based authority)
@@ -71,7 +92,11 @@ export {
   classifyProjectionWithStability,
 } from './projection.js';
 
-// COMBINER (karyotype_model.js): pending legacy extraction — see TODO above.
+// COMBINER (karyotype_model.js): still pending — designs against the
+// vote-evidence + trajectory + projection stack. Layer 1d (iv.js)
+// already gives a working per-sample call from het skeleton + HOM
+// anchors; karyotype_model.js will fold that into a multi-evidence
+// verdict once trajectory.js lands.
 
 // ---------------------------------------------------------------------
 // VOTE EVIDENCE — raw vote extraction + co-association matrix

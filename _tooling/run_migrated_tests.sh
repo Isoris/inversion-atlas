@@ -137,6 +137,10 @@ UNITS=(
   test_shared_fingerprint_rank.js
   test_shared_busco_anchors.js
   test_shared_xpehh_per_window.js
+  test_shared_band_tracking_single_band.js
+  test_shared_band_tracking_het.js
+  test_shared_band_tracking_hom.js
+  test_shared_band_tracking_iv.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
