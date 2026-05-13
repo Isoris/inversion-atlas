@@ -165,6 +165,31 @@ UNITS=(
   test_shared_mendelian_family_test.js
   test_shared_inversion_classification_axes.js
   test_shared_inversion_classification.js
+  test_shared_recombination_suppression.js
+  test_shared_inversion_relationships.js
+  test_shared_homokaryotype_diversity_pattern.js
+  test_shared_phylogenetic_confound.js
+  test_shared_atlas_chrome.js
+  test_shared_mgl_pca_json.js
+  test_shared_mgl_beagle_parser.js
+  test_shared_mgl_pca_compute.js
+  test_shared_mgl_heatmap_json.js
+  test_shared_mgl_nj_tree.js
+  test_shared_mgl_render_state.js
+  test_shared_mgl_candidate_mode.js
+  test_shared_mgl_fingerprinter.js
+  test_shared_mgl_dosage_clustering.js
+  test_shared_mgl_similarity_matrix.js
+  test_shared_mgl_nested_detector.js
+  test_discovery_page_tree_panel.js
+  test_discovery_page_fingerprint_track.js
+  test_discovery_page_similarity_panel.js
+  test_discovery_page_pca_panel.js
+  test_discovery_page_dosage_heatmap.js
+  test_discovery_page_nested_detector.js
+  test_discovery_page_dosage_cluster.js
+  test_shared_mgl_panel_linkage.js
+  test_shared_mgl_stripe_quality.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
@@ -230,6 +255,13 @@ SMOKES=(
   smoke_review_page4_round5.mjs
   smoke_review_page11_round5.mjs
   smoke_review_page_ancestry_scroller_round5.mjs
+  smoke_discovery_page_tree_panel_round5.mjs
+  smoke_discovery_page_fingerprint_track_round5.mjs
+  smoke_discovery_page_similarity_panel_round5.mjs
+  smoke_discovery_page_pca_panel_round5.mjs
+  smoke_discovery_page_dosage_heatmap_round5.mjs
+  smoke_discovery_page_nested_detector_round5.mjs
+  smoke_discovery_page_dosage_cluster_round5.mjs
 )
 
 # Smokes that depend on atlas-core — see CORE_DEPENDENT_UNITS above.

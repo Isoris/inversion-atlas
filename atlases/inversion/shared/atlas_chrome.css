@@ -1,0 +1,169 @@
+/* =====================================================================
+   shared/atlas_chrome.css
+
+   GENERIC ATLAS-CHROME STYLES — tab-stage pills + global settings
+   button + active-stage folding.
+
+   SCOPE: this file is intentionally atlas-agnostic. No reference to
+   inversion-specific layouts. Other atlases (diversity, genome,
+   ancestry) can drop this same file in, mirror the HTML contract
+   documented in shared/atlas_chrome.js, and get the same chrome
+   look + behaviour.
+
+   CANDIDATE FOR PROMOTION TO atlas-core/css/atlas_chrome.css. When
+   atlas-core ships its own version, each cartridge's stylesheet
+   list drops this entry and atlas-core hosts it for everyone.
+
+   Stage hue palette uses CSS variables so each atlas can override
+   accent colours via :root overrides if its workflow stages differ
+   from the canonical 5 (discovery / classification / catalogue /
+   comparative / help).
+
+   HTML contract (paired with shared/atlas_chrome.js):
+
+     <nav id="tabBar" data-active-stage="discovery">
+       <button id="globalSettingsBtn" …>⚙</button>
+       <button class="tab-stage-pill" data-stage="discovery"
+               data-expanded="1">discover</button>
+       <button class="tab-stage-pill" data-stage="classification">…</button>
+       …
+       <button data-page="page1" data-stage="discovery"
+               class="active">1 local PCA |z|</button>
+       …
+     </nav>
+
+   Uses shell-provided CSS tokens (--panel-2, --ink, --rule, etc.)
+   from atlas-core/css/tokens.css. If you're embedding this in a
+   shell that doesn't define them, set fallback values here.
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   Stage-hue palette — override at :root in your atlas to retheme.
+   --------------------------------------------------------------------- */
+:root {
+  --atlas-stage-hue-discovery:      79, 163, 255;
+  --atlas-stage-hue-classification: 60, 192, 138;
+  --atlas-stage-hue-catalogue:      245, 165, 36;
+  --atlas-stage-hue-comparative:    228, 138, 60;
+  --atlas-stage-hue-help:           138, 148, 163;
+  /* Back-compat hues for legacy stage names — only used if a cartridge
+     still references these. Safe to delete once all atlases migrate
+     to the canonical 5 names. */
+  --atlas-stage-hue-refinement:     122, 211, 219;
+  --atlas-stage-hue-synthesis:      232, 196, 76;
+  --atlas-stage-hue-review:          60, 192, 138; /* same as classification */
+  --atlas-stage-hue-compare:        228, 138, 60;  /* same as comparative */
+}
+
+/* ---------------------------------------------------------------------
+   Global settings button — sits at the LEFT end of the tab bar.
+   --------------------------------------------------------------------- */
+#tabBar #globalSettingsBtn {
+  background: #c2410c; color: #fff8e7;
+  border: 1px solid #9a3412;
+  border-radius: 4px;
+  padding: 0 10px;
+  margin: 4px 12px 4px 0;
+  font-family: var(--mono); font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+#tabBar #globalSettingsBtn:hover  { background: #9a3412; border-color: #c2410c; }
+#tabBar #globalSettingsBtn:active { transform: translateY(1px); }
+body.light-theme #tabBar #globalSettingsBtn { color: #fff; }
+
+/* When the parent layout collapses the sidebar, the settings button
+   still sits in the same place — no rule needed. Cartridges can
+   layer their own sidebar-collapse rules on top. */
+
+/* ---------------------------------------------------------------------
+   Tab-stage pills — one per workflow stage.
+   --------------------------------------------------------------------- */
+#tabBar .tab-stage-pill {
+  background: var(--panel-2); color: var(--ink-dim);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 4px 10px;
+  font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: 0.04em; line-height: 1;
+  cursor: pointer;
+  align-self: center;
+  margin: 0 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex; align-items: center;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+#tabBar .tab-stage-pill .pill-count {
+  margin-left: 5px;
+  font-size: 9.5px;
+  opacity: 0.65;
+}
+#tabBar .tab-stage-pill .pill-arrow {
+  margin-left: 5px;
+  font-size: 9px;
+  opacity: 0.55;
+  transition: transform 0.12s;
+}
+#tabBar .tab-stage-pill:hover {
+  background: var(--panel-3);
+  color: var(--ink);
+  border-color: var(--rule-strong, var(--rule));
+}
+
+/* Stage-coloured left edge for each pill. Reads its hue from the
+   --atlas-stage-hue-<stage> custom property. */
+#tabBar .tab-stage-pill[data-stage="discovery"]      { border-left: 3px solid rgba(var(--atlas-stage-hue-discovery),      0.55); }
+#tabBar .tab-stage-pill[data-stage="classification"] { border-left: 3px solid rgba(var(--atlas-stage-hue-classification), 0.55); }
+#tabBar .tab-stage-pill[data-stage="catalogue"]      { border-left: 3px solid rgba(var(--atlas-stage-hue-catalogue),      0.55); }
+#tabBar .tab-stage-pill[data-stage="comparative"]    { border-left: 3px solid rgba(var(--atlas-stage-hue-comparative),    0.55); }
+#tabBar .tab-stage-pill[data-stage="help"]           { border-left: 3px solid rgba(var(--atlas-stage-hue-help),           0.55); }
+
+/* Active-pill background (filled with the stage hue). Driven by
+   data-expanded="1" — set by shared/atlas_chrome.js. */
+#tabBar .tab-stage-pill[data-stage="discovery"][data-expanded="1"] {
+  background: rgba(var(--atlas-stage-hue-discovery),      0.20); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-discovery),      0.65);
+}
+#tabBar .tab-stage-pill[data-stage="classification"][data-expanded="1"] {
+  background: rgba(var(--atlas-stage-hue-classification), 0.20); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-classification), 0.65);
+}
+#tabBar .tab-stage-pill[data-stage="catalogue"][data-expanded="1"] {
+  background: rgba(var(--atlas-stage-hue-catalogue),      0.22); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-catalogue),      0.70);
+}
+#tabBar .tab-stage-pill[data-stage="comparative"][data-expanded="1"] {
+  background: rgba(var(--atlas-stage-hue-comparative),    0.22); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-comparative),    0.70);
+}
+#tabBar .tab-stage-pill[data-stage="help"][data-expanded="1"] {
+  background: rgba(var(--atlas-stage-hue-help),           0.18); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-help),           0.55);
+}
+
+/* Arrow rotates 180° when expanded. */
+#tabBar .tab-stage-pill[data-expanded="1"] .pill-arrow {
+  transform: rotate(180deg); opacity: 0.85;
+}
+
+/* When a stage has exactly one child page (e.g. 'help' usually only
+   has one page), hide the count + arrow chips — the pill IS the
+   page button visually. */
+#tabBar .tab-stage-pill[data-single-child="1"] .pill-count,
+#tabBar .tab-stage-pill[data-single-child="1"] .pill-arrow {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------
+   Active-stage folding — hide every page button whose data-stage
+   doesn't match the tab bar's data-active-stage. This is what
+   creates the "expand the active stage's pages, fold the others"
+   behaviour.
+   --------------------------------------------------------------------- */
+#tabBar[data-active-stage="discovery"]      button[data-page]:not([data-stage="discovery"])      { display: none !important; }
+#tabBar[data-active-stage="classification"] button[data-page]:not([data-stage="classification"]) { display: none !important; }
+#tabBar[data-active-stage="catalogue"]      button[data-page]:not([data-stage="catalogue"])      { display: none !important; }
+#tabBar[data-active-stage="comparative"]    button[data-page]:not([data-stage="comparative"])    { display: none !important; }
+#tabBar[data-active-stage="help"]           button[data-page]:not([data-stage="help"])           { display: none !important; }

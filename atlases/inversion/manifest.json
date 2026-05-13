@@ -58,35 +58,35 @@
     {
       "id": "page4",
       "label": "karyotype / tier",
-      "stage": "review",
+      "stage": "classification",
       "fragment": "atlases/inversion/pages/review/page4.html",
       "module": "atlases/inversion/pages/review/page4.js"
     },
     {
       "id": "page6",
       "label": "popstats",
-      "stage": "review",
+      "stage": "classification",
       "fragment": "atlases/inversion/pages/review/page6.html",
       "module": "atlases/inversion/pages/review/page6.js"
     },
     {
       "id": "page7",
       "label": "ancestry",
-      "stage": "review",
+      "stage": "classification",
       "fragment": "atlases/inversion/pages/review/page7.html",
       "module": "atlases/inversion/pages/review/page7.js"
     },
     {
       "id": "page11",
       "label": "boundaries",
-      "stage": "review",
+      "stage": "classification",
       "fragment": "atlases/inversion/pages/review/page11.html",
       "module": "atlases/inversion/pages/review/page11.js"
     },
     {
       "id": "page_sv_evidence",
       "label": "SV evidence",
-      "stage": "review",
+      "stage": "classification",
       "fragment": "atlases/inversion/pages/review/page_sv_evidence.html",
       "module": "atlases/inversion/pages/review/page_sv_evidence.js"
     },
@@ -114,14 +114,14 @@
     {
       "id": "page17",
       "label": "stats profile",
-      "stage": "synthesis",
+      "stage": "classification",
       "fragment": "atlases/inversion/pages/catalogue/page17.html",
       "module": "atlases/inversion/pages/catalogue/page17.js"
     },
     {
       "id": "page18",
       "label": "marker panel",
-      "stage": "synthesis",
+      "stage": "classification",
       "fragment": "atlases/inversion/pages/catalogue/page18.html",
       "module": "atlases/inversion/pages/catalogue/page18.js"
     },
@@ -135,7 +135,7 @@
     {
       "id": "page_overview",
       "label": "overview",
-      "stage": "synthesis",
+      "stage": "classification",
       "fragment": "atlases/inversion/pages/catalogue/page_overview.html",
       "module": "atlases/inversion/pages/catalogue/page_overview.js"
     },
@@ -161,6 +161,62 @@
       "fragment": "atlases/inversion/pages/comparative/page16b.html",
       "module": "atlases/inversion/pages/comparative/page16b.js",
       "tooltip": "Multi-species comparative atlas page (per HANDOFF_SUPPLEMENT)."
+    },
+    {
+      "id": "page_tree_panel",
+      "label": "tree panel",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page_tree_panel.html",
+      "module": "atlases/inversion/pages/discovery/page_tree_panel.js",
+      "tooltip": "Inversion-core sample tree (NJ on dosage distances) with cluster colouring and ARI-vs-clusters badge (HANDOFF_5)."
+    },
+    {
+      "id": "page_fingerprint_track",
+      "label": "fingerprint track",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page_fingerprint_track.html",
+      "module": "atlases/inversion/pages/discovery/page_fingerprint_track.js",
+      "tooltip": "Per-window diversity-regime fingerprint with rank-equivalence regime IDs, switch markers, fragment-proportions treemap, and architecture-scenario verdict (HANDOFF_6)."
+    },
+    {
+      "id": "page_similarity_panel",
+      "label": "similarity matrix",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page_similarity_panel.html",
+      "module": "atlases/inversion/pages/discovery/page_similarity_panel.js",
+      "tooltip": "Per-window sample×sample similarity heatmap with block detection + adjacent-window ARI transition strip (HANDOFF_10)."
+    },
+    {
+      "id": "page_pca_panel",
+      "label": "PCA scatter",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page_pca_panel.html",
+      "module": "atlases/inversion/pages/discovery/page_pca_panel.js",
+      "tooltip": "Per-window PC1×PC2 scatter with cluster colouring and λ-magnitude scrubber (SPEC_0 §10 Phase 1)."
+    },
+    {
+      "id": "page_dosage_heatmap",
+      "label": "dosage heatmap",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page_dosage_heatmap.html",
+      "module": "atlases/inversion/pages/discovery/page_dosage_heatmap.js",
+      "tooltip": "Sample × marker dosage heatmap with K=3 group track and polarity stripe. Accepts mgl_heatmap_json or legacy candidate-chunk shape via shared adapters (SPEC_0 §11)."
+    },
+    {
+      "id": "page_nested_detector",
+      "label": "nested detector",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page_nested_detector.html",
+      "module": "atlases/inversion/pages/discovery/page_nested_detector.js",
+      "tooltip": "Nested-inversion detector with 3 stratum tracks (HOM1 / HET / HOM2) and contiguous inner-interval overlays (HANDOFF_7)."
+    },
+    {
+      "id": "page_dosage_cluster",
+      "label": "dosage cluster",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/page_dosage_cluster.html",
+      "module": "atlases/inversion/pages/discovery/page_dosage_cluster.js",
+      "tooltip": "Adaptive-K sample clustering on per-window dosage profiles, with per-K scoring table and cluster mean-curve display (HANDOFF_8)."
     }
   ],
   "registries": {
@@ -189,8 +245,10 @@
   "analysis_dir": "atlases/inversion/analysis/",
   "css_dir": "atlases/inversion/css/",
   "stylesheets": [
+    "atlases/inversion/shared/atlas_chrome.css",
     "atlases/inversion/css/inversion.css"
   ],
+  "_stylesheets_chrome_doc": "atlas_chrome.css is a generic chrome stylesheet (tab pills + settings button + active-stage folding) shipped here as a CANDIDATE FOR PROMOTION to atlas-core. Pairs with shared/atlas_chrome.js. Other atlases can drop the same two files in. When atlas-core ships its own copy, remove this entry + delete the cartridge copy.",
   "_stylesheets_doc": "Atlas-wide stylesheets, loaded by the shell at atlas-register time. Currently one big bundle (extracted verbatim from the legacy monolith). Future work: split into per-page stylesheets (atlases/inversion/css/pages/page1.css etc.) and reference them from each page entry's `stylesheet` field below — the router loads page-stylesheet on mount.",
   "scope_pickers": [
     {
@@ -208,9 +266,10 @@
       "order": 1
     },
     {
-      "id": "review",
-      "label": "review",
-      "order": 2
+      "id": "classification",
+      "label": "classification",
+      "order": 2,
+      "_doc": "Absorbs the legacy 'refinement' + 'classification' + 'synthesis' stages — the per-candidate karyotype/tier deep-dive, popstats/ancestry tracks, boundary refinement, SV evidence, plus the cohort-level stats profile / marker panel / overview pages that previously lived under 'synthesis'."
     },
     {
       "id": "catalogue",

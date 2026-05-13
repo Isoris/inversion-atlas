@@ -533,6 +533,15 @@ function _buildLegacyState(atlasState) {
     pdfStyle: true,
     candidateList: [],
     candidateMode: false,
+    // mglCandidateMode — the multi-allelic candidate mode state slot
+    // per HANDOFF_2 §"Component 1: candidate-mode state machine".
+    // Distinct from the legacy `candidateMode` boolean above (which
+    // governs the existing scrub-vs-candidate UI plumbing). The
+    // MGL slot owns the new PCA + heatmap dual-panel + tree + etc.
+    // controls + coordinated render state. Built lazily — `null`
+    // here, populated by shared/mgl_candidate_mode.createMglCandidateModeSlot
+    // on first activation.
+    mglCandidateMode: null,
     travelMode: 'L2',
     stepMode: 'l2',
     stepModeN: 15,

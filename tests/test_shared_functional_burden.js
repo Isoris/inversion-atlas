@@ -21,6 +21,8 @@ import {
   classifyMetricVerdict,
   compositeSummaryTag,
   summarizeCandidateFunctionalBurden,
+  compareHomokaryotypePiToAll,
+  subsampleControlForHomokaryotypePi,
 } from '../atlases/inversion/shared/functional_burden.js';
 
 let pass = 0, fail = 0;
@@ -309,6 +311,70 @@ check('warning emitted for missing lof_burden layer',
       result.warnings.some(w => w.includes('lof_burden')));
 check('missing-layer per_metric row = underpowered',
       result.per_metric.lof_burden.verdict === FUNCTIONAL_BURDEN_VERDICTS.UNDERPOWERED);
+
+// =====================================================================
+group('compareHomokaryotypePiToAll — overdominance disentangler');
+
+// 10 STD/STD samples, 10 HET, 10 INV/INV.
+// STD/STD has reduced π (mean 0.5), HET has high π (mean 1.0), INV/INV
+// has medium (mean 0.8). All-karyotype mean = (10*0.5 + 10*1.0 + 10*0.8)/30 = 0.766...
+// Most-frequent homokaryotype is a tie (10 vs 10); the helper picks
+// STD/STD when counts are tied. Expected reduction: 1 - 0.5/0.766 ≈ 0.348.
+const hk_vals = [];
+const hk_karyo = [];
+for (let i = 0; i < 10; i++) { hk_vals.push(0.5); hk_karyo.push('STD/STD'); }
+for (let i = 0; i < 10; i++) { hk_vals.push(1.0); hk_karyo.push('HET'); }
+for (let i = 0; i < 10; i++) { hk_vals.push(0.8); hk_karyo.push('INV/INV'); }
+const cmp = compareHomokaryotypePiToAll(hk_vals, hk_karyo);
+check('compare: pi_all ≈ 0.7666',                Math.abs(cmp.pi_all - 0.766667) < 1e-4);
+check('compare: pi_mode_homokaryotype = 0.5',    Math.abs(cmp.pi_mode_homokaryotype - 0.5) < 1e-9);
+check('compare: mode = STD/STD (tied → first)',  cmp.mode_karyotype === 'STD/STD');
+check('compare: fraction_reduction ≈ 0.348',     Math.abs(cmp.fraction_reduction - 0.34782) < 1e-3);
+check('compare: n_all = 30',                     cmp.n_all === 30);
+check('compare: n_mode = 10',                    cmp.n_mode === 10);
+
+// INV/INV majority — make BB the mode
+const vals2 = []; const karyo2 = [];
+for (let i = 0; i < 5;  i++) { vals2.push(0.5); karyo2.push('STD/STD'); }
+for (let i = 0; i < 10; i++) { vals2.push(1.0); karyo2.push('HET'); }
+for (let i = 0; i < 15; i++) { vals2.push(0.4); karyo2.push('INV/INV'); }
+const cmp2 = compareHomokaryotypePiToAll(vals2, karyo2);
+check('compare: INV/INV majority → mode = INV/INV', cmp2.mode_karyotype === 'INV/INV');
+check('compare: pi_mode_homokaryotype = 0.4',       Math.abs(cmp2.pi_mode_homokaryotype - 0.4) < 1e-9);
+
+// Edge cases
+check('compare: null inputs → null', compareHomokaryotypePiToAll(null, null) === null);
+check('compare: empty arrays → null', compareHomokaryotypePiToAll([], []) === null);
+check('compare: all heterozygotes (no homo) → null',
+      compareHomokaryotypePiToAll([0.5, 0.5, 0.5], ['HET', 'HET', 'HET']) === null);
+
+// =====================================================================
+group('subsampleControlForHomokaryotypePi');
+
+// Same fixture: STD/STD has mean 0.5, all-karyotype pool has mean ~0.767.
+// Subsampling 10 values from the pool should give means clustered
+// around 0.767 with some spread. STD/STD's mean of 0.5 should be a
+// significant lower outlier → verdict = real_reduction.
+const ctrl = subsampleControlForHomokaryotypePi(hk_vals, hk_karyo, { n_reps: 500, seed: 42 });
+check('subsample: returns 500 reps',           ctrl.n_reps === 500);
+check('subsample: mean ≈ 0.767',               Math.abs(ctrl.subsampled_mean_pi - 0.766667) < 0.05);
+check('subsample: pi_mode well below mean',    ctrl.pi_mode_homokaryotype < ctrl.subsampled_mean_pi);
+check('subsample: p_one_sided < 0.05',         ctrl.p_one_sided < 0.05);
+check('subsample: verdict = real_reduction',   ctrl.verdict === 'real_reduction');
+
+// Same-value cohort: π_mode == π_all → no reduction → consistent_with_sample_size
+const flatVals = []; const flatK = [];
+for (let i = 0; i < 30; i++) { flatVals.push(0.5); flatK.push(i % 3 === 0 ? 'STD/STD' : (i % 3 === 1 ? 'HET' : 'INV/INV')); }
+const ctrlFlat = subsampleControlForHomokaryotypePi(flatVals, flatK, { n_reps: 200, seed: 99 });
+check('flat fixture: pi_mode == subsampled mean', Math.abs(ctrlFlat.pi_mode_homokaryotype - ctrlFlat.subsampled_mean_pi) < 1e-6);
+check('flat fixture: not real_reduction',         ctrlFlat.verdict !== 'real_reduction');
+
+// Deterministic with seed
+const ctrlA = subsampleControlForHomokaryotypePi(hk_vals, hk_karyo, { n_reps: 100, seed: 7 });
+const ctrlB = subsampleControlForHomokaryotypePi(hk_vals, hk_karyo, { n_reps: 100, seed: 7 });
+check('same seed → same subsampled_mean_pi',   ctrlA.subsampled_mean_pi === ctrlB.subsampled_mean_pi);
+
+check('subsample null → null',                  subsampleControlForHomokaryotypePi(null, null) === null);
 
 // =====================================================================
 console.log('\n=================');

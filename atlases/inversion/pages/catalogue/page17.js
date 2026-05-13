@@ -81,6 +81,14 @@ const SP_ALPHA = 0.05;
 // (used to merge user-supplied overrides), a `category`, and a description
 // of how to derive each species' result. The 13 rows mirror the screenshots
 // from the user's "comparative inversion phenotype page" mockup.
+// Karyotype-aware rows (those flagged with `karyotype_aware: true`)
+// support hover- and click-based karyotype-group selection in the
+// page: the displayed value cycles between {all karyotypes pooled,
+// STD/STD only, HET only, INV/INV only}. The atlas-side data is
+// always computed per-group by the producer (functional_burden);
+// the UI just decides which slice to surface in the table cell.
+// TODO: wire the hover/click interaction into renderStatsProfilePage
+// — for now `karyotype_aware: true` is metadata only.
 const SP_DEFAULT_ROWS = [
   // ------ A. Breakpoint architecture ------------------------------------------
   {
@@ -169,6 +177,7 @@ const SP_DEFAULT_ROWS = [
   // ------ H. Heterozygosity inside inversions ---------------------------------
   {
     id: 'heterozygosity_inversions',
+    karyotype_aware: true,
     category: 'Population variation',
     statistic: 'Heterozygosity / nucleotide diversity inside inversions',
     test: 'Wilcoxon / permutation',
@@ -182,6 +191,7 @@ const SP_DEFAULT_ROWS = [
   // ------ I. ROH / inbreeding overlap -----------------------------------------
   {
     id: 'roh_overlap',
+    karyotype_aware: true,
     category: 'Population variation',
     statistic: 'ROH / FROH overlap with inversions',
     test: 'permutation / Fisher / Wilcoxon',
@@ -195,6 +205,7 @@ const SP_DEFAULT_ROWS = [
   // ------ J. Deleterious burden -----------------------------------------------
   {
     id: 'deleterious_burden',
+    karyotype_aware: true,
     category: 'Population variation',
     statistic: 'Deleterious-variant burden in inversion haplotypes',
     test: 'Wilcoxon / GLM (family-corrected)',
@@ -208,6 +219,7 @@ const SP_DEFAULT_ROWS = [
   // ------ K. FST / dXY between inversion haplotypes ---------------------------
   {
     id: 'haplotype_differentiation',
+    karyotype_aware: true,
     category: 'Population variation',
     statistic: 'FST / dXY between inversion structural states',
     test: 'permutation / bootstrap window comparison',
@@ -217,6 +229,186 @@ const SP_DEFAULT_ROWS = [
     bighead_hint: 'African-only',
     african_only: true,
     interpretation_default: 'Inversion states represent differentiated structural haplotypes.',
+  },
+  // ------ K1. Absolute π / πS in region vs rest of genome --------------------
+  // Reference: same paper as the homokaryotype-mode test below.
+  // "Based on the diversity-recombination rate relationship, one would
+  // expect a significant decrease in diversity in the candidate
+  // regions. Contrary to this expectation, almost all regions showed
+  // no significant reduction neither in π or πS … as if the negative
+  // effect of low recombination on diversity was compensated by
+  // overdominance or associative overdominance."
+  //
+  // Separate from heterozygosity_inversions above (which is
+  // matched-interval permutation); this row tests the raw absolute
+  // π / πS in the inversion region against the rest of the genome
+  // directly, expecting (under the diversity-recombination-rate
+  // null) a significant DROP. No drop → compensation hypothesis,
+  // which the homokaryotype-mode test (next row) then disentangles.
+  {
+    id: 'pi_and_pi_s_region_vs_genome',
+    category: 'Population variation',
+    statistic: 'Absolute π and πS in region vs rest of genome',
+    test: 'two-sided Wilcoxon (region vs genome) on per-window π and on per-window πS',
+    null_comparison: 'per-window π and πS from the rest of the genome',
+    derive_from: 'functional_burden.pi + functional_burden.pi_n_pi_s (πS only)',
+    african_hint: 'requires per-window π + πS layers (functional_burden producer)',
+    bighead_hint: 'African-only',
+    african_only: true,
+    interpretation_default: 'Under the standard diversity-recombination null, low-recombining inversion regions should show reduced π and πS. NO significant reduction (the typical observation in real cohorts) → diversity is being maintained against the recombination-suppression expectation, suggesting overdominance / associative overdominance. Strong reduction → the recombination depression is dominant and not compensated.',
+  },
+  // ------ K2. Homokaryotype-mode π / πS reduction -----------------------------
+  // Reference: paper showing diversity (π, πS) of the most-frequent
+  // homokaryotype reduced ~40% vs all-karyotype pooled π / πS across
+  // 6 candidate regions. Distinguishes recombination-suppression
+  // depression from overdominance / associative-overdominance
+  // compensation: if pooled π is maintained while homokaryotype-only
+  // π drops sharply, the cohort-level diversity is partly carried
+  // by heterozygotes.
+  {
+    id: 'pi_homokaryotype_mode_reduction',
+    category: 'Population variation',
+    statistic: 'Absolute π, πS, πN in most-frequent homokaryotype vs all karyotypes pooled',
+    test: 'paired Wilcoxon (region-wise) on raw π / πS / πN; per-region effect-size with CI; sample-size subsampling control (1000-rep bootstrap) to rule out finite-n bias; report mean % reduction across regions',
+    null_comparison: 'all-karyotype-pooled π / πS / πN for the same region + sample-size-matched subsamples from the same pool',
+    derive_from: 'functional_burden + compareHomokaryotypePiToAll + subsampleControlForHomokaryotypePi',
+    african_hint: 'requires per-sample π / πS / πN (functional_burden producer) + karyotype calls',
+    bighead_hint: 'African-only',
+    african_only: true,
+    karyotype_aware: true,
+    interpretation_default: 'Paired with K1: K1 asks "is pooled diversity reduced in the region vs rest of the genome?" — typical answer is no. K2 asks "is diversity reduced when you strip out heterozygotes and look only at the most-frequent homokaryotype?" If K1 is null but K2 shows a sharp drop (~40% for π / πS, ~45% for πN reported in the reference paper, six regions), the cohort-level diversity is being carried by heterozygotes → overdominance / associative overdominance compensating for the recombination-suppression depression that K1 was expected to reveal. The 45% πN drop (vs ~40% for neutral π) further suggests purifying selection is more effective in homokaryotypes — relaxed in the heterokaryotype substrate. Each row reports raw π / πS / πN in the mode homokaryotype + the all-karyotype pooled value + the fraction reduction + the subsampled-control p-value (real reduction vs sample-size artefact).',
+    // Hover-pill ([evo] in the upper-right of the stat cell). Hovering
+    // shows the pattern interpretation for the joint (π_homA, π_homB,
+    // π_AB, n_AA, n_AB, n_BB) signature, classified by
+    // shared/homokaryotype_diversity_pattern.classifyHomokaryotypeDiversityPattern.
+    hover_pill: 'evo',
+    hover_pattern_classifier: 'classifyHomokaryotypeDiversityPattern',
+    hover_pattern_module:     'shared/homokaryotype_diversity_pattern.js',
+  },
+  // ------ K7. Between-arrangement FST vs rest of genome ----------------------
+  // Reference: paper Supplementary Fig. 14 + Supplementary Table 10 —
+  // "All pairwise FST between clusters were significantly higher in
+  // the region than in the rest of the genome." Pairwise FST between
+  // arrangement K-means clusters (AA / AB / BB or generalised
+  // multi-cluster) inside the inversion region vs same pairs computed
+  // over windows outside the region.
+  //
+  // Distinct from K (heterozygosity_inversions) and K1 (π/πS vs genome):
+  //   K  = within-cohort π pooled, matched permutation
+  //   K1 = within-cohort π / πS pooled, vs genome
+  //   K7 = BETWEEN-arrangement FST, vs genome
+  // K7 tests whether the inversion separates internally-distinct
+  // haplotype lineages; K2 tests whether those lineages are old/diverged.
+  {
+    id: 'between_arrangement_fst_vs_genome',
+    category: 'Population variation',
+    statistic: 'Pairwise FST between arrangement clusters in region vs rest of genome',
+    test: 'two-sided Wilcoxon (in-region per-pair FST vs genome per-pair FST) + per-pair resampling',
+    null_comparison: 'pairwise FST between the same arrangement clusters computed on windows outside the region',
+    derive_from: 'divergence_network.computeDivergenceNetwork + region/genome masking',
+    african_hint: 'requires per-window FST track or computeDivergenceNetwork output keyed by region/non-region',
+    bighead_hint: 'African-only',
+    african_only: true,
+    karyotype_aware: true,
+    interpretation_default: 'In-region pairwise FST significantly higher than genome-background → arrangement clusters are sequence-divergent inside the inversion, beyond what neutral expectation predicts. Combined with K2 (within-arrangement diversity), this is the "between high / within low" signature of an old polymorphism. Combined with K6 (deleterious / tolerated ratio), it points toward heterochromatic / load-rich arrangements that are diverged but degenerating.',
+  },
+  // ------ K8. QC: Phylogenetic confound (POD bands vs background tree) -------
+  // CRITICAL STRESS TEST. The "3 bands" we get from K-means on local
+  // PCA can be EITHER genuine karyotype signal OR phylogenetic-
+  // structure leakage. This row compares the per-sample K-means
+  // karyotype calls against a per-sample BACKGROUND clade assignment
+  // from an independent sample-relationship tree (recommended:
+  // PCAngsd cov.tree from genome-wide neutral SNPs EXCLUDING the
+  // candidate POD intervals).
+  //
+  // If the karyotype calls and clade calls are highly associated
+  // (high Cramér's V / ARI / NMI) → "ancestry_like" interpretation;
+  // the candidate likely fails as a real inversion. If they're
+  // orthogonal → "local_haplotype_regime" or, with breakpoint support,
+  // "inversion_supported".
+  //
+  // 4-state interpretation chip per shared/phylogenetic_confound.js:
+  //   ancestry_like / family_ld_suspect           (confounded)
+  //   local_haplotype_regime / inversion_supported (independent)
+  //   unknown                                      (insufficient data)
+  {
+    id: 'phylo_confound_qc',
+    category: 'Population variation',
+    statistic: 'POD bands vs background sample structure (PCAngsd cov.tree)',
+    test: 'χ² of independence + Cramér\'s V + ARI + NMI on (karyotype × clade) contingency',
+    null_comparison: 'background clade labels from a genome-wide cov.tree built EXCLUDING candidate POD intervals',
+    derive_from: 'shared/phylogenetic_confound.summariseConfoundForCandidate',
+    african_hint: 'requires per-sample karyotype call (K-means on local PCA) + per-sample clade label (PCAngsd cov.tree, candidate-excluding background SNPs)',
+    bighead_hint: 'African-only',
+    african_only: true,
+    karyotype_aware: false,
+    interpretation_default: 'QC stress test for whether the "3 bands" are real karyotype signal vs an artefact of underlying sample relationships. High Cramér\'s V (≥ 0.60) or ARI (≥ 0.40) → ancestry_like (or family_ld_suspect if the clade structure traces families); the inversion claim should be downgraded. Low Cramér\'s V (< 0.30) + non-significant p → local_haplotype_regime; with independent breakpoint support → inversion_supported. We use PCAngsd cov.tree as the background-relatedness frame, not a true phylogeny — sufficient for asking "are these fish globally similar?"',
+  },
+  // ------ K3. FIS within region vs rest of genome -----------------------------
+  // Reference: Table 1 of the same paper — per-region mean FIS,
+  // significance from (a) two-sided Wilcoxon vs genome FIS,
+  // (b) deviation from HWE expectation (zero).
+  {
+    id: 'fis_region_vs_genome',
+    category: 'Population variation',
+    statistic: 'Mean FIS in region vs rest of genome (+ HWE deviation)',
+    test: 'two-sided Wilcoxon (region vs genome) + t-test of mean FIS != 0 (HWE)',
+    null_comparison: 'mean FIS over all polymorphic loci outside the region',
+    derive_from: 'per_locus_fis_track',
+    african_hint: 'requires per-locus FIS (ngsF / vcftools output) + region mask',
+    bighead_hint: 'African-only unless Mac per-locus FIS available',
+    african_only: true,
+    interpretation_default: 'Negative FIS within region + significant vs genome → heterozygote excess (consistent with associative overdominance or balanced polymorphism). FIS ≈ 0 + ns → standard HWE. Strongly positive FIS → inbreeding / cryptic substructure inside the inversion.',
+  },
+  // ------ K4. πN/πS ratio vs rest of genome (polymorphism-based) --------------
+  // Reference: Table 1 — per-region πN/πS ratio with two-sided 1000-rep
+  // resampling test vs the rest of the genome. A reduced πN/πS at
+  // polymorphism sites = stronger purifying selection on standing
+  // variation inside the region.
+  {
+    id: 'pin_pis_ratio_vs_genome',
+    category: 'Population variation',
+    statistic: 'πN/πS ratio in region vs rest of genome',
+    test: 'two-sided resampling (1000 reps) on the πN/πS ratio',
+    null_comparison: 'πN/πS computed from polymorphic sites in the rest of the genome',
+    derive_from: 'functional_burden.pi_n_pi_s',
+    african_hint: 'requires per-window πN + πS (functional_burden producer layer)',
+    bighead_hint: 'African-only',
+    african_only: true,
+    interpretation_default: 'Region πN/πS significantly < genome → stronger purifying selection on protein-coding variation inside the inversion. Significantly > genome → relaxed selection / accumulation. ns → no detectable difference in selection efficacy on polymorphism.',
+  },
+  // ------ K5. pN/pS ratio vs rest of genome (fixed-site, divergence-based) ---
+  // Reference: Table 1 — per-region pN/pS at fixed sites (between-
+  // arrangement divergence), tested by 1000-rep resampling vs genome.
+  // Different from πN/πS: this uses substitutions/divergence rather
+  // than polymorphism.
+  {
+    id: 'pn_ps_ratio_vs_genome',
+    category: 'Population variation',
+    statistic: 'pN/pS ratio (fixed sites) in region vs rest of genome',
+    test: 'two-sided resampling (1000 reps) on the fixed-site pN/pS ratio',
+    null_comparison: 'pN/pS computed from fixed sites in the rest of the genome',
+    derive_from: 'between_arrangement_substitution_track',
+    african_hint: 'requires fixed-site count by syn / nonsyn between arrangement classes',
+    bighead_hint: 'African-only',
+    african_only: true,
+    interpretation_default: 'Region pN/pS < genome → stronger purifying selection on protein-coding divergence between arrangements. > genome → either relaxed selection or positive selection on diverged sites. Compare with πN/πS to separate polymorphism-level from divergence-level selection.',
+  },
+  // ------ K6. Deleterious / tolerated ratio vs rest of genome ----------------
+  // Reference: Table 1 — per-region ratio of deleterious-to-tolerated
+  // mutations (SIFT / VESM / PROVEAN classes). Two tests: G-test +
+  // 1000-rep two-sided resampling vs the rest of the genome.
+  {
+    id: 'deleterious_tolerated_ratio_vs_genome',
+    category: 'Population variation',
+    statistic: 'Deleterious-to-tolerated mutation ratio in region vs rest of genome',
+    test: 'G-test + two-sided resampling (1000 reps)',
+    null_comparison: 'deleterious/tolerated counts in the rest of the genome',
+    derive_from: 'functional_burden.vesm_burden + per-variant tolerance classifier',
+    african_hint: 'requires per-variant SIFT/VESM tolerance class + region mask',
+    bighead_hint: 'African-only',
+    african_only: true,
+    interpretation_default: 'Region ratio significantly > genome → accumulated deleterious load (degeneration hypothesis). Significantly < → purified haplotypes (purifying selection on protein-coding load). ns → no detectable difference. Read alongside FIS + πN/πS for the load-mechanism story.',
   },
   // ------ L. Markerability ----------------------------------------------------
   {
