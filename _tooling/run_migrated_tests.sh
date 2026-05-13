@@ -178,6 +178,7 @@ UNITS=(
   test_shared_mgl_render_state.js
   test_shared_mgl_candidate_mode.js
   test_shared_mgl_fingerprinter.js
+  test_shared_mgl_dosage_clustering.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
