@@ -185,7 +185,25 @@ export function classifyRegimeRelatedness(score, opts) {
  * @returns {Object}
  */
 export function inferRelatednessFromRegimes(sample_list, regimes, opts) {
-  const o = opts || {};
+  let o = opts || {};
+  let calibration = null;
+  // Auto-calibrate from ngsPedigree gold-standard pairs supplied
+  // via opts.known_pairs (typical workflow: ngsPedigree's 1st-degree
+  // pair calls + cohort negative controls).
+  if (o.auto_calibrate && Array.isArray(o.known_pairs)) {
+    const cal = calibratePedigreeThresholdsFromKnownPairs(
+      o.known_pairs, regimes, o);
+    if (cal.ok) {
+      o = Object.assign({}, o, {
+        duplicate_above: cal.duplicate_above,
+        first_degree_above: cal.first_degree_above,
+        second_degree_above: cal.second_degree_above,
+      });
+      calibration = cal;
+    } else {
+      calibration = cal;   // record failure reason
+    }
+  }
   const n = Array.isArray(sample_list) ? sample_list.length : 0;
   const pairs = [];
   for (let i = 0; i < n; i++) {
@@ -202,6 +220,7 @@ export function inferRelatednessFromRegimes(sample_list, regimes, opts) {
     n_samples: n,
     n_regimes: Array.isArray(regimes) ? regimes.length : 0,
     pairs,
+    calibration,
   };
 }
 

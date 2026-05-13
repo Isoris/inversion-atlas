@@ -223,6 +223,24 @@ export function regimeLD(matrix, n_samples, n_regimes, a_idx, b_idx, opts) {
  * @returns {Object}
  */
 export function regimeLinkageMatrix(regimes, sample_list, opts) {
+  let o = opts || {};
+  let calibration = null;
+  // Auto-calibration short-circuit: derive linked_above /
+  // weakly_linked_above from the cross-chromosome V distribution
+  // BEFORE running the full all-pairs scan.
+  if (o.auto_calibrate) {
+    const cal = calibrateLinkageThresholdsFromCrossChrom(
+      regimes, sample_list, o);
+    if (cal.ok) {
+      o = Object.assign({}, o, {
+        linked_above: cal.linked_above,
+        weakly_linked_above: cal.weakly_linked_above,
+      });
+      calibration = cal;
+    } else {
+      calibration = cal;   // record the failure reason for the caller
+    }
+  }
   const m = buildSampleRegimeMatrix(regimes, sample_list);
   const N = m.n_regimes;
   const cramers_v_matrix = new Float32Array(N * N);
@@ -258,6 +276,7 @@ export function regimeLinkageMatrix(regimes, sample_list, opts) {
     p_value_matrix,
     edges,
     regime_uids: m.regime_uids,
+    calibration,           // null when auto_calibrate not requested
   };
 }
 

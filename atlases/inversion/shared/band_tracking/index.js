@@ -245,6 +245,7 @@ export {
   classifyMeioticDrive,
   annotateRegimeWithDyads,
   calibrateMeioticDriveBands,
+  annotateRegimesWithDyadsAuto,
 } from './regime_dyad_mendelian.js';
 
 // ---------------------------------------------------------------------

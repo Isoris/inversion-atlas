@@ -439,3 +439,61 @@ export function calibrateMeioticDriveBands(perRegimeAnnotations, opts) {
     median_ratio: median,
   };
 }
+
+// =====================================================================
+// 8. Cohort orchestrator with auto-calibration
+// =====================================================================
+
+/**
+ * Annotate MANY regimes with dyad-aware Mendelian + meiotic-drive
+ * classification, optionally with auto-calibration of the drive
+ * bands. Two-pass:
+ *
+ *   1. annotateRegimeWithDyads per regime → collects transmission
+ *      ratios across all regimes
+ *   2. (when opts.auto_calibrate) → calibrateMeioticDriveBands on
+ *      those ratios → re-classify each regime's meiotic_drive
+ *      verdict with the calibrated bands
+ *
+ * Returns:
+ *   {
+ *     per_regime:    [annotateRegimeWithDyads output, ...] —
+ *                    same shape, but meiotic_drive verdict
+ *                    re-classified with calibrated bands when
+ *                    auto-calibration succeeded
+ *     calibration:   output of calibrateMeioticDriveBands, or
+ *                    null if not requested
+ *     used_defaults: bool — true if calibration was skipped or
+ *                    failed (then default MEIOTIC_DRIVE_DEFAULTS
+ *                    bands apply)
+ *   }
+ *
+ * @param {Array<Object>} regimes
+ * @param {Array<{parent:number, offspring:number}>} dyads
+ * @param {{auto_calibrate?:boolean, min_regimes?:number,
+ *          min_dyads?:number}} [opts]
+ * @returns {Object}
+ */
+export function annotateRegimesWithDyadsAuto(regimes, dyads, opts) {
+  const o = opts || {};
+  const per_regime = (regimes || []).map(r =>
+    annotateRegimeWithDyads(r, dyads, o));
+  let calibration = null;
+  let used_defaults = true;
+  if (o.auto_calibrate) {
+    calibration = calibrateMeioticDriveBands(per_regime, o);
+    if (calibration.ok) {
+      const calibratedOpts = Object.assign({}, o, {
+        mendelian_band:   calibration.mendelian_band,
+        mild_drive_band:  calibration.mild_drive_band,
+        strong_drive_band: calibration.strong_drive_band,
+      });
+      for (const ann of per_regime) {
+        ann.meiotic_drive = classifyMeioticDrive(ann.transmission,
+          calibratedOpts);
+      }
+      used_defaults = false;
+    }
+  }
+  return { per_regime, calibration, used_defaults };
+}
