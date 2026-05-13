@@ -70,7 +70,8 @@ class FakeNode {
 const _nodes = new Map();
 function _ensureNode(id) {
   if (!_nodes.has(id)) {
-    const isCanvas = id === 'fingerprintTrackCanvas';
+    const isCanvas = (id === 'fingerprintTrackCanvas')
+                  || (id === 'fingerprintProportionsCanvas');
     _nodes.set(id, isCanvas ? new FakeCanvas(id) : new FakeNode(id));
   }
   return _nodes.get(id);
@@ -163,6 +164,36 @@ group('Smoke: mount with a fingerprint result');
      || _ensureNode('fingerprintSwitchListBody').innerHTML.indexOf('terminal') >= 0);
   check('empty-state hidden',
         _ensureNode('fingerprintTrackEmpty').style.display === 'none');
+
+  // -------------------------------------------------------------------
+  group('Smoke: proportions treemap painted');
+  {
+    const pCanvas = _ensureNode('fingerprintProportionsCanvas');
+    check('proportions canvas cleared',
+          pCanvas._ctx.calls.some(c => c[0] === 'clearRect'));
+    check('proportions canvas drew tiles (fillRect)',
+          pCanvas._ctx.calls.some(c => c[0] === 'fillRect'));
+    check('proportions canvas drew borders (strokeRect)',
+          pCanvas._ctx.calls.some(c => c[0] === 'strokeRect'));
+    check('regime_hit_regions populated',
+          state._pageState.regime_hit_regions.length > 0);
+
+    // Hovering a regime tile should highlight (re-paint the tile
+    // with a different stroke colour). We can't inspect colour, so
+    // just verify the hover toggles hovered_regime on state and
+    // triggers a repaint.
+    const hit = state._pageState.regime_hit_regions[0];
+    pCanvas._ctx.calls.length = 0;
+    pCanvas.dispatchEvent({
+      type: 'mousemove',
+      clientX: hit.x + hit.w / 2,
+      clientY: hit.y + hit.h / 2,
+    });
+    check('hover on tile updates hovered_regime',
+          state._pageState.hovered_regime === hit.regime_id);
+    check('proportions canvas repainted on hover',
+          pCanvas._ctx.calls.some(c => c[0] === 'clearRect'));
+  }
 
   // -------------------------------------------------------------------
   group('Smoke: hover updates the right panel');

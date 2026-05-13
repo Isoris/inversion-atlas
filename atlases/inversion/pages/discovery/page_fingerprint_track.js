@@ -43,6 +43,10 @@ import {
   summariseWindow,
 } from './page_fingerprint_track/selection.js';
 import {
+  paintRegimeProportions,
+  findRegimeAtPixel,
+} from './page_fingerprint_track/proportions.js';
+import {
   MGL_ARCHITECTURE_SCENARIOS,
   MGL_SWITCH_TYPES,
 } from '../../shared/mgl_fingerprinter.js';
@@ -77,6 +81,7 @@ export function refreshFingerprintTrack(state) {
   _paintTrackCanvas(_pageState);
   _renderRightPanel(_pageState);
   _renderSwitchList(_pageState);
+  _paintProportionsCanvas(_pageState);
 }
 
 export function initFingerprintTrackToolbar() {
@@ -127,6 +132,8 @@ function _buildPageState(atlasState) {
     regime_colors_by_id:   colors,
     window_hit_regions:    [],
     switch_hit_regions:    [],
+    regime_hit_regions:    [],
+    hovered_regime:        null,
     view_state:            Object.assign({}, DEFAULT_VIEW_STATE,
                                           (ft && ft.view_state) || {}),
     selection:             createFingerprintSelection(),
@@ -222,6 +229,28 @@ function _renderRightPanel(state) {
   fields.innerHTML = html;
 }
 
+function _paintProportionsCanvas(state) {
+  if (!state) return;
+  if (typeof document === 'undefined' || !document.getElementById) return;
+  const canvas = document.getElementById('fingerprintProportionsCanvas');
+  if (!canvas) return;
+  const fp = state.fingerprint_result;
+  if (!fp || !Array.isArray(fp.windows) || fp.windows.length === 0) {
+    if (canvas.getContext) {
+      const ctx = canvas.getContext('2d');
+      if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, canvas.width || 220, canvas.height || 100);
+    }
+    state.regime_hit_regions = [];
+    return;
+  }
+  const paint = paintRegimeProportions(canvas, fp, {
+    regime_colors_by_id: state.regime_colors_by_id,
+    hovered_regime:      state.hovered_regime,
+    show_labels:         true,
+  });
+  state.regime_hit_regions = paint.regime_hit_regions;
+}
+
 function _renderSwitchList(state) {
   if (!state) return;
   if (typeof document === 'undefined' || !document.getElementById) return;
@@ -260,6 +289,7 @@ function _wireToolbar(state) {
   const repaint = () => {
     _paintTrackCanvas(state);
     _renderSwitchList(state);
+    _paintProportionsCanvas(state);
   };
 
   const onShowBrief = (e) => {
@@ -299,25 +329,42 @@ function _wireToolbar(state) {
     _renderRightPanel(state);
   });
 
+  const onPropMove = (ev) => {
+    const canvas = document.getElementById('fingerprintProportionsCanvas');
+    if (!canvas) return;
+    const rect = typeof canvas.getBoundingClientRect === 'function'
+      ? canvas.getBoundingClientRect() : { left: 0, top: 0 };
+    const x = ((ev && ev.clientX) || 0) - (rect.left || 0);
+    const y = ((ev && ev.clientY) || 0) - (rect.top  || 0);
+    const r = findRegimeAtPixel(state.regime_hit_regions, x, y);
+    if (state.hovered_regime !== r) {
+      state.hovered_regime = r;
+      _paintProportionsCanvas(state);
+    }
+  };
+
   state._handlers = {
     onShowBrief, onShowLabels,
     onCanvasMove, onCanvasClick,
+    onPropMove,
     unsubSelection,
   };
 
-  _addListener('fingerprintShowBriefSwitches', 'change',    onShowBrief);
-  _addListener('fingerprintShowLabels',        'change',    onShowLabels);
-  _addListener('fingerprintTrackCanvas',       'mousemove', onCanvasMove);
-  _addListener('fingerprintTrackCanvas',       'click',     onCanvasClick);
+  _addListener('fingerprintShowBriefSwitches',   'change',    onShowBrief);
+  _addListener('fingerprintShowLabels',          'change',    onShowLabels);
+  _addListener('fingerprintTrackCanvas',         'mousemove', onCanvasMove);
+  _addListener('fingerprintTrackCanvas',         'click',     onCanvasClick);
+  _addListener('fingerprintProportionsCanvas',   'mousemove', onPropMove);
 }
 
 function _teardownToolbar(state) {
   if (!state || !state._handlers) return;
   const h = state._handlers;
-  if (h.onShowBrief)   _removeListener('fingerprintShowBriefSwitches', 'change',    h.onShowBrief);
-  if (h.onShowLabels)  _removeListener('fingerprintShowLabels',        'change',    h.onShowLabels);
-  if (h.onCanvasMove)  _removeListener('fingerprintTrackCanvas',       'mousemove', h.onCanvasMove);
-  if (h.onCanvasClick) _removeListener('fingerprintTrackCanvas',       'click',     h.onCanvasClick);
+  if (h.onShowBrief)   _removeListener('fingerprintShowBriefSwitches',   'change',    h.onShowBrief);
+  if (h.onShowLabels)  _removeListener('fingerprintShowLabels',          'change',    h.onShowLabels);
+  if (h.onCanvasMove)  _removeListener('fingerprintTrackCanvas',         'mousemove', h.onCanvasMove);
+  if (h.onCanvasClick) _removeListener('fingerprintTrackCanvas',         'click',     h.onCanvasClick);
+  if (h.onPropMove)    _removeListener('fingerprintProportionsCanvas',   'mousemove', h.onPropMove);
   if (typeof h.unsubSelection === 'function') { try { h.unsubSelection(); } catch (_) {} }
   state._handlers = {};
 }

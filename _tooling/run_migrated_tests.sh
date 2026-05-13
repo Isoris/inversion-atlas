@@ -183,6 +183,7 @@ UNITS=(
   test_shared_mgl_nested_detector.js
   test_discovery_page_tree_panel.js
   test_discovery_page_fingerprint_track.js
+  test_discovery_page_similarity_panel.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
@@ -250,6 +251,7 @@ SMOKES=(
   smoke_review_page_ancestry_scroller_round5.mjs
   smoke_discovery_page_tree_panel_round5.mjs
   smoke_discovery_page_fingerprint_track_round5.mjs
+  smoke_discovery_page_similarity_panel_round5.mjs
 )
 
 # Smokes that depend on atlas-core — see CORE_DEPENDENT_UNITS above.

@@ -18,6 +18,12 @@ import {
   summariseWindow,
 } from '../atlases/inversion/pages/discovery/page_fingerprint_track/selection.js';
 import {
+  regimeProportions,
+  squarifyTreemap,
+  paintRegimeProportions,
+  findRegimeAtPixel,
+} from '../atlases/inversion/pages/discovery/page_fingerprint_track/proportions.js';
+import {
   MGL_ARCHITECTURE_SCENARIOS,
   MGL_SWITCH_TYPES,
   fingerprintCandidate,
@@ -248,6 +254,103 @@ check('summary has fst[2,1,3]',                s.indexOf('fst[2,1,3]') >= 0);
 check('null window → "—"',                     summariseWindow(null) === '—');
 const noSig = { idx: 1, regime_id: 0, rank_signature: null };
 check('no-signature → "no data"',              summariseWindow(noSig).indexOf('no data') >= 0);
+
+// =====================================================================
+group('proportions.regimeProportions');
+
+const props = regimeProportions(fp);
+check('proportions: array returned',          Array.isArray(props));
+check('proportions: counts sum to n_windows',
+      props.reduce((s, p) => s + p.count, 0) === fp.windows.length);
+check('proportions: fractions sum ≈ 1',
+      Math.abs(props.reduce((s, p) => s + p.fraction, 0) - 1) < 1e-9);
+check('proportions: sorted by count desc',
+      props.every((p, i) => i === 0 || props[i - 1].count >= p.count));
+check('proportions: each row has regime_id',
+      props.every(p => typeof p.regime_id === 'number'));
+
+check('null fingerprint → []',                regimeProportions(null).length === 0);
+check('empty windows → []',
+      regimeProportions({ windows: [] }).length === 0);
+
+// include_zero filter
+const fpZero = {
+  windows: [
+    { regime_id: 0 }, { regime_id: 1 }, { regime_id: 1 }, { regime_id: 2 },
+  ],
+};
+check('include_zero default keeps regime 0',
+      regimeProportions(fpZero).find(p => p.regime_id === 0) !== undefined);
+check('include_zero: false drops regime 0',
+      regimeProportions(fpZero, { include_zero: false })
+        .find(p => p.regime_id === 0) === undefined);
+
+// =====================================================================
+group('proportions.squarifyTreemap');
+
+const items = [
+  { regime_id: 1, value: 5 },
+  { regime_id: 2, value: 3 },
+  { regime_id: 3, value: 2 },
+];
+const laid = squarifyTreemap(items, 100, 100);
+check('treemap: returns one tile per item',   laid.length === items.length);
+check('treemap: each tile has x/y/w/h',
+      laid.every(t => Number.isFinite(t.x) && Number.isFinite(t.y)
+                   && Number.isFinite(t.w) && Number.isFinite(t.h)));
+check('treemap: total tile area = container area',
+      Math.abs(laid.reduce((s, t) => s + t.w * t.h, 0) - 100 * 100) < 1e-6);
+check('treemap: tiles within container',
+      laid.every(t => t.x >= 0 && t.y >= 0
+                   && t.x + t.w <= 100 + 1e-6
+                   && t.y + t.h <= 100 + 1e-6));
+check('treemap: tile order preserved',
+      laid[0].regime_id === 1 && laid[1].regime_id === 2 && laid[2].regime_id === 3);
+
+check('treemap: empty items → []',            squarifyTreemap([], 100, 100).length === 0);
+check('treemap: zero-area container → []',    squarifyTreemap(items, 0, 100).length === 0);
+const zeroVals = squarifyTreemap([{ value: 0 }, { value: 0 }], 100, 100);
+check('treemap: zero-value items → zero w/h',
+      zeroVals.every(t => t.w === 0 && t.h === 0));
+
+// =====================================================================
+group('proportions.paintRegimeProportions');
+
+const propCanvas = new FakeCanvas();
+propCanvas.width = 200; propCanvas.height = 100;
+const propPaint = paintRegimeProportions(propCanvas, fp, {
+  regime_colors_by_id: { 1: '#3074C8', 2: '#2BAA50' },
+});
+check('proportions paint: regime_hit_regions populated',
+      propPaint.regime_hit_regions.length === props.length);
+check('proportions paint: fillRect for each tile',
+      propCanvas._ctx.calls.filter(c => c === 'fillRect').length === props.length);
+check('proportions paint: strokeRect for each tile (border)',
+      propCanvas._ctx.calls.filter(c => c === 'strokeRect').length >= props.length);
+check('proportions paint: cleared canvas',
+      propCanvas._ctx.calls.includes('clearRect'));
+check('proportions paint: every hit carries fraction',
+      propPaint.regime_hit_regions.every(h => Number.isFinite(h.fraction)));
+
+// Null safety
+check('null fingerprint → 0 hits',
+      paintRegimeProportions(propCanvas, null).regime_hit_regions.length === 0);
+check('null canvas → 0 hits',
+      paintRegimeProportions(null, fp).regime_hit_regions.length === 0);
+
+// =====================================================================
+group('proportions.findRegimeAtPixel');
+
+const propHits = [
+  { regime_id: 1, x: 0,   y: 0,  w: 50,  h: 100, fraction: 0.5 },
+  { regime_id: 2, x: 50,  y: 0,  w: 30,  h: 100, fraction: 0.3 },
+  { regime_id: 3, x: 80,  y: 0,  w: 20,  h: 100, fraction: 0.2 },
+];
+check('regime hit at (25, 50) → 1',           findRegimeAtPixel(propHits, 25, 50) === 1);
+check('regime hit at (60, 50) → 2',           findRegimeAtPixel(propHits, 60, 50) === 2);
+check('regime hit at (90, 50) → 3',           findRegimeAtPixel(propHits, 90, 50) === 3);
+check('regime miss off-grid',                 findRegimeAtPixel(propHits, 200, 200) === null);
+check('null hits → null',                     findRegimeAtPixel(null, 0, 0) === null);
 
 // =====================================================================
 console.log('\n=================');
