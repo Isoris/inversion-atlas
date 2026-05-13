@@ -22,12 +22,22 @@
 // across many regimes is an IBD-block-style relatedness estimate
 // tied directly to the inversion-regime stack we've already built.
 //
-// Useful as:
-//   - A cross-check on ngsPedigree's pair calls
-//   - A way to flag pedigree-ambiguous samples for ngsPedigree to
-//     re-resolve with a different threshold
-//   - A standalone relatedness estimate when ngsRelate / ngsPedigree
-//     isn't available for the cohort
+// ARCHITECTURE NOTE: pedigree RESOLUTION is ngsPedigree's job, not
+// the atlas's. Atlas should consume ngsPedigree pair calls /
+// trio resolutions as INPUT (via Layer 4a + Layer 4d), not
+// re-implement them from scratch. This module exists as a
+// COMPLEMENT, not a replacement:
+//   - DISCOVERY direction (inverse of ngsPedigree): when ngsRelate
+//     gives ambiguous results, regime co-membership offers an
+//     independent signal that can flag samples for ngsPedigree to
+//     re-resolve.
+//   - CROSS-CHECK: confirm ngsPedigree first-degree pair calls by
+//     checking that they also share haplotype identity across many
+//     regimes (a confidence boost for the paper).
+//   - LONG-RANGE: regime co-membership is well-suited to detecting
+//     extended-family clusters across many chromosomes — an
+//     atlas-side data-integration task that ngsPedigree (focused
+//     on per-pair likelihood) doesn't optimise for.
 //
 // Pure JS — no DOM, no fetch.
 

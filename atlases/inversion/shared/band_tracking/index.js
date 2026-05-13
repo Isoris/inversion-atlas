@@ -221,6 +221,30 @@ export {
 } from './regime_linkage.js';
 
 // ---------------------------------------------------------------------
+// LAYER 4d — DYAD-aware Mendelian + meiotic-drive classification.
+//
+// Trios are rare in real cohorts; parent-offspring DYADS are common
+// (mom+kid, dad+kid). This layer:
+//   - Annotates regimes from dyads alone (using cohort allele
+//     frequency for the unknown other-mate's contribution)
+//   - Pools across many AB-parent dyads to estimate transmission
+//     ratio
+//   - Classifies the meiotic-drive verdict (MENDELIAN /
+//     MILD_DRIVE / STRONG_DRIVE / INVIABILITY) instead of the
+//     strict binary mendelian / non-mendelian flag
+// ---------------------------------------------------------------------
+export {
+  MEIOTIC_DRIVE_VERDICTS,
+  MEIOTIC_DRIVE_DEFAULTS,
+  estimateAlleleFrequency,
+  expectedDyadPMF,
+  assessDyadConsistency,
+  estimateTransmissionRatio,
+  classifyMeioticDrive,
+  annotateRegimeWithDyads,
+} from './regime_dyad_mendelian.js';
+
+// ---------------------------------------------------------------------
 // LAYER 2 — BandSet Projection (set-based authority)
 //
 // Note: legacy aspirational names (bp_compute_projection_vector,
