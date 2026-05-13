@@ -186,6 +186,7 @@ UNITS=(
   test_comparative_page16b.js
   test_review_page4.js
   test_review_page11.js
+  test_review_page_ancestry_scroller.js
 )
 
 # Tests that depend on atlas-core (core/ modules) — only runnable
@@ -221,6 +222,7 @@ SMOKES=(
   smoke_comparative_page16b_round5.mjs
   smoke_review_page4_round5.mjs
   smoke_review_page11_round5.mjs
+  smoke_review_page_ancestry_scroller_round5.mjs
 )
 
 # Smokes that depend on atlas-core — see CORE_DEPENDENT_UNITS above.
