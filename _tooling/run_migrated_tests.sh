@@ -154,6 +154,7 @@ UNITS=(
   test_shared_band_tracking_auto_calibrate.js
   test_shared_band_tracking_layer4_integration.js
   test_v34_drop_smoke.js
+  test_shared_regime_annotation.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
