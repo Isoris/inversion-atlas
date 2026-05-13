@@ -137,6 +137,34 @@ UNITS=(
   test_shared_fingerprint_rank.js
   test_shared_busco_anchors.js
   test_shared_xpehh_per_window.js
+  test_shared_band_tracking_single_band.js
+  test_shared_band_tracking_het.js
+  test_shared_band_tracking_hom.js
+  test_shared_band_tracking_iv.js
+  test_shared_band_tracking_trajectory.js
+  test_shared_band_tracking_karyotype_model.js
+  test_shared_band_tracking_haplotype_regime.js
+  test_shared_band_tracking_regime_topology.js
+  test_shared_band_tracking_regime_mendelian.js
+  test_shared_band_tracking_regime_pedigree.js
+  test_shared_band_tracking_genome_scale.js
+  test_shared_band_tracking_regime_linkage.js
+  test_shared_band_tracking_regime_dyad_mendelian.js
+  test_shared_band_tracking_calibration.js
+  test_shared_band_tracking_auto_calibrate.js
+  test_shared_band_tracking_layer4_integration.js
+  test_v34_drop_smoke.js
+  test_shared_regime_annotation.js
+  test_shared_ancestry_alignment.js
+  test_shared_ancestry_bricks.js
+  test_shared_copy_origin_painting.js
+  test_shared_arrangement_calls.js
+  test_shared_functional_burden.js
+  test_shared_busco_4d_age.js
+  test_shared_mendelian_para_vs_peri.js
+  test_shared_mendelian_family_test.js
+  test_shared_inversion_classification_axes.js
+  test_shared_inversion_classification.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
@@ -165,6 +193,7 @@ UNITS=(
   test_comparative_page16b.js
   test_review_page4.js
   test_review_page11.js
+  test_review_page_ancestry_scroller.js
 )
 
 # Tests that depend on atlas-core (core/ modules) — only runnable
@@ -200,6 +229,7 @@ SMOKES=(
   smoke_comparative_page16b_round5.mjs
   smoke_review_page4_round5.mjs
   smoke_review_page11_round5.mjs
+  smoke_review_page_ancestry_scroller_round5.mjs
 )
 
 # Smokes that depend on atlas-core — see CORE_DEPENDENT_UNITS above.
