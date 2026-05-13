@@ -161,8 +161,22 @@ export {
   annotateRegimesWithMendelian,
 } from './regime_mendelian.js';
 
-// LAYER 4b — INVERSE-direction pedigree inference (regime
-// co-membership → pairwise relatedness): pending follow-up commit.
+// ---------------------------------------------------------------------
+// LAYER 4b — INVERSE-direction pedigree inference. Derives pairwise
+// relatedness from cross-regime co-membership; cross-checks against
+// ngsRelate / ngsPedigree pair calls. Per user framing:
+//
+//   scan genomes > find inversions > use inversion haplotype regimes
+//   to find who is parent and offspring of who.
+// ---------------------------------------------------------------------
+export {
+  REGIME_PEDIGREE_DEFAULTS,
+  REGIME_PEDIGREE_VERDICTS,
+  regimePairCoMembership,
+  classifyRegimeRelatedness,
+  inferRelatednessFromRegimes,
+  crossCheckPedigreeWithRegimes,
+} from './regime_pedigree.js';
 
 // ---------------------------------------------------------------------
 // LAYER 2 — BandSet Projection (set-based authority)
