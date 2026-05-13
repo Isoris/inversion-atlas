@@ -301,3 +301,125 @@ export function crossCheckPedigreeWithRegimes(inferred, provided_pairs) {
 function _pairKey(a, b) {
   return a <= b ? a + '|' + b : b + '|' + a;
 }
+
+// =====================================================================
+// 4. Auto-calibration of pedigree thresholds from known pairs
+// =====================================================================
+
+/**
+ * Calibrate the duplicate / first-degree / second-degree thresholds
+ * from an externally-supplied SET OF KNOWN PAIRS (e.g. ngsPedigree's
+ * gold-standard 1st-degree calls + any unrelated negative-control
+ * pairs).
+ *
+ * Method: bucket known pairs by `relationship_class`; for each
+ * bucket compute the empirical median + IQR of regime
+ * same_class_frac. Thresholds are the midpoint between adjacent
+ * class medians:
+ *
+ *   duplicate_above       = (median(DUPLICATE) + median(1st_degree)) / 2
+ *   first_degree_above    = (median(1st_degree) + median(2nd_degree)) / 2
+ *   second_degree_above   = (median(2nd_degree) + median(unrelated)) / 2
+ *
+ * Missing buckets fall back to the defaults
+ * (REGIME_PEDIGREE_DEFAULTS). Returns `{ok:false, reason}` when
+ * fewer than `min_pairs_per_class` known pairs in any required
+ * bucket.
+ *
+ * `known_pairs` shape:
+ *   [{sample_a, sample_b, relationship_class:
+ *     'identical_twin'|'duplicate'|'1st_degree'|'2nd_degree'|'unrelated'}, ...]
+ *
+ * @param {Array<Object>} known_pairs
+ * @param {Array<Object>} regimes
+ * @param {Object} [opts]
+ * @returns {Object}
+ */
+export function calibratePedigreeThresholdsFromKnownPairs(known_pairs, regimes, opts) {
+  const o = opts || {};
+  const minPerClass = Number.isFinite(o.min_pairs_per_class)
+    ? o.min_pairs_per_class : 5;
+  if (!Array.isArray(known_pairs) || !Array.isArray(regimes)) {
+    return { ok: false, reason: 'invalid_input' };
+  }
+  const buckets = {
+    duplicate_or_identical: [],
+    first_degree: [],
+    second_degree: [],
+    unrelated_or_distant: [],
+  };
+  const aliases = {
+    duplicate: 'duplicate_or_identical',
+    duplicate_or_identical: 'duplicate_or_identical',
+    identical_twin: 'duplicate_or_identical',
+    '1st_degree': 'first_degree',
+    first_degree: 'first_degree',
+    '2nd_degree': 'second_degree',
+    second_degree: 'second_degree',
+    unrelated: 'unrelated_or_distant',
+    unrelated_or_distant: 'unrelated_or_distant',
+    '3rd_degree': 'unrelated_or_distant',
+  };
+  for (const p of known_pairs) {
+    if (!p) continue;
+    const cls = aliases[p.relationship_class];
+    if (!cls) continue;
+    const score = regimePairCoMembership(p.sample_a, p.sample_b, regimes);
+    if (!Number.isFinite(score.same_class_frac)) continue;
+    buckets[cls].push(score.same_class_frac);
+  }
+  function importPercentileMedian(arr) {
+    if (!arr || arr.length < minPerClass) return null;
+    const sorted = arr.slice().sort((a, b) => a - b);
+    const m = sorted.length;
+    return m % 2 === 1
+      ? sorted[(m - 1) / 2]
+      : 0.5 * (sorted[m / 2 - 1] + sorted[m / 2]);
+  }
+  const medians = {
+    duplicate:     importPercentileMedian(buckets.duplicate_or_identical),
+    first_degree:  importPercentileMedian(buckets.first_degree),
+    second_degree: importPercentileMedian(buckets.second_degree),
+    unrelated:     importPercentileMedian(buckets.unrelated_or_distant),
+  };
+  // Need at least two adjacent classes to derive any threshold.
+  const usableClasses = Object.values(medians).filter(v => v != null).length;
+  if (usableClasses < 2) {
+    return {
+      ok: false, reason: 'insufficient_known_pairs',
+      medians,
+      bucket_counts: {
+        duplicate_or_identical: buckets.duplicate_or_identical.length,
+        first_degree:           buckets.first_degree.length,
+        second_degree:          buckets.second_degree.length,
+        unrelated_or_distant:   buckets.unrelated_or_distant.length,
+      },
+      required_per_class: minPerClass,
+    };
+  }
+  // Adjacent-midpoint thresholds when both flanking medians exist;
+  // otherwise fall back to REGIME_PEDIGREE_DEFAULTS.
+  function midpoint(hi, lo, fallback) {
+    if (hi == null || lo == null) return fallback;
+    return 0.5 * (hi + lo);
+  }
+  return {
+    ok: true,
+    medians,
+    bucket_counts: {
+      duplicate_or_identical: buckets.duplicate_or_identical.length,
+      first_degree:           buckets.first_degree.length,
+      second_degree:          buckets.second_degree.length,
+      unrelated_or_distant:   buckets.unrelated_or_distant.length,
+    },
+    duplicate_above:
+      midpoint(medians.duplicate,    medians.first_degree,
+        REGIME_PEDIGREE_DEFAULTS.duplicate_above),
+    first_degree_above:
+      midpoint(medians.first_degree, medians.second_degree,
+        REGIME_PEDIGREE_DEFAULTS.first_degree_above),
+    second_degree_above:
+      midpoint(medians.second_degree, medians.unrelated,
+        REGIME_PEDIGREE_DEFAULTS.second_degree_above),
+  };
+}

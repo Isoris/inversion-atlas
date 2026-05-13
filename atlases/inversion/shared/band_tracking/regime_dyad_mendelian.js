@@ -47,6 +47,7 @@
 // Pure JS — no DOM, no fetch.
 
 import { chiSqSurvival } from '../contingency.js';
+import { percentile } from '../stats_helpers.js';
 import { regimeKaryotypeForSample } from './regime_mendelian.js';
 
 // =====================================================================
@@ -354,5 +355,87 @@ export function annotateRegimeWithDyads(regime, dyads, opts) {
     dyad_rows,
     transmission,
     meiotic_drive,
+  };
+}
+
+// =====================================================================
+// 7. Auto-calibration of meiotic-drive bands from regime data
+// =====================================================================
+
+/**
+ * Calibrate the meiotic-drive band thresholds from the cohort's
+ * empirical regime-ratio distribution. Assumes most regimes are
+ * Mendelian noise — the central 95 % of the ratio distribution
+ * defines `mendelian_band`; the central 99 % defines the outer edge
+ * of `mild_drive_band`. Beyond the central 99 % → STRONG_DRIVE.
+ * INVIABILITY band stays fixed at [0.10, 0.90] since "one karyotype
+ * class essentially absent" is biology-deterministic, not noise.
+ *
+ * Why this matters: with a 5-fish-per-family cohort the per-regime
+ * ratio has wide binomial noise (a single regime could land at 0.4
+ * by pure chance). The HARDCODED defaults assume ~100 dyads — way
+ * more than typical. Calibration on YOUR data makes the bands
+ * appropriate for YOUR sample sizes.
+ *
+ * Inputs:
+ *   - perRegimeAnnotations: array of `annotateRegimeWithDyads`
+ *     outputs from many regimes (one per regime).
+ *   - opts.min_regimes: minimum regimes with informative
+ *     transmission for calibration to run (default 20).
+ *
+ * Returns:
+ *   {
+ *     ok:            boolean,
+ *     n_regimes_used: int   (only those with
+ *                            n_informative_transmissions ≥ min_dyads)
+ *     mendelian_band:    [lo, hi]   (empirical 2.5%-97.5%)
+ *     mild_drive_band:   [lo, hi]   (empirical 0.5%-99.5%)
+ *     strong_drive_band: [0.10, 0.90]   (fixed)
+ *     median_ratio:      number     (sanity check — should be ~0.5)
+ *   }
+ *
+ * Returns `{ok: false, reason}` when there aren't enough regimes;
+ * caller falls back to MEIOTIC_DRIVE_DEFAULTS.
+ *
+ * @param {Array<Object>} perRegimeAnnotations
+ * @param {{min_regimes?:number, min_dyads_per_regime?:number}} [opts]
+ * @returns {Object}
+ */
+export function calibrateMeioticDriveBands(perRegimeAnnotations, opts) {
+  const o = opts || {};
+  const minRegimes = Number.isFinite(o.min_regimes) ? o.min_regimes : 20;
+  const minDyads = Number.isFinite(o.min_dyads_per_regime)
+    ? o.min_dyads_per_regime : MEIOTIC_DRIVE_DEFAULTS.min_dyads;
+  if (!Array.isArray(perRegimeAnnotations)) {
+    return { ok: false, reason: 'invalid_input' };
+  }
+  const ratios = [];
+  for (const ann of perRegimeAnnotations) {
+    if (!ann || !ann.transmission) continue;
+    const t = ann.transmission;
+    if (!Number.isFinite(t.transmission_ratio_A)) continue;
+    if (t.n_informative_transmissions < minDyads) continue;
+    ratios.push(t.transmission_ratio_A);
+  }
+  if (ratios.length < minRegimes) {
+    return {
+      ok: false,
+      reason: 'insufficient_regimes',
+      n_regimes_with_data: ratios.length,
+      required: minRegimes,
+    };
+  }
+  const lo95 = percentile(ratios, 0.025);
+  const hi95 = percentile(ratios, 0.975);
+  const lo99 = percentile(ratios, 0.005);
+  const hi99 = percentile(ratios, 0.995);
+  const median = percentile(ratios, 0.5);
+  return {
+    ok: true,
+    n_regimes_used: ratios.length,
+    mendelian_band:    [lo95, hi95],
+    mild_drive_band:   [lo99, hi99],
+    strong_drive_band: [0.10, 0.90],
+    median_ratio: median,
   };
 }

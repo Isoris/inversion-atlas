@@ -31,6 +31,7 @@
 // Pure JS — no DOM, no fetch.
 
 import { chiSquare, cramersV, chiSqSurvival } from '../contingency.js';
+import { percentile } from '../stats_helpers.js';
 import {
   estimateRecombinationRate,
 } from '../mendelian_segregation.js';
@@ -400,5 +401,78 @@ export function familyRegimeRecombination(regimeA, regimeB, families, opts) {
     pooled_r_hat: pooled && pooled.ok ? pooled.r_hat : null,
     pooled_se:    pooled && pooled.ok ? pooled.se    : null,
     pooled_verdict: cohortVerdict,
+  };
+}
+
+// =====================================================================
+// 6. Auto-calibration of LD thresholds from cross-chromosome pairs
+// =====================================================================
+
+/**
+ * Calibrate the `linked_above` + `weakly_linked_above` thresholds
+ * from the EMPIRICAL Cramér's V distribution of cross-chromosome
+ * regime pairs.
+ *
+ * Why this matters: two regimes on DIFFERENT chromosomes are
+ * physically unlinked, so any positive Cramér's V they show
+ * reflects cohort-level confounding (relatedness, population
+ * structure, ancestry stratification). That distribution is the
+ * empirical "no-physical-linkage" null. Same-chromosome pairs
+ * should have higher V if physical linkage exists; the calibrated
+ * thresholds say "above THIS V, the signal is stronger than the
+ * cross-chrom baseline."
+ *
+ *   linked_above        = 99th percentile of cross-chrom V
+ *   weakly_linked_above = 95th percentile of cross-chrom V
+ *
+ * Requires regimes to carry a `chrom` field (e.g. from
+ * mergePerChromosomeRegimes — Layer 5). Falls back to defaults
+ * when fewer than `min_cross_chrom_pairs` qualifying pairs.
+ *
+ * @param {Array<Object>} regimes        with `chrom` field per regime
+ * @param {Array<number>} sample_list
+ * @param {Object} [opts]
+ * @returns {Object}
+ */
+export function calibrateLinkageThresholdsFromCrossChrom(regimes, sample_list, opts) {
+  const o = opts || {};
+  const minPairs = Number.isFinite(o.min_cross_chrom_pairs)
+    ? o.min_cross_chrom_pairs : 10;
+  const minSamples = Number.isFinite(o.min_samples_called)
+    ? o.min_samples_called : REGIME_LINKAGE_DEFAULTS.min_samples_called;
+  if (!Array.isArray(regimes) || !Array.isArray(sample_list)) {
+    return { ok: false, reason: 'invalid_input' };
+  }
+  // Build the per-sample matrix once.
+  const m = buildSampleRegimeMatrix(regimes, sample_list);
+  const N = m.n_regimes;
+  const cross_v = [];
+  for (let i = 0; i < N; i++) {
+    const chromI = regimes[i] && regimes[i].chrom;
+    if (chromI == null) continue;
+    for (let j = i + 1; j < N; j++) {
+      const chromJ = regimes[j] && regimes[j].chrom;
+      if (chromJ == null) continue;
+      if (chromI === chromJ) continue;     // skip intra-chrom
+      const r = regimeLD(m.matrix, m.n_samples, N, i, j,
+        Object.assign({}, o, { linked_above: 1.1, weakly_linked_above: 1.1 }));
+      if (r.n_called < minSamples) continue;
+      if (Number.isFinite(r.cramers_v)) cross_v.push(r.cramers_v);
+    }
+  }
+  if (cross_v.length < minPairs) {
+    return {
+      ok: false, reason: 'insufficient_cross_chrom_pairs',
+      n_pairs_evaluated: cross_v.length, required: minPairs,
+    };
+  }
+  const v95 = percentile(cross_v, 0.95);
+  const v99 = percentile(cross_v, 0.99);
+  return {
+    ok: true,
+    n_cross_chrom_pairs_used: cross_v.length,
+    linked_above:        v99,
+    weakly_linked_above: v95,
+    median_cross_chrom_v: percentile(cross_v, 0.5),
   };
 }

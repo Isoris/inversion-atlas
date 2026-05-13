@@ -176,6 +176,7 @@ export {
   classifyRegimeRelatedness,
   inferRelatednessFromRegimes,
   crossCheckPedigreeWithRegimes,
+  calibratePedigreeThresholdsFromKnownPairs,
 } from './regime_pedigree.js';
 
 // ---------------------------------------------------------------------
@@ -218,6 +219,7 @@ export {
   regimeLD,
   regimeLinkageMatrix,
   familyRegimeRecombination,
+  calibrateLinkageThresholdsFromCrossChrom,
 } from './regime_linkage.js';
 
 // ---------------------------------------------------------------------
@@ -242,6 +244,7 @@ export {
   estimateTransmissionRatio,
   classifyMeioticDrive,
   annotateRegimeWithDyads,
+  calibrateMeioticDriveBands,
 } from './regime_dyad_mendelian.js';
 
 // ---------------------------------------------------------------------

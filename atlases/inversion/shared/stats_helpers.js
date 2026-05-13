@@ -124,3 +124,34 @@ export function shannonEntropy(fractions, K) {
   if (norm > 1) return 1;
   return norm;
 }
+
+/**
+ * Empirical percentile of a numeric array. `p` is a fraction in
+ * [0, 1] (e.g. 0.025 for 2.5th percentile, 0.975 for 97.5th).
+ * Uses linear interpolation between adjacent ranks.
+ *
+ * Drops non-finite values + the legacy `-1` missing sentinel.
+ * Returns NaN when fewer than 1 valid value, or when `p` is out
+ * of [0, 1].
+ *
+ * @param {Array<number>|TypedArray|null} arr
+ * @param {number} p  fraction in [0, 1]
+ * @returns {number}
+ */
+export function percentile(arr, p) {
+  if (!arr || !Number.isFinite(p) || p < 0 || p > 1) return NaN;
+  const vals = [];
+  for (let i = 0; i < arr.length; i++) {
+    const v = arr[i];
+    if (Number.isFinite(v) && v !== -1) vals.push(v);
+  }
+  if (vals.length === 0) return NaN;
+  if (vals.length === 1) return vals[0];
+  vals.sort((a, b) => a - b);
+  const idx = p * (vals.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return vals[lo];
+  const frac = idx - lo;
+  return vals[lo] * (1 - frac) + vals[hi] * frac;
+}
