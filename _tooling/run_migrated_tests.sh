@@ -186,6 +186,9 @@ UNITS=(
   test_discovery_page_similarity_panel.js
   test_discovery_page_pca_panel.js
   test_discovery_page_dosage_heatmap.js
+  test_discovery_page_nested_detector.js
+  test_discovery_page_dosage_cluster.js
+  test_shared_mgl_panel_linkage.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
@@ -256,6 +259,8 @@ SMOKES=(
   smoke_discovery_page_similarity_panel_round5.mjs
   smoke_discovery_page_pca_panel_round5.mjs
   smoke_discovery_page_dosage_heatmap_round5.mjs
+  smoke_discovery_page_nested_detector_round5.mjs
+  smoke_discovery_page_dosage_cluster_round5.mjs
 )
 
 # Smokes that depend on atlas-core — see CORE_DEPENDENT_UNITS above.

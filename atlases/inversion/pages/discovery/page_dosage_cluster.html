@@ -1,0 +1,44 @@
+  <div id="page_dosage_cluster" class="page">
+
+    <header id="dosageClusterHeader" class="dc-header">
+      <div class="dc-title">
+        <h2>Dosage clustering</h2>
+        <span id="dosageClusterCandidateLabel" class="dc-meta">—</span>
+      </div>
+      <div class="dc-controls">
+        <span id="dosageClusterVerdictBadge"
+              class="dc-verdict-badge"
+              title="Verdict per HANDOFF_8">—</span>
+        <span class="dc-sep"></span>
+        <span id="dosageClusterKBadge" class="dc-meta">K = —</span>
+      </div>
+    </header>
+
+    <div class="dc-body">
+      <div class="dc-curves-wrap">
+        <canvas id="dosageClusterCurvesCanvas" class="dc-curves-canvas"></canvas>
+        <div id="dosageClusterEmpty" class="dc-empty" style="display:none;">
+          No clustering result loaded. Run adaptiveKDosageClustering on
+          a per-window dosage-profile matrix first.
+        </div>
+      </div>
+      <aside class="dc-right">
+        <header class="dc-panel-head">
+          <h4>Per-K scores</h4>
+          <span id="dosageClusterSelectedHint" class="dc-hint">(click a row to focus)</span>
+        </header>
+        <div id="dosageClusterPerKBody" class="dc-per-k-body"></div>
+        <section id="dosageClusterChosen" class="dc-chosen-section">
+          <h5>Chosen K detail</h5>
+          <dl id="dosageClusterChosenFields" class="dc-chosen-fields"></dl>
+        </section>
+      </aside>
+    </div>
+
+    <footer id="dosageClusterFooter" class="dc-footer">
+      ⓘ Adaptive K via silhouette + bootstrap stability + spatial
+      coherence + minimum cluster size (HANDOFF_8). Per-cluster mean
+      curves show the average dosage profile along the candidate.
+    </footer>
+
+  </div>
