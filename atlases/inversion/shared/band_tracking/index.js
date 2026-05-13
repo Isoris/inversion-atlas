@@ -145,6 +145,26 @@ export {
 } from './regime_topology.js';
 
 // ---------------------------------------------------------------------
+// LAYER 4a — per-regime Mendelian annotation. Runs BOTH Method A
+// (trio contradiction counting) and Method B (per-family chi-square
+// goodness-of-fit) when their respective inputs are available.
+// ---------------------------------------------------------------------
+export {
+  REGIME_KARYOTYPE_STATES,
+  REGIME_EXPECTED,
+  TRIO_SUPPORT_STATUS,
+  TRIO_SUPPORT_THRESHOLDS,
+  REGIME_MENDELIAN_DEFAULTS,
+  regimeKaryotypeForSample,
+  annotateRegimeWithTrios,
+  annotateRegimeWithFamilies,
+  annotateRegimesWithMendelian,
+} from './regime_mendelian.js';
+
+// LAYER 4b — INVERSE-direction pedigree inference (regime
+// co-membership → pairwise relatedness): pending follow-up commit.
+
+// ---------------------------------------------------------------------
 // LAYER 2 — BandSet Projection (set-based authority)
 //
 // Note: legacy aspirational names (bp_compute_projection_vector,
