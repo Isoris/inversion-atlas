@@ -180,6 +180,7 @@ UNITS=(
   test_shared_mgl_fingerprinter.js
   test_shared_mgl_dosage_clustering.js
   test_shared_mgl_similarity_matrix.js
+  test_shared_mgl_nested_detector.js
   test_page9_carousel.js
   test_page19_negative_regions.js
   test_page8_window_summary.js
