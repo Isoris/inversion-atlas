@@ -162,6 +162,7 @@ UNITS=(
   test_shared_functional_burden.js
   test_shared_busco_4d_age.js
   test_shared_mendelian_para_vs_peri.js
+  test_shared_mendelian_family_test.js
   test_shared_inversion_classification_axes.js
   test_page9_carousel.js
   test_page19_negative_regions.js
