@@ -192,6 +192,7 @@ UNITS=(
   test_shared_mgl_stripe_quality.js
   test_shared_mgl_founder_consensus.js
   test_shared_mgl_doubleton_sfs_clusters.js
+  test_shared_mgl_haplotype_network.js
   test_evolution_page_polarize_msa.js
   test_page9_carousel.js
   test_page19_negative_regions.js
@@ -266,6 +267,7 @@ SMOKES=(
   smoke_discovery_page_nested_detector_round5.mjs
   smoke_discovery_page_dosage_cluster_round5.mjs
   smoke_evolution_page_polarize_msa_round5.mjs
+  smoke_evolution_page_haplotype_network_round5.mjs
 )
 
 # Smokes that depend on atlas-core — see CORE_DEPENDENT_UNITS above.
