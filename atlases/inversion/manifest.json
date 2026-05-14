@@ -217,6 +217,54 @@
       "fragment": "atlases/inversion/pages/discovery/page_dosage_cluster.html",
       "module": "atlases/inversion/pages/discovery/page_dosage_cluster.js",
       "tooltip": "Adaptive-K sample clustering on per-window dosage profiles, with per-K scoring table and cluster mean-curve display (HANDOFF_8)."
+    },
+    {
+      "id": "page_evolution_polarize_msa",
+      "label": "polarize · MSA",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_polarize_msa.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_polarize_msa.js",
+      "tooltip": "Stacked-consensus MSA view of the inversion: outgroup row + INV founder-like consensus row + per-subgroup consensus rows (from 2D-SFS doubleton hierarchical clustering) + STD consensus row. Confidence + reason tier per site."
+    },
+    {
+      "id": "page_evolution_haplotype_network",
+      "label": "haplotype network",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_haplotype_network.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_haplotype_network.js",
+      "tooltip": "Minimum-spanning haplotype network of INV chromosomes. Nodes are Hamming-radius clusters; edges are pairwise mutational distance. Node colour matches the 2D-SFS doubleton subgroup."
+    },
+    {
+      "id": "page_evolution_polarize_synteny",
+      "label": "polarize · synteny",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_polarize_synteny.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_polarize_synteny.js",
+      "tooltip": "Outgroup-synteny polarization: per-outgroup-species break-point orientation vote (HOM_A / HOM_B / unresolved), aggregated to an arrangement verdict."
+    },
+    {
+      "id": "page_evolution_age",
+      "label": "age + divergence",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_age.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_age.js",
+      "tooltip": "Per-candidate age estimate: dXY between arrangements, private variant density on the derived class, MRCA depth, segregating-sites summary."
+    },
+    {
+      "id": "page_evolution_mosaicism",
+      "label": "mosaicism / leakage",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_mosaicism.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_mosaicism.js",
+      "tooltip": "Recombinant-tract / polarity-switch detector on INV chromosomes. Per-sample per-window mosaic-call + summary leakage score."
+    },
+    {
+      "id": "page_evolution_internal_history",
+      "label": "internal history",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_internal_history.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_internal_history.js",
+      "tooltip": "Sub-PCA on derived-only samples: looks for haplotype clusters / nested rearrangements / sublineages inside the inversion class."
     }
   ],
   "registries": {
@@ -284,14 +332,20 @@
       "order": 4
     },
     {
+      "id": "evolution",
+      "label": "evolution",
+      "order": 5,
+      "_doc": "Per-candidate evolution stage: polarize ancestral vs derived arrangement, reconstruct founder-like / MRCA-like consensus, build haplotype networks of INV chromosomes, estimate age + leakage + internal substructure. All cartridges consume the existing mgl_adapter primitives (PCA / dosage / heatmap / nj-tree) plus a small set of evolution-specific helpers (founder_consensus, doubleton_sfs_clusters, haplotype_network, outgroup_synteny, inversion_age, mosaicism_detector)."
+    },
+    {
       "id": "comparative",
       "label": "comparative",
-      "order": 5
+      "order": 6
     },
     {
       "id": "help",
       "label": "help",
-      "order": 6
+      "order": 7
     }
   ]
 }
