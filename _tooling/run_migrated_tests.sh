@@ -274,6 +274,7 @@ SMOKES=(
   smoke_evolution_page_polarize_synteny_round5.mjs
   smoke_evolution_page_age_round5.mjs
   smoke_evolution_page_mosaicism_round5.mjs
+  smoke_evolution_page_internal_history_round5.mjs
 )
 
 # Smokes that depend on atlas-core — see CORE_DEPENDENT_UNITS above.
