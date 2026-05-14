@@ -195,6 +195,7 @@ UNITS=(
   test_shared_mgl_haplotype_network.js
   test_shared_mgl_outgroup_synteny.js
   test_shared_mgl_inversion_divergence.js
+  test_shared_mgl_mosaicism_detector.js
   test_evolution_page_polarize_msa.js
   test_page9_carousel.js
   test_page19_negative_regions.js
@@ -272,6 +273,7 @@ SMOKES=(
   smoke_evolution_page_haplotype_network_round5.mjs
   smoke_evolution_page_polarize_synteny_round5.mjs
   smoke_evolution_page_age_round5.mjs
+  smoke_evolution_page_mosaicism_round5.mjs
 )
 
 # Smokes that depend on atlas-core — see CORE_DEPENDENT_UNITS above.
