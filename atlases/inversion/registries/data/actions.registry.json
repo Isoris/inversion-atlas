@@ -1,0 +1,9 @@
+{
+  "actions": {
+    "run_popstats": {
+      "runner":      "runners.popstats.run_fst",
+      "schema_in":   "run_popstats_v1",
+      "description": "Pairwise FST/dXY/theta_pi via /api/popstats/groupwise (Engine F, region_popstats). Produces an fst_windows_v1 layer."
+    }
+  }
+}

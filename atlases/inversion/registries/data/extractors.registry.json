@@ -1,0 +1,13 @@
+{
+  "extractors": [
+    {
+      "extractor_id":   "extract_fst_windows_v1",
+      "layer_type":     "fst_windows",
+      "schema_version": "fst_windows_v1",
+      "stage":          "normalized",
+      "parser":         "extractors.fst_windows.extract",
+      "input_format":   "json",
+      "params": { "value_col": "fst" }
+    }
+  ]
+}

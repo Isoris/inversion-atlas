@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "fst_windows_v1.schema.json",
+  "title": "fst_windows_v1 — layer payload schema",
+  "description": "Validated payload for normalized layers of type 'fst_windows'. The Atlas renders payload.windows as an FST track. payload.summary is for dashboards / overview tiles.",
+  "type": "object",
+  "required": ["windows", "summary"],
+  "additionalProperties": true,
+  "properties": {
+    "windows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["start_bp", "end_bp"],
+        "additionalProperties": true,
+        "properties": {
+          "start_bp": { "type": "integer", "minimum": 0 },
+          "end_bp":   { "type": "integer", "minimum": 1 },
+          "fst":      { "type": ["number", "null"] },
+          "n_sites":  { "type": ["integer", "null"] }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["n_windows"],
+      "additionalProperties": true,
+      "properties": {
+        "n_windows": { "type": "integer", "minimum": 0 },
+        "mean_fst":  { "type": ["number", "null"] },
+        "max_fst":   { "type": ["number", "null"] }
+      }
+    }
+  }
+}

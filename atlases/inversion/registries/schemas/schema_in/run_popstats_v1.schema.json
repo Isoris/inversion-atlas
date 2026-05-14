@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "run_popstats_v1.schema.json",
+  "title": "run_popstats_v1 — manifest contract for inversion-atlas FST/dXY/pi",
+  "description": "Validates the body of POST /api/actions when type='run_popstats'. The action wraps /api/popstats/groupwise (which runs region_popstats / Engine F) and produces an fst_windows_v1 layer. target carries chrom + optional region + groups; params carries stat + window settings.",
+  "type": "object",
+  "required": ["target", "params"],
+  "additionalProperties": true,
+  "properties": {
+    "target": {
+      "type": "object",
+      "required": ["chrom", "groups"],
+      "additionalProperties": true,
+      "properties": {
+        "chrom":    { "type": "string", "minLength": 1, "description": "Engine F --chr value, e.g. 'C_gar_LG28'." },
+        "start_bp": { "type": "integer", "minimum": 0, "description": "Region start (optional; chromosome-wide if omitted)." },
+        "end_bp":   { "type": "integer", "minimum": 1, "description": "Region end (must be present if start_bp is)." },
+        "groups": {
+          "type": "object",
+          "minProperties": 2,
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "description": "{ group_name: [sample_id, ...] }. ≥ 2 groups for pairwise FST."
+        }
+      }
+    },
+    "params": {
+      "type": "object",
+      "required": ["stat"],
+      "additionalProperties": true,
+      "properties": {
+        "stat":    { "type": "string", "enum": ["fst", "dxy", "theta_pi"] },
+        "win_bp":  { "type": "integer", "minimum": 1, "default": 50000 },
+        "step_bp": { "type": "integer", "minimum": 1, "default": 10000 }
+      }
+    }
+  }
+}
