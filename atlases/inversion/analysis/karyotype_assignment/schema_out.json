@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "atlases/inversion/analysis/karyotype_assignment/schema_out.json",
+  "title": "Karyotype assignment — output",
+  "description": "Pure-compute output from assignKaryotypes(). Consumable by mendelian, ngsPedigree, popstats, stripe_quality, breeding card.",
+  "type": "object",
+  "required": ["per_sample", "per_band", "karyotype_assignment", "coarse_group", "source", "n_samples", "n_bands"],
+  "properties": {
+    "candidate_id": { "type": ["string", "null"] },
+    "per_sample": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["si", "band", "het", "divergence_class", "possible_state"],
+        "properties": {
+          "si":                { "type": "integer", "minimum": 0 },
+          "sample":            { "type": ["string", "null"] },
+          "band":              { "type": "integer", "minimum": -1 },
+          "het":               { "type": ["number", "null"] },
+          "divergence_class":  { "type": "string", "enum": ["low", "mid", "high", "unknown"] },
+          "possible_state":    { "type": "string", "enum": ["hom-like", "het-like", "ambiguous"] },
+          "sub_band":          { "type": ["integer", "null"] },
+          "coarse_group":      { "type": "string", "enum": ["HOMO_1", "HET", "HOMO_2", "unknown"], "description": "Cohort-side label that ngsPedigree + stripe_quality consume." }
+        }
+      }
+    },
+    "per_band": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["band", "n", "interpretation"],
+        "properties": {
+          "band":             { "type": "integer", "minimum": 0 },
+          "n":                { "type": "integer", "minimum": 0 },
+          "n_low":            { "type": "integer", "minimum": 0 },
+          "n_mid":            { "type": "integer", "minimum": 0 },
+          "n_high":           { "type": "integer", "minimum": 0 },
+          "lowhet_fraction":  { "type": "number" },
+          "midhet_fraction":  { "type": "number" },
+          "highhet_fraction": { "type": "number" },
+          "is_mixed":         { "type": "boolean" },
+          "n_modes":          { "type": "integer" },
+          "mode_centers":     { "type": "array", "items": { "type": "number" } },
+          "interpretation":   { "type": "string", "enum": ["hom-like", "het-like", "mixed", "ambiguous"] }
+        }
+      }
+    },
+    "karyotype_assignment": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["band", "label_legacy", "label_detailed", "interpretation"],
+        "properties": {
+          "band":            { "type": "integer", "minimum": 0 },
+          "sub_band":        { "type": ["integer", "null"] },
+          "label_legacy":    { "type": "string" },
+          "label_detailed":  { "type": "string" },
+          "haplotype_class": { "type": ["string", "null"], "description": "e.g. 'H1/H1', 'H1/H2'. Null for non-hom-like, non-het-like bands." },
+          "interpretation":  { "type": "string", "enum": ["hom-like", "het-like", "mixed", "ambiguous"] }
+        }
+      }
+    },
+    "coarse_group": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["HOMO_1", "HET", "HOMO_2", "unknown"] },
+      "description": "Per-sample cohort-side group label, indexed by si. Convenience extraction of per_sample[].coarse_group; ngsPedigree consumes this array directly."
+    },
+    "source":      { "type": "string", "enum": ["precomp_het", "atlas_proxy", "insufficient"] },
+    "n_samples":   { "type": "integer", "minimum": 0 },
+    "n_bands":     { "type": "integer", "minimum": 0 },
+    "input_layer_ids": { "type": "array", "items": { "type": "string" } },
+    "params_used": { "type": "object" }
+  }
+}

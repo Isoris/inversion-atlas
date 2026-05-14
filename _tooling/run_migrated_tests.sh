@@ -56,6 +56,8 @@ UNITS=(
   test_shared_sample_color.js
   test_analysis_mendelian.js
   test_analysis_mendelian_inheritance.js
+  test_analysis_karyotype_assignment_compute.js
+  test_analysis_karyotype_assignment_adapter.js
   test_relatedness_schema.js
   test_page1_diag_residuals.js
   test_shared_cross_page_clusters.js

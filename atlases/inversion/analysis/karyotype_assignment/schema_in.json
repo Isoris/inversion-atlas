@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "atlases/inversion/analysis/karyotype_assignment/schema_in.json",
+  "title": "Karyotype assignment — input",
+  "description": "Pure-compute input to assignKaryotypes(). Must be portable: the same JSON runs in browser, Node, or any registry-agnostic harness.",
+  "type": "object",
+  "required": ["candidate"],
+  "properties": {
+    "candidate": {
+      "type": "object",
+      "required": ["K", "labels"],
+      "properties": {
+        "id":          { "type": "string", "description": "Candidate id (e.g. INV_LG28_001). Optional but recommended." },
+        "K":           { "type": "integer", "minimum": 1, "maximum": 12, "description": "Number of K-means bands locked for this candidate." },
+        "labels":      { "type": "array", "items": { "type": "integer", "minimum": -1 }, "description": "Per-sample band id [0..K-1]; -1 = unassigned." },
+        "pc1":         { "type": "array", "items": { "type": "number" }, "description": "Per-sample PC1 score. Required to rank hom-like bands and place het-like bands." },
+        "per_sample_het": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0, "maximum": 1 },
+          "description": "Per-sample heterozygosity rate ∈ [0,1]. When absent, the proxy-fallback path is taken if params.allow_pc_residual_proxy is true."
+        },
+        "samples":     { "type": "array", "items": { "type": "string" }, "description": "Per-sample external IDs (e.g. CGA001). Optional; preserved in the output for downstream joins." }
+      }
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "allow_pc_residual_proxy": { "type": "boolean", "default": false, "description": "When per_sample_het is missing, derive a proxy from PC residuals. Disabled by default — proxy is informative but not accurate." },
+        "low_het_threshold":       { "type": "number", "default": 0.40, "description": "het < this → 'low divergence' (hom-like signal)." },
+        "high_het_threshold":      { "type": "number", "default": 0.50, "description": "het ≥ this → 'high divergence' (het-like signal)." },
+        "multimodal_gap_z":        { "type": "number", "default": 2.0,  "description": "Bimodal gap must exceed this many pooled σ." },
+        "multimodal_gap_min":      { "type": "number", "default": 0.15, "description": "Bimodal gap must also exceed this absolute het-units gap." },
+        "min_mode_samples":        { "type": "integer", "default": 3,   "description": "Each mode needs at least this many samples to be counted." }
+      }
+    },
+    "input_layer_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Provenance: registry layer ids the adapter resolved to build this input. Round-tripped to the output for lineage tracking. Compute itself ignores it."
+    }
+  }
+}
