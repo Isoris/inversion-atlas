@@ -265,6 +265,30 @@
       "fragment": "atlases/inversion/pages/evolution/page_evolution_internal_history.html",
       "module": "atlases/inversion/pages/evolution/page_evolution_internal_history.js",
       "tooltip": "Sub-PCA on derived-only samples: looks for haplotype clusters / nested rearrangements / sublineages inside the inversion class."
+    },
+    {
+      "id": "page_evolution_layer_cleaning",
+      "label": "layer cleaning",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_layer_cleaning.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_layer_cleaning.js",
+      "tooltip": "Layer 0/1 noise removal: kinship + family-size downweighting + hatchery-duplicate exclusion so close relatives don't double-count in deep-Layer-2 stats."
+    },
+    {
+      "id": "page_evolution_event_tree",
+      "label": "event tree",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_event_tree.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_event_tree.js",
+      "tooltip": "Relative-ordering inference across multiple inversions on the same chromosome — carrier-overlap nesting, internal diversity ranking, outgroup presence, age class chaining."
+    },
+    {
+      "id": "page_evolution_archaeology_card",
+      "label": "archaeology card",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_archaeology_card.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_archaeology_card.js",
+      "tooltip": "Per-candidate synthesis card: pulls together polarity, age class, integrity, mosaicism, frequency, π/dXY/FST, private/fixed counts, and confidence into one screen — the Step-6 verdict."
     }
   ],
   "registries": {
