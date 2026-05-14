@@ -4846,3 +4846,242 @@ html[data-theme="academic"] #page16 .cs-synteny-sankey {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
 }
 .dh2-canvas-wrap { position: relative; }
+
+/* ====================================================================
+   Evolution stage cartridges (page_evolution_*). 9 panels share the
+   same header / body / aside / footer skeleton via per-prefix tokens
+   (.pmsa- / .hnet- / .syn- / .age- / .mos- / .ih- / .lc- / .et- / .ac-).
+   ==================================================================== */
+
+.page#page_evolution_polarize_msa.active,
+.page#page_evolution_haplotype_network.active,
+.page#page_evolution_polarize_synteny.active,
+.page#page_evolution_age.active,
+.page#page_evolution_mosaicism.active,
+.page#page_evolution_internal_history.active,
+.page#page_evolution_layer_cleaning.active,
+.page#page_evolution_event_tree.active,
+.page#page_evolution_archaeology_card.active {
+  display: flex; flex-direction: column;
+  height: 100%; min-height: 0; overflow: hidden;
+}
+
+.pmsa-header, .hnet-header, .syn-header, .age-header, .mos-header,
+.ih-header, .lc-header, .et-header, .ac-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 10px 16px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel-2);
+  flex-shrink: 0;
+}
+.pmsa-title, .hnet-title, .syn-title, .age-title, .mos-title,
+.ih-title, .lc-title, .et-title, .ac-title {
+  display: flex; align-items: baseline; gap: 12px; min-width: 0;
+}
+.pmsa-title h2, .hnet-title h2, .syn-title h2, .age-title h2,
+.mos-title h2, .ih-title h2, .lc-title h2, .et-title h2, .ac-title h2 {
+  font-family: var(--serif); font-weight: 500; font-size: 16px;
+  color: var(--ink); margin: 0; white-space: nowrap;
+}
+.pmsa-meta, .hnet-meta, .syn-meta, .age-meta, .mos-meta,
+.ih-meta, .lc-meta, .et-meta, .ac-meta {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-dim); white-space: nowrap;
+}
+.pmsa-controls, .hnet-controls, .syn-controls, .age-controls,
+.mos-controls, .ih-controls, .lc-controls, .et-controls, .ac-controls {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-dim);
+  flex-wrap: wrap; flex-shrink: 0;
+}
+.pmsa-toggle, .hnet-toggle, .syn-toggle, .age-toggle, .mos-toggle,
+.ih-toggle, .lc-toggle, .et-toggle, .ac-toggle {
+  display: inline-flex; align-items: center; gap: 4px;
+  cursor: pointer; color: var(--ink-dim);
+}
+.pmsa-toggle input[type="checkbox"],
+.hnet-toggle input[type="checkbox"],
+.lc-toggle input[type="checkbox"] { accent-color: var(--accent); }
+.pmsa-select, .hnet-select, .syn-select, .age-select, .mos-select,
+.ih-select, .lc-select, .et-select, .ac-select {
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: 2px;
+  font-family: var(--mono); font-size: 10.5px;
+  padding: 2px 6px; cursor: pointer;
+}
+.pmsa-sep, .hnet-sep, .syn-sep, .age-sep, .mos-sep, .ih-sep,
+.lc-sep, .et-sep, .ac-sep {
+  display: inline-block; width: 1px; height: 14px;
+  background: var(--rule); flex-shrink: 0;
+}
+
+.pmsa-body, .hnet-body, .syn-body, .age-body, .mos-body, .ih-body,
+.lc-body, .et-body, .ac-body {
+  display: grid; grid-template-columns: 1fr 280px;
+  gap: 14px; flex: 1; min-height: 0;
+  padding: 12px 16px; overflow: hidden;
+}
+
+.pmsa-canvas-wrap, .hnet-canvas-wrap, .syn-canvas-wrap,
+.age-metrics-wrap, .mos-canvas-wrap, .ih-canvas-wrap,
+.lc-canvas-wrap, .et-canvas-wrap, .ac-card-wrap {
+  position: relative;
+  display: flex; flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--rule); border-radius: 2px;
+  min-height: 0; overflow: hidden;
+}
+
+.pmsa-canvas, .hnet-canvas, .syn-canvas, .age-canvas, .mos-canvas,
+.ih-canvas, .lc-canvas, .et-canvas {
+  display: block; width: 100%;
+  background: var(--panel);
+}
+.pmsa-canvas, .mos-canvas, .et-canvas { flex: 1; min-height: 280px; }
+.hnet-canvas { flex: 1; min-height: 360px; }
+.syn-canvas  { height: 100px; }
+.age-canvas  { flex: 1; min-height: 220px; }
+.ih-canvas   { flex: 1; min-height: 320px; }
+.lc-canvas   { flex: 1; min-height: 280px; }
+
+.pmsa-right, .hnet-right, .syn-right, .age-right, .mos-right,
+.ih-right, .lc-right, .et-right, .ac-right {
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--rule); border-radius: 2px;
+  padding: 10px 12px; overflow: auto;
+  font-family: var(--mono); font-size: 11px; color: var(--ink);
+}
+.pmsa-panel-head, .hnet-panel-head, .syn-panel-head, .age-panel-head,
+.mos-panel-head, .ih-panel-head, .lc-panel-head, .et-panel-head,
+.ac-panel-head {
+  display: flex; flex-direction: column; gap: 2px;
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 6px; margin-bottom: 2px;
+}
+.pmsa-panel-head h4, .hnet-panel-head h4, .syn-panel-head h4,
+.age-panel-head h4, .mos-panel-head h4, .ih-panel-head h4,
+.lc-panel-head h4, .et-panel-head h4, .ac-panel-head h4 {
+  margin: 0; font-family: var(--mono); font-size: 10px;
+  color: var(--ink-dim); font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.pmsa-hint, .hnet-hint, .syn-hint, .age-hint, .mos-hint, .ih-hint,
+.lc-hint, .et-hint, .ac-hint {
+  font-size: 10px; color: var(--ink-dimmer); font-style: italic;
+}
+
+.pmsa-selected-fields, .hnet-selected-fields, .age-metrics-body,
+.mos-selected-fields, .ih-metrics-body, .lc-counts-body,
+.ac-metrics-body {
+  display: grid; grid-template-columns: max-content 1fr;
+  gap: 4px 10px; margin: 0; font-size: 11px;
+}
+.pmsa-selected-fields dt, .hnet-selected-fields dt,
+.age-metrics-body dt, .mos-selected-fields dt, .ih-metrics-body dt,
+.lc-counts-body dt, .ac-metrics-body dt {
+  color: var(--ink-dim); white-space: nowrap;
+}
+.pmsa-selected-fields dd, .hnet-selected-fields dd,
+.age-metrics-body dd, .mos-selected-fields dd, .ih-metrics-body dd,
+.lc-counts-body dd, .ac-metrics-body dd {
+  color: var(--ink); margin: 0; word-break: break-word;
+}
+
+.pmsa-footer, .hnet-footer, .syn-footer, .age-footer, .mos-footer,
+.ih-footer, .lc-footer, .et-footer, .ac-footer {
+  padding: 8px 16px;
+  border-top: 1px solid var(--rule);
+  background: var(--panel-2);
+  font-family: var(--mono); font-size: 10px;
+  color: var(--ink-dimmer);
+  flex-shrink: 0; line-height: 1.5;
+}
+
+.pmsa-empty, .hnet-empty, .syn-empty, .age-empty, .mos-empty,
+.ih-empty, .lc-empty, .et-empty, .ac-empty {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-dimmer);
+  text-align: center;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.pmsa-verdict-badge, .syn-verdict-badge, .age-class-badge,
+.mos-integrity-badge, .ac-verdict-badge, .lc-summary-badge,
+.hnet-summary-badge, .et-summary-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.04em;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--rule); white-space: nowrap;
+}
+
+/* Tier swatches (polarize MSA) */
+.pmsa-tier-row { display: flex; align-items: center; gap: 6px;
+                  padding: 2px 0; font-size: 11px; }
+.pmsa-tier-swatch { display: inline-block; width: 10px; height: 10px;
+                     border-radius: 2px; flex-shrink: 0; }
+.pmsa-tier-high      { background: #1f5723; }
+.pmsa-tier-medium    { background: #3aa14a; }
+.pmsa-tier-low       { background: #cfa12a; }
+.pmsa-tier-ambiguous { background: #c66b1d; }
+.pmsa-tier-suspicious{ background: #888888; }
+
+/* Row legend (polarize MSA) */
+.pmsa-row-legend, .pmsa-tier-summary, .pmsa-switch-list,
+.pmsa-proportions, .pmsa-row-legend-body,
+.hnet-edge-list, .hnet-node-list, .syn-votes-body,
+.lc-counts-body, .et-age-section, .ac-conf-section {
+  border-top: 1px dashed var(--rule);
+  padding-top: 8px;
+}
+.pmsa-row-legend h5, .pmsa-tier-summary h5,
+.hnet-edge-list h5, .hnet-node-list h5,
+.et-age-section h5, .ac-conf-section h5,
+.mos-counts-section h5, .age-class-section h5 {
+  margin: 0 0 6px; font-size: 10px; color: var(--ink-dim);
+  font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.pmsa-row-legend-row, .hnet-edge-row, .hnet-node-row, .syn-vote-row,
+.et-pair-row, .et-age-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 2px 0; font-size: 11px;
+}
+.pmsa-row-swatch, .hnet-node-swatch, .syn-vote-swatch,
+.et-pair-swatch {
+  display: inline-block; width: 10px; height: 10px;
+  border-radius: 2px; flex-shrink: 0;
+}
+
+/* Archaeology card boxes */
+.ac-reason-box, .ac-interpretation-box {
+  padding: 14px 18px; margin: 12px;
+  border-radius: 4px;
+  background: var(--panel-2);
+  border-left: 4px solid var(--accent);
+  font-family: var(--serif); font-size: 14px;
+  color: var(--ink); line-height: 1.5;
+}
+.ac-interpretation-box { font-style: italic; color: var(--ink-dim); }
+
+/* Reason box (age cartridge) */
+.age-reason-body { font-size: 11px; color: var(--ink); line-height: 1.5; }
+
+.pmsa-tier-body, .mos-counts-body, .lc-counts-body, .ac-conf-body,
+.et-pairs-body, .et-age-body, .syn-votes-body, .hnet-edge-body,
+.hnet-node-body, .age-reason-body {
+  font-size: 11px; color: var(--ink);
+}
+
+/* Status: empty-state sub-text */
+.pmsa-row-legend-body .empty, .hnet-edge-body .empty,
+.hnet-node-body .empty, .syn-votes-body .empty,
+.et-pairs-body .empty, .et-age-body .empty,
+.pmsa-selected-fields .empty, .ac-metrics-body .empty,
+.mos-counts-body .empty, .lc-counts-body .empty {
+  color: var(--ink-dimmer); font-style: italic;
+}
