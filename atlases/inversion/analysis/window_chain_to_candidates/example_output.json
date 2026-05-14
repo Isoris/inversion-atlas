@@ -1,0 +1,107 @@
+{
+  "chrom": "LG28",
+  "chains": [
+    {
+      "chain_type": "het",
+      "anchor_w": 4,
+      "start_w": 2,
+      "end_w": 6,
+      "start_bp": 1200000,
+      "end_bp": 1700000,
+      "n_windows": 5,
+      "cramers_v_mean": null,
+      "cramers_v_min": null,
+      "het_span_mean": 1,
+      "samples_per_arrangement": {
+        "H1": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "H2": [
+          8,
+          9,
+          10,
+          11
+        ],
+        "HET": [
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "evidence": {
+        "het_band_present": true,
+        "n_het_windows": 5,
+        "n_homo_only_windows": 0,
+        "min_window_K": 3,
+        "max_window_K": 3,
+        "anchor_K": 3,
+        "reason": "het_chain ok; het band span 0.49"
+      }
+    },
+    {
+      "chain_type": "hom_separation",
+      "anchor_w": 10,
+      "start_w": 8,
+      "end_w": 12,
+      "start_bp": 1800000,
+      "end_bp": 2300000,
+      "n_windows": 5,
+      "cramers_v_mean": 1,
+      "cramers_v_min": 1,
+      "het_span_mean": null,
+      "samples_per_arrangement": {
+        "H1": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "H2": [
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "evidence": {
+        "het_band_present": false,
+        "n_het_windows": 0,
+        "n_homo_only_windows": 5,
+        "min_window_K": 2,
+        "max_window_K": 2,
+        "anchor_K": 2,
+        "reason": "hom_separation chained on Cramérs V; mean V 1.00"
+      }
+    }
+  ],
+  "n_chains": 2,
+  "source": "compute",
+  "branches_run": [
+    "het",
+    "hom_separation"
+  ],
+  "input_layer_ids": [
+    "scrubber_main:LG28"
+  ],
+  "params_used": {
+    "branches": [
+      "het",
+      "hom_separation"
+    ],
+    "cramers_v_threshold": 0.7,
+    "min_chain_length": 3,
+    "max_chain_skip": 1,
+    "het_signal": "pc1_midpoint",
+    "het_span_min": 0.2,
+    "merge_overlap_bp": 0,
+    "dedupe_prefer": "het"
+  }
+}

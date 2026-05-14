@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "atlases/inversion/analysis/window_chain_to_candidates/schema_in.json",
+  "title": "Window chain → candidates — input",
+  "description": "Pure-compute input. Caller supplies per-window labels + (optionally) per-window PC1 / dosage, plus a list of seed window indices. The module returns chain intervals, each tagged with chain_type ∈ {het, hom_separation, mixed}. Adapter is responsible for resolving these from the registry / atlasState.",
+  "type": "object",
+  "required": ["windows", "n_samples"],
+  "properties": {
+    "chrom":     { "type": ["string", "null"] },
+    "n_samples": { "type": "integer", "minimum": 1 },
+    "windows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["idx", "K", "labels"],
+        "properties": {
+          "idx":            { "type": "integer", "minimum": 0, "description": "Window index along the chromosome." },
+          "start_bp":       { "type": ["integer", "number", "null"] },
+          "end_bp":         { "type": ["integer", "number", "null"] },
+          "K":              { "type": "integer", "minimum": 1, "description": "K-means K used for this window's labels." },
+          "labels":         { "type": "array", "items": { "type": "integer", "minimum": -1 }, "description": "Per-sample band id [0..K-1]; -1 = unassigned." },
+          "pc1":            { "type": ["array", "null"], "items": { "type": "number" }, "description": "Per-sample PC1 score; required for het-band detection via pc1_midpoint." },
+          "dosage":         { "type": ["array", "null"], "items": { "type": "number" }, "description": "Per-sample dosage in [0..2]; enables biological het-detection." },
+          "band_quality":   { "type": ["number", "null"], "description": "Optional per-window band-quality score; influences seed picking." }
+        }
+      }
+    },
+    "seed_windows": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0 },
+      "description": "Window indices to seed chains from. When omitted, every window is treated as a potential seed (slower)."
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "branches":               { "type": "array", "items": { "type": "string", "enum": ["het", "hom_separation"] }, "default": ["het", "hom_separation"], "description": "Which branches to run. Drop 'het' for K=2-only chromosomes; drop 'hom_separation' to suppress the homozygous-state path." },
+        "cramers_v_threshold":    { "type": "number", "default": 0.70, "description": "Minimum Cramér's V on the L3 contingency between anchor and candidate window for the hom_separation branch." },
+        "min_chain_length":       { "type": "integer", "default": 3, "description": "Reject chains shorter than this many windows." },
+        "max_chain_skip":         { "type": "integer", "default": 1, "description": "Allow this many bad windows in a row before terminating the chain (hysteresis)." },
+        "het_signal":             { "type": "string", "enum": ["pc1_midpoint", "dosage_one"], "default": "pc1_midpoint" },
+        "het_span_min":           { "type": "number", "default": 0.20, "description": "Minimum het-band PC1 span fraction at the seed for the het branch to engage." },
+        "merge_overlap_bp":       { "type": ["integer", "number"], "default": 0, "description": "Adjacent/overlapping intervals within this bp distance are merged into one candidate. 0 = strict overlap only." },
+        "dedupe_prefer":          { "type": "string", "enum": ["het", "hom_separation", "longer"], "default": "het", "description": "When two chains overlap, prefer the het-based one (typically richer evidence), or the longer one." }
+      }
+    },
+    "input_layer_ids": { "type": "array", "items": { "type": "string" } }
+  }
+}
