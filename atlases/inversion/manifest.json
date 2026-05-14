@@ -262,29 +262,36 @@
   "stages": [
     {
       "id": "discovery",
-      "label": "discovery",
-      "order": 1
+      "label": "discovery 1",
+      "order": 1,
+      "_doc": "Round-1 discovery: the local-PCA detection pipeline (|z|, θπ, GHSL). Other discovery panels — dosage heatmap, PCA scatter, similarity matrix, fingerprint track, haplotype regimes, tree panel, nested detector, dosage cluster — live in 'discovery_2'. Per-window summary table + negative regions catalogue moved to 'catalogue'."
+    },
+    {
+      "id": "discovery_2",
+      "label": "discovery 2",
+      "order": 2,
+      "_doc": "Round-2 discovery: the supplementary detection / inspection panels that aren't core local-PCA. Split out from 'discovery' on 2026-05-14 to keep the local-PCA workflow uncluttered."
     },
     {
       "id": "classification",
       "label": "classification",
-      "order": 2,
+      "order": 3,
       "_doc": "Absorbs the legacy 'refinement' + 'classification' + 'synthesis' stages — the per-candidate karyotype/tier deep-dive, popstats/ancestry tracks, boundary refinement, SV evidence, plus the cohort-level stats profile / marker panel / overview pages that previously lived under 'synthesis'."
     },
     {
       "id": "catalogue",
       "label": "catalogue",
-      "order": 3
+      "order": 4
     },
     {
       "id": "comparative",
       "label": "comparative",
-      "order": 4
+      "order": 5
     },
     {
       "id": "help",
       "label": "help",
-      "order": 5
+      "order": 6
     }
   ]
 }
