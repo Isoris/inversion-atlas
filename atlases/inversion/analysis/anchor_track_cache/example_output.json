@@ -1,0 +1,58 @@
+{
+  "chrom": "LG28",
+  "s_window": 0,
+  "e_window": 9,
+  "n_windows": 10,
+  "n_anchors": 1,
+  "source": "compute",
+  "tracks": [
+    {
+      "anchor_w": 4,
+      "K_a": 2,
+      "disabled": false,
+      "v_track": [
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0,
+        0,
+        0
+      ],
+      "h_off_track": [
+        0,
+        0,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0,
+        0,
+        0
+      ],
+      "k_w_track": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ]
+    }
+  ],
+  "input_layer_ids": [
+    "scrubber_main:LG28"
+  ],
+  "params_used": {
+    "s_window": 0,
+    "e_window": 9
+  }
+}

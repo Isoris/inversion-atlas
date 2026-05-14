@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "atlases/inversion/analysis/window_chain_to_candidates/schema_out.json",
+  "title": "Window chain → candidates — output",
+  "description": "Pure-compute output. Each chain is a candidate interval with provenance + per-window evidence. The adapter promotes these into atlasState.candidateList via shared/candidate_promote.",
+  "type": "object",
+  "required": ["chains", "n_chains", "source", "branches_run"],
+  "properties": {
+    "chrom":          { "type": ["string", "null"] },
+    "chains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["chain_type", "anchor_w", "start_w", "end_w", "n_windows"],
+        "properties": {
+          "chain_type":          { "type": "string", "enum": ["het", "hom_separation", "mixed"] },
+          "anchor_w":            { "type": "integer", "minimum": 0 },
+          "start_w":             { "type": "integer", "minimum": 0 },
+          "end_w":               { "type": "integer", "minimum": 0 },
+          "start_bp":            { "type": ["integer", "number", "null"] },
+          "end_bp":              { "type": ["integer", "number", "null"] },
+          "n_windows":           { "type": "integer", "minimum": 1 },
+          "cramers_v_mean":      { "type": ["number", "null"], "description": "Mean V across the chain (hom_separation + mixed only)." },
+          "cramers_v_min":       { "type": ["number", "null"] },
+          "het_span_mean":       { "type": ["number", "null"], "description": "Mean het-band PC1 span (het + mixed only)." },
+          "samples_per_arrangement": {
+            "type": "object",
+            "description": "Per-arrangement sample membership at the anchor window. Keys: H1 / H2 / HET (when K=3) or H1 / H2 (when K=2).",
+            "additionalProperties": { "type": "array", "items": { "type": "integer" } }
+          },
+          "evidence": {
+            "type": "object",
+            "properties": {
+              "het_band_present":       { "type": "boolean" },
+              "n_het_windows":          { "type": "integer", "minimum": 0 },
+              "n_homo_only_windows":    { "type": "integer", "minimum": 0 },
+              "min_window_K":           { "type": "integer" },
+              "max_window_K":           { "type": "integer" },
+              "anchor_K":               { "type": "integer" },
+              "reason":                 { "type": "string", "description": "Free-form explanation of which branch produced this chain and why it terminated." }
+            }
+          }
+        }
+      }
+    },
+    "n_chains":       { "type": "integer", "minimum": 0 },
+    "source":         { "type": "string", "enum": ["compute", "insufficient"] },
+    "branches_run":   { "type": "array", "items": { "type": "string" } },
+    "input_layer_ids":{ "type": "array", "items": { "type": "string" } },
+    "params_used":    { "type": "object" }
+  }
+}

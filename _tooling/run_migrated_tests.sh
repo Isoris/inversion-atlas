@@ -56,6 +56,11 @@ UNITS=(
   test_shared_sample_color.js
   test_analysis_mendelian.js
   test_analysis_mendelian_inheritance.js
+  test_analysis_window_chain_to_candidates_compute.js
+  test_analysis_window_chain_to_candidates_adapter.js
+  test_shared_band_tracking_anchor_track_cache.js
+  test_analysis_anchor_track_cache_compute.js
+  test_analysis_anchor_track_cache_adapter.js
   test_relatedness_schema.js
   test_page1_diag_residuals.js
   test_shared_cross_page_clusters.js
