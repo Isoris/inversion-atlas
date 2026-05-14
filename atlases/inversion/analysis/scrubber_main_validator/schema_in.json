@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "atlases/inversion/analysis/scrubber_main_validator/schema_in.json",
+  "title": "scrubber_main validator — input",
+  "description": "Wraps a candidate scrubber_main JSON for validation. Pure-compute; the actual scrubber_main schema is referenced by name and supplied via context (the adapter resolves it from registries/schemas/).",
+  "type": "object",
+  "required": ["payload"],
+  "properties": {
+    "payload": {
+      "type": ["object", "array", "string", "number", "boolean", "null"],
+      "description": "The raw value to validate (typically a scrubber_main JSON object)."
+    },
+    "schema": {
+      "type": ["object", "null"],
+      "description": "JSON Schema to validate against. When omitted, the adapter is expected to resolve atlases/inversion/registries/schemas/scrubber_main.schema.json and inject it here."
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "max_errors": { "type": "integer", "minimum": 1, "default": 50 },
+        "strict":     { "type": "boolean", "default": false, "description": "When true, warnings are upgraded to errors." }
+      }
+    },
+    "input_layer_ids": { "type": "array", "items": { "type": "string" } }
+  }
+}

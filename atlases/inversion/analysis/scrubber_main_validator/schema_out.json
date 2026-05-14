@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "atlases/inversion/analysis/scrubber_main_validator/schema_out.json",
+  "title": "scrubber_main validator — output",
+  "type": "object",
+  "required": ["ok", "errors", "warnings", "summary"],
+  "properties": {
+    "ok":       { "type": "boolean" },
+    "errors":   { "type": "array", "items": { "$ref": "#/definitions/issue" } },
+    "warnings": { "type": "array", "items": { "$ref": "#/definitions/issue" } },
+    "summary": {
+      "type": "object",
+      "required": ["n_errors", "n_warnings"],
+      "properties": {
+        "n_errors":           { "type": "integer", "minimum": 0 },
+        "n_warnings":         { "type": "integer", "minimum": 0 },
+        "schema_id":          { "type": ["string", "null"] },
+        "validated_chrom":    { "type": ["string", "null"] },
+        "validated_n_windows":{ "type": ["integer", "null"], "minimum": 0 },
+        "validated_n_samples":{ "type": ["integer", "null"], "minimum": 0 },
+        "schema_supplied":    { "type": "boolean", "description": "false → adapter never resolved a schema; output is informational only." }
+      }
+    },
+    "params_used":     { "type": "object" },
+    "input_layer_ids": { "type": "array", "items": { "type": "string" } }
+  },
+  "definitions": {
+    "issue": {
+      "type": "object",
+      "required": ["path", "schema_path", "message"],
+      "properties": {
+        "path":        { "type": "string" },
+        "schema_path": { "type": "string" },
+        "message":     { "type": "string" }
+      }
+    }
+  }
+}

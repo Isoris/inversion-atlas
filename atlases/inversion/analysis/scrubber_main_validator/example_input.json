@@ -1,0 +1,26 @@
+{
+  "payload": {
+    "chrom": "LG28",
+    "n_windows": 3,
+    "n_samples": 4,
+    "samples": [
+      { "id": "S1", "cga": "CGA001" },
+      { "id": "S2", "cga": "CGA002" },
+      { "id": "S3", "cga": "CGA003" },
+      { "id": "S4", "cga": "CGA004" }
+    ],
+    "windows": [
+      { "idx": 0, "start_bp": 1000000, "end_bp": 1100000, "K": 3, "band_quality": 0.78, "labels": [0, 0, 1, 2] },
+      { "idx": 1, "start_bp": 1100000, "end_bp": 1200000, "K": 3, "band_quality": 0.82, "labels": [0, 0, 1, 2] },
+      { "idx": 2, "start_bp": 1200000, "end_bp": 1300000, "K": 3, "band_quality": 0.75, "labels": [0, 0, 1, 2] }
+    ],
+    "l2_envelopes": [
+      { "idx": 0, "start_w": 0, "end_w": 2, "start_bp": 1000000, "end_bp": 1300000, "K": 3, "silhouette": 0.41 }
+    ]
+  },
+  "params": {
+    "strict": false,
+    "max_errors": 50
+  },
+  "input_layer_ids": ["scrubber_main:LG28"]
+}

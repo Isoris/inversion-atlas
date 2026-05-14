@@ -18,6 +18,8 @@
       "_path_was": "data/precomp/{chrom}.json",
       "_root_doc": "Resolved through master_config.yaml -> roots.precomp_zblocks (currently /mnt/e/results_inversions/local_PCA_MDS_z/09_atlas_json/). To switch precomp source, edit the root entry — no layer change needed.",
       "schema": "schemas/scrubber_main.schema.json",
+      "schema_status": "validated",
+      "_schema_validator": "analysis/scrubber_main_validator.js (compute → shared/validators/json_schema_lite.js)",
       "chunked": false,
       "_v2_chunked_plan": "When whole-genome support arrives, set chunked: true and split <chrom>.json into <chrom>_<window_block>.json shards.",
       "pin_to": "AtlasState.inversion.tracks.{chrom}",
