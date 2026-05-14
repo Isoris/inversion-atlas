@@ -150,6 +150,16 @@ def _build_envelope(
         envelope["coordinate"] = coord
     if isinstance(target.get("groups"), dict):
         envelope["sample_scope"] = {"group_ids": list(target["groups"].keys())}
+    # Lineage: when the manifest names source envelope(s) (the staging-
+    # to-normalized promotion pattern from PIPELINE_FLOW.md), echo them
+    # into provenance.source_layer_ids so the new envelope traces back
+    # to whatever it was derived from. Accepts either a scalar
+    # 'source_layer_id' or a list 'source_layer_ids'.
+    src_ids = target.get("source_layer_ids")
+    if not src_ids and target.get("source_layer_id"):
+        src_ids = [target["source_layer_id"]]
+    if src_ids:
+        envelope["provenance"]["source_layer_ids"] = list(src_ids)
     return envelope
 
 

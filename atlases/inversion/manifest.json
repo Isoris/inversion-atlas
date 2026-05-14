@@ -29,7 +29,7 @@
     {
       "id": "page2",
       "label": "candidate focus",
-      "stage": "discovery",
+      "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/discovery/page2.html",
       "module": "atlases/inversion/pages/discovery/page2.js"
     },
