@@ -301,20 +301,27 @@ karyotyped-and-classifiable candidates is unbroken end to end.
 
 ---
 
-## Open questions (flag for review)
+## Resolved decisions
 
-1. **Window-chain vs banding-pipeline overlap**: PR #14's
-   `window_chain_to_candidates` already promotes chains to
-   candidateList. When BOTH modules run on the same chromosome, we'll
-   likely get overlapping candidate intervals from two sources. Should
-   we (a) prefer banding-pipeline candidates because they have stage2
-   linkage + stage4 consensus evidence, (b) keep both and let the
-   review UI dedupe, or (c) add a merge step? Recommendation: (b) for
-   v1 — both sources are visible, the review UI can deduplicate via
-   interval overlap. Revisit if duplicate candidates become a UX
-   problem.
-2. **id collisions**: when the same locus is found at slightly
-   different boundaries by re-runs, the deterministic
+1. **Dedup policy — source-tagged, no dedup (decision 2026-05-14)**:
+   Every candidate carries a `source` tag — one of
+   `'seeds_pipeline'`, `'het_chain'`, `'hom_chain'` — so the catalogue
+   page can show overlaps side-by-side and the user reviews them
+   manually. `seeds_to_candidates` does NOT attempt to merge against
+   existing `state.candidateList` entries from
+   `window_chain_to_candidates` (PR #14). Both sources coexist;
+   downstream review/filtering modules can dedupe later if needed.
+   - **Schema impact**: `schema_out.json` requires a `source` field
+     on every candidate (enum of the three tags above).
+   - **Adapter impact**: `saveOutput` appends to
+     `state.candidateList` without inspecting prior entries.
+   - **Test impact**: add a test that runs `seeds_to_candidates`
+     after `window_chain_to_candidates` on a fixture that overlaps,
+     asserts both are present, asserts both carry distinct `source`
+     tags.
+
+2. **id collisions on re-run**: when the same locus is found at
+   slightly different boundaries by re-runs, the deterministic
    `{prefix}_{chrom}_{start_bp}_{end_bp}` id changes — so re-runs
    create new candidates rather than updating old ones. Acceptable
    for v1; if re-run idempotency becomes needed, switch to
