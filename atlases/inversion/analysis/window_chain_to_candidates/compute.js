@@ -23,7 +23,13 @@
 //                                   het_track_skeleton,
 //                                   het_define_interval,
 //                                   iv_merge_het_tracks
-//   shared/contingency.js           buildContingency, cramersV
+//   shared/band_tracking/anchor_track_cache.js
+//                                   createAnchorTrackCache  — the
+//                                   memoised band-tracking V(anchor,w)
+//                                   shared with discoverSeedFromAnchor.
+//                                   Replaces the chi²-based Cramér's V
+//                                   we used to build inline (so both
+//                                   modules consult one signal scale).
 //
 // No DOM, no fetch, no registry, no state. Same JSON runs in browser,
 // Node, or batch CLI.
@@ -35,10 +41,8 @@ import {
   het_define_interval,
   iv_merge_het_tracks,
 } from '../../shared/band_tracking/het.js';
-import {
-  buildContingency,
-  cramersV,
-} from '../../shared/contingency.js';
+import { createAnchorTrackCache }
+  from '../../shared/band_tracking/anchor_track_cache.js';
 
 const DEFAULT_PARAMS = Object.freeze({
   branches:            ['het', 'hom_separation'],
@@ -254,6 +258,24 @@ function _runHomSeparationBranch(input, winByIdx, orderedIdx, seedSet, params) {
   const orderPos = new Map();
   for (let i = 0; i < orderedIdx.length; i++) orderPos.set(orderedIdx[i], i);
 
+  // Build a memoised V(anchor_w, w) cache. Same band-tracking V
+  // definition that discoverSeedFromAnchor uses — replaces the
+  // separate chi²-based Cramérs V we used to build inline so the two
+  // modules consult ONE signal scale.
+  const vCache = createAnchorTrackCache({
+    getLabels(w_idx) {
+      const w = winByIdx.get(w_idx);
+      if (!w || !Array.isArray(w.labels)) return null;
+      return Int8Array.from(w.labels);
+    },
+    getK(w_idx) {
+      const w = winByIdx.get(w_idx);
+      return (w && w.K > 0) ? (w.K | 0) : 0;
+    },
+    chr_s_window: orderedIdx[0],
+    chr_e_window: orderedIdx[orderedIdx.length - 1],
+  });
+
   for (const seed_w of seedSet) {
     const anchor = winByIdx.get(seed_w);
     if (!anchor) continue;
@@ -287,19 +309,15 @@ function _runHomSeparationBranch(input, winByIdx, orderedIdx, seedSet, params) {
     const vSeries = []; // accumulated V values per accepted window
     let lo = anchorPos, hi = anchorPos;
 
-    // Right walk.
+    // Right walk. K-match guard + shared band-tracking V.
     let skips = 0;
     for (let p = anchorPos + 1; p < orderedIdx.length; p++) {
       const wIdx = orderedIdx[p];
       const w = winByIdx.get(wIdx);
-      // K-match guard: the hom-separation chain requires the same
-      // partition cardinality across windows. K mismatch terminates
-      // the walk (it indicates the structure has changed — different
-      // arrangement count is itself a chain boundary).
+      // K-match guard: hom-separation requires same partition
+      // cardinality across windows. K mismatch terminates the walk.
       if (!w || !Array.isArray(w.labels) || w.K !== anchorK) { if (++skips > maxSkip) break; continue; }
-      const ct = buildContingency(anchorLabels, w.labels, anchorK, w.K);
-      if (!ct) { if (++skips > maxSkip) break; continue; }
-      const v = cramersV(_flattenContingency(ct), ct.KA, ct.KB);
+      const v = vCache.getV(seed_w, wIdx);
       if (!Number.isFinite(v) || v < thrV) { if (++skips > maxSkip) break; continue; }
       hi = p; vSeries.push(v); skips = 0;
     }
@@ -308,14 +326,8 @@ function _runHomSeparationBranch(input, winByIdx, orderedIdx, seedSet, params) {
     for (let p = anchorPos - 1; p >= 0; p--) {
       const wIdx = orderedIdx[p];
       const w = winByIdx.get(wIdx);
-      // K-match guard: the hom-separation chain requires the same
-      // partition cardinality across windows. K mismatch terminates
-      // the walk (it indicates the structure has changed — different
-      // arrangement count is itself a chain boundary).
       if (!w || !Array.isArray(w.labels) || w.K !== anchorK) { if (++skips > maxSkip) break; continue; }
-      const ct = buildContingency(anchorLabels, w.labels, anchorK, w.K);
-      if (!ct) { if (++skips > maxSkip) break; continue; }
-      const v = cramersV(_flattenContingency(ct), ct.KA, ct.KB);
+      const v = vCache.getV(seed_w, wIdx);
       if (!Number.isFinite(v) || v < thrV) { if (++skips > maxSkip) break; continue; }
       lo = p; vSeries.push(v); skips = 0;
     }
@@ -370,17 +382,6 @@ function _runHomSeparationBranch(input, winByIdx, orderedIdx, seedSet, params) {
     });
   }
   return out;
-}
-
-function _flattenContingency(ct) {
-  // buildContingency returns { M: [[...]], KA, KB } where M is 2D.
-  // cramersV expects a flat row-major Length-K_a*K_c array.
-  const KA = ct.KA, KB = ct.KB;
-  const flat = new Array(KA * KB);
-  for (let i = 0; i < KA; i++) {
-    for (let j = 0; j < KB; j++) flat[i * KB + j] = ct.M[i][j];
-  }
-  return flat;
 }
 
 function _bandSizes(labels, K) {
