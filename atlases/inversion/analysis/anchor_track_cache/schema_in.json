@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "atlases/inversion/analysis/anchor_track_cache/schema_in.json",
+  "title": "Anchor V/H_off track precompute — input",
+  "description": "Pure-compute input. Caller supplies per-window labels for a contiguous chromosome range plus a list of anchor window indices. The compute emits V(anchor_w, w), H_off(anchor_w, w), K_w(anchor_w, w) tracks per anchor. Downstream consumers cache the result and query via getV / getHoff.",
+  "type": "object",
+  "required": ["windows", "anchors"],
+  "properties": {
+    "chrom":   { "type": ["string", "null"] },
+    "windows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["idx", "labels", "K"],
+        "properties": {
+          "idx":    { "type": "integer", "minimum": 0 },
+          "labels": { "type": "array", "items": { "type": "integer", "minimum": -1 } },
+          "K":      { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "anchors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "integer", "minimum": 0 },
+      "description": "Window indices to use as anchors. Each anchor produces one V/H_off track over the chromosome range."
+    },
+    "params": {
+      "type": "object",
+      "properties": {
+        "s_window": { "type": ["integer", "null"], "minimum": 0, "description": "Lower bound of the tracking range. Defaults to min(windows[].idx)." },
+        "e_window": { "type": ["integer", "null"], "minimum": 0, "description": "Upper bound. Defaults to max(windows[].idx)." }
+      }
+    },
+    "input_layer_ids": { "type": "array", "items": { "type": "string" } }
+  }
+}
