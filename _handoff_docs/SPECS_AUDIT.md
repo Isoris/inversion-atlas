@@ -1,0 +1,127 @@
+# SPECS_AUDIT — what specs exist, what's missing, what references what
+
+**Question**: most specs seem to be gone — is that true?
+
+**Short answer**: not gone, but **scattered across 4 different doc
+folders + 1 nested folder structure**, with **~9 SPEC_* files
+referenced in code that have no on-disk doc**. The full picture below.
+
+---
+
+## 4 places specs / handoffs live (right now)
+
+| dir                | purpose | count |
+|--------------------|---------|------:|
+| `specs_todo/`             | the canonical spec library — formal `SPEC_*.md` files + nested per-page `pages_*/_to_do/HANDOFF_N_*.md` | 15 SPECs + 5 HANDOFFs + 1 master |
+| `handoff_docs/`           | older turn-by-turn handoffs (Atlas_round166 era) + 1 SPEC | 7 handoffs + 1 SPEC |
+| `_handoff_docs/`          | newer turn-by-turn handoffs (chat 34/35/36 + 2026-05-12/13/14) | 37 files (handoffs + audits + plans + 1 SPEC) |
+| `docs/`                   | migration tracking + family roadmap + TODO inventories | 3 .md + `merge_inputs/` |
+| `atlases/inversion/*/README.md` | per-subsystem READMEs | 10 files |
+
+→ no single "find a spec by name" entry point.
+
+---
+
+## SPEC_* files that **exist** on disk (16 total)
+
+**Canonical library** (`specs_todo/`):
+- `SPEC_arrangement_color_mode_and_arrangement_calls_v1.md`
+- `SPEC_busco_4d_age_brackets.md`
+- `SPEC_busco_anchors_v1.md`
+- `SPEC_copy_origin_painting.md`
+- `SPEC_fish_ancestry_scroller.md`
+- `SPEC_functional_burden_per_candidate_v1.md`
+- `SPEC_inversion_age_atlas_surface_AMENDMENT.md`
+- `SPEC_inversion_divergence_network_v1.md`
+- `SPEC_mendelian_inheritance_para_vs_peri_v1.md`
+- `SPEC_page1_candidate_mode_ui.md`
+- `SPEC_regime_annotation_v34.md`
+- `SPEC_registry_v1.md`
+- `SPEC_registry_write_and_page_isolation.md`
+- `SPEC_xpehh_per_window_track.md`
+
+**`mgl_adapter` family** (`specs_todo/mgl_adapter/`):
+- `SPEC_0_master.md` — the master mgl_adapter spec
+- `README.md` + `README_specs.md` — entry points
+- `HANDOFF_1_producer.md`, `HANDOFF_3_validation.md`, `HANDOFF_7_nested_inversion.md`, `HANDOFF_8_dosage_clustering.md`, `HANDOFF_9_dosage_similarity.md`
+
+**Nested per-page handoffs** (`specs_todo/pages_*/_to_do/`):
+- `pages_candidate_mode/_to_do/HANDOFF_2_atlas_ui.md`
+- `pages_custom_views/_to_do/HANDOFF_4_caching_custom.md`
+- `pages_fingerprint_track/_to_do/HANDOFF_6_fingerprinter.md`
+- `pages_similarity_panel/_to_do/HANDOFF_10_atlas_similarity.md`
+- `pages_tree_panel/_to_do/HANDOFF_5_tree.md`
+
+**Scattered elsewhere** (NOT in `specs_todo/`):
+- `handoff_docs/SPEC_band_track_extraction_and_l3_single_band_rows.md` ← the master band-tracking SPEC, lives in old handoff_docs
+- `_handoff_docs/SPEC_registry_v2.md` ← the v2 registry SPEC, lives in new handoff_docs
+- `handoff_docs/HANDOFF_2026-05-06_morning_age_specs.md` ← contains inversion-age specs inline
+
+---
+
+## SPEC_* files **referenced but missing** (8+ missing)
+
+These names appear in code or docs but have **no on-disk file** with that name:
+
+| Referenced as | Referenced from | Status |
+|---------------|-----------------|--------|
+| `SPEC_DEFERRED.md` | `_handoff_docs/HANDOFF_2026-05-06_chat34_registry_v2_done.md`, `READ_MODES_CONFIRMED.md`, `AUDIT_LOG.md` | **MISSING** — multiple deferred-decisions references, no doc |
+| `SPEC_distant_band_concordance_fish_trajectory.md` | `handoff_docs/SPEC_band_track_extraction_and_l3_single_band_rows.md`, `docs/MIGRATION_INVENTORY.md` | **MISSING** — referenced as a parent SPEC |
+| `SPEC_g_panel_unified_groups.md` | `pages/discovery/page1/pca_panel.js`, `page1.html` | **MISSING** — referenced in shipping page1 code |
+| `SPEC_l2_sweep_inheritance.md` | `pages/discovery/page1.html`, `MIGRATION_INVENTORY.md`, band-track SPEC | **MISSING** — page1 ships an L2-sweep cartridge (`page1/l2_sweep.js`) with no spec |
+| `SPEC_l3_het_dosage_coloring.md` | `pages/discovery/page1.html` | **MISSING** — referenced from page1 |
+| `SPEC_lasso_inheritance_backgrounds.md` | `handoff_docs/HANDOFF_2026-05-05_turn164_lasso_linkage.md`, `page1.html` | **MISSING** |
+| `SPEC_lines_panel_candidate_bands.md` | `MIGRATION_INVENTORY.md`, band-track SPEC | **MISSING** — `page1/lines_panel.js` ships without a spec |
+| `SPEC_review_surfaces_auto_and_lineages.md` | `css/inversion.css`, `MIGRATION_INVENTORY.md`, band-track SPEC | **MISSING** |
+| `SPEC_sv_evidence_page.md` | `engines/producers/sv_evidence/STEP_SV_GT_AGG_aggregate_genotype_counts.py`, `pages/review/page_sv_evidence.js` | **MISSING** — both the producer pipeline and the page reference it |
+
+**Also missing**:
+- `SCHEMA_V2.md` — referenced by `pages.registry.json`'s page4 _doc (§19) and elsewhere
+- `SCHEMAS.md` — referenced from migration docs
+- `HANDOFF_BATCH_3.md`, `HANDOFF_BATCH_4.md`, `HANDOFF_BATCH_5.md` — referenced from each batch's `BATCH_*_NOTES.md` but no master HANDOFF_BATCH_N file
+
+---
+
+## What's referenced as a SPEC but lives inside another file
+
+These are NOT missing — they exist as **sections inside other docs**:
+- `SPEC_0` → contents of `specs_todo/mgl_adapter/SPEC_0_master.md`
+- `SCHEMA §9 / §10 / §19 / §22` → refers to schema sections in some doc; the JSON-schema definitions are in `atlases/inversion/registries/schemas/*.schema.json` (26 schema files exist there) — the prose document doesn't appear to exist anywhere on disk
+- `SCHEMA_V2.md` — pages.registry mentions "cross-refs SCHEMA_V2.md §19" but no file by that name exists; the 14-axis classification schema lives in `pages/review/page4/tier_axes.js`
+- legacy-line citations (e.g. "legacy lines 36977-37050") refer to `legacy/Inversion_atlas.html` — confirmed at `/home/user/inversion-atlas/legacy/` if that dir exists (haven't checked)
+
+---
+
+## What's healthy
+
+- `SPEC_band_track_extraction_and_l3_single_band_rows.md` (the master band-tracking spec) is **explicitly** the parent doc — it lists 4 child SPECs as its dependency network, and 3 of those 4 children are **missing**. So this SPEC has a known "TODO_MISSING children" structural debt.
+- `SPEC_registry_v2.md` (newest) supersedes `SPEC_registry_v1.md` — both exist; v1 in `specs_todo/`, v2 in `_handoff_docs/`. Consider promoting v2 into `specs_todo/`.
+- `SPEC_0_master.md` (mgl_adapter master) is a self-contained mini-library with its own HANDOFFs and READMEs — closest thing to a clean documentation tree in the repo.
+
+---
+
+## Recommended actions (concrete + small)
+
+### 1. Move all SPECs into one home
+Move:
+- `handoff_docs/SPEC_band_track_extraction_and_l3_single_band_rows.md` → `specs_todo/`
+- `_handoff_docs/SPEC_registry_v2.md` → `specs_todo/`
+
+Result: `specs_todo/` becomes the single SPEC home.
+
+### 2. Author the 8 missing SPECs (or mark them retired)
+For each of the missing SPEC_* names referenced from code, decide:
+- **Author** — write a one-page SPEC that documents what the shipped code does (esp. `SPEC_g_panel_unified_groups`, `SPEC_lines_panel_candidate_bands`, `SPEC_l2_sweep_inheritance`, `SPEC_l3_het_dosage_coloring`, `SPEC_sv_evidence_page` — all reference shipping code)
+- **Retire** — remove the reference from the code/doc (esp. `SPEC_DEFERRED.md`, which is a register of deferred decisions; either start the doc, or delete the references)
+
+### 3. Author the prose SCHEMA doc
+Currently `pages.registry.json` cross-refs `SCHEMA_V2.md §19` / `§22` / etc. but no such file exists. Either:
+- Write `specs_todo/SCHEMA_V2.md` consolidating the 26 JSON schemas in `registries/schemas/`, OR
+- Replace the prose `SCHEMA_V2.md §N` references with concrete `registries/schemas/<layer>.schema.json` paths
+
+### 4. Add `specs_todo/INDEX.md`
+One-line per SPEC + status (DONE / IN_PROGRESS / NOT_STARTED / RETIRED) + which pages/modules consume it. Pairs with the `ATLAS_PAGES_MAP.md` we just shipped.
+
+---
+
+https://claude.ai/code/session_01KN8Jkn7aaWJvu53xd3EGnx
