@@ -55,27 +55,11 @@
   --atlas-stage-hue-compare:        228, 138, 60;  /* same as comparative */
 }
 
-/* ---------------------------------------------------------------------
-   Global settings button — sits at the LEFT end of the tab bar.
-   --------------------------------------------------------------------- */
-#tabBar #globalSettingsBtn {
-  background: #c2410c; color: #fff8e7;
-  border: 1px solid #9a3412;
-  border-radius: 4px;
-  padding: 0 10px;
-  margin: 4px 12px 4px 0;
-  font-family: var(--mono); font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-#tabBar #globalSettingsBtn:hover  { background: #9a3412; border-color: #c2410c; }
-#tabBar #globalSettingsBtn:active { transform: translateY(1px); }
-body.light-theme #tabBar #globalSettingsBtn { color: #fff; }
-
-/* When the parent layout collapses the sidebar, the settings button
-   still sits in the same place — no rule needed. Cartridges can
-   layer their own sidebar-collapse rules on top. */
+/* The global settings gear (#globalSettingsBtn) is no longer rendered
+   into #tabBar — it lives in the shell header now (atlas-core/index.html
+   + atlas-core/css/base.css). The rules that used to live here are
+   intentionally removed so the gear doesn't render twice in any future
+   resurrection. */
 
 /* ---------------------------------------------------------------------
    Tab-stage pills — one per workflow stage.
@@ -167,3 +151,9 @@ body.light-theme #tabBar #globalSettingsBtn { color: #fff; }
 #tabBar[data-active-stage="catalogue"]      button[data-page]:not([data-stage="catalogue"])      { display: none !important; }
 #tabBar[data-active-stage="comparative"]    button[data-page]:not([data-stage="comparative"])    { display: none !important; }
 #tabBar[data-active-stage="help"]           button[data-page]:not([data-stage="help"])           { display: none !important; }
+
+/* Click-twice-to-collapse: when the active stage pill is re-clicked,
+   wireTabStagePills sets data-collapsed="1" on the tab bar so every
+   page button is hidden (folds the row of sub-tabs). Any subsequent
+   pill click clears this attribute and restores the per-stage rules. */
+#tabBar[data-collapsed="1"] button[data-page] { display: none !important; }

@@ -78,15 +78,34 @@ export function wireTabStagePills(rootEl, opts) {
   const handlePillClick = (pill) => {
     const stage = pill.getAttribute('data-stage');
     if (!stage) return;
+    const currentStage = rootEl.getAttribute('data-active-stage');
+    const isCollapsed  = rootEl.getAttribute('data-collapsed') === '1';
+
+    // Same pill clicked while its sub-tabs are expanded → collapse them.
+    // The CSS rule `#tabBar[data-collapsed="1"] button[data-page]` hides
+    // every page button; the pill's data-expanded is cleared so the
+    // arrow indicator returns to its idle state.
+    if (stage === currentStage && !isCollapsed) {
+      rootEl.setAttribute('data-collapsed', '1');
+      pill.removeAttribute('data-expanded');
+      if (typeof o.onStageChange === 'function') {
+        try { o.onStageChange(stage); } catch (_) { /* swallow */ }
+      }
+      return;
+    }
+
+    // Otherwise: expand (clearing any collapsed state) and, if switching
+    // to a different stage, click into its first page so the router
+    // actually navigates.
+    rootEl.removeAttribute('data-collapsed');
     setActiveStageOn(rootEl, stage);
-    // Click the first page button in the new stage so the router
-    // navigates into it. The shell's page-button click dispatcher
-    // owns the actual mount.
-    const firstPageBtn = rootEl.querySelector(
-      'button[data-page][data-stage="' + _cssEscape(stage) + '"]',
-    );
-    if (firstPageBtn && typeof firstPageBtn.click === 'function') {
-      firstPageBtn.click();
+    if (stage !== currentStage) {
+      const firstPageBtn = rootEl.querySelector(
+        'button[data-page][data-stage="' + _cssEscape(stage) + '"]',
+      );
+      if (firstPageBtn && typeof firstPageBtn.click === 'function') {
+        firstPageBtn.click();
+      }
     }
     if (typeof o.onStageChange === 'function') {
       try { o.onStageChange(stage); } catch (_) { /* swallow */ }

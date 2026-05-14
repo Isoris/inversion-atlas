@@ -21,7 +21,7 @@
     },
     {
       "id": "page15",
-      "label": "GHSL haplotype divergence",
+      "label": "local PCA GHSL",
       "stage": "discovery",
       "fragment": "atlases/inversion/pages/discovery/page15.html",
       "module": "atlases/inversion/pages/discovery/page15.js"
@@ -36,21 +36,21 @@
     {
       "id": "page8",
       "label": "per-window summary table",
-      "stage": "discovery",
+      "stage": "catalogue",
       "fragment": "atlases/inversion/pages/discovery/page8.html",
       "module": "atlases/inversion/pages/discovery/page8.js"
     },
     {
       "id": "page19",
       "label": "negative regions catalogue",
-      "stage": "discovery",
+      "stage": "catalogue",
       "fragment": "atlases/inversion/pages/discovery/page19.html",
       "module": "atlases/inversion/pages/discovery/page19.js"
     },
     {
       "id": "page22",
       "label": "haplotype regimes",
-      "stage": "discovery",
+      "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/discovery/page22.html",
       "module": "atlases/inversion/pages/discovery/page22.js",
       "tooltip": "Long-range haplotype regimes (Stage 4 bruteforce projection). Run runBandingPipeline on the active chromosome and explore where each seed-band voter lands across target windows. Export the result as a regime catalogue JSON."
@@ -165,7 +165,7 @@
     {
       "id": "page_tree_panel",
       "label": "tree panel",
-      "stage": "discovery",
+      "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/discovery/page_tree_panel.html",
       "module": "atlases/inversion/pages/discovery/page_tree_panel.js",
       "tooltip": "Inversion-core sample tree (NJ on dosage distances) with cluster colouring and ARI-vs-clusters badge (HANDOFF_5)."
@@ -173,7 +173,7 @@
     {
       "id": "page_fingerprint_track",
       "label": "fingerprint track",
-      "stage": "discovery",
+      "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/discovery/page_fingerprint_track.html",
       "module": "atlases/inversion/pages/discovery/page_fingerprint_track.js",
       "tooltip": "Per-window diversity-regime fingerprint with rank-equivalence regime IDs, switch markers, fragment-proportions treemap, and architecture-scenario verdict (HANDOFF_6)."
@@ -181,7 +181,7 @@
     {
       "id": "page_similarity_panel",
       "label": "similarity matrix",
-      "stage": "discovery",
+      "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/discovery/page_similarity_panel.html",
       "module": "atlases/inversion/pages/discovery/page_similarity_panel.js",
       "tooltip": "Per-window sample×sample similarity heatmap with block detection + adjacent-window ARI transition strip (HANDOFF_10)."
@@ -189,7 +189,7 @@
     {
       "id": "page_pca_panel",
       "label": "PCA scatter",
-      "stage": "discovery",
+      "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/discovery/page_pca_panel.html",
       "module": "atlases/inversion/pages/discovery/page_pca_panel.js",
       "tooltip": "Per-window PC1×PC2 scatter with cluster colouring and λ-magnitude scrubber (SPEC_0 §10 Phase 1)."
@@ -197,7 +197,7 @@
     {
       "id": "page_dosage_heatmap",
       "label": "dosage heatmap",
-      "stage": "discovery",
+      "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/discovery/page_dosage_heatmap.html",
       "module": "atlases/inversion/pages/discovery/page_dosage_heatmap.js",
       "tooltip": "Sample × marker dosage heatmap with K=3 group track and polarity stripe. Accepts mgl_heatmap_json or legacy candidate-chunk shape via shared adapters (SPEC_0 §11)."
@@ -205,7 +205,7 @@
     {
       "id": "page_nested_detector",
       "label": "nested detector",
-      "stage": "discovery",
+      "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/discovery/page_nested_detector.html",
       "module": "atlases/inversion/pages/discovery/page_nested_detector.js",
       "tooltip": "Nested-inversion detector with 3 stratum tracks (HOM1 / HET / HOM2) and contiguous inner-interval overlays (HANDOFF_7)."
@@ -213,7 +213,7 @@
     {
       "id": "page_dosage_cluster",
       "label": "dosage cluster",
-      "stage": "discovery",
+      "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/discovery/page_dosage_cluster.html",
       "module": "atlases/inversion/pages/discovery/page_dosage_cluster.js",
       "tooltip": "Adaptive-K sample clustering on per-window dosage profiles, with per-K scoring table and cluster mean-curve display (HANDOFF_8)."

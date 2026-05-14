@@ -13,12 +13,15 @@
   #app-root > .wrap > #pagesArea > main#page1.active { height: 100%; min-height: 0; }
 
   /* The legacy header hosted #layoutModeBtn and #resetLayoutBtn with rules
-     scoped to `header #layoutModeBtn`. In the new shell these buttons live
-     inside #ctrlBar at the top of page1, so the legacy rules don't apply.
-     Replicate the visual style here so they don't render as default browser
-     buttons. */
+     scoped to `header #layoutModeBtn`. In the new shell those two are
+     surfaced in the top banner as #headerLayoutModeBtn / #headerResetLayoutBtn,
+     which delegate clicks to these in-page buttons via data-cmd. We keep the
+     in-page elements in the DOM so the handlers wired in sidebar.js
+     (_wireLayoutMode) still bind, but hide them visually to remove the
+     duplicate from the ctrlBar. #candidateModeBtn stays visible — it has no
+     top-banner duplicate today. */
   #ctrlBar #layoutModeBtn,
-  #ctrlBar #resetLayoutBtn,
+  #ctrlBar #resetLayoutBtn { display: none !important; }
   #ctrlBar #candidateModeBtn {
     align-self: center;
     background: var(--panel-2); border: 1px solid var(--rule); color: var(--ink);
@@ -28,8 +31,6 @@
     display: inline-flex; align-items: center;
     margin-left: 6px;
   }
-  #ctrlBar #layoutModeBtn:hover,
-  #ctrlBar #resetLayoutBtn:hover,
   #ctrlBar #candidateModeBtn:hover {
     background: var(--panel-3); border-color: var(--accent);
   }
