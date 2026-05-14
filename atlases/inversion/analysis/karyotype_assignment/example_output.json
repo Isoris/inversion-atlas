@@ -1,0 +1,230 @@
+{
+  "candidate_id": "INV_LG28_001",
+  "per_sample": [
+    {
+      "si": 0,
+      "sample": "CGA001",
+      "band": 0,
+      "het": 0.02,
+      "divergence_class": "low",
+      "possible_state": "hom-like",
+      "sub_band": null,
+      "coarse_group": "HOMO_1"
+    },
+    {
+      "si": 1,
+      "sample": "CGA002",
+      "band": 0,
+      "het": 0.05,
+      "divergence_class": "low",
+      "possible_state": "hom-like",
+      "sub_band": null,
+      "coarse_group": "HOMO_1"
+    },
+    {
+      "si": 2,
+      "sample": "CGA003",
+      "band": 0,
+      "het": 0.03,
+      "divergence_class": "low",
+      "possible_state": "hom-like",
+      "sub_band": null,
+      "coarse_group": "HOMO_1"
+    },
+    {
+      "si": 3,
+      "sample": "CGA004",
+      "band": 0,
+      "het": 0.04,
+      "divergence_class": "low",
+      "possible_state": "hom-like",
+      "sub_band": null,
+      "coarse_group": "HOMO_1"
+    },
+    {
+      "si": 4,
+      "sample": "CGA005",
+      "band": 1,
+      "het": 0.55,
+      "divergence_class": "high",
+      "possible_state": "het-like",
+      "sub_band": null,
+      "coarse_group": "HET"
+    },
+    {
+      "si": 5,
+      "sample": "CGA006",
+      "band": 1,
+      "het": 0.61,
+      "divergence_class": "high",
+      "possible_state": "het-like",
+      "sub_band": null,
+      "coarse_group": "HET"
+    },
+    {
+      "si": 6,
+      "sample": "CGA007",
+      "band": 1,
+      "het": 0.58,
+      "divergence_class": "high",
+      "possible_state": "het-like",
+      "sub_band": null,
+      "coarse_group": "HET"
+    },
+    {
+      "si": 7,
+      "sample": "CGA008",
+      "band": 1,
+      "het": 0.62,
+      "divergence_class": "high",
+      "possible_state": "het-like",
+      "sub_band": null,
+      "coarse_group": "HET"
+    },
+    {
+      "si": 8,
+      "sample": "CGA009",
+      "band": 2,
+      "het": 0.03,
+      "divergence_class": "low",
+      "possible_state": "hom-like",
+      "sub_band": null,
+      "coarse_group": "HOMO_2"
+    },
+    {
+      "si": 9,
+      "sample": "CGA010",
+      "band": 2,
+      "het": 0.04,
+      "divergence_class": "low",
+      "possible_state": "hom-like",
+      "sub_band": null,
+      "coarse_group": "HOMO_2"
+    },
+    {
+      "si": 10,
+      "sample": "CGA011",
+      "band": 2,
+      "het": 0.02,
+      "divergence_class": "low",
+      "possible_state": "hom-like",
+      "sub_band": null,
+      "coarse_group": "HOMO_2"
+    },
+    {
+      "si": 11,
+      "sample": "CGA012",
+      "band": 2,
+      "het": 0.05,
+      "divergence_class": "low",
+      "possible_state": "hom-like",
+      "sub_band": null,
+      "coarse_group": "HOMO_2"
+    }
+  ],
+  "per_band": [
+    {
+      "band": 0,
+      "n": 4,
+      "n_low": 4,
+      "n_mid": 0,
+      "n_high": 0,
+      "lowhet_fraction": 1,
+      "midhet_fraction": 0,
+      "highhet_fraction": 0,
+      "is_mixed": false,
+      "n_modes": 1,
+      "mode_centers": [
+        0.035
+      ],
+      "interpretation": "hom-like"
+    },
+    {
+      "band": 1,
+      "n": 4,
+      "n_low": 0,
+      "n_mid": 0,
+      "n_high": 4,
+      "lowhet_fraction": 0,
+      "midhet_fraction": 0,
+      "highhet_fraction": 1,
+      "is_mixed": false,
+      "n_modes": 1,
+      "mode_centers": [
+        0.5900000000000001
+      ],
+      "interpretation": "het-like"
+    },
+    {
+      "band": 2,
+      "n": 4,
+      "n_low": 4,
+      "n_mid": 0,
+      "n_high": 0,
+      "lowhet_fraction": 1,
+      "midhet_fraction": 0,
+      "highhet_fraction": 0,
+      "is_mixed": false,
+      "n_modes": 1,
+      "mode_centers": [
+        0.035
+      ],
+      "interpretation": "hom-like"
+    }
+  ],
+  "karyotype_assignment": [
+    {
+      "band": 0,
+      "sub_band": null,
+      "label_legacy": "band 1",
+      "label_detailed": "H1/H1",
+      "haplotype_class": "H1/H1",
+      "interpretation": "hom-like"
+    },
+    {
+      "band": 1,
+      "sub_band": null,
+      "label_legacy": "band 2",
+      "label_detailed": "H1/H2",
+      "haplotype_class": "H1/H2",
+      "interpretation": "het-like"
+    },
+    {
+      "band": 2,
+      "sub_band": null,
+      "label_legacy": "band 3",
+      "label_detailed": "H2/H2",
+      "haplotype_class": "H2/H2",
+      "interpretation": "hom-like"
+    }
+  ],
+  "coarse_group": [
+    "HOMO_1",
+    "HOMO_1",
+    "HOMO_1",
+    "HOMO_1",
+    "HET",
+    "HET",
+    "HET",
+    "HET",
+    "HOMO_2",
+    "HOMO_2",
+    "HOMO_2",
+    "HOMO_2"
+  ],
+  "source": "precomp_het",
+  "n_samples": 12,
+  "n_bands": 3,
+  "input_layer_ids": [
+    "candidate_lineage:INV_LG28_001",
+    "per_sample_het:LG28:12000000-18000000"
+  ],
+  "params_used": {
+    "allow_pc_residual_proxy": false,
+    "low_het_threshold": 0.4,
+    "high_het_threshold": 0.5,
+    "multimodal_gap_z": 2,
+    "multimodal_gap_min": 0.15,
+    "min_mode_samples": 3
+  }
+}
