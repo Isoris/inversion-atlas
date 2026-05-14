@@ -59,6 +59,36 @@ referenced in code that have no on-disk doc**. The full picture below.
 
 ---
 
+## Why specs went missing — the `specs_done/` sweep
+
+User recall: *"in the past we used to have many many specs but they got
+done and swept for some reasons"* — **confirmed by `_handoff_docs/AUDIT_LOG.md:3517`**:
+
+> `Atlas/specs_done/`, `specs_todo/`, `specs_new_turn131/` — spec inventory.
+
+The legacy upload tarball (`Atlas_turn166_round2_2026-05-05_tar.gz`,
+audited 2026-05-06 late evening) contained **three** spec folders:
+
+| folder              | what it held | what happened |
+|---------------------|--------------|---------------|
+| `Atlas/specs_done/` | completed specs (the "many many" that got finished) | **NOT copied into this repo** |
+| `Atlas/specs_todo/` | spec'd-but-not-implemented | copied to `inversion-atlas/specs_todo/` (the 14 SPECs you see today) |
+| `Atlas/specs_new_turn131/` | turn-131 in-flight specs | **NOT copied** — but the legacy monolith still references e.g. `SPEC_per_candidate_breeding_readiness_card.md` (legacy lines 21424, 23239) from this folder |
+
+Git-history check confirms nothing was deleted from this repo: 232 commits, the raw-log status codes are only `A` (add) and `M` (modify), zero `D` (delete). The "swept" specs were lost at **tarball import time**, not in any commit of this repo.
+
+The convention was also documented in `handoff_docs/HANDOFF_2026-05-06_morning_age_specs.md:325`:
+
+> "When the age layer ships into the production atlas, move both specs to `specs_done/` after archiving."
+
+So the workflow was: spec → `specs_todo/` → implement → move to `specs_done/`. That `specs_done/` was archived/sweep-deleted **before** the inversion-atlas repo was seeded, so the audit trail of "what got implemented from what spec" is gone with it.
+
+What remains as evidence the old specs existed:
+- Inline references inside `legacy/Inversion_atlas.html` (12 unique `SPEC_*` names, including `SPEC_age_origin_panel`, `SPEC_observable_allele_h_label_system`, `SPEC_per_candidate_breeding_readiness_card`, `SPEC_inversion_age_atlas_surface`)
+- 14 changelog turns (1..127) referenced in `AUDIT_LOG.md:3515` — at turn 127 the legacy was 62,023 LOC with 762/762 tests green. The changelogs themselves are also at `Atlas/changelogs/` in the un-imported tarball.
+
+---
+
 ## SPEC_* files **referenced but missing** (8+ missing)
 
 These names appear in code or docs but have **no on-disk file** with that name:
