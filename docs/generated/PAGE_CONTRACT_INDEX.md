@@ -60,21 +60,21 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | classification | page7 | ancestry | active (thin loader) | high | [page.manifest.json](page_contracts/page7/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page7/PAGE_CONTRACT.md) |
 | classification | page11 | boundaries | active | high | [page.manifest.json](page_contracts/page11/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page11/PAGE_CONTRACT.md) |
 | classification | page_sv_evidence | SV evidence | active (thin loader) | high | [page.manifest.json](page_contracts/page_sv_evidence/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_sv_evidence/PAGE_CONTRACT.md) |
-| evolution | page_evolution_polarize_msa | polarize · MSA | _pending_ | _ | _ |
-| evolution | page_evolution_haplotype_network | haplotype network | _pending_ | _ | _ |
-| evolution | page_evolution_polarize_synteny | polarize · synteny | _pending_ | _ | _ |
-| evolution | page_evolution_age | age + divergence | _pending_ | _ | _ |
-| evolution | page_evolution_mosaicism | mosaicism | _pending_ | _ | _ |
-| evolution | page_evolution_internal_history | internal history | _pending_ | _ | _ |
-| evolution | page_evolution_layer_cleaning | layer cleaning | _pending_ | _ | _ |
-| evolution | page_evolution_event_tree | event tree | _pending_ | _ | _ |
-| evolution | page_evolution_archaeology_card | archaeology card | _pending_ | _ | _ |
+| evolution | page_evolution_polarize_msa | polarize · MSA | active | high | [page.manifest.json](page_contracts/page_evolution_polarize_msa/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_polarize_msa/PAGE_CONTRACT.md) |
+| evolution | page_evolution_haplotype_network | haplotype network | active | high | [page.manifest.json](page_contracts/page_evolution_haplotype_network/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_haplotype_network/PAGE_CONTRACT.md) |
+| evolution | page_evolution_polarize_synteny | polarize · synteny | active | medium | [page.manifest.json](page_contracts/page_evolution_polarize_synteny/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_polarize_synteny/PAGE_CONTRACT.md) |
+| evolution | page_evolution_age | age + divergence | active | medium | [page.manifest.json](page_contracts/page_evolution_age/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_age/PAGE_CONTRACT.md) |
+| evolution | page_evolution_mosaicism | mosaicism | active | medium | [page.manifest.json](page_contracts/page_evolution_mosaicism/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_mosaicism/PAGE_CONTRACT.md) |
+| evolution | page_evolution_internal_history | internal history | active | medium | [page.manifest.json](page_contracts/page_evolution_internal_history/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_internal_history/PAGE_CONTRACT.md) |
+| evolution | page_evolution_layer_cleaning | layer cleaning | active | high | [page.manifest.json](page_contracts/page_evolution_layer_cleaning/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_layer_cleaning/PAGE_CONTRACT.md) |
+| evolution | page_evolution_event_tree | event tree | active | medium | [page.manifest.json](page_contracts/page_evolution_event_tree/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_event_tree/PAGE_CONTRACT.md) |
+| evolution | page_evolution_archaeology_card | archaeology card | active | high | [page.manifest.json](page_contracts/page_evolution_archaeology_card/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_archaeology_card/PAGE_CONTRACT.md) |
 | comparative | page16 | cross-species breakpoints | _pending_ | _ | _ |
 | comparative | page16b | multi-species cockpit | _pending_ | _ | _ |
 | help | page5 | help | _pending_ | _ | _ |
 | _unregistered_ | page_ancestry_scroller | ancestry scroller (not in manifest) | _pending_ | _ | _ |
 
-**Progress**: 26 / 38 pages contracted.
+**Progress**: 35 / 38 pages contracted.
 
 ## Next batches
 
