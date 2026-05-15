@@ -1,6 +1,8 @@
 // pages/discovery/page1/l2_sweep.js
 //
 // L2-sweep auto-promote pipeline (legacy lines 41749-42153).
+// SPEC: specs_done/SPEC_l2_sweep_inheritance.md (authored 2026-05-15
+//       from this file).
 //
 // When state.l2SweepEnabled is true and the user navigates to a new
 // chromosome, page1.applyData() runs an inheritance-group clustering

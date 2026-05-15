@@ -157,7 +157,8 @@
   "documents": {
     "page_registry_doc": "atlases/inversion/registries/data/pages.registry.json -> pages.page1._doc",
     "specs_done": [
-      "specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md"
+      "specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md",
+      "specs_done/SPEC_l2_sweep_inheritance.md (authored 2026-05-15 from page1/l2_sweep.js)"
     ],
     "specs_todo": [
       "specs_todo/SPEC_page1_candidate_mode_ui.md"
@@ -165,7 +166,6 @@
     "specs_referenced_in_code_but_missing": [
       "SPEC_g_panel_unified_groups.md",
       "SPEC_lines_panel_candidate_bands.md",
-      "SPEC_l2_sweep_inheritance.md",
       "SPEC_l3_het_dosage_coloring.md",
       "SPEC_lasso_inheritance_backgrounds.md"
     ],
