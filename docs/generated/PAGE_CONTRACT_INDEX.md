@@ -37,10 +37,10 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | discovery | page1 | local PCA \|Z\| | active | high | [page.manifest.json](page_contracts/page1/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page1/PAGE_CONTRACT.md) |
 | discovery | page12 | local PCA θπ | active (empty-state until layers) | high | [page.manifest.json](page_contracts/page12/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page12/PAGE_CONTRACT.md) |
 | discovery | page15 | local PCA GHSL | stub (renderers TODO) | high | [page.manifest.json](page_contracts/page15/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page15/PAGE_CONTRACT.md) |
-| discovery_2 | page2 | candidate focus | _pending_ | _ | _ |
-| discovery_2 | page22 | haplotype regimes | _pending_ | _ | _ |
-| discovery_2 | page_tree_panel | tree panel | _pending_ | _ | _ |
-| discovery_2 | page_fingerprint_track | fingerprint track | _pending_ | _ | _ |
+| discovery_2 | page2 | candidate focus | active | high | [page.manifest.json](page_contracts/page2/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page2/PAGE_CONTRACT.md) |
+| discovery_2 | page22 | haplotype regimes | active (Phase 1) | high | [page.manifest.json](page_contracts/page22/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page22/PAGE_CONTRACT.md) |
+| discovery_2 | page_tree_panel | tree panel | active (Phase 1) | high | [page.manifest.json](page_contracts/page_tree_panel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_tree_panel/PAGE_CONTRACT.md) |
+| discovery_2 | page_fingerprint_track | fingerprint track | active (Phase 1) | high | [page.manifest.json](page_contracts/page_fingerprint_track/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_fingerprint_track/PAGE_CONTRACT.md) |
 | discovery_2 | page_similarity_panel | similarity matrix | _pending_ | _ | _ |
 | discovery_2 | page_pca_panel | PCA scatter | _pending_ | _ | _ |
 | discovery_2 | page_dosage_heatmap | dosage heatmap | _pending_ | _ | _ |
@@ -74,7 +74,7 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | help | page5 | help | _pending_ | _ | _ |
 | _unregistered_ | page_ancestry_scroller | ancestry scroller (not in manifest) | _pending_ | _ | _ |
 
-**Progress**: 3 / 38 pages contracted.
+**Progress**: 7 / 38 pages contracted.
 
 ## Next batches
 

@@ -1,0 +1,77 @@
+{
+  "page_id": "page_fingerprint_track",
+  "label": "fingerprint track",
+  "page_type": "core_page",
+  "stage": "discovery_2",
+  "owner_atlas": "inversion",
+  "status": "active (Phase 1)",
+  "current_path": {
+    "html": "atlases/inversion/pages/discovery/page_fingerprint_track.html",
+    "js_entry": "atlases/inversion/pages/discovery/page_fingerprint_track.js",
+    "js_subdir": "atlases/inversion/pages/discovery/page_fingerprint_track/"
+  },
+
+  "purpose": "Per-window diversity-regime fingerprint with rank-equivalence regime IDs, switch markers (▲ return / ▼ terminal / · brief), fragment-proportions treemap, architecture-scenario verdict (stable / recombinant_tract / two_adjacent / nested / complex / insufficient). Cartridge implementation of HANDOFF_6.",
+
+  "required_layers": [],
+  "required_slots": ["activeCandidate (reads atlasState.inversion.fingerprint_track_state)"],
+  "input_contract": "atlasState.inversion.fingerprint_track_state = { fingerprint_result: mgl_fingerprinter output, candidate_label?: string, regime_colors_by_id?: Object<number,string>, window_labels?: Array<string> }",
+
+  "panels": [
+    {"id": "fingerprint_strip", "module": "page_fingerprint_track/renderer.js", "purpose": "horizontal regime strip across the candidate (canvas)"},
+    {"id": "switch_markers", "module": "page_fingerprint_track/renderer.js", "purpose": "▲ return / ▼ terminal / · brief switches above the strip"},
+    {"id": "scenario_badge", "purpose": "architecture-scenario verdict in the header (stable / recombinant_tract / two_adjacent / nested / complex / insufficient)"},
+    {"id": "proportions_treemap", "module": "page_fingerprint_track/proportions.js", "purpose": "treemap-style plot of regime fragment proportions"}
+  ],
+  "deferred": [
+    "Genomic coordinates axis (start_bp / end_bp) — needs window metadata wired through atlasState; currently uses window indices",
+    "Cross-panel linkage with tree / PCA / heatmap (separate commit once HANDOFF_2's candidate-mode slot is wired)",
+    "Stage 1 in-browser π / dXY / Fst from Beagle — separate primitive"
+  ],
+
+  "subdir_files": [
+    "_state.js — _pageState + setter",
+    "renderer.js — canvas painter for fingerprint strip + switch markers",
+    "proportions.js — treemap-style regime fragment proportions plot",
+    "selection.js — hover (window cell or switch marker) + click-to-toggle selected window set"
+  ],
+
+  "primitives_used": [
+    "shared/mgl_fingerprinter.js (fingerprintCandidate)"
+  ],
+  "adapters_used": ["unknown — reads pre-computed fingerprint_result from atlasState"],
+
+  "interactions": [
+    {"id": "hover_window_cell", "type": "hover"},
+    {"id": "hover_switch_marker", "type": "hover"},
+    {"id": "click_window", "type": "click", "store": "selection.js (toggle in selected window set)"}
+  ],
+  "hotkeys": [],
+
+  "computed_preview_outputs": [
+    "fingerprint regime strip",
+    "switch markers (return / terminal / brief)",
+    "scenario badge verdict",
+    "fragment proportions treemap"
+  ],
+  "committable_outputs": ["none"],
+  "commit_policy": "none_by_default",
+
+  "documents": {
+    "page_registry_doc": "unknown — page_fingerprint_track not in pages.registry.json (only manifest.json)",
+    "specs_done": [],
+    "specs_todo": [
+      "specs_todo/mgl_adapter/HANDOFF_6_fingerprinter.md",
+      "specs_todo/pages_fingerprint_track/_to_do/HANDOFF_6_fingerprinter.md (duplicate)"
+    ],
+    "handoffs": ["HANDOFF_6 (in mgl_adapter library + pages_fingerprint_track/_to_do/)"],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [
+    "Phase 1 only — genomic coordinates axis deferred (uses window indices today).",
+    "Cross-panel linkage deferred."
+  ],
+
+  "confidence": "high"
+}
