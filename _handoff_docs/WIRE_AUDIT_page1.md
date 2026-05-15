@@ -133,6 +133,12 @@ Group H — Cluster-label notation overlay (LOWER PRIORITY since CTRL is now res
 |---------|-------------------|----------|-------|
 | **Cluster-label notation on PCA scatter** | overlay group labels around K-means cluster centroids; cycle through notation modes via a NEW key (G-panel tap? dedicated `N` key? user to choose) | medium | per the original 2026-05-15 spec: cycle through `default (none)` → `g1/g2/g3` → `HOMO_1/HET/HOMO_2` → `H1/H1 H1/H2 H2/H2`. Needs: (1) state slot `state.pcaClusterLabelMode`, persisted to localStorage. (2) render hook in `drawPCA` (page1/pca_panel.js) at cluster centroid (from `cl.centers`) with halo. (3) label sources: `g1/g2/g3` literal; `HOMO_1/HET/HOMO_2` from `pages/review/page4/karyo_labels.js#K3_H_SYSTEM`; `H1/H1` H-pair notation (inline or in karyo_labels.js). (4) Mirror across page1 / page12 (θπ) / page15 (GHSL) / page2 (candidate focus) local PCAs. |
 
+Group I — Cross-evidence PCA comparator (NEW 2026-05-15):
+
+| feature | what it should do | priority | notes |
+|---------|-------------------|----------|-------|
+| **3-PCA comparator** (dosage \| θπ \| GHSL side-by-side) | new page with 3 synchronized mini-PCA panels at the active window, shared cursor + hovered-sample state, K-band color inherited from dosage anchor | **medium-high** | user-requested 2026-05-15 "how could we try to have some sort of overlay of the 3 pcas at once so we can compare ? or have them side by side". Full design exploration in `specs_todo/SPEC_local_pca_comparator.md` covering 3 options (side-by-side / Procrustes overlay / per-sample trajectory). Recommended: ship Phase 1 side-by-side first; revisit Procrustes overlay only if there's a real use case after evaluation. Implementation: ~1-2 days; new page `page_pca_comparator` in `discovery_2` stage, reads existing layer data, writes nothing. Open questions (per the SPEC §"Open questions"): anchor selection, missing-layer behaviour, slab-mode aggregation, axis labels. |
+
 ---
 
 ## Layout bugs (separate from wires)
