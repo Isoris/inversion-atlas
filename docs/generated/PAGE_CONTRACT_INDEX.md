@@ -80,17 +80,20 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 
 ### Pages NOT in `pages.registry.json` (only in `manifest.json`)
 
+**RESOLVED 2026-05-15** — all 16 missing entries added to
+`pages.registry.json` by porting `_doc` from the page contracts.
+Registry now covers all 38 manifest pages + 1 registry-only entry
+(`popstats_demo`) = 39 entries total.
+
+Closed entries:
 - page_tree_panel, page_fingerprint_track, page_similarity_panel,
   page_pca_panel, page_dosage_heatmap, page_nested_detector,
-  page_dosage_cluster
-- all 9 evolution pages
-- (i.e. every cartridge page from HANDOFF_5 / 6 / 7 / 8 / 10 / SPEC_0,
-  and every evolution-stage page)
-
-**Implication**: `pages.registry.json` lags behind `manifest.json`.
-Either add `_doc` entries to `pages.registry.json` for these, or
-declare `manifest.json` as the canonical page registry and migrate
-the `_doc` field there.
+  page_dosage_cluster (7 cartridge pages — HANDOFF_5/6/7/8/10 + SPEC_0)
+- page_evolution_polarize_msa, page_evolution_haplotype_network,
+  page_evolution_polarize_synteny, page_evolution_age,
+  page_evolution_mosaicism, page_evolution_internal_history,
+  page_evolution_layer_cleaning, page_evolution_event_tree,
+  page_evolution_archaeology_card (9 evolution pages)
 
 ### Directory / stage discrepancies
 
