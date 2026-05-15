@@ -25,6 +25,7 @@ SPEC against `specs_todo/`.
 | `HOW_TO_USE_page22.md` | (standalone) | user guide for page22 (haplotype regimes) — first end-user docs for any atlas page | — |
 | `HOW_TO_USE_page1.md` | (standalone, authored 2026-05-15) | user guide for page1 (local PCA \|Z\| — the big page); walks the basic discovery workflow, 11 hotkeys, 10 color modes, L3 panel sub-views, L2-sweep, fish-set linkage, candidate band highlights, session restore, cross-page hand-offs, 5 common gotchas | — |
 | `HOW_TO_USE_page2.md` | (standalone, authored 2026-05-15) | user guide for page2 (candidate focus deep-dive); ~15 sub-panels, candidate-list management, confirm/unconfirm flow, FIG_C07 ridgeline + FIG_C08 dosage heatmap, cross-page hand-offs, 5 common gotchas | — |
+| `HOW_TO_USE_page4.md` | (standalone, authored 2026-05-15) | user guide for page4 (karyotype / tier — first review-stage page); 2 subviews (Karyotype rows + 14-axis Tier grid), K=3..K=6 label vocab + persistence, full 14-axis schema with all 6 sections + per-axis category enums, registry mismatch flagged (swap hypothesis with page11), 5 common gotchas | — |
 
 ## How this relates to the canonical locations
 
