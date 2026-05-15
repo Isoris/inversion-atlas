@@ -127,20 +127,40 @@ What remains as evidence the old specs existed:
 
 ---
 
-## SPEC_* files **referenced but missing** (8+ missing)
+## SPEC_* files **referenced but missing** — STATUS UPDATE 2026-05-15
+
+**ALL 8 PREVIOUSLY-MISSING SPECs NOW RESOLVED.** Each was authored
+from shipped code + handoffs + legacy line citations and lives at
+`specs_done/SPEC_<name>.md`. SPECS were not invented — every claim
+in each new SPEC traces back to:
+- shipped JS modules (with line numbers)
+- legacy `Inversion_atlas.html` comments (with line numbers)
+- prior handoffs (`_handoff_docs/HANDOFF_*.md` and `handoff_docs/HANDOFF_*.md`)
+- the parent SPEC's interaction notes (where applicable)
+
+Where the shipped code only implemented some of the SPEC's slices,
+the SPEC is annotated with per-slice ✅ shipped / 🟡 deferred status
++ a brief reason for each deferral.
+
+`SPEC_DEFERRED.md` (a register of deferred decisions, not an
+individual feature SPEC) remains unauthored. Decision: this should
+either become a meta-doc or be retired in favour of inline
+`Status: deferred` annotations in the individual SPECs.
+
+## SPEC_* files **referenced but missing** (original audit table)
 
 These names appear in code or docs but have **no on-disk file** with that name:
 
 | Referenced as | Referenced from | Status |
 |---------------|-----------------|--------|
 | `SPEC_DEFERRED.md` | `_handoff_docs/HANDOFF_2026-05-06_chat34_registry_v2_done.md`, `READ_MODES_CONFIRMED.md`, `AUDIT_LOG.md` | **MISSING** — multiple deferred-decisions references, no doc |
-| `SPEC_distant_band_concordance_fish_trajectory.md` | `handoff_docs/SPEC_band_track_extraction_and_l3_single_band_rows.md`, `docs/MIGRATION_INVENTORY.md` | **MISSING** — referenced as a parent SPEC |
+| `SPEC_distant_band_concordance_fish_trajectory.md` | `specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md`, `docs/MIGRATION_INVENTORY.md`, multiple legacy comments | **RESOLVED 2026-05-15** — Slices 1-5 SPEC authored from legacy comments + round-4 page1 splits + lineage/band-trace shared modules into `specs_done/SPEC_distant_band_concordance_fish_trajectory.md`. Slice 6 (cross-strip chaining) deferred. |
 | `SPEC_g_panel_unified_groups.md` | `pages/discovery/page1/pca_panel.js`, `page1.html` | **RESOLVED 2026-05-15** — Slice 1 SPEC authored from page1.html + pca_panel.js + manual_groups.js into `specs_done/SPEC_g_panel_unified_groups.md`. Slices 2 + 3 (Karyotype + Inheritance tabs) outlined but not yet implemented. |
 | `SPEC_l2_sweep_inheritance.md` | `pages/discovery/page1.html`, `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — authored from `page1/l2_sweep.js` (444 LOC) into `specs_done/SPEC_l2_sweep_inheritance.md` |
 | `SPEC_l3_het_dosage_coloring.md` | `pages/discovery/page1.html` | **RESOLVED 2026-05-15** — Slice 1 SPEC authored from page1.html turn-128d annotation into `specs_done/SPEC_l3_het_dosage_coloring.md` |
 | `SPEC_lasso_inheritance_backgrounds.md` | `handoff_docs/HANDOFF_2026-05-05_turn164_lasso_linkage.md`, `page1.html` | **RESOLVED 2026-05-15** — Slices 1 + 3 SPEC authored from turn-164 handoff + page1.html into `specs_done/SPEC_lasso_inheritance_backgrounds.md`. Slices 2/4/5 deferred. |
 | `SPEC_lines_panel_candidate_bands.md` | `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — SPEC authored from page1/lines_panel.js + page1/candidates.js into `specs_done/SPEC_lines_panel_candidate_bands.md` |
-| `SPEC_review_surfaces_auto_and_lineages.md` | `css/inversion.css`, `MIGRATION_INVENTORY.md`, band-track SPEC | **MISSING** |
+| `SPEC_review_surfaces_auto_and_lineages.md` | `css/inversion.css`, `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — Slices 0-2 SPEC authored from CSS lines 947-960 + turn-130 + turn-165 handoffs into `specs_done/SPEC_review_surfaces_auto_and_lineages.md`. Slice 3 (lineages tab) deferred. |
 | `SPEC_sv_evidence_page.md` | `engines/producers/sv_evidence/STEP_SV_GT_AGG_aggregate_genotype_counts.py`, `pages/review/page_sv_evidence.js` | **RESOLVED 2026-05-15** — authored from shipped code into `specs_done/SPEC_sv_evidence_page.md` |
 
 **Also missing**:
