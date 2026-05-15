@@ -1,0 +1,33 @@
+{
+  "page_id": "page_evolution_haplotype_network",
+  "label": "haplotype network",
+  "page_type": "core_page (Phase 1 cartridge)",
+  "stage": "evolution",
+  "owner_atlas": "inversion",
+  "status": "active",
+  "current_path": {
+    "html": "atlases/inversion/pages/evolution/page_evolution_haplotype_network.html",
+    "js_entry": "atlases/inversion/pages/evolution/page_evolution_haplotype_network.js",
+    "js_subdir": "atlases/inversion/pages/evolution/page_evolution_haplotype_network/"
+  },
+  "purpose": "INV haplotype-network cartridge. Reuses shared/mgl_haplotype_network to cluster INV chromosomes by Hamming radius and lay out a minimum spanning tree between cluster representatives. Nodes sized by chromosome count, coloured by 2D-SFS subgroup.",
+  "required_slots": ["activeCandidate"],
+  "input_contract": "atlasState.inversion.haplotype_network_state = { dosage, n_markers, n_samples, inv_idx, sample_labels?, candidate_label?, view_state?: { hamming_radius?, layout_seed?, show_labels? } }",
+  "subdir_files": ["_state.js", "renderer.js — canvas painter (force-directed via Mulberry32 PRNG)", "selection.js — createHapNetSelection (hovered node + selected set)"],
+  "primitives_used": ["shared/mgl_haplotype_network.js"],
+  "interactions": [
+    {"id": "hover_node", "type": "hover"},
+    {"id": "click_node", "type": "click"},
+    {"id": "view_state_controls", "type": "view_control", "values": ["hamming_radius", "layout_seed", "show_labels"]}
+  ],
+  "computed_preview_outputs": ["minimum-spanning haplotype network: nodes = Hamming-radius clusters; edges = pairwise mutational distance"],
+  "committable_outputs": [],
+  "commit_policy": "none_by_default",
+  "documents": {
+    "page_registry_doc": "unknown",
+    "specs_done": [],
+    "specs_todo": [],
+    "user_guide": "unknown"
+  },
+  "confidence": "high"
+}

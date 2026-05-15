@@ -2,7 +2,7 @@
 
 **Date**: 2026-05-05
 **Scope**: spec-only turn — extending
-`specs_todo/SPEC_band_track_extraction_and_l3_single_band_rows.md`
+`specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md`
 **Atlas main file**: not modified this turn (still 76,407 LOC from
 turn 165 close).
 **Project**: `MS_Inversions_North_african_catfish`
@@ -110,7 +110,7 @@ tooltips, methods sections, figure captions.
 
 ## Spec final shape
 
-`specs_todo/SPEC_band_track_extraction_and_l3_single_band_rows.md`
+`specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md`
 1,769 lines, 12 top-level sections:
 
 ```
@@ -245,7 +245,7 @@ This spec extends and consumes:
 
 ## Files in this handoff
 
-- `specs_todo/SPEC_band_track_extraction_and_l3_single_band_rows.md` —
+- `specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md` —
   the fully-extended spec (1,769 lines)
 - This handoff note
 

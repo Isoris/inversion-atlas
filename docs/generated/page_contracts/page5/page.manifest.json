@@ -1,0 +1,54 @@
+{
+  "page_id": "page5",
+  "label": "help",
+  "page_type": "core_page (static)",
+  "stage": "help",
+  "owner_atlas": "inversion",
+  "status": "active (static; no JS renderer)",
+  "current_path": {
+    "html": "atlases/inversion/pages/comparative/page5.html",
+    "js_entry": "atlases/inversion/pages/comparative/page5.js",
+    "js_subdir": "atlases/inversion/pages/comparative/page5/"
+  },
+  "legacy_source": "legacy/Inversion_atlas.html lines 8159-9316 (~1158 LOC HTML help content) + CSS 2054-2071 + tabBar router line 5142 (data-page='page5' data-stage='help')",
+
+  "purpose": "Static quick-reference / help page — purely declarative HTML with help / vocabulary / hotkeys / pipeline reference content. ~1158 LOC of HTML in page5.html. No interactive elements requiring JS.",
+
+  "label_correction_note": "HANDOFF_BATCH_5.md mislabelled page5 as 'Multi-species comparison page' — that is INCORRECT per legacy-line check. The actual multi-species cockpit is page16b. page5 is help.",
+
+  "required_layers": [],
+  "required_slots": [],
+  "preloads": [],
+
+  "panels": [{"id": "help_content", "purpose": "static HTML — help, vocabulary, hotkeys, pipeline reference"}],
+
+  "subdir_files": ["_state.js — _pageState + setter (degenerate; renderPage5 is a no-op)"],
+
+  "primitives_used": [],
+  "adapters_used": [],
+
+  "interactions": [],
+  "hotkeys": [],
+
+  "computed_preview_outputs": [],
+  "committable_outputs": [],
+  "commit_policy": "none_by_default",
+
+  "exports": {
+    "renderPage5": "true no-op (kept for tabBar router contract)",
+    "PAGE5_META": "{id:'page5', stage:'help', label:'help', num:16, static:true} — read by tabBar router at legacy line 5142"
+  },
+
+  "documents": {
+    "page_registry_doc": "pages.registry.json -> pages.page5._doc",
+    "specs_done": [],
+    "specs_todo": [],
+    "handoffs": ["atlases/inversion/pages/comparative/BATCH_5_NOTES.md (with label-correction note)"],
+    "user_guide": "self — this PAGE IS the user guide for the atlas"
+  },
+
+  "known_issues": [
+    "HANDOFF_BATCH_5.md mislabels page5 as 'Multi-species comparison page' — preserved in module header as a corrected note. Actual multi-species cockpit is page16b."
+  ],
+  "confidence": "high"
+}

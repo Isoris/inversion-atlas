@@ -9,7 +9,8 @@
 // Tab dispatch: Wired by the merge chat into the tab dispatcher (init when
 //               the tab first activates, loadCandidate whenever
 //               state.candidate changes).
-// Spec:         specs_todo/SPEC_sv_evidence_page.md
+// Spec:         specs_done/SPEC_sv_evidence_page.md (authored 2026-05-15
+//               from shipped code — see SPECS_AUDIT.md recovery effort)
 //
 // What this page does
 // -------------------
