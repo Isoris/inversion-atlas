@@ -41,11 +41,11 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | discovery_2 | page22 | haplotype regimes | active (Phase 1) | high | [page.manifest.json](page_contracts/page22/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page22/PAGE_CONTRACT.md) |
 | discovery_2 | page_tree_panel | tree panel | active (Phase 1) | high | [page.manifest.json](page_contracts/page_tree_panel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_tree_panel/PAGE_CONTRACT.md) |
 | discovery_2 | page_fingerprint_track | fingerprint track | active (Phase 1) | high | [page.manifest.json](page_contracts/page_fingerprint_track/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_fingerprint_track/PAGE_CONTRACT.md) |
-| discovery_2 | page_similarity_panel | similarity matrix | _pending_ | _ | _ |
-| discovery_2 | page_pca_panel | PCA scatter | _pending_ | _ | _ |
-| discovery_2 | page_dosage_heatmap | dosage heatmap | _pending_ | _ | _ |
-| discovery_2 | page_nested_detector | nested detector | _pending_ | _ | _ |
-| discovery_2 | page_dosage_cluster | dosage cluster | _pending_ | _ | _ |
+| discovery_2 | page_similarity_panel | similarity matrix | active (Phase 1) | high | [page.manifest.json](page_contracts/page_similarity_panel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_similarity_panel/PAGE_CONTRACT.md) |
+| discovery_2 | page_pca_panel | PCA scatter | active (Phase 1) | high | [page.manifest.json](page_contracts/page_pca_panel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_pca_panel/PAGE_CONTRACT.md) |
+| discovery_2 | page_dosage_heatmap | dosage heatmap | active (Phase 1) | high | [page.manifest.json](page_contracts/page_dosage_heatmap/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_dosage_heatmap/PAGE_CONTRACT.md) |
+| discovery_2 | page_nested_detector | nested detector | active (Phase 1) | high | [page.manifest.json](page_contracts/page_nested_detector/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_nested_detector/PAGE_CONTRACT.md) |
+| discovery_2 | page_dosage_cluster | dosage cluster | active (Phase 1) | high | [page.manifest.json](page_contracts/page_dosage_cluster/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_dosage_cluster/PAGE_CONTRACT.md) |
 | catalogue | page8 | per-window summary table | _pending_ | _ | _ |
 | catalogue | page19 | negative regions catalogue | _pending_ | _ | _ |
 | catalogue | page3 | catalogue | _pending_ | _ | _ |
@@ -74,7 +74,7 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | help | page5 | help | _pending_ | _ | _ |
 | _unregistered_ | page_ancestry_scroller | ancestry scroller (not in manifest) | _pending_ | _ | _ |
 
-**Progress**: 7 / 38 pages contracted.
+**Progress**: 12 / 38 pages contracted.
 
 ## Next batches
 
