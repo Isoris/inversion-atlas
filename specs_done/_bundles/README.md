@@ -22,7 +22,9 @@ SPEC against `specs_todo/`.
 | `inversion_atlas_v3.4_DROP/` | 2026-05-08 | v3.4 banding pipeline (Stage 1-4) + page22 (regimes) + dosage overlay | `README.md` (27 KB pipeline diagram), `HANDOFF.md` (37 KB audit checklist) |
 | `banding_unified_v3.4_AUDIT_BUNDLE/` | 2026-05-08 (audit revision) | same code as the v3.4 DROP plus reference/ (lines_panel, pca_panel from legacy, lazy_windows_json, dosage_bridge) + plots/ | `README.md`, `HANDOFF.md`, `reference_SERVER_README.md` |
 | `mgl_adapter_v22_dragdrop_fixed/` | 2026-05 | mgl_adapter library v22 (10 numbered HANDOFFs + SPEC_0_master + the implemented Beagle adapter in R/.sh) | full extracted tree — `README_DRAG_DROP.md`, `Specs_WIP_modules/mgl_adapter/specs/` (all 11 spec files), `catfish-population-analysis/MODULE_X_mgl_adapter/` (Beagle adapter scripts + `_STATUS.md`), `inversion-atlas/pages_*/_to_do/` markers |
-| `HOW_TO_USE_page22.md` | (standalone) | user guide for page22 (haplotype regimes) — currently the only end-user docs for any page | — |
+| `HOW_TO_USE_page22.md` | (standalone) | user guide for page22 (haplotype regimes) — first end-user docs for any atlas page | — |
+| `HOW_TO_USE_page1.md` | (standalone, authored 2026-05-15) | user guide for page1 (local PCA \|Z\| — the big page); walks the basic discovery workflow, 11 hotkeys, 10 color modes, L3 panel sub-views, L2-sweep, fish-set linkage, candidate band highlights, session restore, cross-page hand-offs, 5 common gotchas | — |
+| `HOW_TO_USE_page2.md` | (standalone, authored 2026-05-15) | user guide for page2 (candidate focus deep-dive); ~15 sub-panels, candidate-list management, confirm/unconfirm flow, FIG_C07 ridgeline + FIG_C08 dosage heatmap, cross-page hand-offs, 5 common gotchas | — |
 
 ## How this relates to the canonical locations
 
