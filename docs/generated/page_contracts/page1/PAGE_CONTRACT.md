@@ -167,6 +167,7 @@ Adapters:
 - **Specs (done)**:
   - `specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md`
   - `specs_done/SPEC_l2_sweep_inheritance.md` (authored 2026-05-15 from `page1/l2_sweep.js`)
+  - `specs_done/SPEC_g_panel_unified_groups.md` (Slice 1 shipped; Slices 2 + 3 pending)
 - **Specs (todo)**: `specs_todo/SPEC_page1_candidate_mode_ui.md`
 - **Handoffs**: `_handoff_docs/HANDOFF_2026-05-06_chat35_round4_done.md`,
   `atlases/inversion/pages/discovery/BATCH_1_NOTES.md`

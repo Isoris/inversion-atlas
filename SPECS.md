@@ -33,6 +33,7 @@ That doesn't happen again.
 | `SPEC_band_track_extraction_and_l3_single_band_rows.md` | het-anchored band-track skeleton + L3 single-band-rows contingency view | `shared/band_tracking/` (32 modules) + `pages/discovery/page1/l3_panel.js` + `page1/band_diagnostics.js` |
 | `SPEC_sv_evidence_page.md` | SV evidence page + producer pipeline | `pages/review/page_sv_evidence.js` + `js/atlas_sv_evidence.js` + `engines/producers/sv_evidence/` |
 | `SPEC_l2_sweep_inheritance.md` | L2-sweep auto-promote pipeline (page1 candidate discovery: 6 gates) | `pages/discovery/page1/l2_sweep.js` |
+| `SPEC_g_panel_unified_groups.md` | G-panel unified-groups popup (Karyotype / Inheritance / Manual tabs; Slice 1 shipped) | `pages/discovery/page1/{pca_panel.js, manual_groups.js}` + `page1.html#gPanelOpenBtn` |
 
 ### Pending — `specs_todo/`
 

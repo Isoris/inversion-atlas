@@ -45,6 +45,7 @@ re-derive the manual from the SPECs without re-reading the code.
 | `SPEC_band_track_extraction_and_l3_single_band_rows.md` | het-anchored band-track skeleton + L3 single-band-rows contingency view | `atlases/inversion/shared/band_tracking/` (32 modules) + `pages/discovery/page1/l3_panel.js` + `pages/discovery/page1/band_diagnostics.js` |
 | `SPEC_sv_evidence_page.md` | SV evidence page + producer pipeline (sv_genotype_counts_v1 schema, pattern-label decision rule, zone classification, FDR gating) | `pages/review/page_sv_evidence.js` (page) + `js/atlas_sv_evidence.js` (external renderer) + `engines/producers/sv_evidence/` (4 Python scripts) |
 | `SPEC_l2_sweep_inheritance.md` | L2-sweep auto-promote pipeline: usability filter, inheritance-group clustering on every usable L2, 6 promotion gates, dismissed-set persistence, cache invalidation, `confirmed: false` discipline | `pages/discovery/page1/l2_sweep.js` (444 LOC) + `pages/discovery/page1.js#applyData` + `shared/inheritance_groups.js` |
+| `SPEC_g_panel_unified_groups.md` | G-panel unified-groups popup (Slice 1 shipped: Manual tab re-host + 3-surface single-source-of-truth render; Slice 2 Karyotype + Slice 3 Inheritance pending) | `pages/discovery/page1.html#gPanelOpenBtn` + `pages/discovery/page1/pca_panel.js#renderManualGroupsList` + `pages/discovery/page1/manual_groups.js` |
 
 (See `SPECS.md` at the repo root for the cross-cutting index.)
 

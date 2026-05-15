@@ -135,7 +135,7 @@ These names appear in code or docs but have **no on-disk file** with that name:
 |---------------|-----------------|--------|
 | `SPEC_DEFERRED.md` | `_handoff_docs/HANDOFF_2026-05-06_chat34_registry_v2_done.md`, `READ_MODES_CONFIRMED.md`, `AUDIT_LOG.md` | **MISSING** — multiple deferred-decisions references, no doc |
 | `SPEC_distant_band_concordance_fish_trajectory.md` | `handoff_docs/SPEC_band_track_extraction_and_l3_single_band_rows.md`, `docs/MIGRATION_INVENTORY.md` | **MISSING** — referenced as a parent SPEC |
-| `SPEC_g_panel_unified_groups.md` | `pages/discovery/page1/pca_panel.js`, `page1.html` | **MISSING** — referenced in shipping page1 code |
+| `SPEC_g_panel_unified_groups.md` | `pages/discovery/page1/pca_panel.js`, `page1.html` | **RESOLVED 2026-05-15** — Slice 1 SPEC authored from page1.html + pca_panel.js + manual_groups.js into `specs_done/SPEC_g_panel_unified_groups.md`. Slices 2 + 3 (Karyotype + Inheritance tabs) outlined but not yet implemented. |
 | `SPEC_l2_sweep_inheritance.md` | `pages/discovery/page1.html`, `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — authored from `page1/l2_sweep.js` (444 LOC) into `specs_done/SPEC_l2_sweep_inheritance.md` |
 | `SPEC_l3_het_dosage_coloring.md` | `pages/discovery/page1.html` | **MISSING** — referenced from page1 |
 | `SPEC_lasso_inheritance_backgrounds.md` | `handoff_docs/HANDOFF_2026-05-05_turn164_lasso_linkage.md`, `page1.html` | **MISSING** |
