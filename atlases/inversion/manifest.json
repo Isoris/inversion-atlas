@@ -91,6 +91,14 @@
       "module": "atlases/inversion/pages/review/page_sv_evidence.js"
     },
     {
+      "id": "page_ancestry_scroller",
+      "label": "ancestry scroller",
+      "stage": "classification",
+      "fragment": "atlases/inversion/pages/review/page_ancestry_scroller.html",
+      "module": "atlases/inversion/pages/review/page_ancestry_scroller.js",
+      "tooltip": "Fish Ancestry Scroller — per-fish ancestry painting across one selected inversion candidate (one chromosome viewport). Three numbered layers (PC1 Band / Ancestry Bricks / Brick summary cohort) + 5-row brick-metrics heatmap + tab strip. Headline metric: mean |ΔQ| (global vs local). Consumes shared/ancestry_alignment.js (F-based label-switching alignment) + shared/ancestry_bricks.js (per-fish bricks + flags). See specs_todo/SPEC_fish_ancestry_scroller.md for UI layout v2."
+    },
+    {
       "id": "page3",
       "label": "catalogue",
       "stage": "catalogue",

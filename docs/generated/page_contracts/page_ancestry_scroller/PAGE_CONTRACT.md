@@ -1,15 +1,21 @@
 # page_ancestry_scroller — Fish Ancestry Scroller — Page Capability Contract
 
-**Atlas**: inversion · **Stage**: review (per source) · **Status**: unregistered (on disk but NOT in manifest.json)
+**Atlas**: inversion · **Stage**: classification · **Status**: active (registered 2026-05-15)
 
-## ⚠ Registration status
+## Registration status (resolved 2026-05-15)
 
-This page **exists on disk** (entry .js/.html + 4-module subdir) but
-is **not registered** in `atlases/inversion/manifest.json`. The
-atlas shell will not mount it. Status is either:
+Previously unregistered. As of 2026-05-15 the entry is in
+`manifest.json` AND `pages.registry.json` (commit
+`docs(manifest): register page_ancestry_scroller`). The shell can
+now mount the page.
 
-- (a) **in-progress** — needs manifest entry to be wired, OR
-- (b) **deprecated** — should be removed.
+**Still pending**: the caller-supplies-model contract — `mount()`
+expects a fully-prepared `model` derived from
+`shared/ancestry_alignment.js` + `shared/ancestry_bricks.js` +
+cluster-side `instant_q` (Engine B). The derivation pipeline that
+glues these into the model isn't wired automatically yet, so an
+empty mount today shows the page's empty-state ("model not
+provided").
 
 ## Purpose
 

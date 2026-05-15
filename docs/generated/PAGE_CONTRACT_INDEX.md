@@ -72,9 +72,11 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | comparative | page16 | cross-species breakpoints | active | high | [page.manifest.json](page_contracts/page16/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page16/PAGE_CONTRACT.md) |
 | comparative | page16b | multi-species cockpit | active | high | [page.manifest.json](page_contracts/page16b/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page16b/PAGE_CONTRACT.md) |
 | help | page5 | help | active (static) | high | [page.manifest.json](page_contracts/page5/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page5/PAGE_CONTRACT.md) |
-| _unregistered_ | page_ancestry_scroller | Fish Ancestry Scroller | unregistered | high | [page.manifest.json](page_contracts/page_ancestry_scroller/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_ancestry_scroller/PAGE_CONTRACT.md) |
+| classification | page_ancestry_scroller | Fish Ancestry Scroller | active (registered 2026-05-15) | high | [page.manifest.json](page_contracts/page_ancestry_scroller/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_ancestry_scroller/PAGE_CONTRACT.md) |
 
 **Progress**: 38 / 38 pages contracted. ✅ **Complete first pass.**
+All 38 pages registered in `manifest.json` + `pages.registry.json`
+(page_ancestry_scroller registered 2026-05-15 — was on-disk-but-unregistered until then).
 
 ## Cross-cutting findings (rollup)
 

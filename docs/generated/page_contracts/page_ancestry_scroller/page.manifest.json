@@ -2,9 +2,9 @@
   "page_id": "page_ancestry_scroller",
   "label": "Fish Ancestry Scroller",
   "page_type": "core_page (Phase 1 cartridge)",
-  "stage": "review (per source comment) — NOT in manifest.json",
+  "stage": "classification",
   "owner_atlas": "inversion",
-  "status": "unregistered (exists on disk but not in atlases/inversion/manifest.json)",
+  "status": "active (registered 2026-05-15)",
   "current_path": {
     "html": "atlases/inversion/pages/review/page_ancestry_scroller.html",
     "js_entry": "atlases/inversion/pages/review/page_ancestry_scroller.js",
@@ -69,10 +69,9 @@
   },
 
   "known_issues": [
-    "**NOT IN MANIFEST.JSON** — page exists on disk (entry .js/.html + 4-module subdir) but is not registered in atlases/inversion/manifest.json. Atlas shell will not mount it.",
-    "Status either: (a) in-progress — needs manifest entry to be wired, OR (b) deprecated — should be removed.",
     "Ancestry bricks layer is a DERIVED simplification merging RFs into bricks with multi-metric labels (RARE_ANCESTRY, HIGH_HET, REGIME_DISCORDANT, etc.). NOT a discovery system — 'we discovered N bricks' is forbidden phrasing per the SPEC.",
-    "Consumes instant_q (Engine B) per-RF output — cluster-side producer."
+    "Consumes instant_q (Engine B) per-RF output — cluster-side producer integration not yet wired.",
+    "Caller must supply a fully prepared `model` to mount() — model derivation from raw atlasState.inversion not yet automatic."
   ],
   "confidence": "high"
 }
