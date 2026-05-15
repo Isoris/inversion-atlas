@@ -137,9 +137,9 @@ These names appear in code or docs but have **no on-disk file** with that name:
 | `SPEC_distant_band_concordance_fish_trajectory.md` | `handoff_docs/SPEC_band_track_extraction_and_l3_single_band_rows.md`, `docs/MIGRATION_INVENTORY.md` | **MISSING** — referenced as a parent SPEC |
 | `SPEC_g_panel_unified_groups.md` | `pages/discovery/page1/pca_panel.js`, `page1.html` | **RESOLVED 2026-05-15** — Slice 1 SPEC authored from page1.html + pca_panel.js + manual_groups.js into `specs_done/SPEC_g_panel_unified_groups.md`. Slices 2 + 3 (Karyotype + Inheritance tabs) outlined but not yet implemented. |
 | `SPEC_l2_sweep_inheritance.md` | `pages/discovery/page1.html`, `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — authored from `page1/l2_sweep.js` (444 LOC) into `specs_done/SPEC_l2_sweep_inheritance.md` |
-| `SPEC_l3_het_dosage_coloring.md` | `pages/discovery/page1.html` | **MISSING** — referenced from page1 |
-| `SPEC_lasso_inheritance_backgrounds.md` | `handoff_docs/HANDOFF_2026-05-05_turn164_lasso_linkage.md`, `page1.html` | **MISSING** |
-| `SPEC_lines_panel_candidate_bands.md` | `MIGRATION_INVENTORY.md`, band-track SPEC | **MISSING** — `page1/lines_panel.js` ships without a spec |
+| `SPEC_l3_het_dosage_coloring.md` | `pages/discovery/page1.html` | **RESOLVED 2026-05-15** — Slice 1 SPEC authored from page1.html turn-128d annotation into `specs_done/SPEC_l3_het_dosage_coloring.md` |
+| `SPEC_lasso_inheritance_backgrounds.md` | `handoff_docs/HANDOFF_2026-05-05_turn164_lasso_linkage.md`, `page1.html` | **RESOLVED 2026-05-15** — Slices 1 + 3 SPEC authored from turn-164 handoff + page1.html into `specs_done/SPEC_lasso_inheritance_backgrounds.md`. Slices 2/4/5 deferred. |
+| `SPEC_lines_panel_candidate_bands.md` | `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — SPEC authored from page1/lines_panel.js + page1/candidates.js into `specs_done/SPEC_lines_panel_candidate_bands.md` |
 | `SPEC_review_surfaces_auto_and_lineages.md` | `css/inversion.css`, `MIGRATION_INVENTORY.md`, band-track SPEC | **MISSING** |
 | `SPEC_sv_evidence_page.md` | `engines/producers/sv_evidence/STEP_SV_GT_AGG_aggregate_genotype_counts.py`, `pages/review/page_sv_evidence.js` | **RESOLVED 2026-05-15** — authored from shipped code into `specs_done/SPEC_sv_evidence_page.md` |
 

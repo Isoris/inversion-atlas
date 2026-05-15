@@ -34,6 +34,9 @@ That doesn't happen again.
 | `SPEC_sv_evidence_page.md` | SV evidence page + producer pipeline | `pages/review/page_sv_evidence.js` + `js/atlas_sv_evidence.js` + `engines/producers/sv_evidence/` |
 | `SPEC_l2_sweep_inheritance.md` | L2-sweep auto-promote pipeline (page1 candidate discovery: 6 gates) | `pages/discovery/page1/l2_sweep.js` |
 | `SPEC_g_panel_unified_groups.md` | G-panel unified-groups popup (Karyotype / Inheritance / Manual tabs; Slice 1 shipped) | `pages/discovery/page1/{pca_panel.js, manual_groups.js}` + `page1.html#gPanelOpenBtn` |
+| `SPEC_lines_panel_candidate_bands.md` | Per-candidate vertical band highlights on lines panel (confirmed-only, palette stable across zoom, default-ON) | `pages/discovery/page1/{lines_panel.js, candidates.js}` |
+| `SPEC_lasso_inheritance_backgrounds.md` | Fish-set linkage table (Slices 1 + 3 shipped: pure compute + cache + TSV + modal; Slices 2/4/5 deferred) | legacy turn 164 (migration to modular tree TBD) |
+| `SPEC_l3_het_dosage_coloring.md` | L3 mini-PCA dot fill by per-sample het rate (cold blue → warm red); halo stays K-coloured | `pages/discovery/page1/l3_panel.js` + `shared/het_rate.js` + `page1.html#l3HetToggle` |
 
 ### Pending — `specs_todo/`
 

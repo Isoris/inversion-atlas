@@ -159,16 +159,15 @@
     "specs_done": [
       "specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md",
       "specs_done/SPEC_l2_sweep_inheritance.md (authored 2026-05-15 from page1/l2_sweep.js)",
-      "specs_done/SPEC_g_panel_unified_groups.md (Slice 1 shipped; Slices 2+3 pending)"
+      "specs_done/SPEC_g_panel_unified_groups.md (Slice 1 shipped; Slices 2+3 pending)",
+      "specs_done/SPEC_lines_panel_candidate_bands.md (authored 2026-05-15 from page1/lines_panel.js + candidates.js)",
+      "specs_done/SPEC_lasso_inheritance_backgrounds.md (Slices 1+3 shipped in legacy turn 164; Slices 2/4/5 deferred)",
+      "specs_done/SPEC_l3_het_dosage_coloring.md (authored 2026-05-15 from page1.html turn-128d annotation)"
     ],
     "specs_todo": [
       "specs_todo/SPEC_page1_candidate_mode_ui.md"
     ],
-    "specs_referenced_in_code_but_missing": [
-      "SPEC_lines_panel_candidate_bands.md",
-      "SPEC_l3_het_dosage_coloring.md",
-      "SPEC_lasso_inheritance_backgrounds.md"
-    ],
+    "specs_referenced_in_code_but_missing": [],
     "handoffs": [
       "_handoff_docs/HANDOFF_2026-05-06_chat35_round4_done.md (round-4 split)",
       "atlases/inversion/pages/discovery/BATCH_1_NOTES.md"
@@ -178,8 +177,7 @@
 
   "known_issues": [
     "Layer set is the heaviest of any page — 4 required + 6 preloads (60 fps target).",
-    "applyData orchestrates ~10 sub-modules; cross-chrom safety clears state.candidate on chrom switch but mid-state during the switch is a known fragile path.",
-    "5 SPEC names referenced in page1.html / page1/pca_panel.js / page1/lines_panel.js / page1/l2_sweep.js do not have on-disk SPEC files (see specs_referenced_in_code_but_missing)."
+    "applyData orchestrates ~10 sub-modules; cross-chrom safety clears state.candidate on chrom switch but mid-state during the switch is a known fragile path."
   ],
 
   "confidence": "high"

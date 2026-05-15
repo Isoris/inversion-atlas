@@ -152,11 +152,9 @@ Adapters:
 - **Status**: active, shipped, performance-critical.
 - The layer set is the heaviest of any page (4 required + 6
   preloads). All required layers must be hot-tier to keep 60 fps.
-- 5 SPEC names referenced in this page's source (`page1.html`,
-  `pca_panel.js`, `lines_panel.js`, `l2_sweep.js`) have no on-disk
-  SPEC files: `SPEC_g_panel_unified_groups`,
-  `SPEC_lines_panel_candidate_bands`, `SPEC_l2_sweep_inheritance`,
-  `SPEC_l3_het_dosage_coloring`, `SPEC_lasso_inheritance_backgrounds`.
+- All 5 SPEC names previously referenced in this page's source
+  WITHOUT on-disk files were authored on 2026-05-15 from the
+  shipped code (see Documents → Specs done below).
 - `applyData()` orchestrates ~10 sub-modules; cross-chrom safety
   clears `state.candidate` on chrom switch, but the mid-state during
   the switch is a known fragile path (legacy lines 54476-54690).
@@ -168,6 +166,9 @@ Adapters:
   - `specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md`
   - `specs_done/SPEC_l2_sweep_inheritance.md` (authored 2026-05-15 from `page1/l2_sweep.js`)
   - `specs_done/SPEC_g_panel_unified_groups.md` (Slice 1 shipped; Slices 2 + 3 pending)
+  - `specs_done/SPEC_lines_panel_candidate_bands.md` (authored 2026-05-15)
+  - `specs_done/SPEC_lasso_inheritance_backgrounds.md` (Slices 1 + 3 shipped in legacy turn 164; Slices 2/4/5 deferred)
+  - `specs_done/SPEC_l3_het_dosage_coloring.md` (authored 2026-05-15)
 - **Specs (todo)**: `specs_todo/SPEC_page1_candidate_mode_ui.md`
 - **Handoffs**: `_handoff_docs/HANDOFF_2026-05-06_chat35_round4_done.md`,
   `atlases/inversion/pages/discovery/BATCH_1_NOTES.md`
