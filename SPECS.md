@@ -45,12 +45,27 @@ Highlights:
 
 - `SPEC_0_master.md` — the master MGL adapter spec
 - `README.md`, `README_specs.md` — entry points
-- 5 numbered HANDOFFs: `HANDOFF_1_producer.md`, `HANDOFF_3_validation.md`, `HANDOFF_7_nested_inversion.md`, `HANDOFF_8_dosage_clustering.md`, `HANDOFF_9_dosage_similarity.md`
-- Plus nested per-page handoffs at `specs_todo/pages_{candidate_mode,custom_views,fingerprint_track,similarity_panel,tree_panel}/_to_do/HANDOFF_*.md`
+- 10 numbered HANDOFFs (1, 2, 3, 4, 5, 6, 7, 8, 9, 10) — completed 2026-05-15 from the `mgl_adapter_v22_dragdrop_fixed` bundle
+- The same 5 page-keyed HANDOFFs are duplicated at `specs_todo/pages_{candidate_mode,custom_views,fingerprint_track,similarity_panel,tree_panel}/_to_do/HANDOFF_*.md` (these duplicates are byte-identical to the canonical mgl_adapter copies)
 
 This sub-tree is treated as a single self-contained library — moves
 between `specs_todo/` and `specs_done/` would happen as a unit, not
 file-by-file.
+
+### Bundle museum — `specs_done/_bundles/`
+
+Verbatim drop-bundle snapshots that preserve **bundle-level meta-docs**
+(pipeline diagrams, audit checklists, drag-drop instructions). The
+individual SPECs from these bundles were imported into the canonical
+locations above; the bundle READMEs / HANDOFFs were not, and would
+otherwise be lost. See `specs_done/_bundles/README.md` for the
+per-bundle inventory.
+
+Current contents:
+- `inversion_atlas_v3.4_DROP/` — 2026-05-08 v3.4 banding-pipeline drop (README + HANDOFF only; code already shipped to `shared/band_tracking/`)
+- `banding_unified_v3.4_AUDIT_BUNDLE/` — 2026-05-08 audit-revision of same (README + HANDOFF + SERVER_README)
+- `mgl_adapter_v22_dragdrop_fixed/` — full extracted tree (mgl_adapter v22 multi-repo drop)
+- `HOW_TO_USE_page22.md` — user guide for page22 (only end-user docs for any page right now)
 
 ## SPECs **referenced in shipping code but missing from disk**
 
