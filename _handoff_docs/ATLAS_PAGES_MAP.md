@@ -290,7 +290,7 @@ The following directory exists under `pages/` but is **not in the manifest** (so
 
 ## Recommended next docs
 
-1. **`shared/band_tracking/README.md`** — 32 source files, zero overview. The pipeline diagram already lives in `index.js`; pull it out + add a section that ties each file back to `SPEC_band_track_extraction_and_l3_single_band_rows.md`.
+1. **`shared/band_tracking/README.md`** — 32 source files, zero overview. The pipeline diagram already lives in `index.js`; pull it out + add a section that ties each file back to `specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md`.
 2. **`shared/README.md`** — list every primitive (mgl_*, kmeans, hungarian, contingency, het_rate, per_l2_cluster, clustering, page1_data_helpers) with a one-line purpose. Right now you have to grep to find them.
 3. **`SPEC_band_track_extraction_and_l3_single_band_rows.md`** addendum — implementation-status table mapping each SPEC section to the file in `shared/band_tracking/` that now implements it.
 4. **`analysis/README.md`** — list every analysis module (`karyotype_assignment`, `window_chain_to_candidates`, `scrubber_main_validator`, `anchor_track_cache`, planned `seeds_to_candidates`) with the JSON-in / out + adapter pattern.

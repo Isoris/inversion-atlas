@@ -3,7 +3,7 @@
 **Filed:** 2026-05-12.
 **Status:** the page-isolation half is enforced in the cartridge as of
 commit `4e695f7` (zero cross-page imports). The Registry.write half
-defers to `_handoff_docs/SPEC_registry_v2.md` which is the canonical
+defers to `specs_done/SPEC_registry_v2.md` which is the canonical
 design.
 **Why this file still exists:** SPEC_registry_v2.md describes the
 atlas-core Registry.write contract. This file captures the
@@ -12,7 +12,7 @@ swap work mechanically when v2 lands.
 
 **Canonical reference for Registry.write semantics, layer
 `writable: true` flag, server transport, schema validation, cache
-invalidation: `_handoff_docs/SPEC_registry_v2.md`.** Read that first.
+invalidation: `specs_done/SPEC_registry_v2.md`.** Read that first.
 
 This SPEC is **complementary**, not parallel. It says: regardless of
 how persistence works, pages must not import from each other.
@@ -107,7 +107,7 @@ The full contract — signature `registry.write(key, args, payload)`,
 `writable: true` flag on layer entries, path templating, schema
 validation before send, `POST /file/{path:path}` transport, cache
 invalidation on success, transitive invalidation on candidate_change
-— is specified in `_handoff_docs/SPEC_registry_v2.md` items 4 + 5.
+— is specified in `specs_done/SPEC_registry_v2.md` items 4 + 5.
 Don't duplicate it here.
 
 The signature I sketched in an earlier revision of this file

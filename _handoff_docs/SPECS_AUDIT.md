@@ -8,17 +8,18 @@ referenced in code that have no on-disk doc**. The full picture below.
 
 ---
 
-## 4 places specs / handoffs live (right now)
+## Spec / handoff folders (2026-05-15: consolidated)
 
 | dir                | purpose | count |
 |--------------------|---------|------:|
-| `specs_todo/`             | the canonical spec library — formal `SPEC_*.md` files + nested per-page `pages_*/_to_do/HANDOFF_N_*.md` | 15 SPECs + 5 HANDOFFs + 1 master |
-| `handoff_docs/`           | older turn-by-turn handoffs (Atlas_round166 era) + 1 SPEC | 7 handoffs + 1 SPEC |
-| `_handoff_docs/`          | newer turn-by-turn handoffs (chat 34/35/36 + 2026-05-12/13/14) | 37 files (handoffs + audits + plans + 1 SPEC) |
+| `specs_todo/`             | design backlog (authored, not yet implemented) | 14 SPECs + nested `mgl_adapter/` + `pages_*/_to_do/` |
+| `specs_done/`             | **NEW** — shipped SPECs (kept forever; seed material for the manual) | 2 SPECs |
+| `handoff_docs/`           | older turn-by-turn handoffs (Atlas_round166 era) | 7 handoffs |
+| `_handoff_docs/`          | newer turn-by-turn handoffs (chat 34/35/36 + 2026-05-12..14) | 36 files (handoffs + audits + plans) |
 | `docs/`                   | migration tracking + family roadmap + TODO inventories | 3 .md + `merge_inputs/` |
 | `atlases/inversion/*/README.md` | per-subsystem READMEs | 10 files |
 
-→ no single "find a spec by name" entry point.
+→ entry point: `SPECS.md` at repo root.
 
 ---
 
@@ -90,8 +91,8 @@ its original drop bundle name.
 - `pages_tree_panel/_to_do/HANDOFF_5_tree.md`
 
 **Scattered elsewhere** (NOT in `specs_todo/`):
-- `handoff_docs/SPEC_band_track_extraction_and_l3_single_band_rows.md` ← the master band-tracking SPEC, lives in old handoff_docs
-- `_handoff_docs/SPEC_registry_v2.md` ← the v2 registry SPEC, lives in new handoff_docs
+- `specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md` ← master band-tracking SPEC (moved 2026-05-15 from `handoff_docs/`)
+- `specs_done/SPEC_registry_v2.md` ← v2 registry SPEC (moved 2026-05-15 from `_handoff_docs/`)
 - `handoff_docs/HANDOFF_2026-05-06_morning_age_specs.md` ← contains inversion-age specs inline
 
 ---

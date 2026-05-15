@@ -1,0 +1,87 @@
+# SPECS — master index
+
+Cross-cutting index of every specification in the repo. Pair with
+`_handoff_docs/SPECS_AUDIT.md` (provenance) and
+`_handoff_docs/ATLAS_PAGES_MAP.md` (consumer inventory).
+
+## The folder convention (locked in 2026-05-15)
+
+```
+specs_todo/     — design backlog (authored, not yet implemented)
+specs_done/     — shipped (implementation matches the SPEC)
+specs_todo/mgl_adapter/  — self-contained spec sub-tree for the mgl
+                           adapter library; has its own SPEC_0_master
+                           + 5 numbered HANDOFFs + 2 READMEs
+```
+
+**Rule**: a SPEC never gets deleted. If the code ships, move the SPEC
+from `specs_todo/` to `specs_done/`, update its status line, and add
+an `Implemented in:` block at the top. See
+`specs_done/README.md` for the workflow.
+
+This rule exists because we lost a `specs_done/` folder at tarball
+import time (see `_handoff_docs/SPECS_AUDIT.md` for the forensics).
+That doesn't happen again.
+
+## All SPECs at a glance
+
+### Shipped — `specs_done/`
+
+| SPEC | what it covers | implementation |
+|------|----------------|----------------|
+| `SPEC_registry_v2.md` | 9-item registry v2 design (versioning + write contract + cache invalidation) | `atlases/inversion/registries/data/*.registry.json` + atlas-core registry runtime |
+| `SPEC_band_track_extraction_and_l3_single_band_rows.md` | het-anchored band-track skeleton + L3 single-band-rows contingency view | `shared/band_tracking/` (32 modules) + `pages/discovery/page1/l3_panel.js` + `page1/band_diagnostics.js` |
+
+### Pending — `specs_todo/`
+
+See `specs_todo/README.md` for the per-SPEC status table.
+Highlights:
+- 3 SPECs explicitly marked "SPEC ONLY — awaiting audit": `SPEC_copy_origin_painting.md`, `SPEC_regime_annotation_v34.md`, `SPEC_fish_ancestry_scroller.md`
+- 4 SPECs whose described code appears to ship but match-to-SPEC has not been verified: `SPEC_arrangement_color_mode_and_arrangement_calls_v1.md`, `SPEC_busco_4d_age_brackets.md`, `SPEC_busco_anchors_v1.md`, `SPEC_mendelian_inheritance_para_vs_peri_v1.md`
+- 1 partial: `SPEC_registry_write_and_page_isolation.md` (page-isolation half shipped, Registry.write half pending — see `specs_done/SPEC_registry_v2.md` for the canonical Registry.write design)
+- 1 superseded: `SPEC_registry_v1.md` (superseded by `specs_done/SPEC_registry_v2.md`; kept for historical reference)
+
+### Sub-library — `specs_todo/mgl_adapter/`
+
+- `SPEC_0_master.md` — the master MGL adapter spec
+- `README.md`, `README_specs.md` — entry points
+- 5 numbered HANDOFFs: `HANDOFF_1_producer.md`, `HANDOFF_3_validation.md`, `HANDOFF_7_nested_inversion.md`, `HANDOFF_8_dosage_clustering.md`, `HANDOFF_9_dosage_similarity.md`
+- Plus nested per-page handoffs at `specs_todo/pages_{candidate_mode,custom_views,fingerprint_track,similarity_panel,tree_panel}/_to_do/HANDOFF_*.md`
+
+This sub-tree is treated as a single self-contained library — moves
+between `specs_todo/` and `specs_done/` would happen as a unit, not
+file-by-file.
+
+## SPECs **referenced in shipping code but missing from disk**
+
+Detail at `_handoff_docs/SPECS_AUDIT.md`. Summary:
+- 9 SPEC names cited in legacy/Inversion_atlas.html, current pages, or producer code that have no on-disk file (e.g. `SPEC_g_panel_unified_groups`, `SPEC_lines_panel_candidate_bands`, `SPEC_sv_evidence_page`, `SPEC_DEFERRED`)
+- Likely lost when only `specs_todo/` was copied across from the legacy tarball (`Atlas/specs_done/` and `Atlas/specs_new_turn131/` were not imported)
+- Action: either author one-page SPECs from the shipped code (mark as `specs_done/`) or retire the references
+
+## Working-doc folders (NOT specs — handoffs, audits, plans)
+
+| folder | purpose |
+|--------|---------|
+| `_handoff_docs/` | newer turn-by-turn handoffs + audits + plans (chat 34/35/36/2026-05-12..14) |
+| `handoff_docs/` | older Atlas_round166-era handoffs (pre-import) |
+| `docs/` | migration tracking + family roadmap + TODO inventories |
+| `atlases/inversion/*/README.md` | per-subsystem READMEs (10 of them: analysis/, data/, engines/, etc.) |
+
+These are deliberately distinct from the SPEC folders. A SPEC is a
+*design contract*; a handoff is a *narrative of a session*. Don't
+collapse them — but do make sure each handoff that introduces a new
+SPEC files the SPEC under `specs_todo/`.
+
+## Building the manual from this material
+
+Eventually we'll write a user-facing manual. The plan:
+
+1. **Source of truth = `specs_done/`** + per-page `_doc` fields in
+   `atlases/inversion/registries/data/pages.registry.json`
+2. **Page chapter** = `ATLAS_PAGES_MAP.md` (per-page narrative)
+3. **Layer chapter** = the 26 schemas in `atlases/inversion/registries/schemas/` + a prose `SCHEMA.md` to be written
+4. **Pipeline chapter** = stage-by-stage walkthrough from the SPECs in `specs_done/` (band-tracking SPEC has the v3.4 pipeline diagram; we should also recover the `inversion_atlas_v3.4_DROP` README which had the full diagram — currently not in the repo)
+
+When the manual gets written, it cites SPECs by their canonical path
+(`specs_done/SPEC_*.md`) — so don't rename or move them after that.

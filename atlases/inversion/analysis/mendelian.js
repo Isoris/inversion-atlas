@@ -5,7 +5,7 @@
 //
 // CANONICAL ANALYSIS MODULE SHAPE — copy this pattern for new analysis.
 //
-// SPEC_v2 NOTE (_handoff_docs/SPEC_registry_v2.md item 7):
+// SPEC_v2 NOTE (specs_done/SPEC_registry_v2.md item 7):
 //   The orchestrator that wraps this module (mendelian_inheritance.js,
 //   not yet written) will:
 //     - take candidate_id + version_id + selectedFamilies + selectedSamples
