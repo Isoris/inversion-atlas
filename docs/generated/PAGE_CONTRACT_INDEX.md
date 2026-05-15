@@ -55,11 +55,11 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | classification | page17 | stats profile | active | high | [page.manifest.json](page_contracts/page17/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page17/PAGE_CONTRACT.md) |
 | classification | page18 | marker readiness panel | active | high | [page.manifest.json](page_contracts/page18/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page18/PAGE_CONTRACT.md) |
 | classification | page_overview | overview | empty stub | high | [page.manifest.json](page_contracts/page_overview/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_overview/PAGE_CONTRACT.md) |
-| classification | page4 | karyotype / tier | _pending_ | _ | _ |
-| classification | page6 | popstats | _pending_ | _ | _ |
-| classification | page7 | ancestry | _pending_ | _ | _ |
-| classification | page11 | boundaries | _pending_ | _ | _ |
-| classification | page_sv_evidence | SV evidence | _pending_ | _ | _ |
+| classification | page4 | karyotype / tier | active | high | [page.manifest.json](page_contracts/page4/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page4/PAGE_CONTRACT.md) |
+| classification | page6 | popstats | active (thin loader) | high | [page.manifest.json](page_contracts/page6/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page6/PAGE_CONTRACT.md) |
+| classification | page7 | ancestry | active (thin loader) | high | [page.manifest.json](page_contracts/page7/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page7/PAGE_CONTRACT.md) |
+| classification | page11 | boundaries | active | high | [page.manifest.json](page_contracts/page11/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page11/PAGE_CONTRACT.md) |
+| classification | page_sv_evidence | SV evidence | active (thin loader) | high | [page.manifest.json](page_contracts/page_sv_evidence/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_sv_evidence/PAGE_CONTRACT.md) |
 | evolution | page_evolution_polarize_msa | polarize · MSA | _pending_ | _ | _ |
 | evolution | page_evolution_haplotype_network | haplotype network | _pending_ | _ | _ |
 | evolution | page_evolution_polarize_synteny | polarize · synteny | _pending_ | _ | _ |
@@ -74,7 +74,7 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | help | page5 | help | _pending_ | _ | _ |
 | _unregistered_ | page_ancestry_scroller | ancestry scroller (not in manifest) | _pending_ | _ | _ |
 
-**Progress**: 21 / 38 pages contracted.
+**Progress**: 26 / 38 pages contracted.
 
 ## Next batches
 
