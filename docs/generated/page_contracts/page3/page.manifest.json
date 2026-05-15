@@ -1,0 +1,67 @@
+{
+  "page_id": "page3",
+  "label": "catalogue",
+  "page_type": "core_page",
+  "stage": "catalogue",
+  "owner_atlas": "inversion",
+  "status": "active",
+  "current_path": {
+    "html": "atlases/inversion/pages/catalogue/page3.html",
+    "js_entry": "atlases/inversion/pages/catalogue/page3.js",
+    "js_subdir": "atlases/inversion/pages/catalogue/page3/"
+  },
+  "legacy_source": "legacy/Inversion_atlas.html line 5051+; renderCatalogue was referenced via typeof guards but never defined in legacy — implementation written fresh here",
+
+  "purpose": "Sortable / filterable catalogue of all L2 envelopes (or L1-merged inversions). Hover any column header for definition. Export selected rows as TSV or Markdown. Bulk breeding-card export (HTML + JSON) via Turn-146 pipeline.",
+
+  "required_layers": ["scrubber_main"],
+  "required_slots": ["activeChrom"],
+  "preloads": ["scrubber_main"],
+
+  "subdir_files": [
+    "_state.js — _pageState + setter",
+    "_breeding_export.js — Turn-146 bulk breeding-card exports (HTML, JSON; tier-gated; 17 functions + 1 constant table, 1106 LOC)",
+    "catalogue.js — the rendering pipeline legacy never shipped"
+  ],
+
+  "primitives_used": [
+    "shared/diamond_detection.js (diamondCountFor)"
+  ],
+  "adapters_used": [],
+
+  "interactions": [
+    {"id": "sortable_columns", "type": "view_control"},
+    {"id": "filter_chips", "type": "view_control"},
+    {"id": "row_selection", "type": "selection"},
+    {"id": "export_tsv_btn", "type": "action"},
+    {"id": "export_markdown_btn", "type": "action"},
+    {"id": "cat_export_breeding_html_btn", "type": "action", "exports_via": "_breeding_export.js"},
+    {"id": "cat_export_breeding_json_btn", "type": "action"}
+  ],
+  "hotkeys": [],
+
+  "computed_preview_outputs": [
+    "sortable catalogue table of L2 envelopes / L1-merged inversions",
+    "filtered view"
+  ],
+  "committable_outputs": [
+    "TSV export of selected rows",
+    "Markdown export of selected rows",
+    "breeding-card HTML bundle (per candidate, tier-gated)",
+    "breeding-card JSON bundle"
+  ],
+  "commit_policy": "manual_only",
+
+  "documents": {
+    "page_registry_doc": "pages.registry.json -> pages.page3._doc",
+    "specs_done": [],
+    "specs_todo": [],
+    "handoffs": ["_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step3_done.md", "atlases/inversion/pages/catalogue/BATCH_3_NOTES.md"],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [
+    "renderCatalogue not migrated from legacy (legacy referenced it via typeof guards but never defined it); fresh implementation in catalogue.js."
+  ],
+  "confidence": "high"
+}

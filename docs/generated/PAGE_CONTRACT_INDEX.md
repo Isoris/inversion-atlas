@@ -46,15 +46,15 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | discovery_2 | page_dosage_heatmap | dosage heatmap | active (Phase 1) | high | [page.manifest.json](page_contracts/page_dosage_heatmap/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_dosage_heatmap/PAGE_CONTRACT.md) |
 | discovery_2 | page_nested_detector | nested detector | active (Phase 1) | high | [page.manifest.json](page_contracts/page_nested_detector/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_nested_detector/PAGE_CONTRACT.md) |
 | discovery_2 | page_dosage_cluster | dosage cluster | active (Phase 1) | high | [page.manifest.json](page_contracts/page_dosage_cluster/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_dosage_cluster/PAGE_CONTRACT.md) |
-| catalogue | page8 | per-window summary table | _pending_ | _ | _ |
-| catalogue | page19 | negative regions catalogue | _pending_ | _ | _ |
-| catalogue | page3 | catalogue | _pending_ | _ | _ |
-| catalogue | page9 | confirmed carousel | _pending_ | _ | _ |
-| catalogue | page10 | marker panels | _pending_ | _ | _ |
-| catalogue | page21 | annotation cockpit | _pending_ | _ | _ |
-| classification | page17 | stats profile | _pending_ | _ | _ |
-| classification | page18 | marker readiness panel | _pending_ | _ | _ |
-| classification | page_overview | overview | _pending_ | _ | _ |
+| catalogue | page8 | per-window summary table | active (fresh) | high | [page.manifest.json](page_contracts/page8/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page8/PAGE_CONTRACT.md) |
+| catalogue | page19 | negative regions catalogue | active (fresh) | high | [page.manifest.json](page_contracts/page19/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page19/PAGE_CONTRACT.md) |
+| catalogue | page3 | catalogue | active | high | [page.manifest.json](page_contracts/page3/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page3/PAGE_CONTRACT.md) |
+| catalogue | page9 | confirmed carousel | active (fresh) | high | [page.manifest.json](page_contracts/page9/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page9/PAGE_CONTRACT.md) |
+| catalogue | page10 | marker panels | active | high | [page.manifest.json](page_contracts/page10/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page10/PAGE_CONTRACT.md) |
+| catalogue | page21 | annotation cockpit | active | high | [page.manifest.json](page_contracts/page21/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page21/PAGE_CONTRACT.md) |
+| classification | page17 | stats profile | active | high | [page.manifest.json](page_contracts/page17/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page17/PAGE_CONTRACT.md) |
+| classification | page18 | marker readiness panel | active | high | [page.manifest.json](page_contracts/page18/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page18/PAGE_CONTRACT.md) |
+| classification | page_overview | overview | empty stub | high | [page.manifest.json](page_contracts/page_overview/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_overview/PAGE_CONTRACT.md) |
 | classification | page4 | karyotype / tier | _pending_ | _ | _ |
 | classification | page6 | popstats | _pending_ | _ | _ |
 | classification | page7 | ancestry | _pending_ | _ | _ |
@@ -74,7 +74,7 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | help | page5 | help | _pending_ | _ | _ |
 | _unregistered_ | page_ancestry_scroller | ancestry scroller (not in manifest) | _pending_ | _ | _ |
 
-**Progress**: 12 / 38 pages contracted.
+**Progress**: 21 / 38 pages contracted.
 
 ## Next batches
 
