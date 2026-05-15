@@ -1,0 +1,81 @@
+{
+  "page_id": "page12",
+  "label": "local PCA θπ",
+  "page_type": "core_page",
+  "stage": "discovery",
+  "owner_atlas": "inversion",
+  "status": "active_empty_state_until_layer_ships",
+  "current_path": {
+    "html": "atlases/inversion/pages/discovery/page12.html",
+    "js_entry": "atlases/inversion/pages/discovery/page12.js",
+    "js_subdir": "atlases/inversion/pages/discovery/page12/"
+  },
+  "legacy_source": "legacy/Inversion_atlas.html lines 53045-54168 (verbatim 8 helpers)",
+
+  "purpose": "Sister to page1, same six-panel layout but driven by per-sample nucleotide diversity (θπ) instead of dosage. Chromosome-wide diversity scanner. Orthogonal evidence axis to page1 — regions hit by BOTH are ~certainly real biology; regions hit ONLY by θπ are sweeps / balancing selection invisible to genotype-based scrubbers.",
+
+  "required_layers": ["scrubber_main"],
+  "required_slots": ["activeChrom"],
+  "preloads": ["scrubber_main"],
+  "optional_layers_driving_panels": [
+    "theta_pi_per_window",
+    "theta_pi_local_pca",
+    "theta_pi_envelopes",
+    "cusum_theta"
+  ],
+
+  "panels": [
+    {"id": "thCusumHero", "exports": ["_drawThCusumHero"], "purpose": "CUSUM hero panel (θπ accumulator)"},
+    {"id": "thSimMat", "exports": ["_drawThSimMatPanel"], "purpose": "θπ-based window×window similarity heatmap"},
+    {"id": "thZ", "exports": ["_drawThZPanel"], "purpose": "θπ-driven robust |Z| panel"},
+    {"id": "thLines", "exports": ["_drawThLinesPanel"], "purpose": "per-sample θπ line traces across windows"},
+    {"id": "thAnchorStrip", "exports": ["_drawThAnchorStripPanel"], "purpose": "anchor strip on θπ axis"},
+    {"id": "thPca", "exports": ["_drawThPcaPanel"], "purpose": "PCA scatter on θπ"},
+    {"id": "thTrackedSamplesCompact", "purpose": "tracked-samples sidebar (compact)"},
+    {"id": "thL3", "purpose": "L3 contingency panel mirror (unimplemented?)"}
+  ],
+
+  "primitives_used": [
+    "shared/per_l2_cluster.js (contextFromState, clusterL2, ClusterCache)",
+    "shared/het_rate.js (hetRateColor)",
+    "shared/hungarian.js (alignLabels, hungarianChainProjection, concordanceMatrix)",
+    "shared/contingency.js (buildContingency, computeARI, computeNMI, cramersV)",
+    "shared/kmeans.js (kmeans1D, kmeans2D, silhouette1D, adaptiveK1D)",
+    "shared/color_helpers.js (simColor)"
+  ],
+  "adapters_used": [],
+  "mirror_dispatch_from": "page1.applyData() — when theta_pi_* layers present in loaded data, page1 dispatches the 8 panel renderers from this file",
+  "subdir_files": ["_state.js"],
+
+  "interactions": [
+    {"id": "scrubber_cursor", "type": "cursor", "shared_with": "page1"},
+    {"id": "layer_status_chips", "type": "indicator", "ids": "[data-th-layer] chips toggle 🟢/⚪ off state.layersPresent"}
+  ],
+  "hotkeys": ["shared with page1 (mounted same hotkeys when active)"],
+
+  "computed_preview_outputs": [
+    "θπ per-window CUSUM",
+    "θπ-based sim_mat",
+    "θπ robust |Z|",
+    "θπ per-sample lines",
+    "θπ PCA"
+  ],
+  "committable_outputs": ["none — read-only diversity scanner"],
+  "commit_policy": "none_by_default",
+
+  "documents": {
+    "page_registry_doc": "atlases/inversion/registries/data/pages.registry.json -> pages.page12._doc",
+    "specs_done": [],
+    "specs_todo": [],
+    "specs_referenced_in_code_but_missing": [],
+    "handoffs": ["atlases/inversion/pages/discovery/BATCH_1_NOTES.md", "_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step10_done.md"],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [
+    "Empty-state placeholder visible until the R pipeline ships at least one of the theta_pi_* layers.",
+    "L3 contingency panel mirror not yet wired (page1 has it; page12 stops at PCA)."
+  ],
+
+  "confidence": "high"
+}
