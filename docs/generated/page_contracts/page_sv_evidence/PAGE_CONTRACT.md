@@ -67,16 +67,13 @@ Preview-only. No committable outputs.
 
 ## Status and known issues
 
-- `SPEC_sv_evidence_page.md` is **referenced from both this file
-  AND the cluster-side producer** (`STEP_SV_GT_AGG_aggregate_genotype_counts.py`)
-  but **does not exist on disk**.
 - External `window.AtlasSVEvidence` absent → empty-state fallback in
   `#sv_evidence_root` (guarded by `.__svInitFailed`).
 
 ## Documents
 
 - **Registry doc**: `pages.registry.json` → `pages.page_sv_evidence._doc`
-- **Specs referenced but missing**: `SPEC_sv_evidence_page.md`
+- **Specs (done)**: `specs_done/SPEC_sv_evidence_page.md` (authored 2026-05-15 from shipped code; previously listed as missing in SPECS_AUDIT.md)
 - **Producer pipeline**: `atlases/inversion/engines/producers/sv_evidence/`
 - **Handoffs**:
   `_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step19_done.md`

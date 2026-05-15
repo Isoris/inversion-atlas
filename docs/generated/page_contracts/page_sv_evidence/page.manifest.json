@@ -57,16 +57,15 @@
 
   "documents": {
     "page_registry_doc": "pages.registry.json -> pages.page_sv_evidence._doc",
-    "specs_done": [],
+    "specs_done": ["specs_done/SPEC_sv_evidence_page.md (authored 2026-05-15 from shipped code)"],
     "specs_todo": [],
-    "specs_referenced_but_missing": ["SPEC_sv_evidence_page.md (referenced from page_sv_evidence.js + engines/producers/sv_evidence/STEP_SV_GT_AGG_aggregate_genotype_counts.py)"],
+    "specs_referenced_but_missing": [],
     "producer_pipeline": "atlases/inversion/engines/producers/sv_evidence/ (4 Python scripts + shared IO module)",
     "handoffs": ["atlases/inversion/pages/review/BATCH_2_NOTES.md", "_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step19_done.md (third + final review tier-1 thin-loader-stub migration)"],
     "user_guide": "unknown"
   },
 
   "known_issues": [
-    "SPEC_sv_evidence_page.md referenced from both this file AND the cluster-side producer but does NOT exist on disk.",
     "External module window.AtlasSVEvidence absent → empty-state fallback in #sv_evidence_root (guarded by .__svInitFailed)."
   ],
   "confidence": "high"

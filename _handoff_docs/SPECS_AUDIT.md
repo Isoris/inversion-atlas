@@ -141,7 +141,7 @@ These names appear in code or docs but have **no on-disk file** with that name:
 | `SPEC_lasso_inheritance_backgrounds.md` | `handoff_docs/HANDOFF_2026-05-05_turn164_lasso_linkage.md`, `page1.html` | **MISSING** |
 | `SPEC_lines_panel_candidate_bands.md` | `MIGRATION_INVENTORY.md`, band-track SPEC | **MISSING** — `page1/lines_panel.js` ships without a spec |
 | `SPEC_review_surfaces_auto_and_lineages.md` | `css/inversion.css`, `MIGRATION_INVENTORY.md`, band-track SPEC | **MISSING** |
-| `SPEC_sv_evidence_page.md` | `engines/producers/sv_evidence/STEP_SV_GT_AGG_aggregate_genotype_counts.py`, `pages/review/page_sv_evidence.js` | **MISSING** — both the producer pipeline and the page reference it |
+| `SPEC_sv_evidence_page.md` | `engines/producers/sv_evidence/STEP_SV_GT_AGG_aggregate_genotype_counts.py`, `pages/review/page_sv_evidence.js` | **RESOLVED 2026-05-15** — authored from shipped code into `specs_done/SPEC_sv_evidence_page.md` |
 
 **Also missing**:
 - `SCHEMA_V2.md` — referenced by `pages.registry.json`'s page4 _doc (§19) and elsewhere
