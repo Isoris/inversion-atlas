@@ -163,10 +163,17 @@ These names appear in code or docs but have **no on-disk file** with that name:
 | `SPEC_review_surfaces_auto_and_lineages.md` | `css/inversion.css`, `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — Slices 0-2 SPEC authored from CSS lines 947-960 + turn-130 + turn-165 handoffs into `specs_done/SPEC_review_surfaces_auto_and_lineages.md`. Slice 3 (lineages tab) deferred. |
 | `SPEC_sv_evidence_page.md` | `engines/producers/sv_evidence/STEP_SV_GT_AGG_aggregate_genotype_counts.py`, `pages/review/page_sv_evidence.js` | **RESOLVED 2026-05-15** — authored from shipped code into `specs_done/SPEC_sv_evidence_page.md` |
 
-**Also missing**:
-- `SCHEMA_V2.md` — referenced by `pages.registry.json`'s page4 _doc (§19) and elsewhere
-- `SCHEMAS.md` — referenced from migration docs
-- `HANDOFF_BATCH_3.md`, `HANDOFF_BATCH_4.md`, `HANDOFF_BATCH_5.md` — referenced from each batch's `BATCH_*_NOTES.md` but no master HANDOFF_BATCH_N file
+**Also missing — STATUS UPDATE 2026-05-15**:
+- `SCHEMA_V2.md` / `SCHEMA.md` — **RESOLVED 2026-05-15** — authored
+  as `specs_done/SCHEMA.md`. Resolves §9, §10, §13, §19, §22, §26,
+  §27 + reserves §0-§30 with explicit pointers to the 26 JSON
+  schemas in `registries/schemas/`. Convention locked: "SCHEMA §N"
+  and "SCHEMA_V2.md §N" both refer to sections in
+  `specs_done/SCHEMA.md` (V2 designation is historical; one schema
+  doc).
+- `HANDOFF_BATCH_3.md`, `HANDOFF_BATCH_4.md`, `HANDOFF_BATCH_5.md` —
+  still missing. Likely never authored; the
+  `pages/<stage>/BATCH_*_NOTES.md` files are the de-facto handoffs.
 
 ---
 
@@ -175,7 +182,7 @@ These names appear in code or docs but have **no on-disk file** with that name:
 These are NOT missing — they exist as **sections inside other docs**:
 - `SPEC_0` → contents of `specs_todo/mgl_adapter/SPEC_0_master.md`
 - `SCHEMA §9 / §10 / §19 / §22` → refers to schema sections in some doc; the JSON-schema definitions are in `atlases/inversion/registries/schemas/*.schema.json` (26 schema files exist there) — the prose document doesn't appear to exist anywhere on disk
-- `SCHEMA_V2.md` — pages.registry mentions "cross-refs SCHEMA_V2.md §19" but no file by that name exists; the 14-axis classification schema lives in `pages/review/page4/tier_axes.js`
+- ~~`SCHEMA_V2.md` — pages.registry mentions "cross-refs SCHEMA_V2.md §19" but no file by that name exists; the 14-axis classification schema lives in `pages/review/page4/tier_axes.js`~~ **RESOLVED 2026-05-15** — `specs_done/SCHEMA.md` §19 carries the 14-axis prose schema (pulled from `tier_axes.js#TIER_AXES`).
 - legacy-line citations (e.g. "legacy lines 36977-37050") refer to `legacy/Inversion_atlas.html` — confirmed at `/home/user/inversion-atlas/legacy/` if that dir exists (haven't checked)
 
 ---
@@ -203,9 +210,7 @@ For each of the missing SPEC_* names referenced from code, decide:
 - **Retire** — remove the reference from the code/doc (esp. `SPEC_DEFERRED.md`, which is a register of deferred decisions; either start the doc, or delete the references)
 
 ### 3. Author the prose SCHEMA doc
-Currently `pages.registry.json` cross-refs `SCHEMA_V2.md §19` / `§22` / etc. but no such file exists. Either:
-- Write `specs_todo/SCHEMA_V2.md` consolidating the 26 JSON schemas in `registries/schemas/`, OR
-- Replace the prose `SCHEMA_V2.md §N` references with concrete `registries/schemas/<layer>.schema.json` paths
+~~Currently `pages.registry.json` cross-refs `SCHEMA_V2.md §19` / `§22` / etc. but no such file exists.~~ **RESOLVED 2026-05-15** — `specs_done/SCHEMA.md` now exists and covers §9 / §10 / §13 / §19 / §22 / §26 / §27 with a complete `§0-§30` reservation map for future schemas.
 
 ### 4. Add `specs_todo/INDEX.md`
 One-line per SPEC + status (DONE / IN_PROGRESS / NOT_STARTED / RETIRED) + which pages/modules consume it. Pairs with the `ATLAS_PAGES_MAP.md` we just shipped.
