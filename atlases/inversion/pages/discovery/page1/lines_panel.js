@@ -1287,6 +1287,28 @@ export function refreshLinesColorMode(state) {
       }
     }
     sel.value = state.linesColorMode;
+
+    // 2026-05-15 bug-fix: wire the change handler. Without this the
+    // select had no event listener anywhere in the repo (verified by
+    // grep) — picking a colour mode from the dropdown did nothing.
+    // Idempotent via dataset.wired so refreshes don't double-attach.
+    if (!sel.dataset.wired) {
+      sel.addEventListener('change', (e) => {
+        const newMode = e.target.value;
+        // Only accept modes that are currently available; if the user
+        // somehow picks a disabled option (shouldn't happen via the
+        // dropdown UI, but be defensive) fall back to kmeans.
+        if (_isLinesColorModeAvailable(state, newMode)) {
+          state.linesColorMode = newMode;
+        } else {
+          state.linesColorMode = 'kmeans';
+          sel.value = 'kmeans';
+        }
+        try { drawLinesPanel(state); }
+        catch (err) { console.warn('[linesColorMode] drawLinesPanel:', err); }
+      });
+      sel.dataset.wired = '1';
+    }
   }
 }
 

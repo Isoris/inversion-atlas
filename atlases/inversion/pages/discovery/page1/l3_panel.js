@@ -45,6 +45,25 @@ import { manualGroupForSample } from './manual_groups.js';
 // fine. Used to make neighbor panes clickable (jump cursor to that L2).
 import { setCur } from './events.js';
 
+// 2026-05-15: clusterSlabAtK + getSlabClusterAt — verbatim port from legacy
+// (this file calls getSlabClusterAt 4 times but never defined it; the
+// modular tree never had clusterSlabAtK either). Throws-silently bug.
+// Local aggregateSlab() at line 1243 is unaffected; the imports below
+// only fix the missing two. silhouette is now computed inside
+// clusterSlabAtK so the L3 K-badge can surface a quality indicator.
+import {
+  clusterSlabAtK as _clusterSlabAtK,
+  getSlabClusterAt as _getSlabClusterAtImpl,
+} from './l3_slab.js';
+
+// Bridge to the legacy bare-state call shape used by the render code.
+function getSlabClusterAt(s, e, K) {
+  return _getSlabClusterAtImpl(_pageState, s, e, K);
+}
+function clusterSlabAtK(s, e, K) {
+  return _clusterSlabAtK(_pageState, s, e, K);
+}
+
 // =============================================================================
 // refreshPinUI(state) — legacy lines 70130-70161
 // =============================================================================
