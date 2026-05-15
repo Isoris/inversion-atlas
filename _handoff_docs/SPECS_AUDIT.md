@@ -22,6 +22,43 @@ referenced in code that have no on-disk doc**. The full picture below.
 
 ---
 
+## Example drop verified: `inversion_atlas_v3.4_DROP` (2026-05-08)
+
+User uploaded two copies of this drop (`.gz` 187 KB / `.zip` 211 KB,
+identical contents) as an example of the swept-style standalone
+bundles. Contents:
+
+| file | repo location | status |
+|------|---------------|--------|
+| `README.md` (27 KB, full pipeline diagram) | **not imported** as a standalone doc | content split into `pages.registry.json` page22 _doc + module headers |
+| `HANDOFF.md` (37 KB, audit checklist) | **not imported** | same |
+| `REGIME_ANNOTATION_SPEC.md` (1436 lines) | `specs_todo/SPEC_regime_annotation_v34.md` | **identical** (0 diff lines) |
+| `FISH_ANCESTRY_SCROLLER_SPEC.md` (1599 lines) | `specs_todo/SPEC_fish_ancestry_scroller.md` | **identical** |
+| `COPY_ORIGIN_PAINTING_SPEC.md` (500 lines) | `specs_todo/SPEC_copy_origin_painting.md` | **identical** |
+| 21 `*.js` modules (anchor_signals / band_quality / window_classification / seed_discovery / cross_seed_voting / locus_construction / projection / breadth_voting / banding_pipeline / band_voters / partition_enumerate / partition_consensus / dosage_overlay / vote_evidence / karyotype_caller / hungarian / contingency + 3 page22 panels + band_tracking_index) | `shared/band_tracking/` + `shared/` + `pages/discovery/page22/` | **all imported** (15 byte-identical except 4 with import-path tweaks `./hungarian.js` → `../hungarian.js`; 2 page22 panels diverged by ~15 lines of post-import work; `band_tracking_index.js` renamed → `shared/band_tracking/index.js` and extended) |
+| `band_tracking_index.js` (125 lines) | `shared/band_tracking/{index.js, index_min.js}` | renamed + extended (110 / 243 diff lines vs the two repo variants) |
+| `smoke_test.mjs`, `smoke_test_v2.mjs`, `integration_test_v2.mjs`, `regimes_panel_smoke.mjs` | **dropped** | replaced by `tests/test_discovery_page22.js` (different framework) |
+
+**Verdict on this drop**: completely imported, with proper renaming
+(SPEC files got the `SPEC_*_v34.md` / `SPEC_*.md` convention,
+band_tracking_index.js became the canonical `index.js`). The only
+content lost: the 64 KB of meta-docs (README + HANDOFF) describing the
+pipeline as a whole — that big pipeline diagram doesn't appear
+verbatim anywhere in the repo. The current `pages.registry.json`
+page22 _doc covers it at a higher level, but the per-stage diagram
+with module names is gone.
+
+**What this tells us**: the import process **kept the SPECs but
+dropped the bundle-level READMEs**. If this is representative of how
+the other drops landed, then `specs_done/` likely had a similar
+shape (per-feature SPECs we now have under different names + meta-doc
+READMEs that didn't survive). The SPECs themselves may not be lost;
+they may just be renamed to fit the `SPEC_*.md` convention. Worth a
+provenance audit: each `specs_todo/SPEC_*.md` should be traced back to
+its original drop bundle name.
+
+---
+
 ## SPEC_* files that **exist** on disk (16 total)
 
 **Canonical library** (`specs_todo/`):
