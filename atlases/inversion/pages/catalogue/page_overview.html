@@ -1,1 +1,24 @@
-  <div id="page_overview" class="page"></div>
+  <div id="page_overview" class="page">
+    <div class="page-content" style="padding: 16px; max-width: 980px;">
+      <div class="page-title" style="font-size: 18px; font-weight: 600; margin-bottom: 4px;">
+        Synthesis overview
+      </div>
+      <div class="page-subtitle" style="font-size: 12px; color: #888; margin-bottom: 16px;">
+        Action-pipeline inventory. Lists every layer envelope currently
+        registered in <code>&lt;workspace&gt;/registry/layers.registry.json</code>.
+        Empty until at least one <code>POST /api/actions</code> has succeeded.
+      </div>
+
+      <!-- Populated by page_overview.js::_renderLayerInventory.
+           A 2-column table: layer_type · capture count · latest layer_id + date. -->
+      <div id="invLayerInventory" style="
+           font-size: 13px;
+           border: 1px solid #ddd;
+           border-radius: 3px;
+           background: #fafafa;
+           padding: 12px;
+           min-height: 60px;">
+        <span style="color: #888; font-style: italic;">Querying /api/layers …</span>
+      </div>
+    </div>
+  </div>

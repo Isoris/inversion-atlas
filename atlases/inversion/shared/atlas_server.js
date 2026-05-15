@@ -221,3 +221,109 @@ export const atlasServer = makeAtlasServer();
 atlasServer._initUrl();
 
 export default atlasServer;
+
+// =====================================================================
+// Action pipeline — POST /api/actions, GET /api/actions/{id}, /api/layers
+// =====================================================================
+// Pages use these to consume action-pipeline outputs (fst_windows_v1
+// envelopes from run_popstats, candidate_regions, etc.) without going
+// through hardcoded file paths. Contract: atlas-core/toolkit_registries/
+// PIPELINE_FLOW.md. Endpoints: atlas-core/server/atlas_server.py.
+//
+// Convention matches read/write/compute above — fail-soft
+// { ok, status, json?, text?, error? } instead of throwing — so pages
+// can branch uniformly on .ok across all server interactions.
+//
+// All methods read the active server URL from `atlasServer.url`, so
+// users can `atlasServer.setUrl(...)` once and every call picks it up.
+
+// GET /api/layers — filter the envelope index.
+//   filters: { layer_type, dataset_id, stage, status, limit }
+// On success: { ok:true, status:200, json:{ layers:[...], n, total } }.
+export async function listLayers(filters) {
+  filters = filters || {};
+  const q = new URLSearchParams();
+  for (const k of ['layer_type', 'dataset_id', 'stage', 'status']) {
+    const v = filters[k];
+    if (v !== undefined && v !== null && v !== '') q.set(k, String(v));
+  }
+  if (filters.limit !== undefined && filters.limit !== null) {
+    q.set('limit', String(Number(filters.limit) | 0));
+  }
+  const qs = q.toString();
+  return _doGetJson(`/api/layers${qs ? '?' + qs : ''}`);
+}
+
+// GET /api/layers/{layer_id} — fetch one full envelope.
+export async function getLayer(layer_id) {
+  if (!layer_id) return { ok: false, status: 0, error: 'no layer_id' };
+  return _doGetJson(`/api/layers/${encodeURIComponent(layer_id)}`);
+}
+
+// Convenience: most-recent envelope of `layer_type` matching the
+// optional dataset_id / stage / status filters. Returns
+//   { ok:true, status:200, json: null }              when no match
+//   { ok:true, status:200, json: envelope }          when one is found
+//   { ok:false, status, error: ... }                 on server error.
+export async function resolveLatestLayer(layer_type, opts) {
+  if (!layer_type) return { ok: false, status: 0, error: 'no layer_type' };
+  const list = await listLayers(Object.assign({}, opts || {}, { layer_type }));
+  if (!list.ok) return list;
+  const rows = (list.json && list.json.layers) || [];
+  if (rows.length === 0) return { ok: true, status: 200, json: null };
+  return getLayer(rows[rows.length - 1].layer_id);
+}
+
+// POST /api/actions — submit an action manifest.
+//   manifest: full action_manifest dict
+//   opts.atlas: optional ?atlas=… (overrides manifest.atlas_id + master_config)
+// On success: { ok:true, status:200, json:{ ok, action_id, atlas_id, produced_layers } }.
+export async function submitAction(manifest, opts) {
+  if (!manifest || typeof manifest !== 'object') {
+    return { ok: false, status: 0, error: 'manifest object required' };
+  }
+  const atlas = (opts && opts.atlas) || null;
+  const q = atlas ? `?atlas=${encodeURIComponent(atlas)}` : '';
+  try {
+    const resp = await fetch(atlasServer.url + `/api/actions${q}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(manifest),
+    });
+    const out = { ok: resp.ok, status: resp.status };
+    if (resp.ok) { try { out.json = await resp.json(); } catch (_) { out.text = await resp.text(); } }
+    else { try { out.error = await resp.text(); } catch (_) { out.error = `HTTP ${resp.status}`; } }
+    return out;
+  } catch (e) {
+    return { ok: false, status: 0, error: (e && e.message) || String(e) };
+  }
+}
+
+// GET /api/actions/{action_id} — latest log entry.
+export async function getActionLog(action_id) {
+  if (!action_id) return { ok: false, status: 0, error: 'no action_id' };
+  return _doGetJson(`/api/actions/${encodeURIComponent(action_id)}`);
+}
+
+// Generate an action_id matching ^act_[A-Za-z0-9_]+$.
+export function newActionId(tag) {
+  const ms = Date.now();
+  const tail = tag || Math.random().toString(36).slice(2, 5).padEnd(3, '0');
+  return `act_${ms}_${tail}`;
+}
+
+// Internal: GET a JSON path, return the same shape read/write/compute use.
+async function _doGetJson(path) {
+  try {
+    const resp = await fetch(atlasServer.url + path, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    const out = { ok: resp.ok, status: resp.status };
+    if (resp.ok) { try { out.json = await resp.json(); } catch (_) { out.text = await resp.text(); } }
+    else { try { out.error = await resp.text(); } catch (_) { out.error = `HTTP ${resp.status}`; } }
+    return out;
+  } catch (e) {
+    return { ok: false, status: 0, error: (e && e.message) || String(e) };
+  }
+}
