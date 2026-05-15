@@ -1,0 +1,101 @@
+{
+  "page_id": "page11",
+  "label": "boundaries",
+  "page_type": "core_page",
+  "stage": "classification",
+  "owner_atlas": "inversion",
+  "status": "active",
+  "current_path": {
+    "html": "atlases/inversion/pages/review/page11.html",
+    "js_entry": "atlases/inversion/pages/review/page11.js",
+    "js_subdir": "atlases/inversion/pages/review/page11/"
+  },
+  "legacy_source": "legacy/Inversion_atlas.html lines 7906-7921 (HTML shell) + 30175-30314 (renderBoundariesPage) + 30318-30345 (_bndKeyHandler/_bndAttachHotkeys/_bndDetachHotkeys) + 17763-20941 (31 TODO_MISSING _bnd*/_wireRepeatDensity* helpers)",
+
+  "purpose": "Boundaries refinement page. Refines a promoted candidate's [start_bp, end_bp] into approximate left/right boundary zones using multiple evidence tracks. Auto-propose runs BOUNDARY_TRACK_WEIGHTS-weighted algorithm (`_bndAutoPropose`); manual override at scrubber cursor via E (left) / F (right) hotkeys. Save (B) persists onto the candidate; Reset (R) clears.",
+
+  "terminology_contract": {
+    "boundary_zone": "default verdict (what auto ever produces)",
+    "exact_breakpoint": "reserved for junction-level evidence only"
+  },
+
+  "scan_radii": ["1 kb", "5 kb", "10 kb", "25 kb", "100 kb", "1 Mb", "1.5 Mb", "2 Mb", "5 Mb"],
+  "scan_radius_notes": "smaller four match MODULE_3 win5000.step1000 and win10000.step2000 θπ scales; upper four kick in automatically beyond CANDIDATE_HUGE_BP via _boundaryScanRange",
+
+  "required_layers": [
+    "candidate_final_class (REGISTRY MISMATCH — appears misplaced, may be swap with page4)",
+    "candidate_breeding_card (REGISTRY MISMATCH — not referenced anywhere in page11 source)"
+  ],
+  "actually_consumed": [
+    "state.candidate (cross_atlas slot — active candidate id/chrom/start_bp/end_bp/K)",
+    "state.candidateList (cross_atlas array — for candidate dropdown)",
+    "state.data (transient sub-fields)",
+    "state.repeatDensity (per-chrom TE density layer, lazily created by data IO)",
+    "state.ncRNADensity (per-chrom ncRNA layer)"
+  ],
+  "required_slots": ["activeCandidate"],
+  "preloads": ["candidate_final_class", "candidate_breeding_card"],
+
+  "panels": [
+    {"id": "page11Header", "purpose": "page header"},
+    {"id": "page11Content", "purpose": "toolbar slot"},
+    {"id": "bndCandSelect", "purpose": "candidate dropdown"},
+    {"id": "bndRadiusBtns", "purpose": "9 #bnd-radius-btn buttons"},
+    {"id": "bndActionBtns", "purpose": "#bndAutoProposeBtn / #bndOverrideLBtn / #bndOverrideRBtn / #bndResetBtn / #bndSaveBtn"},
+    {"id": "bndStatusSel", "purpose": "boundary_zone_only / SV_supported / junction_supported"},
+    {"id": "bndInfo", "purpose": "info readout"},
+    {"id": "bndTracks", "purpose": "track stack (multiple evidence tracks)"},
+    {"id": "bndSummary", "purpose": "summary panel"},
+    {"id": "bndClassSummary", "purpose": "auto-scan summary (v4 turn 25)"},
+    {"id": "bndRepeatDensity", "purpose": "TE density panel (v4 turn 18)"},
+    {"id": "bndNcRNADensity", "purpose": "rRNA / tRNA / ncRNA-other panel (turn 116)"},
+    {"id": "bndFocalVsBg", "purpose": "focal-vs-background widget (turn 117)"}
+  ],
+
+  "subdir_files": [
+    "_state.js — _pageState + setter",
+    "boundaries.js — pure-helper port (constants + binary search + smoothing + MAD normalization; legacy 17687-18430)",
+    "boundaries_ui.js — toolbar wiring + state-mutating actions (legacy 18351-18626 + 30175-30314)"
+  ],
+
+  "primitives_used": [],
+  "adapters_used": [],
+
+  "interactions": [
+    {"id": "bndAutoProposeBtn", "type": "action", "purpose": "run BOUNDARY_TRACK_WEIGHTS-weighted algorithm"},
+    {"id": "bndOverrideLBtn", "type": "action", "purpose": "manual left at scrubber cursor"},
+    {"id": "bndOverrideRBtn", "type": "action", "purpose": "manual right at scrubber cursor"},
+    {"id": "bndSaveBtn", "type": "action", "purpose": "persist boundary annotation onto candidate"},
+    {"id": "bndResetBtn", "type": "action", "purpose": "clear"},
+    {"id": "bnd_radius_btn", "type": "view_control", "values": ["1kb","5kb","10kb","25kb","100kb","1Mb","1.5Mb","2Mb","5Mb"]},
+    {"id": "bndStatusSel", "type": "view_control", "values": ["boundary_zone_only", "SV_supported", "junction_supported"]}
+  ],
+  "hotkeys": ["E — left override", "F — right override", "B — save", "R — reset", "A — auto-propose"],
+
+  "computed_preview_outputs": [
+    "per-track weighted score along the candidate's flanks",
+    "auto-propose left/right boundary zones",
+    "TE density panel",
+    "ncRNA density panel",
+    "focal-vs-background widget"
+  ],
+  "committable_outputs": [
+    "boundary annotation persisted onto candidate (state.candidate.boundary_zone)"
+  ],
+  "commit_policy": "manual_only",
+
+  "documents": {
+    "page_registry_doc": "pages.registry.json -> pages.page11._doc (4th registry mismatch flag — possible swap hypothesis with page4)",
+    "specs_done": [],
+    "specs_todo": [],
+    "handoffs": ["_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step22_done.md (THE FINAL MIGRATION; **MIGRATION COMPLETE 21/21**)", "atlases/inversion/pages/review/BATCH_2_NOTES.md"],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [
+    "REGISTRY MISMATCH (flagged 2026-05-07 step 22): requires_layers candidate_final_class + candidate_breeding_card look misplaced. candidate_final_class looks like page4's territory; candidate_breeding_card does not appear anywhere in page11 source. SWAP HYPOTHESIS: may have been swapped with page4's candidate_sv_counts + candidate_boundaries.",
+    "31 TODO_MISSING _bnd* / _wireRepeatDensity* helpers — mount-time render is wrapped in try/catch because populated path hits these. Cross-page audit confirms these are page11-private (not fold-in opportunities from other migrated pages).",
+    "mount() installs document-level keydown hotkey listener (E/F/B/R/A); unmount() removes it via _bndDetachHotkeys."
+  ],
+  "confidence": "high"
+}

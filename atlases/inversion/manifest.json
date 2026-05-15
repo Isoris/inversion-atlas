@@ -91,6 +91,14 @@
       "module": "atlases/inversion/pages/review/page_sv_evidence.js"
     },
     {
+      "id": "page_ancestry_scroller",
+      "label": "ancestry scroller",
+      "stage": "classification",
+      "fragment": "atlases/inversion/pages/review/page_ancestry_scroller.html",
+      "module": "atlases/inversion/pages/review/page_ancestry_scroller.js",
+      "tooltip": "Fish Ancestry Scroller — per-fish ancestry painting across one selected inversion candidate (one chromosome viewport). Three numbered layers (PC1 Band / Ancestry Bricks / Brick summary cohort) + 5-row brick-metrics heatmap + tab strip. Headline metric: mean |ΔQ| (global vs local). Consumes shared/ancestry_alignment.js (F-based label-switching alignment) + shared/ancestry_bricks.js (per-fish bricks + flags). See specs_todo/SPEC_fish_ancestry_scroller.md for UI layout v2."
+    },
+    {
       "id": "page3",
       "label": "catalogue",
       "stage": "catalogue",
@@ -217,6 +225,78 @@
       "fragment": "atlases/inversion/pages/discovery/page_dosage_cluster.html",
       "module": "atlases/inversion/pages/discovery/page_dosage_cluster.js",
       "tooltip": "Adaptive-K sample clustering on per-window dosage profiles, with per-K scoring table and cluster mean-curve display (HANDOFF_8)."
+    },
+    {
+      "id": "page_evolution_polarize_msa",
+      "label": "polarize · MSA",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_polarize_msa.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_polarize_msa.js",
+      "tooltip": "Stacked-consensus MSA view of the inversion: outgroup row + INV founder-like consensus row + per-subgroup consensus rows (from 2D-SFS doubleton hierarchical clustering) + STD consensus row. Confidence + reason tier per site."
+    },
+    {
+      "id": "page_evolution_haplotype_network",
+      "label": "haplotype network",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_haplotype_network.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_haplotype_network.js",
+      "tooltip": "Minimum-spanning haplotype network of INV chromosomes. Nodes are Hamming-radius clusters; edges are pairwise mutational distance. Node colour matches the 2D-SFS doubleton subgroup."
+    },
+    {
+      "id": "page_evolution_polarize_synteny",
+      "label": "polarize · synteny",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_polarize_synteny.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_polarize_synteny.js",
+      "tooltip": "Outgroup-synteny polarization: per-outgroup-species break-point orientation vote (HOM_A / HOM_B / unresolved), aggregated to an arrangement verdict."
+    },
+    {
+      "id": "page_evolution_age",
+      "label": "age + divergence",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_age.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_age.js",
+      "tooltip": "Per-candidate age estimate: dXY between arrangements, private variant density on the derived class, MRCA depth, segregating-sites summary."
+    },
+    {
+      "id": "page_evolution_mosaicism",
+      "label": "mosaicism / leakage",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_mosaicism.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_mosaicism.js",
+      "tooltip": "Recombinant-tract / polarity-switch detector on INV chromosomes. Per-sample per-window mosaic-call + summary leakage score."
+    },
+    {
+      "id": "page_evolution_internal_history",
+      "label": "internal history",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_internal_history.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_internal_history.js",
+      "tooltip": "Sub-PCA on derived-only samples: looks for haplotype clusters / nested rearrangements / sublineages inside the inversion class."
+    },
+    {
+      "id": "page_evolution_layer_cleaning",
+      "label": "layer cleaning",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_layer_cleaning.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_layer_cleaning.js",
+      "tooltip": "Layer 0/1 noise removal: kinship + family-size downweighting + hatchery-duplicate exclusion so close relatives don't double-count in deep-Layer-2 stats."
+    },
+    {
+      "id": "page_evolution_event_tree",
+      "label": "event tree",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_event_tree.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_event_tree.js",
+      "tooltip": "Relative-ordering inference across multiple inversions on the same chromosome — carrier-overlap nesting, internal diversity ranking, outgroup presence, age class chaining."
+    },
+    {
+      "id": "page_evolution_archaeology_card",
+      "label": "archaeology card",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/evolution/page_evolution_archaeology_card.html",
+      "module": "atlases/inversion/pages/evolution/page_evolution_archaeology_card.js",
+      "tooltip": "Per-candidate synthesis card: pulls together polarity, age class, integrity, mosaicism, frequency, π/dXY/FST, private/fixed counts, and confidence into one screen — the Step-6 verdict."
     }
   ],
   "registries": {
@@ -284,14 +364,20 @@
       "order": 4
     },
     {
+      "id": "evolution",
+      "label": "evolution",
+      "order": 5,
+      "_doc": "Per-candidate evolution stage: polarize ancestral vs derived arrangement, reconstruct founder-like / MRCA-like consensus, build haplotype networks of INV chromosomes, estimate age + leakage + internal substructure. All cartridges consume the existing mgl_adapter primitives (PCA / dosage / heatmap / nj-tree) plus a small set of evolution-specific helpers (founder_consensus, doubleton_sfs_clusters, haplotype_network, outgroup_synteny, inversion_age, mosaicism_detector)."
+    },
+    {
       "id": "comparative",
       "label": "comparative",
-      "order": 5
+      "order": 6
     },
     {
       "id": "help",
       "label": "help",
-      "order": 6
+      "order": 7
     }
   ]
 }

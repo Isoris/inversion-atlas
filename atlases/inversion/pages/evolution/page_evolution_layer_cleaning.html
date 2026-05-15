@@ -1,0 +1,49 @@
+  <div id="page_evolution_layer_cleaning" class="page">
+
+    <header id="lcHeader" class="lc-header">
+      <div class="lc-title">
+        <h2>Layer 0 · 1 cleaning</h2>
+        <span id="lcCandidateLabel" class="lc-meta">—</span>
+      </div>
+      <div class="lc-controls">
+        <span id="lcSummaryBadge" class="lc-summary-badge"
+              title="Sample weight summary">—</span>
+        <span class="lc-sep"></span>
+        <label class="lc-toggle">
+          Kinship thr
+          <input id="lcKinshipThr" type="number" min="0" max="0.5" step="0.01" value="0.10"
+                 style="width:54px;">
+        </label>
+        <label class="lc-toggle">
+          Duplicate weight
+          <input id="lcDupWeight" type="number" min="0" max="1" step="0.1" value="0"
+                 style="width:54px;">
+        </label>
+      </div>
+    </header>
+
+    <div class="lc-body">
+      <div class="lc-canvas-wrap">
+        <canvas id="lcCanvas" class="lc-canvas"></canvas>
+        <div id="lcEmpty" class="lc-empty" style="display:none;">
+          No layer-cleaning input. atlasState.inversion.layer_cleaning_state
+          needs n_samples + at least one of kinship / family_ids /
+          hatchery_dup.
+        </div>
+      </div>
+      <aside class="lc-right">
+        <header class="lc-panel-head">
+          <h4>Counts</h4>
+        </header>
+        <dl id="lcCountsBody" class="lc-counts-body"></dl>
+      </aside>
+    </div>
+
+    <footer id="lcFooter" class="lc-footer">
+      ⓘ Per-sample weights for downstream Layer-2/3 statistics. Close
+      relatives and family clusters are downweighted so they don't
+      double-count when measuring deep divergence; hatchery duplicates
+      can be hard-excluded.
+    </footer>
+
+  </div>

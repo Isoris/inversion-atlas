@@ -1,0 +1,34 @@
+{
+  "page_id": "page_evolution_archaeology_card",
+  "label": "archaeology card",
+  "page_type": "core_page (Phase 1 cartridge — synthesis card)",
+  "stage": "evolution",
+  "owner_atlas": "inversion",
+  "status": "active",
+  "current_path": {
+    "html": "atlases/inversion/pages/evolution/page_evolution_archaeology_card.html",
+    "js_entry": "atlases/inversion/pages/evolution/page_evolution_archaeology_card.js",
+    "js_subdir": "atlases/inversion/pages/evolution/page_evolution_archaeology_card/"
+  },
+  "purpose": "Step-6 synthesis card. Consumes a pre-computed metrics bag (or computes one inline from the standard inputs) and renders a single verdict + reason + interpretation + per-metric numeric table. Pulls together polarity, age class, integrity, mosaicism, frequency, π/dXY/FST, private/fixed counts, confidence.",
+  "required_slots": ["activeCandidate"],
+  "input_contract": "atlasState.inversion.archaeology_card_state = { metrics: { pi_inv, pi_std, dxy, fst_hudson, private_inv, private_std, fixed_differences, arrangement_frequency?, leakage_score?, n_regimes?, outgroup_present?, polarity_verdict?, age_class? }, candidate_label?, opts? }",
+  "subdir_files": ["_state.js — _pageState + setter"],
+  "primitives_used": ["shared/mgl_archaeology_classifier.js"],
+  "interactions": [],
+  "computed_preview_outputs": [
+    "verdict",
+    "reason",
+    "interpretation",
+    "per-metric numeric table (π_inv, π_std, dXY, F_ST, private/fixed counts, ...)"
+  ],
+  "committable_outputs": [],
+  "commit_policy": "none_by_default",
+  "documents": {
+    "page_registry_doc": "unknown",
+    "specs_done": [],
+    "specs_todo": [],
+    "user_guide": "unknown"
+  },
+  "confidence": "high"
+}

@@ -205,7 +205,7 @@ def _classify_zone(pos_bp: int, zones: dict | None,
     return "right_flank"
 
 
-# Pattern-label decision rule. Spec §3.3 of SPEC_sv_evidence_page.md.
+# Pattern-label decision rule. Spec §3.3 of specs_done/SPEC_sv_evidence_page.md.
 # Inputs: zone (str), gt_counts (dict of group → AA/AB/BB/miss), OR, FDR.
 # Output: one of canonical_breakpoint_marker / dominant_presence_marker /
 # het_specific_marker / sub_haplotype_marker / internal_linked_marker /

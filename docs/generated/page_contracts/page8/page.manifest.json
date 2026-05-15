@@ -1,0 +1,67 @@
+{
+  "page_id": "page8",
+  "label": "per-window summary table",
+  "page_type": "core_page",
+  "stage": "catalogue (per manifest.json; lives under pages/discovery/ dir)",
+  "owner_atlas": "inversion",
+  "status": "active (fresh implementation)",
+  "current_path": {
+    "html": "atlases/inversion/pages/discovery/page8.html",
+    "js_entry": "atlases/inversion/pages/discovery/page8.js",
+    "js_subdir": "atlases/inversion/pages/discovery/page8/"
+  },
+  "legacy_source": "legacy/Inversion_atlas.html lines 7672-7774 (HTML shell ONLY — no JS in legacy; implementation written fresh)",
+
+  "purpose": "Per-window summary table for the active chromosome — a sortable read-out of |Z|, λ1/λ2, eigenvalue ratio, and ANGSD biallelic-SNP counts per window, alongside a per-window strip canvas coloured by the active sortable column (default = |Z|) with L1/L2 zone bars on top.",
+
+  "required_layers": ["scrubber_main"],
+  "required_slots": ["activeChrom"],
+  "preloads": ["scrubber_main"],
+
+  "panels": [
+    {"id": "winSumStripCanvas", "purpose": "per-window strip coloured by the active sortable column"},
+    {"id": "winSumTable", "purpose": "sortable table of |Z|, λ1/λ2, eigenvalue ratio, ANGSD bi-SNP counts"},
+    {"id": "winSumChips", "purpose": "filter chips (L2 cluster + |Z| threshold)"},
+    {"id": "winSumBisnpInfoPanel", "purpose": "read-only ANGSD bi-SNP discovery parameter panel (-GL / -minQ / -SNP_pval) for full provenance"}
+  ],
+
+  "subdir_files": [
+    "_state.js — _pageState + setter",
+    "window_summary.js — fresh implementation; legacy had only HTML shell"
+  ],
+
+  "primitives_used": [],
+  "adapters_used": [],
+
+  "interactions": [
+    {"id": "sortable_columns", "type": "view_control"},
+    {"id": "filter_chips_l2", "type": "view_control"},
+    {"id": "filter_chip_z_threshold", "type": "view_control"},
+    {"id": "winSumBisnpInfoBtn", "type": "action", "purpose": "open ANGSD info panel"}
+  ],
+  "hotkeys": [],
+
+  "computed_preview_outputs": [
+    "per-window |Z|",
+    "per-window λ1/λ2 + eigenvalue ratio",
+    "per-window ANGSD biallelic-SNP counts",
+    "strip canvas coloured by active column",
+    "L1/L2 zone bars"
+  ],
+  "committable_outputs": ["none"],
+  "commit_policy": "none_by_default",
+
+  "documents": {
+    "page_registry_doc": "pages.registry.json -> pages.page8._doc",
+    "specs_done": [],
+    "specs_todo": [],
+    "handoffs": ["_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step13_done.md (?)", "atlases/inversion/pages/discovery/BATCH_1_NOTES.md"],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [
+    "Directory / stage discrepancy: manifest stage is 'catalogue' but file lives under pages/discovery/.",
+    "Legacy had no JS implementation; this is a fresh build."
+  ],
+  "confidence": "high"
+}

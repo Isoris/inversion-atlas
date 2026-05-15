@@ -1,0 +1,112 @@
+{
+  "page_id": "page22",
+  "label": "haplotype regimes — Stage 4 bruteforce projection",
+  "page_type": "core_page",
+  "stage": "discovery_2",
+  "owner_atlas": "inversion",
+  "status": "active",
+  "current_path": {
+    "html": "atlases/inversion/pages/discovery/page22.html",
+    "js_entry": "atlases/inversion/pages/discovery/page22.js",
+    "js_subdir": "atlases/inversion/pages/discovery/page22/"
+  },
+  "bundle_source": "imported from inversion_atlas_v3.4_DROP (2026-05-08) + banding_unified_v3.4_AUDIT_BUNDLE",
+  "legacy_source": "n/a — this page was new in v3.4 (not in legacy/Inversion_atlas.html)",
+
+  "purpose": "Long-range haplotype regimes. Wires the v3.4 banding pipeline (Stage 1 seed discovery + Stage 2 cross-seed voting + Stage 3 chain walk + Stage 4 bruteforce projection) into the atlas-core shell. 2×2 panel grid: chrom-scope and genome-scope versions of target-band lanes and PC1 lines. Action bar exposes 'run pipeline' and 'export catalogue' buttons.",
+
+  "required_layers": ["scrubber_main"],
+  "required_slots": ["activeChrom"],
+  "preloads": ["scrubber_main"],
+  "requires_operations": [],
+
+  "panels": [
+    {"id": "regimes_panel_chrom_lanes", "module": "page22/regimes_panel.js", "purpose": "target-band lanes panel at chromosome scope"},
+    {"id": "regimes_pc1_panel_chrom", "module": "page22/regimes_pc1_panel.js", "purpose": "PC1 lines at chromosome scope (per-sample lines coloured by voter band)"},
+    {"id": "regimes_panel_genome_lanes", "module": "page22/regimes_panel.js (genome opt-in)", "purpose": "target-band lanes at genome scope (toggled via 'g' key)"},
+    {"id": "regimes_pc1_panel_genome", "module": "page22/regimes_pc1_panel.js (genome opt-in)", "purpose": "PC1 lines at genome scope"},
+    {"id": "action_bar", "module": "page22/regimes_page.js", "purpose": "run pipeline button + export catalogue button + focal-voter controls"}
+  ],
+
+  "subdir_files": [
+    "regimes_page.js — page wrapper (4 panels in 2×2 grid + header)",
+    "regimes_panel.js — target-band lanes panel, scope-aware (chrom default, genome opt-in)",
+    "regimes_pc1_panel.js — PC1-lines variant; same focal-voter logic, y-axis = PC1 from upstream local PCA"
+  ],
+
+  "primitives_used": [
+    "shared/per_l2_cluster.js (contextFromState, ClusterCache) — per-window K-means labels cached",
+    "shared/band_tracking/banding_pipeline.js (runBandingPipeline, BANDING_PIPELINE_DEFAULTS) — the orchestrator",
+    "shared/band_tracking/projection.js (classifyProjection) — Stage 4 classifier",
+    "shared/band_tracking/regime_catalogue.js (buildCatalogue, computeKnobHash) — cohort-level catalogue export",
+    "shared/band_tracking/seed_discovery.js — Stage 1",
+    "shared/band_tracking/cross_seed_voting.js — Stage 2",
+    "shared/band_tracking/locus_construction.js — Stage 3",
+    "shared/band_tracking/breadth_voting.js — Stage 4 driver",
+    "shared/band_tracking/dosage_overlay.js — HOM_REF/HET/HOM_INV classifier for the dosage tint"
+  ],
+  "adapters_used": [
+    "ClusterCache pattern (per_l2_cluster.js) — bridges atlas-side state to pipeline ctx"
+  ],
+
+  "interactions": [
+    {"id": "run_pipeline_button", "type": "action", "callback": "runBandingPipeline(ctx, opts)"},
+    {"id": "export_catalogue_button", "type": "action", "callback": "buildCatalogue() → download 3 files"},
+    {"id": "g_key_toggle", "type": "hotkey", "purpose": "show/hide genome-scope panels"},
+    {"id": "arrow_keys", "type": "hotkey", "purpose": "←/→ cycles seeds (per regimes_panel)"},
+    {"id": "updown_keys", "type": "hotkey", "purpose": "↑/↓ cycles band combos"},
+    {"id": "focal_voter_selector", "type": "parameter_control"},
+    {"id": "dosage_callback", "type": "wired_callback", "purpose": "getMacroDosage(locus, sample_set) — provided by host; panels don't talk to dosage server directly"}
+  ],
+  "hotkeys": ["g — toggle genome view", "←/→ — cycle seeds", "↑/↓ — cycle band combos"],
+
+  "computed_preview_outputs": [
+    "Stage 1 seeds (V-driven seed discovery output)",
+    "Stage 2 linkage groups (cross-seed voting)",
+    "Stage 3 stage3_loci (per-band sample-set construction)",
+    "Stage 4 voteRecords + consensus_partition per target locus",
+    "pattern_class per voter→target pair (SINGLE / SUBSET / SPLIT_TWO / SUBSET_SPLIT / COHERENT_SPLIT / RANDOM_FAN / SCATTER / EMPTY)",
+    "consensus class per target (CLEAN_PARTITION / SOFT_PARTITION / AMBIGUOUS_BAND / OVERLAPPING_VOTES / MULTI_LAYER_STRUCTURE / NO_CLEAN_CONSENSUS)",
+    "dosage class per macro-band (HOM_REF / HET / HOM_INV / AMBIGUOUS_DOSAGE / NO_SAMPLES)"
+  ],
+  "committable_outputs": [
+    "regime catalogue JSON (cohort-level, deterministic key: interval_id × cohort_id × reference_id × pipeline_version × knob_hash)",
+    "downstream: stage3_loci promotable into state.candidateList (per HANDOFF_2026-05-14_seeds_to_candidates_wiring; not yet wired)"
+  ],
+  "commit_policy": "manual_only",
+
+  "three_cohort_discipline": "cohort_id + reference_id tagged from active dataset; catalogue does NOT aggregate across reference assemblies (F1 hybrid ≠ 226 pure C.gariepinus ≠ wild C.macrocephalus)",
+
+  "documents": {
+    "page_registry_doc": "atlases/inversion/registries/data/pages.registry.json -> pages.page22._doc",
+    "specs_done": [
+      "specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md (parent SPEC — band-track skeleton)"
+    ],
+    "specs_todo": [
+      "specs_todo/SPEC_regime_annotation_v34.md (Stage 5.5 annotation layer; SPEC ONLY)",
+      "specs_todo/SPEC_copy_origin_painting.md (Stage 5.6 paralogue painting; SPEC ONLY)",
+      "specs_todo/SPEC_fish_ancestry_scroller.md (Stage 5.7 ancestry view; partial impl)"
+    ],
+    "specs_referenced_but_missing": [],
+    "bundle_meta_docs": [
+      "specs_done/_bundles/inversion_atlas_v3.4_DROP/README.md (full pipeline diagram)",
+      "specs_done/_bundles/inversion_atlas_v3.4_DROP/HANDOFF.md (audit checklist)",
+      "specs_done/_bundles/banding_unified_v3.4_AUDIT_BUNDLE/README.md (audit revision)",
+      "specs_done/_bundles/HOW_TO_USE_page22.md (user guide — the ONLY end-user docs for any page right now)"
+    ],
+    "handoffs": [
+      "_handoff_docs/HANDOFF_2026-05-14_seeds_to_candidates_wiring.md (wiring stage3_loci → state.candidateList; not yet implemented)"
+    ],
+    "user_guide": "specs_done/_bundles/HOW_TO_USE_page22.md (full end-user guide; rare)"
+  },
+
+  "calibration_target": "LG28 prototype 15.115-18.005 Mb, 60/106/60 karyotype",
+
+  "known_issues": [
+    "Phase 1 only: LG28 → LG28 (per-chromosome). Genome-wide projection (Phase 2/3) requires chromosomes manifest + registry-cached catalogue.",
+    "stage3.loci → state.candidateList wiring is the seeds_to_candidates_wiring HANDOFF — not yet implemented; promote step is manual.",
+    "Annotation layer (SPEC_regime_annotation_v34), copy-origin painting (SPEC_copy_origin_painting), and fish ancestry scroller (SPEC_fish_ancestry_scroller) are all SPEC ONLY per their status lines."
+  ],
+
+  "confidence": "high"
+}

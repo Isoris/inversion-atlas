@@ -1,7 +1,7 @@
 // atlases/inversion/analysis/mendelian_inheritance.js
 //
 // Version-aware orchestrator around analysis/mendelian.js. Implements
-// SPEC_registry_v2.md item 7 — the entry point that the future
+// specs_done/SPEC_registry_v2.md item 7 — the entry point that the future
 // page-level "Mendelian review" page will call.
 //
 // Pipeline (SPEC_v2 §8):

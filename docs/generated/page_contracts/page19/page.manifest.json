@@ -1,0 +1,66 @@
+{
+  "page_id": "page19",
+  "label": "negative regions catalogue",
+  "page_type": "core_page",
+  "stage": "catalogue (per manifest.json; lives under pages/discovery/ dir)",
+  "owner_atlas": "inversion",
+  "status": "active (fresh implementation)",
+  "current_path": {
+    "html": "atlases/inversion/pages/discovery/page19.html",
+    "js_entry": "atlases/inversion/pages/discovery/page19.js",
+    "js_subdir": "atlases/inversion/pages/discovery/page19/"
+  },
+  "legacy_source": "legacy/Inversion_atlas.html lines 7378-7572 (HTML shell ONLY — no JS in legacy; inline HTML comment references planned future renderer name _nrRender but no impl)",
+
+  "purpose": "Region-level catalogue of 'no detectable inversion' calls — complement of the page3 positive catalogue. Each region carries a region_status field (e.g. no_detectable_inversion_high_confidence) — NOT a binary positive/negative. Static caution banner explicitly warns against that misreading.",
+
+  "important_caveat": "The complement framing is deliberate: 'no detectable inversion' means no signal above the study's resolution / sample size / callability limits — tiny inversions, very rare inversions (1-2 fish), inversions in repetitive or low-callability regions, and inversions whose breakpoints fall outside short-read mappability can all be missed.",
+
+  "required_layers": ["scrubber_main"],
+  "required_slots": ["activeChrom"],
+  "preloads": ["scrubber_main"],
+
+  "panels": [
+    {"id": "nrLoadBtn", "purpose": "load negative_regions.json or .tsv"},
+    {"id": "nrSummaryCards", "purpose": "per-region_status counts"},
+    {"id": "nrTableSlot", "purpose": "full per-region detail table"},
+    {"id": "caution_banner", "purpose": "static — warns against binary positive/negative misreading"}
+  ],
+
+  "subdir_files": [
+    "_state.js — _pageState + setter",
+    "negative_regions.js — fresh implementation; legacy had only HTML shell"
+  ],
+
+  "primitives_used": [],
+  "adapters_used": [],
+
+  "interactions": [
+    {"id": "nrLoadInput", "type": "input", "purpose": "load JSON or TSV"},
+    {"id": "nrLoadBtn", "type": "action"},
+    {"id": "nrExportCsvBtn", "type": "action"},
+    {"id": "nrResetBtn", "type": "action"}
+  ],
+  "hotkeys": [],
+
+  "computed_preview_outputs": [
+    "per-region_status summary cards",
+    "full per-region detail table"
+  ],
+  "committable_outputs": ["CSV export"],
+  "commit_policy": "manual_only",
+
+  "documents": {
+    "page_registry_doc": "pages.registry.json -> pages.page19._doc",
+    "specs_done": [],
+    "specs_todo": [],
+    "handoffs": ["_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step14_done.md (?)", "atlases/inversion/pages/discovery/BATCH_1_NOTES.md"],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [
+    "Directory / stage discrepancy: manifest stage is 'catalogue' but file lives under pages/discovery/.",
+    "Legacy had no JS implementation; this is a fresh build."
+  ],
+  "confidence": "high"
+}

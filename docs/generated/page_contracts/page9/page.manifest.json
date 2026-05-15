@@ -1,0 +1,58 @@
+{
+  "page_id": "page9",
+  "label": "confirmed carousel",
+  "page_type": "core_page",
+  "stage": "catalogue",
+  "owner_atlas": "inversion",
+  "status": "active (fresh implementation)",
+  "current_path": {
+    "html": "atlases/inversion/pages/catalogue/page9.html",
+    "js_entry": "atlases/inversion/pages/catalogue/page9.js",
+    "js_subdir": "atlases/inversion/pages/catalogue/page9/"
+  },
+  "legacy_source": "legacy/Inversion_atlas.html lines 7782-7812 (HTML shell ONLY — no JS in legacy; carousel logic written fresh)",
+
+  "purpose": "Carousel walk-through of all candidates marked confirmed on page2 (state.candidateList.filter(c => c.confirmed === true)). Prev/next buttons cycle through the confirmed set. Reuses page2's candidate-detail rendering.",
+
+  "required_layers": ["scrubber_main"],
+  "required_slots": ["activeChrom"],
+  "preloads": ["scrubber_main"],
+
+  "panels": [
+    {"id": "confirmed_nav_bar", "purpose": "prev/next + counter"},
+    {"id": "confirmed_candidate_meta", "purpose": "candidate-detail card (reuses page2's renderer)"},
+    {"id": "confirmed_empty_state", "purpose": "shown when state.candidateList has no confirmed candidates"}
+  ],
+
+  "subdir_files": [
+    "_state.js — _pageState + setter (mirrors page17/page18/page21 pattern)",
+    "carousel.js — fresh implementation; legacy had only HTML shell"
+  ],
+
+  "primitives_used": ["page2's renderCandidateMetadata (cross-page reuse)"],
+  "adapters_used": [],
+
+  "interactions": [
+    {"id": "confirmed_nav_prev_btn", "type": "action"},
+    {"id": "confirmed_nav_next_btn", "type": "action"}
+  ],
+  "hotkeys": [],
+
+  "computed_preview_outputs": [
+    "carousel position (index into state.candidateList.filter(confirmed))",
+    "active confirmed candidate's full detail card"
+  ],
+  "committable_outputs": ["none — read-only carousel; commit gestures happen on page2"],
+  "commit_policy": "none_by_default",
+
+  "documents": {
+    "page_registry_doc": "pages.registry.json -> pages.page9._doc",
+    "specs_done": [],
+    "specs_todo": [],
+    "handoffs": ["_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step7_done.md"],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [],
+  "confidence": "high"
+}
