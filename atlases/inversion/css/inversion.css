@@ -359,8 +359,34 @@ body.light-theme .caution-banner { background: rgba(245, 165, 36, 0.10); }
 .page#page12.active,
 .page#page15.active { overflow-y: auto !important; overflow-x: hidden; }
 .page#page1 { display: none; }       /* will be flipped by tab init */
+/* 2026-05-15 fix: fixed-layout grid heights were hardcoded pixels
+   (40 + 520 + 100 + 28 + 360 = 1048 px of fixed minimums). On viewports
+   shorter than that total, the `auto` + `1fr` rows collapse to 0 and
+   the rest overflows ABOVE the visible area (user-reported: "panels
+   don't fill and overflow to the top so the upper part of the page
+   below the banner is still black"). Replace pixel constants with
+   minmax(MIN_PX, fr-fraction) so rows scale with viewport while
+   keeping minimums for legibility. Row meaning (legacy order):
+   1. #ctrlBar (40px fixed — toolbar height)
+   2. #simPanel (was 520px → minmax(180px, 2.0fr))
+   3. #zPanel   (was 100px → minmax(90px,  0.4fr))
+   4. #anchorStripPanel (auto — usually 24px when visible)
+   5. (reserved 0px row — placeholder for future band trace strip)
+   6. #tracksContainer toolbar (28px fixed)
+   7. #linesPanel (was 1fr → minmax(160px, 1.6fr))
+   8. #pcaPanel  (was 360px → minmax(180px, 1.6fr))
+   The fractional sums (2.0 + 0.4 + 1.6 + 1.6 = 5.6) keep proportions
+   similar to the original ratios (520/100/...360); the minmax floor
+   prevents any row from collapsing to nothing. */
 .page#page1.active { display: grid;
-                     grid-template-rows: 40px 520px 100px auto 0px 28px 1fr 360px; }
+                     grid-template-rows: 40px
+                                         minmax(180px, 2.0fr)
+                                         minmax(90px,  0.4fr)
+                                         auto
+                                         0px
+                                         28px
+                                         minmax(160px, 1.6fr)
+                                         minmax(180px, 1.6fr); }
 
 /* v3.99 turn 4: flex:1 + min-height:0 instead of `height: calc(100vh - 76px)`.
    The calc was correct in principle (header 44px + tabBar 32px = 76px), but
@@ -500,7 +526,18 @@ aside .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 /* Layout: scrubber bar (top) + sim + Z + tracks (variable) + PCA + L3 panel */
 /* main is page1; display rules below override the default grid display when
    the tab is inactive. */
-main#page1 { grid-template-rows: 40px 520px 100px auto 0px 28px 1fr 360px;
+/* 2026-05-15 fix: see .page#page1.active above for the rationale. The
+   same hardcoded-pixel template lived here too (duplicate declaration
+   from the legacy split). Replaced with the same minmax pattern so
+   panels scale with viewport in fixed layout. */
+main#page1 { grid-template-rows: 40px
+                                 minmax(180px, 2.0fr)
+                                 minmax(90px,  0.4fr)
+                                 auto
+                                 0px
+                                 28px
+                                 minmax(160px, 1.6fr)
+                                 minmax(180px, 1.6fr);
              overflow: hidden; }
 /* v3.62: free layout mode. main becomes a normal block-flow scrollable
    container, panels stack at their natural / minimum heights, mouse wheel

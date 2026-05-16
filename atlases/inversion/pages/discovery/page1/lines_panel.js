@@ -917,7 +917,15 @@ export function buildLinesPanelCheckboxes(state) {
       }
       // Preserve order from the sources array (PCs first, then GHSL chips)
       const ordered = sources.filter(s => checkedNow.includes(s));
-      setLinesYsources(ordered);
+      // 2026-05-15 bug-fix: prior code called `setLinesYsources(ordered)`
+      // but no such function exists anywhere in the modular tree (verified
+      // by repo-wide grep). The handler threw ReferenceError silently,
+      // killing the source-checkbox UX — clicking PC2 (or any source)
+      // did nothing. Replaced with the direct slot assignment pattern
+      // used elsewhere in shared/page1_data_helpers.js (lines 562 / 585).
+      if (state && state.viewControls) {
+        state.viewControls.linesYsources = ordered.slice();
+      }
       // If linked, the PCA selector also updates — refresh its UI
       if (state.viewControls.linked) {
         if (typeof refreshPcaAxisBar === 'function') refreshPcaAxisBar();
@@ -1279,6 +1287,28 @@ export function refreshLinesColorMode(state) {
       }
     }
     sel.value = state.linesColorMode;
+
+    // 2026-05-15 bug-fix: wire the change handler. Without this the
+    // select had no event listener anywhere in the repo (verified by
+    // grep) — picking a colour mode from the dropdown did nothing.
+    // Idempotent via dataset.wired so refreshes don't double-attach.
+    if (!sel.dataset.wired) {
+      sel.addEventListener('change', (e) => {
+        const newMode = e.target.value;
+        // Only accept modes that are currently available; if the user
+        // somehow picks a disabled option (shouldn't happen via the
+        // dropdown UI, but be defensive) fall back to kmeans.
+        if (_isLinesColorModeAvailable(state, newMode)) {
+          state.linesColorMode = newMode;
+        } else {
+          state.linesColorMode = 'kmeans';
+          sel.value = 'kmeans';
+        }
+        try { drawLinesPanel(state); }
+        catch (err) { console.warn('[linesColorMode] drawLinesPanel:', err); }
+      });
+      sel.dataset.wired = '1';
+    }
   }
 }
 

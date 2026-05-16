@@ -105,6 +105,113 @@ export function attachSidebarHandlers(state) {
   _wireLayoutMode(state);
   _wireViewMode(state);
   _wirePanelCollapseButtons(state);
+  _wireNewShellControls(state);
+}
+
+// =============================================================================
+// New-shell mirror controls — 2026-05-15 bug-fix wires.
+// =============================================================================
+// The atlas-core shell exposes several controls in the right-side aside
+// (#pcaTrackedAside / #pcaTrackedAsideCompact) and L3 toolbar that mirror
+// the legacy hidden header controls. The legacy hidden controls (#flipPC1,
+// #trailOn, ...) have working handlers (see _wireDisplay above). The
+// VISIBLE aside / compact / L3 mirrors did NOT have handlers — clicking
+// the user-visible checkbox did nothing because state.flipPC1 / .trailOn /
+// .pcaLassoActive / .l3HetColoring were never written.
+//
+// This function wires those mirrors. Idempotent via dataset.wired.
+//
+// Bugs reported 2026-05-15 chat:
+//   - "sign align PC1 its also not working"  → flipPC1Aside + flipPC1Compact
+//   - "the lasso in local PCA its not working" → pcaLassoToggle + Compact
+//   - "the heterozysity (dosage) its not working" → l3HetToggle
+function _wireNewShellControls(state) {
+  if (typeof document === 'undefined') return;
+  const $ = (id) => document.getElementById(id);
+
+  // Pair each visible checkbox with the same handler as its legacy
+  // hidden sibling so toggling either reflects to all of them.
+  // Mirror group: flipPC1 (sign-align PC1).
+  const flipMirrors = ['flipPC1', 'flipPC1Aside', 'flipPC1Compact'];
+  const flipApply = (val) => {
+    state.flipPC1 = !!val;
+    state.l2GroupCache = null;
+    state.cacheKey = null;
+    for (const id of flipMirrors) {
+      const el = $(id);
+      if (el && el.checked !== !!val) el.checked = !!val;
+    }
+    try { drawPCA(state); } catch (e) { console.warn('[flipPC1] drawPCA:', e); }
+    try { renderL3Panel(state); } catch (e) { console.warn('[flipPC1] renderL3Panel:', e); }
+    try { drawLinesPanel(state); } catch (e) { console.warn('[flipPC1] drawLinesPanel:', e); }
+  };
+  for (const id of flipMirrors) {
+    const el = $(id);
+    if (!el || el.dataset.wired === '1') continue;
+    el.checked = !!state.flipPC1;
+    el.addEventListener('change', (e) => flipApply(e.target.checked));
+    el.dataset.wired = '1';
+  }
+
+  // Mirror group: trailOn (PCA trails for tracked samples).
+  const trailMirrors = ['trailOn', 'trailOnAside', 'trailOnCompact'];
+  const trailApply = (val) => {
+    state.trailOn = !!val;
+    for (const id of trailMirrors) {
+      const el = $(id);
+      if (el && el.checked !== !!val) el.checked = !!val;
+    }
+    try { drawPCA(state); } catch (e) { console.warn('[trailOn] drawPCA:', e); }
+  };
+  for (const id of trailMirrors) {
+    const el = $(id);
+    if (!el || el.dataset.wired === '1') continue;
+    el.checked = !!state.trailOn;
+    el.addEventListener('change', (e) => trailApply(e.target.checked));
+    el.dataset.wired = '1';
+  }
+
+  // Mirror group: pcaLassoToggle (lasso into tracked samples). Reads
+  // state.pcaLassoActive — see page1/pca_panel.js#attachPcaLasso pointer-
+  // down handler: when pcaLassoActive is true, plain drag activates the
+  // tracked-lasso path; without it, only Shift+drag works.
+  const lassoMirrors = ['pcaLassoToggle', 'pcaLassoToggleCompact'];
+  const lassoApply = (val) => {
+    state.pcaLassoActive = !!val;
+    for (const id of lassoMirrors) {
+      const el = $(id);
+      if (el && el.checked !== !!val) el.checked = !!val;
+    }
+  };
+  for (const id of lassoMirrors) {
+    const el = $(id);
+    if (!el || el.dataset.wired === '1') continue;
+    el.checked = !!state.pcaLassoActive;
+    el.addEventListener('change', (e) => lassoApply(e.target.checked));
+    el.dataset.wired = '1';
+  }
+
+  // Single control: l3HetToggle (L3 mini-PCA dots coloured by per-sample
+  // het rate). See specs_done/SPEC_l3_het_dosage_coloring.md §3 — state
+  // slot is state.l3HetColoring; persisted to localStorage; falls back
+  // to K-cluster colour when dosage_chunks layer is absent.
+  const hetEl = $('l3HetToggle');
+  if (hetEl && hetEl.dataset.wired !== '1') {
+    hetEl.checked = !!state.l3HetColoring;
+    // Disable if dosage_chunks layer is absent.
+    const dosageAvail = !!(state.layersPresent && state.layersPresent.has('dosage_chunks'));
+    hetEl.disabled = !dosageAvail;
+    hetEl.addEventListener('change', (e) => {
+      state.l3HetColoring = !!e.target.checked;
+      try {
+        localStorage.setItem('pca_scrubber_v3.l3HetColoring',
+                             state.l3HetColoring ? '1' : '0');
+      } catch (_) {}
+      try { renderL3Panel(state); }
+      catch (err) { console.warn('[l3HetToggle] renderL3Panel:', err); }
+    });
+    hetEl.dataset.wired = '1';
+  }
 }
 
 // =============================================================================
