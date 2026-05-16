@@ -1160,9 +1160,49 @@ function _buildLegacyState(atlasState) {
   legacy.layersPresent     = (inv.layersPresent instanceof Set)
                              ? inv.layersPresent
                              : new Set(Array.isArray(inv.layersPresent) ? inv.layersPresent : []);
-  // Chromosome precomp data (cusum_theta + theta_pi_per_window + ...).
+
+  // Chromosome precomp data. Page12 reads two separate atlas JSONs:
+  //   - inv.tracks[chrom]         — z-blocks atlas (scrubber_main; the
+  //     six-panel scaffolding, samples, windows, candidates)
+  //   - inv.tracks_thetapi[chrom] — theta-pi atlas (scrubber_thetapi;
+  //     theta_pi_per_window, theta_pi_local_pca, theta_pi_envelopes,
+  //     theta_pi_cusum)
+  // We expose them as a shallow merge under legacy.data so the page12
+  // renderers (which were written against the legacy monolith's
+  // single-source state.data) keep working unchanged.
+  //
+  // Field rename: the theta-pi pipeline writes `theta_pi_cusum` but
+  // page12 reads `cusum_theta` (the atlas-canonical name from the
+  // legacy schema). Aliased during merge so future pipeline runs
+  // can switch to the canonical name without breaking this page.
   const chrom = sh.activeChrom;
-  legacy.data = (chrom && inv.tracks && inv.tracks[chrom]) ? inv.tracks[chrom] : null;
+  const tracksZ      = (chrom && inv.tracks          && inv.tracks[chrom])          || null;
+  const tracksThPi   = (chrom && inv.tracks_thetapi  && inv.tracks_thetapi[chrom])  || null;
+  if (tracksZ || tracksThPi) {
+    legacy.data = Object.assign({}, tracksZ || {}, tracksThPi || {});
+    if (legacy.data.theta_pi_cusum && legacy.data.cusum_theta === undefined) {
+      legacy.data.cusum_theta = legacy.data.theta_pi_cusum;
+    }
+  } else {
+    legacy.data = null;
+  }
+  // Mark theta-pi layers as present so _refreshThetaPiLayerStatus shows
+  // the green-dot 'loaded' state instead of the 'not loaded' placeholder.
+  // We mutate the same Set (already attached to inv.layersPresent) so
+  // page1 sees the update too — the layer-availability check on the
+  // color-mode picker uses the same Set across pages.
+  if (tracksThPi) {
+    const tpiLayerKeys = [
+      ['theta_pi_per_window', 'theta_pi_per_window'],
+      ['theta_pi_local_pca',  'theta_pi_local_pca'],
+      ['theta_pi_envelopes',  'theta_pi_envelopes'],
+      ['cusum_theta',         'theta_pi_cusum'],
+    ];
+    for (const [layerName, srcField] of tpiLayerKeys) {
+      if (tracksThPi[srcField] != null) legacy.layersPresent.add(layerName);
+    }
+  }
+
   // Geometry caches — written by the renderers, read by hit-test handlers.
   legacy._simGeom    = inv._simGeom    || null;
   legacy._thSimGeom  = inv._thSimGeom  || null;

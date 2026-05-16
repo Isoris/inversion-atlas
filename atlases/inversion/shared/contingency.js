@@ -312,10 +312,15 @@ export function lnGamma(x) {
  * @returns {string}
  */
 // scaleStabilityVerdict canonical implementation now lives in
-// shared/scale_stability.js (matches legacy line 12408 exactly). The
-// re-export below preserves contingency.js's export surface so
-// existing imports keep working.
-export { scaleStabilityVerdict } from './scale_stability.js';
+// shared/scale_stability.js (matches legacy line 12408 exactly). We
+// import it locally AND re-export so existing imports keep working
+// AND the local-binding reference at the bottom of this file
+// (window._scaleStabilityVerdict = ...) still resolves. A bare
+// `export { X } from '...'` re-exports without creating a local
+// binding, which made the debug-window assignment throw ReferenceError
+// the moment page1 imported contingency.js.
+import { scaleStabilityVerdict } from './scale_stability.js';
+export { scaleStabilityVerdict };
 
 // =====================================================================
 // Table-based primitives (input: K×K contingency table)

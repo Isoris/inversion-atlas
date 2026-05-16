@@ -14,7 +14,8 @@
       "preload_on": "chrom_change",
       "source": "file",
       "root": "precomp_zblocks",
-      "path_under_root": "{chrom}.json",
+      "auto_index": true,
+      "_auto_index_doc": "Filename per chrom is discovered at runtime via GET /api/precomp_index?root=precomp_zblocks. The server walks the root, returns {LG01: 'C_gar_LG01.atlas.json', ...} and the registry constructs <root_path>/<filename>. No need to hardcode the species prefix or the .atlas infix; the same layer keeps working when the pipeline's naming convention changes or when a second species lands.",
       "_path_was": "data/precomp/{chrom}.json",
       "_root_doc": "Resolved through master_config.yaml -> roots.precomp_zblocks (currently /mnt/e/results_inversions/local_PCA_MDS_z/09_atlas_json/). To switch precomp source, edit the root entry — no layer change needed.",
       "schema": "schemas/scrubber_main.schema.json",
@@ -69,6 +70,24 @@
         "theta_pi_envelopes",
         "relatedness"
       ]
+    },
+    "scrubber_thetapi": {
+      "tier": "hot",
+      "preload_on": "chrom_change",
+      "source": "file",
+      "root": "precomp_thetapi",
+      "auto_index": true,
+      "_auto_index_doc": "Same discovery mechanism as scrubber_main but pointed at the theta-pi pipeline root. Layout is nested (04_atlas_json/C_gar_LG{NN}/C_gar_LG{NN}_phase2_theta.json); the server's depth-2 scan handles it. Consumed by page12 (local PCA θπ) via _buildLegacyState's merge of tracks_thetapi into state.data.",
+      "pin_to": "AtlasState.inversion.tracks_thetapi.{chrom}"
+    },
+    "scrubber_ghsl": {
+      "tier": "warm",
+      "preload_on": "chrom_change",
+      "source": "file",
+      "root": "precomp_ghsl",
+      "auto_index": true,
+      "_auto_index_doc": "Same discovery mechanism as scrubber_main but pointed at the GHSL pipeline root. Pre-wired for symmetry with scrubber_thetapi; resolves to whatever filename convention the GHSL pipeline lands on, because the layer asks the server which files exist instead of templating.",
+      "pin_to": "AtlasState.inversion.tracks_ghsl.{chrom}"
     },
     "repeat_density": {
       "tier": "hot",

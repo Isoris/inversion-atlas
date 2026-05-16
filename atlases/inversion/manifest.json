@@ -334,11 +334,11 @@
     {
       "slot": "activeChrom",
       "label": "chromosome",
-      "options": ["LG28"],
+      "auto_options_from": "precomp_zblocks",
       "shared": true
     }
   ],
-  "_scope_pickers_doc": "Pickers rendered in the shell's #scopebar (sticky strip below the topbar). Each picker drives an AtlasState slot via setActiveChrom / setActiveCandidate / generic emit. The `options` array lists the values currently shipped with this atlas package; in the demo build only LG28 precomp is included. When data for additional chromosomes is staged into atlases/inversion/data/precomp/, extend this list. Future work: replace the static list with a discovery file (e.g. data/precomp/_index.json) so the shell can populate it dynamically.",
+  "_scope_pickers_doc": "Pickers rendered in the shell's #scopebar (sticky strip below the topbar). Each picker drives an AtlasState slot via setActiveChrom / setActiveCandidate / generic emit. `auto_options_from: <root_name>` makes the dropdown discover its options at runtime via GET /api/precomp_index?root=<root_name> — the server walks the pipeline output dir and returns whichever chromosomes have an atlas JSON on disk. No manual list to maintain; add a new chrom to the pipeline output and it shows up in the dropdown on next page load. (A static `options: [...]` array is still supported for pickers that aren't backed by a precomp root.)",
   "stages": [
     {
       "id": "discovery",
