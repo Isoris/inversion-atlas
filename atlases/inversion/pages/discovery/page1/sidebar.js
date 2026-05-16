@@ -45,7 +45,7 @@ import { _setActiveState } from './_state.js';
 import { getL2Cluster } from './_data.js';
 import { drawSim, drawSimMini } from './sim_panel.js';
 import { drawZ } from './z_panel.js';
-import { drawLinesPanel } from './lines_panel.js';
+import { drawLinesPanel, setLinesPanelCandidateBands } from './lines_panel.js';
 // applyMainGrid recomputes main#page1's grid-template-rows from the
 // current state + visible panels. Called from _setSimInMinimap (sim
 // toggle changes which rows are present) and _applyLayoutMode (so the
@@ -211,6 +211,28 @@ function _wireNewShellControls(state) {
       catch (err) { console.warn('[l3HetToggle] renderL3Panel:', err); }
     });
     hetEl.dataset.wired = '1';
+  }
+
+  // 2026-05-16 Group A.1: linesCandBandsToggle. The function
+  // setLinesPanelCandidateBands(state, b) already exists in
+  // lines_panel.js#1316 (writes state.linesPanelCandidateBands +
+  // localStorage + redraws). The checkbox in page1.html line 747 had
+  // no event listener anywhere — checked-by-default but flipping it
+  // did nothing. WIRE_AUDIT_page1.md Group A entry.
+  const candBandsEl = $('linesCandBandsToggle');
+  if (candBandsEl && candBandsEl.dataset.wired !== '1') {
+    // Default state: checked (per page1.html `checked` attribute). The
+    // shipping default for state.linesPanelCandidateBands is true (per
+    // SPEC_lines_panel_candidate_bands §3 "Toggle + persistence").
+    candBandsEl.checked = (state.linesPanelCandidateBands !== false);
+    candBandsEl.addEventListener('change', (e) => {
+      try {
+        setLinesPanelCandidateBands(state, e.target.checked);
+      } catch (err) {
+        console.warn('[linesCandBandsToggle] setLinesPanelCandidateBands:', err);
+      }
+    });
+    candBandsEl.dataset.wired = '1';
   }
 }
 
