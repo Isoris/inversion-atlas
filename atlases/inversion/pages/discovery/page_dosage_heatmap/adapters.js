@@ -60,12 +60,21 @@ export function adaptMglHeatmapJson(result, opts) {
   const rows = new Array(n_markers);
   const polarity = new Array(n_markers);
   const mlabels = new Array(n_markers);
+  // 2026-05-16: per-marker role-pair sidecar track. SPEC_0 §1 defines
+  // role_a / role_b ∈ {MAJOR, MINOR1, MINOR2, MINOR3}. For tri- and
+  // quad-allelic markers the producer emits multiple pair rows
+  // (MAJOR_MINOR1, MAJOR_MINOR2, MINOR1_MINOR2, etc.); the heatmap
+  // can show all of them but the colour stripe lets the user spot
+  // which pair each column is at a glance.
+  const role_pair = new Array(n_markers);
   for (let i = 0; i < n_markers; i++) {
     const m = result.markers[i] || {};
     rows[i] = useCentered ? (m.dosage_centered || m.dosage || null)
                           : (m.dosage || m.dosage_centered || null);
     polarity[i] = !!m.polarity_flipped;
     mlabels[i] = String(m.marker || ('M' + i));
+    // role_a / role_b absent on bi-allelic legacy precomp → null.
+    role_pair[i] = (m.role_a && m.role_b) ? (m.role_a + '_' + m.role_b) : null;
   }
   const cellValue = (m, s) => {
     const row = rows[m];
@@ -80,6 +89,7 @@ export function adaptMglHeatmapJson(result, opts) {
     sample_group:    o.sample_group || null,
     sample_k6:       o.sample_k6 || null,
     marker_polarity: polarity,
+    marker_role_pair: role_pair,    // 2026-05-16 — null per-marker on bi-only data
     sample_labels:   (result.samples && result.samples.slice()) || null,
     marker_labels:   mlabels,
     _source:         'mgl_heatmap_json',
@@ -151,6 +161,17 @@ export function adaptLegacyChunk(chunk, opts) {
     return v;
   };
 
+  // 2026-05-16: legacy-chunk shape pre-dates the SPEC_0 role-pair
+  // convention. Best-effort extract role_a/role_b from the chunk's
+  // markers[mi] when present; otherwise leave null (the renderer's
+  // role-pair track will simply not appear).
+  const role_pair = new Array(n_markers);
+  for (let i = 0; i < n_markers; i++) {
+    const mi = sel ? sel[i] : i;
+    const m = chunk.markers[mi] || {};
+    role_pair[i] = (m.role_a && m.role_b) ? (m.role_a + '_' + m.role_b) : null;
+  }
+
   return {
     n_samples,
     n_markers,
@@ -158,6 +179,7 @@ export function adaptLegacyChunk(chunk, opts) {
     sample_group:    o.sample_group || null,
     sample_k6:       o.sample_k6 || null,
     marker_polarity: polarity,
+    marker_role_pair: role_pair,    // 2026-05-16 — null per-marker on legacy bi-only chunks
     sample_labels:   chunk.samples.slice(),
     marker_labels,
     _source:         'legacy_chunk',
