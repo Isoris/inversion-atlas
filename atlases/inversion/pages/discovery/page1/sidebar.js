@@ -234,6 +234,34 @@ function _wireNewShellControls(state) {
     });
     candBandsEl.dataset.wired = '1';
   }
+
+  // 2026-05-16 Group A.2 + A.3: linesTransRateToggle + linesRegimeBreadthToggle.
+  // Both checkboxes (page1.html lines 628 / 639) gate the rendering
+  // of strips in the |Z| panel (z_panel.js#_drawTransRateStrip /
+  // _drawRegimeBreadthStrip). The strips early-return when their
+  // state slot is false. No event listeners wired anywhere → toggling
+  // the checkbox did nothing.
+  // Same minimum-invasive pattern as the SPEC_l3_het_dosage_coloring
+  // toggle wire above: flip state slot, drawZ() to re-render. Both
+  // slots default false so the strips stay off until the user opts in.
+  const transRateEl = $('linesTransRateToggle');
+  if (transRateEl && transRateEl.dataset.wired !== '1') {
+    transRateEl.checked = !!state.linesTransRateOn;
+    transRateEl.addEventListener('change', (e) => {
+      state.linesTransRateOn = !!e.target.checked;
+      try { drawZ(state); } catch (err) { console.warn('[linesTransRateToggle] drawZ:', err); }
+    });
+    transRateEl.dataset.wired = '1';
+  }
+  const regimeBreadthEl = $('linesRegimeBreadthToggle');
+  if (regimeBreadthEl && regimeBreadthEl.dataset.wired !== '1') {
+    regimeBreadthEl.checked = !!state.linesRegimeBreadthOn;
+    regimeBreadthEl.addEventListener('change', (e) => {
+      state.linesRegimeBreadthOn = !!e.target.checked;
+      try { drawZ(state); } catch (err) { console.warn('[linesRegimeBreadthToggle] drawZ:', err); }
+    });
+    regimeBreadthEl.dataset.wired = '1';
+  }
 }
 
 // =============================================================================
