@@ -182,6 +182,8 @@ export function deriveMarkerOrder(mode, n_markers, src) {
  *   show_group_track?:   boolean   default true
  *   show_k6_track?:      boolean   default false
  *   show_polarity_track?:boolean   default true
+ *   show_role_pair_track?:boolean  default true (auto-hidden when
+ *                                   no marker has a role_pair value)
  *   group_colors?:       Map<*,string>
  *   k6_colors?:          Map<*,string>
  *   hovered_cell?:       {row:number, col:number} | null  (display coords)
@@ -227,9 +229,19 @@ export function paintDosageHeatmap(canvas, data, opts) {
   const showGroup     = (o.show_group_track !== false)    && !!data.sample_group;
   const showK6        = (o.show_k6_track === true)        && !!data.sample_k6;
   const showPolarity  = (o.show_polarity_track !== false) && !!data.marker_polarity;
+  // 2026-05-16: per-marker role-pair sidecar track (SPEC_0 §1 —
+  // MAJOR_MINOR1 / MAJOR_MINOR2 / MINOR1_MINOR2 / MAJOR_MINOR3 /
+  // MINOR1_MINOR3 / MINOR2_MINOR3). Auto-hidden when no marker has
+  // a role_pair value (legacy bi-only data; or when the user
+  // explicitly opts out via show_role_pair_track: false).
+  const hasAnyRolePair = !!data.marker_role_pair
+    && Array.isArray(data.marker_role_pair)
+    && data.marker_role_pair.some(p => p);
+  const showRolePair = (o.show_role_pair_track !== false) && hasAnyRolePair;
   const leftBands = (showGroup ? trackPx + trackGap : 0)
                  + (showK6    ? trackPx + trackGap : 0);
-  const topBand   = (showPolarity ? trackPx + trackGap : 0);
+  const topBand   = (showPolarity ? trackPx + trackGap : 0)
+                  + (showRolePair ? trackPx + trackGap : 0);
   const drawW = Math.max(50, W - 2 * xPad - leftBands);
   const drawH = Math.max(50, H - 2 * yPad - topBand);
   const cellW = drawW / nM;
@@ -285,6 +297,37 @@ export function paintDosageHeatmap(canvas, data, opts) {
     leftX += trackPx + trackGap;
   }
 
+  // --- Top tracks (stacked above the matrix).
+  // Stack order top-to-bottom: role-pair track (highest), then
+  // polarity stripe, then the matrix. Each track is `trackPx` tall
+  // with `trackGap` between adjacent tracks. The role-pair track
+  // sits at yPad; polarity follows below; the matrix starts at matY.
+  let topY = yPad;
+  if (showRolePair) {
+    // Discrete palette per role-pair. MAJOR_MINOR1 (the default
+    // bi-allelic pair) gets a subdued grey so multi-allelic pairs
+    // stand out. Order matches SPEC_0 §1 pair-emission order.
+    const ROLE_PAIR_COLORS = {
+      'MAJOR_MINOR1':  'rgba(180, 180, 180, 0.7)',    // grey (default / bi-allelic)
+      'MAJOR_MINOR2':  'rgba( 80, 140, 220, 0.85)',   // soft blue
+      'MINOR1_MINOR2': 'rgba(245, 165,  36, 0.85)',   // soft orange
+      'MAJOR_MINOR3':  'rgba( 60, 180, 120, 0.85)',   // soft green
+      'MINOR1_MINOR3': 'rgba(176, 124, 247, 0.85)',   // soft purple
+      'MINOR2_MINOR3': 'rgba(224,  85,  92, 0.85)',   // soft red
+    };
+    for (let c = 0; c < nM; c++) {
+      const mi   = order_m[c];
+      const pair = data.marker_role_pair[mi];
+      const col  = pair ? (ROLE_PAIR_COLORS[pair] || 'rgba(120,120,120,0.5)')
+                        : 'rgba(40,40,40,0.25)';   // very faint grey = no role_pair info
+      ctx.fillStyle = col;
+      if (typeof ctx.fillRect === 'function') {
+        ctx.fillRect(matX + c * cellW, topY, cellW + 0.5, trackPx);
+      }
+    }
+    topY += trackPx + trackGap;
+  }
+
   // --- Top polarity stripe (one cell per displayed marker; black =
   // flipped, light grey = unflipped).
   if (showPolarity) {
@@ -293,7 +336,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
       const f  = !!data.marker_polarity[mi];
       ctx.fillStyle = f ? 'rgba(20,20,20,0.85)' : 'rgba(220,220,220,0.85)';
       if (typeof ctx.fillRect === 'function') {
-        ctx.fillRect(matX + c * cellW, yPad, cellW + 0.5, trackPx);
+        ctx.fillRect(matX + c * cellW, topY, cellW + 0.5, trackPx);
       }
     }
   }
