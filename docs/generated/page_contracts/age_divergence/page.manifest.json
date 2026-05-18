@@ -1,0 +1,30 @@
+{
+  "page_id": "age_divergence",
+  "label": "age + divergence",
+  "page_type": "core_page (Phase 1 cartridge)",
+  "stage": "evolution",
+  "owner_atlas": "inversion",
+  "status": "active",
+  "current_path": {
+    "html": "atlases/inversion/pages/evolution/age_divergence.html",
+    "js_entry": "atlases/inversion/pages/evolution/age_divergence.js",
+    "js_subdir": "atlases/inversion/pages/evolution/age_divergence/"
+  },
+  "purpose": "Deep-divergence + age-class cartridge. 4 sparkline-style summary bars (pi_inv, pi_std, dxy, FST) + private/fixed counts + age-class verdict. Per-candidate age estimate: dXY between arrangements, private variant density on derived class, MRCA depth, segregating-sites summary.",
+  "required_slots": ["activeCandidate"],
+  "input_contract": "atlasState.inversion.age_state = { dosage, n_markers, n_samples, inv_idx, std_idx, candidate_label?, opts? }",
+  "subdir_files": ["_state.js — _pageState + setter"],
+  "primitives_used": ["shared/mgl_inversion_divergence.js (computeDivergence)"],
+  "interactions": [],
+  "computed_preview_outputs": ["pi_inv sparkline", "pi_std sparkline", "dXY sparkline", "FST sparkline", "private/fixed counts", "age-class verdict"],
+  "committable_outputs": [],
+  "commit_policy": "none_by_default",
+  "documents": {
+    "page_registry_doc": "unknown",
+    "specs_done": [],
+    "specs_todo": ["specs_todo/SPEC_inversion_age_atlas_surface_AMENDMENT.md (amendment; parent SPEC not on disk)"],
+    "user_guide": "unknown"
+  },
+  "known_issues": ["Parent SPEC SPEC_inversion_age_atlas_surface.md is referenced by the AMENDMENT but not present on disk."],
+  "confidence": "medium"
+}

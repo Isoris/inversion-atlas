@@ -80,15 +80,15 @@ no tests fail.
 | `dosage_heatmap` | `dosage_heatmap` | sample × marker dosage heatmap |
 | `nested_inversion_detector` | `nested_inversion_detector` | 3-stratum detector |
 | `dosage_cluster_adaptive_k` | `dosage_cluster_adaptive_k` | adaptive-K clustering |
-| `page_evolution_polarize_msa` | `polarize_msa_stacked` | stacked-consensus MSA |
-| `page_evolution_haplotype_network` | `haplotype_network` | MSN of INV chromosomes |
-| `page_evolution_polarize_synteny` | `polarize_synteny_vote` | per-outgroup vote |
-| `page_evolution_age` | `age_divergence` | π / dXY / F_ST / private |
-| `page_evolution_mosaicism` | `mosaicism_leakage` | recombinant-tract detector |
-| `page_evolution_internal_history` | `inv_internal_substructure` | sub-PCA on derived |
-| `page_evolution_layer_cleaning` | `layer_cleaning` | kinship downweighting |
-| `page_evolution_event_tree` | `event_tree_relative_ordering` | cross-candidate ordering |
-| `page_evolution_archaeology_card` | `archaeology_synthesis_card` | Step-6 verdict |
+| `polarize_msa_stacked` | `polarize_msa_stacked` | stacked-consensus MSA |
+| `haplotype_network` | `haplotype_network` | MSN of INV chromosomes |
+| `polarize_synteny_vote` | `polarize_synteny_vote` | per-outgroup vote |
+| `age_divergence` | `age_divergence` | π / dXY / F_ST / private |
+| `mosaicism_leakage` | `mosaicism_leakage` | recombinant-tract detector |
+| `inv_internal_substructure` | `inv_internal_substructure` | sub-PCA on derived |
+| `layer_cleaning` | `layer_cleaning` | kinship downweighting |
+| `event_tree_relative_ordering` | `event_tree_relative_ordering` | cross-candidate ordering |
+| `archaeology_synthesis_card` | `archaeology_synthesis_card` | Step-6 verdict |
 
 ## What stages 2-4 will do (NOT YET SHIPPED)
 

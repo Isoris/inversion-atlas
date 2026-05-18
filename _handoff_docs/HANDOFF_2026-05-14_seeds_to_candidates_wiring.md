@@ -73,8 +73,8 @@ After this handoff lands, the second branch becomes:
             ↓
         page4 (karyotype/tier)          via PR #13 karyotype_assignment
         page17 (stats profile)          via existing legacy
-        page_evolution_polarize_msa     via canonical candidate shape
-        page_evolution_archaeology_card etc.
+        polarize_msa_stacked     via canonical candidate shape
+        archaeology_synthesis_card etc.
 ```
 
 Window-chain candidates from PR #14 (`window_chain_to_candidates`)

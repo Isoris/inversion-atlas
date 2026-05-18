@@ -4890,15 +4890,15 @@ html[data-theme="academic"] #page16 .cs-synteny-sankey {
    (.pmsa- / .hnet- / .syn- / .age- / .mos- / .ih- / .lc- / .et- / .ac-).
    ==================================================================== */
 
-.page#page_evolution_polarize_msa.active,
-.page#page_evolution_haplotype_network.active,
-.page#page_evolution_polarize_synteny.active,
-.page#page_evolution_age.active,
-.page#page_evolution_mosaicism.active,
-.page#page_evolution_internal_history.active,
-.page#page_evolution_layer_cleaning.active,
-.page#page_evolution_event_tree.active,
-.page#page_evolution_archaeology_card.active {
+.page#polarize_msa_stacked.active,
+.page#haplotype_network.active,
+.page#polarize_synteny_vote.active,
+.page#age_divergence.active,
+.page#mosaicism_leakage.active,
+.page#inv_internal_substructure.active,
+.page#layer_cleaning.active,
+.page#event_tree_relative_ordering.active,
+.page#archaeology_synthesis_card.active {
   display: flex; flex-direction: column;
   height: 100%; min-height: 0; overflow: hidden;
 }

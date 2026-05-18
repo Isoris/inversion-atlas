@@ -1,0 +1,34 @@
+{
+  "page_id": "layer_cleaning",
+  "label": "layer cleaning",
+  "page_type": "core_page (Phase 1 cartridge)",
+  "stage": "evolution",
+  "owner_atlas": "inversion",
+  "status": "active",
+  "current_path": {
+    "html": "atlases/inversion/pages/evolution/layer_cleaning.html",
+    "js_entry": "atlases/inversion/pages/evolution/layer_cleaning.js",
+    "js_subdir": "atlases/inversion/pages/evolution/layer_cleaning/"
+  },
+  "purpose": "Per-sample weighting cartridge for Layer 0/1 cleaning. Renders a per-sample bar showing final weight ∈ [0, 1]. Kinship + family-size downweighting + hatchery-duplicate exclusion so close relatives don't double-count in deep-Layer-2 stats.",
+  "weight_classes": {
+    "clean": "weight ≈ 1",
+    "downweighted": "0 < w < 1",
+    "excluded": "w = 0"
+  },
+  "required_slots": ["activeCandidate"],
+  "input_contract": "atlasState.inversion.layer_cleaning_state = { n_samples, kinship?: Float64Array (n × n), family_ids?: Array<*>, hatchery_dup?: boolean[], sample_labels?, candidate_label? }",
+  "subdir_files": ["_state.js — _pageState + setter"],
+  "primitives_used": ["shared/mgl_kinship_downweight.js"],
+  "interactions": [],
+  "computed_preview_outputs": ["per-sample final weight bar"],
+  "committable_outputs": [],
+  "commit_policy": "none_by_default",
+  "documents": {
+    "page_registry_doc": "unknown",
+    "specs_done": [],
+    "specs_todo": [],
+    "user_guide": "unknown"
+  },
+  "confidence": "high"
+}

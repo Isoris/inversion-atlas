@@ -1,0 +1,32 @@
+{
+  "page_id": "event_tree_relative_ordering",
+  "label": "event tree",
+  "page_type": "core_page (Phase 1 cartridge)",
+  "stage": "evolution",
+  "owner_atlas": "inversion",
+  "status": "active",
+  "current_path": {
+    "html": "atlases/inversion/pages/evolution/event_tree_relative_ordering.html",
+    "js_entry": "atlases/inversion/pages/evolution/event_tree_relative_ordering.js",
+    "js_subdir": "atlases/inversion/pages/evolution/event_tree_relative_ordering/"
+  },
+  "purpose": "Relative-ordering cartridge across multiple inversion candidates. Per-candidate × per-candidate overlap matrix coloured by relationship (nested / sister / independent / mutual_exclusive). Carrier-overlap nesting, internal diversity ranking, outgroup presence, age class chaining.",
+  "required_slots": ["activeCandidate (multi-candidate context — reads carrier matrix)"],
+  "input_contract": "atlasState.inversion.event_tree_state = { carriers: Uint8Array | number[] (n_samples × n_candidates row-major), n_samples, n_candidates, per_candidate?: Array<{id, label?, pi_inv?, dxy?, fst?, private_inv?, outgroup_present?, ...}>, chrom_label?, opts? }",
+  "subdir_files": ["_state.js — _pageState + setter"],
+  "primitives_used": ["shared/mgl_event_tree.js"],
+  "interactions": [],
+  "computed_preview_outputs": [
+    "per-candidate × per-candidate overlap matrix",
+    "relationship classification: nested / sister / independent / mutual_exclusive"
+  ],
+  "committable_outputs": [],
+  "commit_policy": "none_by_default",
+  "documents": {
+    "page_registry_doc": "unknown",
+    "specs_done": [],
+    "specs_todo": [],
+    "user_guide": "unknown"
+  },
+  "confidence": "medium"
+}

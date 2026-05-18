@@ -50,7 +50,7 @@ Preview-only. No committable outputs.
 
 ## Downstream consumer
 
-- `page_evolution_polarize_msa` feeds stacked-consensus rows into
+- `polarize_msa_stacked` feeds stacked-consensus rows into
   this painter as a downstream tinted view.
 
 ## Documents

@@ -265,85 +265,94 @@
       "_was_id": "page_dosage_cluster"
     },
     {
-      "id": "page_evolution_polarize_msa",
+      "id": "polarize_msa_stacked",
       "slug": "polarize_msa_stacked",
       "label": "polarize \u00b7 MSA",
       "stage": "evolution",
-      "fragment": "atlases/inversion/pages/evolution/page_evolution_polarize_msa.html",
-      "module": "atlases/inversion/pages/evolution/page_evolution_polarize_msa.js",
-      "tooltip": "Stacked-consensus MSA view of the inversion: outgroup row + INV founder-like consensus row + per-subgroup consensus rows (from 2D-SFS doubleton hierarchical clustering) + STD consensus row. Confidence + reason tier per site."
+      "fragment": "atlases/inversion/pages/evolution/polarize_msa_stacked.html",
+      "module": "atlases/inversion/pages/evolution/polarize_msa_stacked.js",
+      "tooltip": "Stacked-consensus MSA view of the inversion: outgroup row + INV founder-like consensus row + per-subgroup consensus rows (from 2D-SFS doubleton hierarchical clustering) + STD consensus row. Confidence + reason tier per site.",
+      "_was_id": "page_evolution_polarize_msa"
     },
     {
-      "id": "page_evolution_haplotype_network",
+      "id": "haplotype_network",
       "slug": "haplotype_network",
       "label": "haplotype network",
       "stage": "evolution",
-      "fragment": "atlases/inversion/pages/evolution/page_evolution_haplotype_network.html",
-      "module": "atlases/inversion/pages/evolution/page_evolution_haplotype_network.js",
-      "tooltip": "Minimum-spanning haplotype network of INV chromosomes. Nodes are Hamming-radius clusters; edges are pairwise mutational distance. Node colour matches the 2D-SFS doubleton subgroup."
+      "fragment": "atlases/inversion/pages/evolution/haplotype_network.html",
+      "module": "atlases/inversion/pages/evolution/haplotype_network.js",
+      "tooltip": "Minimum-spanning haplotype network of INV chromosomes. Nodes are Hamming-radius clusters; edges are pairwise mutational distance. Node colour matches the 2D-SFS doubleton subgroup.",
+      "_was_id": "page_evolution_haplotype_network"
     },
     {
-      "id": "page_evolution_polarize_synteny",
+      "id": "polarize_synteny_vote",
       "slug": "polarize_synteny_vote",
       "label": "polarize \u00b7 synteny",
       "stage": "evolution",
-      "fragment": "atlases/inversion/pages/evolution/page_evolution_polarize_synteny.html",
-      "module": "atlases/inversion/pages/evolution/page_evolution_polarize_synteny.js",
-      "tooltip": "Outgroup-synteny polarization: per-outgroup-species break-point orientation vote (HOM_A / HOM_B / unresolved), aggregated to an arrangement verdict."
+      "fragment": "atlases/inversion/pages/evolution/polarize_synteny_vote.html",
+      "module": "atlases/inversion/pages/evolution/polarize_synteny_vote.js",
+      "tooltip": "Outgroup-synteny polarization: per-outgroup-species break-point orientation vote (HOM_A / HOM_B / unresolved), aggregated to an arrangement verdict.",
+      "_was_id": "page_evolution_polarize_synteny"
     },
     {
-      "id": "page_evolution_age",
+      "id": "age_divergence",
       "slug": "age_divergence",
       "label": "age + divergence",
       "stage": "evolution",
-      "fragment": "atlases/inversion/pages/evolution/page_evolution_age.html",
-      "module": "atlases/inversion/pages/evolution/page_evolution_age.js",
-      "tooltip": "Per-candidate age estimate: dXY between arrangements, private variant density on the derived class, MRCA depth, segregating-sites summary."
+      "fragment": "atlases/inversion/pages/evolution/age_divergence.html",
+      "module": "atlases/inversion/pages/evolution/age_divergence.js",
+      "tooltip": "Per-candidate age estimate: dXY between arrangements, private variant density on the derived class, MRCA depth, segregating-sites summary.",
+      "_was_id": "page_evolution_age"
     },
     {
-      "id": "page_evolution_mosaicism",
+      "id": "mosaicism_leakage",
       "slug": "mosaicism_leakage",
       "label": "mosaicism / leakage",
       "stage": "evolution",
-      "fragment": "atlases/inversion/pages/evolution/page_evolution_mosaicism.html",
-      "module": "atlases/inversion/pages/evolution/page_evolution_mosaicism.js",
-      "tooltip": "Recombinant-tract / polarity-switch detector on INV chromosomes. Per-sample per-window mosaic-call + summary leakage score."
+      "fragment": "atlases/inversion/pages/evolution/mosaicism_leakage.html",
+      "module": "atlases/inversion/pages/evolution/mosaicism_leakage.js",
+      "tooltip": "Recombinant-tract / polarity-switch detector on INV chromosomes. Per-sample per-window mosaic-call + summary leakage score.",
+      "_was_id": "page_evolution_mosaicism"
     },
     {
-      "id": "page_evolution_internal_history",
+      "id": "inv_internal_substructure",
       "slug": "inv_internal_substructure",
       "label": "internal history",
       "stage": "evolution",
-      "fragment": "atlases/inversion/pages/evolution/page_evolution_internal_history.html",
-      "module": "atlases/inversion/pages/evolution/page_evolution_internal_history.js",
-      "tooltip": "Sub-PCA on derived-only samples: looks for haplotype clusters / nested rearrangements / sublineages inside the inversion class."
+      "fragment": "atlases/inversion/pages/evolution/inv_internal_substructure.html",
+      "module": "atlases/inversion/pages/evolution/inv_internal_substructure.js",
+      "tooltip": "Sub-PCA on derived-only samples: looks for haplotype clusters / nested rearrangements / sublineages inside the inversion class.",
+      "_was_id": "page_evolution_internal_history"
     },
     {
-      "id": "page_evolution_layer_cleaning",
+      "id": "layer_cleaning",
       "slug": "layer_cleaning",
       "label": "layer cleaning",
       "stage": "evolution",
-      "fragment": "atlases/inversion/pages/evolution/page_evolution_layer_cleaning.html",
-      "module": "atlases/inversion/pages/evolution/page_evolution_layer_cleaning.js",
-      "tooltip": "Layer 0/1 noise removal: kinship + family-size downweighting + hatchery-duplicate exclusion so close relatives don't double-count in deep-Layer-2 stats."
+      "fragment": "atlases/inversion/pages/evolution/layer_cleaning.html",
+      "module": "atlases/inversion/pages/evolution/layer_cleaning.js",
+      "tooltip": "Layer 0/1 noise removal: kinship + family-size downweighting + hatchery-duplicate exclusion so close relatives don't double-count in deep-Layer-2 stats.",
+      "_was_id": "page_evolution_layer_cleaning"
     },
     {
-      "id": "page_evolution_event_tree",
+      "id": "event_tree_relative_ordering",
       "slug": "event_tree_relative_ordering",
       "label": "event tree",
       "stage": "evolution",
-      "fragment": "atlases/inversion/pages/evolution/page_evolution_event_tree.html",
-      "module": "atlases/inversion/pages/evolution/page_evolution_event_tree.js",
-      "tooltip": "Relative-ordering inference across multiple inversions on the same chromosome \u2014 carrier-overlap nesting, internal diversity ranking, outgroup presence, age class chaining."
+      "fragment": "atlases/inversion/pages/evolution/event_tree_relative_ordering.html",
+      "module": "atlases/inversion/pages/evolution/event_tree_relative_ordering.js",
+      "tooltip": "Relative-ordering inference across multiple inversions on the same chromosome \u2014 carrier-overlap nesting, internal diversity ranking, outgroup presence, age class chaining.",
+      "_was_id": "page_evolution_event_tree"
     },
     {
-      "id": "page_evolution_archaeology_card",
+      "id": "archaeology_synthesis_card",
       "slug": "archaeology_synthesis_card",
       "label": "archaeology card",
       "stage": "evolution",
-      "fragment": "atlases/inversion/pages/evolution/page_evolution_archaeology_card.html",
-      "module": "atlases/inversion/pages/evolution/page_evolution_archaeology_card.js",
-      "tooltip": "Per-candidate synthesis card: pulls together polarity, age class, integrity, mosaicism, frequency, \u03c0/dXY/FST, private/fixed counts, and confidence into one screen \u2014 the Step-6 verdict."
+      "fragment": "atlases/inversion/pages/evolution/archaeology_synthesis_card.html",
+      "module": "atlases/inversion/pages/evolution/archaeology_synthesis_card.js",
+      "tooltip": "Per-candidate synthesis card: pulls together polarity, age class, integrity, mosaicism, frequency, \u03c0/dXY/FST, private/fixed counts, and confidence into one screen \u2014 the Step-6 verdict.",
+      "_was_id": "page_evolution_archaeology_card"
     }
   ],
   "registries": {

@@ -1,0 +1,62 @@
+  <div id="haplotype_network" class="page">
+
+    <header id="hapNetHeader" class="hnet-header">
+      <div class="hnet-title">
+        <h2>Haplotype network · INV</h2>
+        <span id="hapNetCandidateLabel" class="hnet-meta">—</span>
+      </div>
+      <div class="hnet-controls">
+        <span id="hapNetSummaryBadge" class="hnet-summary-badge"
+              title="Network summary">—</span>
+        <span class="hnet-sep"></span>
+        <label class="hnet-toggle">
+          Hamming radius
+          <input id="hapNetHammingRadius" type="number" min="0" max="20" value="2"
+                 style="width:38px;">
+        </label>
+        <label class="hnet-toggle">
+          Layout seed
+          <input id="hapNetLayoutSeed" type="number" min="1" max="99999" value="12345"
+                 style="width:64px;">
+        </label>
+        <label class="hnet-toggle">
+          <input id="hapNetShowLabels" type="checkbox">
+          Node labels
+        </label>
+      </div>
+    </header>
+
+    <div class="hnet-body">
+      <div class="hnet-canvas-wrap">
+        <canvas id="hapNetCanvas" class="hnet-canvas"></canvas>
+        <div id="hapNetEmpty" class="hnet-empty" style="display:none;">
+          No haplotype-network input loaded.
+          atlasState.inversion.haplotype_network_state needs a dosage
+          matrix + inv_idx.
+        </div>
+      </div>
+      <aside class="hnet-right">
+        <header class="hnet-panel-head">
+          <h4>Hovered node</h4>
+          <span id="hapNetSelectedHint" class="hnet-hint">(hover a node)</span>
+        </header>
+        <dl id="hapNetSelectedFields" class="hnet-selected-fields"></dl>
+        <section id="hapNetEdgeList" class="hnet-edge-list">
+          <h5>Edges</h5>
+          <div id="hapNetEdgeBody" class="hnet-edge-body"></div>
+        </section>
+        <section id="hapNetNodeList" class="hnet-node-list">
+          <h5>Nodes</h5>
+          <div id="hapNetNodeBody" class="hnet-node-body"></div>
+        </section>
+      </aside>
+    </div>
+
+    <footer id="hapNetFooter" class="hnet-footer">
+      ⓘ Minimum-spanning haplotype network of INV chromosomes.
+      Nodes = Hamming-radius clusters; node size ∝ chromosome count;
+      edges = pairwise mutational distance between cluster
+      representatives.
+    </footer>
+
+  </div>

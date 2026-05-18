@@ -212,15 +212,15 @@ Examples:
 | `nested_inversion_detector` | nested detector | `nested_inversion_detector` |
 | `dosage_cluster_adaptive_k` | dosage cluster | `dosage_cluster_adaptive_k` |
 | `page_ancestry_scroller` | ancestry scroller | `fish_ancestry_scroller` |
-| `page_evolution_polarize_msa` | polarize · MSA | `polarize_msa_stacked` |
-| `page_evolution_haplotype_network` | haplotype network | `haplotype_network` |
-| `page_evolution_polarize_synteny` | polarize · synteny | `polarize_synteny_vote` |
-| `page_evolution_age` | age + divergence | `age_divergence` |
-| `page_evolution_mosaicism` | mosaicism / leakage | `mosaicism_leakage` |
-| `page_evolution_internal_history` | internal history | `inv_internal_substructure` |
-| `page_evolution_layer_cleaning` | layer cleaning | `layer_cleaning` |
-| `page_evolution_event_tree` | event tree | `event_tree_relative_ordering` |
-| `page_evolution_archaeology_card` | archaeology card | `archaeology_synthesis_card` |
+| `polarize_msa_stacked` | polarize · MSA | `polarize_msa_stacked` |
+| `haplotype_network` | haplotype network | `haplotype_network` |
+| `polarize_synteny_vote` | polarize · synteny | `polarize_synteny_vote` |
+| `age_divergence` | age + divergence | `age_divergence` |
+| `mosaicism_leakage` | mosaicism / leakage | `mosaicism_leakage` |
+| `inv_internal_substructure` | internal history | `inv_internal_substructure` |
+| `layer_cleaning` | layer cleaning | `layer_cleaning` |
+| `event_tree_relative_ordering` | event tree | `event_tree_relative_ordering` |
+| `archaeology_synthesis_card` | archaeology card | `archaeology_synthesis_card` |
 
 If you want different slug names, edit this table — the migration
 recipe is the same regardless of slug choices.

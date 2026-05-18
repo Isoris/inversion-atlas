@@ -61,6 +61,6 @@
     "user_guide": "unknown"
   },
 
-  "known_issues": ["Reused by page_evolution_polarize_msa as a downstream painter (stacked-consensus rows fed in)."],
+  "known_issues": ["Reused by polarize_msa_stacked as a downstream painter (stacked-consensus rows fed in)."],
   "confidence": "high"
 }

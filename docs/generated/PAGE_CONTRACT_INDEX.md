@@ -60,15 +60,15 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | classification | page7 | ancestry | active (thin loader) | high | [page.manifest.json](page_contracts/page7/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page7/PAGE_CONTRACT.md) |
 | classification | page11 | boundaries | active | high | [page.manifest.json](page_contracts/page11/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page11/PAGE_CONTRACT.md) |
 | classification | page_sv_evidence | SV evidence | active (thin loader) | high | [page.manifest.json](page_contracts/page_sv_evidence/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_sv_evidence/PAGE_CONTRACT.md) |
-| evolution | page_evolution_polarize_msa | polarize · MSA | active | high | [page.manifest.json](page_contracts/page_evolution_polarize_msa/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_polarize_msa/PAGE_CONTRACT.md) |
-| evolution | page_evolution_haplotype_network | haplotype network | active | high | [page.manifest.json](page_contracts/page_evolution_haplotype_network/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_haplotype_network/PAGE_CONTRACT.md) |
-| evolution | page_evolution_polarize_synteny | polarize · synteny | active | medium | [page.manifest.json](page_contracts/page_evolution_polarize_synteny/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_polarize_synteny/PAGE_CONTRACT.md) |
-| evolution | page_evolution_age | age + divergence | active | medium | [page.manifest.json](page_contracts/page_evolution_age/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_age/PAGE_CONTRACT.md) |
-| evolution | page_evolution_mosaicism | mosaicism | active | medium | [page.manifest.json](page_contracts/page_evolution_mosaicism/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_mosaicism/PAGE_CONTRACT.md) |
-| evolution | page_evolution_internal_history | internal history | active | medium | [page.manifest.json](page_contracts/page_evolution_internal_history/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_internal_history/PAGE_CONTRACT.md) |
-| evolution | page_evolution_layer_cleaning | layer cleaning | active | high | [page.manifest.json](page_contracts/page_evolution_layer_cleaning/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_layer_cleaning/PAGE_CONTRACT.md) |
-| evolution | page_evolution_event_tree | event tree | active | medium | [page.manifest.json](page_contracts/page_evolution_event_tree/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_event_tree/PAGE_CONTRACT.md) |
-| evolution | page_evolution_archaeology_card | archaeology card | active | high | [page.manifest.json](page_contracts/page_evolution_archaeology_card/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_evolution_archaeology_card/PAGE_CONTRACT.md) |
+| evolution | polarize_msa_stacked | polarize · MSA | active | high | [page.manifest.json](page_contracts/polarize_msa_stacked/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/polarize_msa_stacked/PAGE_CONTRACT.md) |
+| evolution | haplotype_network | haplotype network | active | high | [page.manifest.json](page_contracts/haplotype_network/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/haplotype_network/PAGE_CONTRACT.md) |
+| evolution | polarize_synteny_vote | polarize · synteny | active | medium | [page.manifest.json](page_contracts/polarize_synteny_vote/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/polarize_synteny_vote/PAGE_CONTRACT.md) |
+| evolution | age_divergence | age + divergence | active | medium | [page.manifest.json](page_contracts/age_divergence/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/age_divergence/PAGE_CONTRACT.md) |
+| evolution | mosaicism_leakage | mosaicism | active | medium | [page.manifest.json](page_contracts/mosaicism_leakage/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/mosaicism_leakage/PAGE_CONTRACT.md) |
+| evolution | inv_internal_substructure | internal history | active | medium | [page.manifest.json](page_contracts/inv_internal_substructure/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/inv_internal_substructure/PAGE_CONTRACT.md) |
+| evolution | layer_cleaning | layer cleaning | active | high | [page.manifest.json](page_contracts/layer_cleaning/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/layer_cleaning/PAGE_CONTRACT.md) |
+| evolution | event_tree_relative_ordering | event tree | active | medium | [page.manifest.json](page_contracts/event_tree_relative_ordering/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/event_tree_relative_ordering/PAGE_CONTRACT.md) |
+| evolution | archaeology_synthesis_card | archaeology card | active | high | [page.manifest.json](page_contracts/archaeology_synthesis_card/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/archaeology_synthesis_card/PAGE_CONTRACT.md) |
 | comparative | page16 | cross-species breakpoints | active | high | [page.manifest.json](page_contracts/page16/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page16/PAGE_CONTRACT.md) |
 | comparative | page16b | multi-species cockpit | active | high | [page.manifest.json](page_contracts/page16b/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page16b/PAGE_CONTRACT.md) |
 | help | page5 | help | active (static) | high | [page.manifest.json](page_contracts/page5/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page5/PAGE_CONTRACT.md) |
@@ -91,11 +91,11 @@ Closed entries:
 - tree_panel, fingerprint_track, similarity_matrix,
   pca_scatter_per_window, dosage_heatmap, nested_inversion_detector,
   dosage_cluster_adaptive_k (7 cartridge pages — HANDOFF_5/6/7/8/10 + SPEC_0)
-- page_evolution_polarize_msa, page_evolution_haplotype_network,
-  page_evolution_polarize_synteny, page_evolution_age,
-  page_evolution_mosaicism, page_evolution_internal_history,
-  page_evolution_layer_cleaning, page_evolution_event_tree,
-  page_evolution_archaeology_card (9 evolution pages)
+- polarize_msa_stacked, haplotype_network,
+  polarize_synteny_vote, age_divergence,
+  mosaicism_leakage, inv_internal_substructure,
+  layer_cleaning, event_tree_relative_ordering,
+  archaeology_synthesis_card (9 evolution pages)
 
 ### Directory / stage discrepancies
 
@@ -187,7 +187,7 @@ help, not a manual.
 - **page12** + **page15** → page1 (`page1.applyData()` dispatches
   panel renderers when θπ / GHSL layers are present)
 - **page9** → page2 (reuses `renderCandidateMetadata`)
-- **page_evolution_polarize_msa** → dosage_heatmap (reuses
+- **polarize_msa_stacked** → dosage_heatmap (reuses
   painter)
 
 ## Statistics

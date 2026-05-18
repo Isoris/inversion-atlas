@@ -208,40 +208,40 @@ All evolution cartridges consume `mgl_adapter` primitives (PCA / dosage / heatma
 - `shared/mgl_event_tree.js`
 - `shared/mgl_archaeology_classifier.js`
 
-### page_evolution_polarize_msa — stacked-consensus MSA  ✅
-- **Subdir**: `page_evolution_polarize_msa/{_state, builder, renderer, selection}.js`
+### polarize_msa_stacked — stacked-consensus MSA  ✅
+- **Subdir**: `polarize_msa_stacked/{_state, builder, renderer, selection}.js`
 - **What it does**: outgroup row + INV founder-like consensus row + per-subgroup consensus rows (from 2D-SFS doubleton hierarchical clustering) + STD consensus row, fed into the existing dosage-heatmap renderer with a tier-confidence stripe on top. Confidence + reason tier per site.
 
-### page_evolution_haplotype_network — INV haplotype MST  ✅
-- **Subdir**: `page_evolution_haplotype_network/{_state, renderer, selection}.js`
+### haplotype_network — INV haplotype MST  ✅
+- **Subdir**: `haplotype_network/{_state, renderer, selection}.js`
 - **What it does**: minimum-spanning haplotype network of INV chromosomes. Nodes are Hamming-radius clusters (sized by chromosome count, coloured by 2D-SFS subgroup); edges are pairwise mutational distance. Force-directed layout (Mulberry32 PRNG).
 
-### page_evolution_polarize_synteny — outgroup-synteny vote  🟡
-- **Subdir**: `page_evolution_polarize_synteny/` (`_state.js` only)
+### polarize_synteny_vote — outgroup-synteny vote  🟡
+- **Subdir**: `polarize_synteny_vote/` (`_state.js` only)
 - **What it does**: per-outgroup-species breakpoint-orientation vote (HOM_A / HOM_B / unresolved), aggregated to an arrangement verdict. Renderers TODO.
 
-### page_evolution_age — age + divergence  🟡
-- **Subdir**: `page_evolution_age/` (`_state.js` only)
+### age_divergence — age + divergence  🟡
+- **Subdir**: `age_divergence/` (`_state.js` only)
 - **What it does**: per-candidate age estimate — dXY between arrangements, private variant density on derived class, MRCA depth, segregating-sites summary.
 
-### page_evolution_mosaicism — leakage / recombinant tracts  🟡
-- **Subdir**: `page_evolution_mosaicism/` (`_state.js` only)
+### mosaicism_leakage — leakage / recombinant tracts  🟡
+- **Subdir**: `mosaicism_leakage/` (`_state.js` only)
 - **What it does**: recombinant-tract / polarity-switch detector on INV chromosomes. Per-sample per-window mosaic-call + summary leakage score.
 
-### page_evolution_internal_history — sub-PCA on derived-only  🟡
-- **Subdir**: `page_evolution_internal_history/` (`_state.js` only)
+### inv_internal_substructure — sub-PCA on derived-only  🟡
+- **Subdir**: `inv_internal_substructure/` (`_state.js` only)
 - **What it does**: sub-PCA on derived-only samples — looks for haplotype clusters / nested rearrangements / sublineages inside the inversion class.
 
-### page_evolution_layer_cleaning — Layer 0/1 noise removal  🟡
-- **Subdir**: `page_evolution_layer_cleaning/` (`_state.js` only)
+### layer_cleaning — Layer 0/1 noise removal  🟡
+- **Subdir**: `layer_cleaning/` (`_state.js` only)
 - **What it does**: kinship + family-size downweighting + hatchery-duplicate exclusion so close relatives don't double-count in deep-Layer-2 stats.
 
-### page_evolution_event_tree — relative ordering of inversions  🟡
-- **Subdir**: `page_evolution_event_tree/` (`_state.js` only)
+### event_tree_relative_ordering — relative ordering of inversions  🟡
+- **Subdir**: `event_tree_relative_ordering/` (`_state.js` only)
 - **What it does**: relative-ordering inference across multiple inversions on the same chromosome — carrier-overlap nesting, internal diversity ranking, outgroup presence, age class chaining.
 
-### page_evolution_archaeology_card — Step-6 verdict card  🟡
-- **Subdir**: `page_evolution_archaeology_card/` (`_state.js` only)
+### archaeology_synthesis_card — Step-6 verdict card  🟡
+- **Subdir**: `archaeology_synthesis_card/` (`_state.js` only)
 - **What it does**: per-candidate synthesis card pulling together polarity, age class, integrity, mosaicism, frequency, π/dXY/F_ST, private/fixed counts, confidence. The Step-6 verdict.
 
 ---
