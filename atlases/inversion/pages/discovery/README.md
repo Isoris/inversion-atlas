@@ -51,17 +51,28 @@ HANDOFF_5 / 6 / 7 / 8 / 10 SPECs).
 | `page12` | local PCA θπ | sister to page1 driven by per-sample θπ; empty-state until R pipeline ships θπ layers |
 | `page15` | local PCA GHSL | third evidence axis (GHSL haplotype divergence); stub — only layer-status chips wired |
 
-### Stage `discovery_2` (round 2)
+### Stage `discovery_2` (round 2 — workflow surfaces only)
 
 | page | label | summary |
 |------|-------|---------|
 | `page2` | candidate focus | per-candidate deep-dive (~15 sub-panels); reads `state.candidate` |
-| `page22` | haplotype regimes | wires the v3.4 banding pipeline (Stage 1-4) into the atlas-core shell; has the ONLY user-facing end-user docs (`HOW_TO_USE_page22.md` in `specs_done/_bundles/`) |
+| `page22` | haplotype regimes | wires the v3.4 banding pipeline (Stage 1-4) into the atlas-core shell; has end-user docs at `specs_done/_bundles/HOW_TO_USE_page22.md` |
+
+### Stage `tooling` — utility / inspector cartridges (re-staged 2026-05-16)
+
+The cartridges below moved from `discovery_2` to a dedicated
+`tooling` stage on 2026-05-16 (per
+`_handoff_docs/AUDIT_local_pca_merge_vs_rename.md` §Q3). They still
+LIVE on disk in `pages/discovery/<page_id>/` but their manifest
+stage is now `tooling`. The shell groups them into a separate tab.
+
+| page | label | summary |
+|------|-------|---------|
 | `page_tree_panel` | tree panel | NJ sample tree on dosage distances + ARI badge (HANDOFF_5) |
 | `page_fingerprint_track` | fingerprint track | per-window diversity-regime fingerprint + switch markers + scenario badge (HANDOFF_6) |
 | `page_similarity_panel` | similarity matrix | per-window sample×sample heatmap + ARI transition strip (HANDOFF_10 / SPEC_0 §11.9) |
 | `page_pca_panel` | PCA scatter | per-window PC1×PC2 scatter with λ-magnitude scrubber (SPEC_0 §10) |
-| `page_dosage_heatmap` | dosage heatmap | sample × marker dosage heatmap with K=3 group track + polarity stripe (SPEC_0 §11) |
+| `page_dosage_heatmap` | dosage heatmap | sample × marker dosage heatmap with K=3 group track + polarity stripe + role-pair sidecar (SPEC_0 §11 / role-pair sidecar shipped 47ce1bc) |
 | `page_nested_detector` | nested detector | 3 stratum tracks (HOM1/HET/HOM2) + inner-interval overlays (HANDOFF_7 / SPEC_0 §11.7) |
 | `page_dosage_cluster` | dosage cluster | adaptive-K sample clustering on per-window dosage profiles (HANDOFF_8 / SPEC_0 §11.8) |
 

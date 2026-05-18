@@ -173,7 +173,7 @@
     {
       "id": "page_tree_panel",
       "label": "tree panel",
-      "stage": "discovery_2",
+      "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_tree_panel.html",
       "module": "atlases/inversion/pages/discovery/page_tree_panel.js",
       "tooltip": "Inversion-core sample tree (NJ on dosage distances) with cluster colouring and ARI-vs-clusters badge (HANDOFF_5)."
@@ -181,7 +181,7 @@
     {
       "id": "page_fingerprint_track",
       "label": "fingerprint track",
-      "stage": "discovery_2",
+      "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_fingerprint_track.html",
       "module": "atlases/inversion/pages/discovery/page_fingerprint_track.js",
       "tooltip": "Per-window diversity-regime fingerprint with rank-equivalence regime IDs, switch markers, fragment-proportions treemap, and architecture-scenario verdict (HANDOFF_6)."
@@ -189,7 +189,7 @@
     {
       "id": "page_similarity_panel",
       "label": "similarity matrix",
-      "stage": "discovery_2",
+      "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_similarity_panel.html",
       "module": "atlases/inversion/pages/discovery/page_similarity_panel.js",
       "tooltip": "Per-window sample×sample similarity heatmap with block detection + adjacent-window ARI transition strip (HANDOFF_10)."
@@ -197,7 +197,7 @@
     {
       "id": "page_pca_panel",
       "label": "PCA scatter",
-      "stage": "discovery_2",
+      "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_pca_panel.html",
       "module": "atlases/inversion/pages/discovery/page_pca_panel.js",
       "tooltip": "Per-window PC1×PC2 scatter with cluster colouring and λ-magnitude scrubber (SPEC_0 §10 Phase 1)."
@@ -205,7 +205,7 @@
     {
       "id": "page_dosage_heatmap",
       "label": "dosage heatmap",
-      "stage": "discovery_2",
+      "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_dosage_heatmap.html",
       "module": "atlases/inversion/pages/discovery/page_dosage_heatmap.js",
       "tooltip": "Sample × marker dosage heatmap with K=3 group track and polarity stripe. Accepts mgl_heatmap_json or legacy candidate-chunk shape via shared adapters (SPEC_0 §11)."
@@ -213,7 +213,7 @@
     {
       "id": "page_nested_detector",
       "label": "nested detector",
-      "stage": "discovery_2",
+      "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_nested_detector.html",
       "module": "atlases/inversion/pages/discovery/page_nested_detector.js",
       "tooltip": "Nested-inversion detector with 3 stratum tracks (HOM1 / HET / HOM2) and contiguous inner-interval overlays (HANDOFF_7)."
@@ -221,7 +221,7 @@
     {
       "id": "page_dosage_cluster",
       "label": "dosage cluster",
-      "stage": "discovery_2",
+      "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_dosage_cluster.html",
       "module": "atlases/inversion/pages/discovery/page_dosage_cluster.js",
       "tooltip": "Adaptive-K sample clustering on per-window dosage profiles, with per-K scoring table and cluster mean-curve display (HANDOFF_8)."
@@ -350,7 +350,13 @@
       "id": "discovery_2",
       "label": "discovery 2",
       "order": 2,
-      "_doc": "Round-2 discovery: the supplementary detection / inspection panels that aren't core local-PCA. Split out from 'discovery' on 2026-05-14 to keep the local-PCA workflow uncluttered."
+      "_doc": "Round-2 discovery: workflow surfaces for per-candidate deep-dive and the v3.4 banding pipeline runner. Currently page2 (candidate focus) + page22 (haplotype regimes). The utility / inspector cartridges (tree panel, fingerprint track, similarity matrix, PCA scatter, dosage heatmap, nested detector, dosage cluster) moved to 'tooling' on 2026-05-16 — see AUDIT_local_pca_merge_vs_rename.md §Q3."
+    },
+    {
+      "id": "tooling",
+      "label": "tooling",
+      "order": 2.5,
+      "_doc": "Utility / inspector cartridges. Open these to characterise a candidate, debug a layer, or compare evidence axes. Distinct from discovery_2's workflow pages. Pages currently in this stage: page_tree_panel, page_fingerprint_track, page_similarity_panel, page_pca_panel, page_dosage_heatmap, page_nested_detector, page_dosage_cluster (re-staged from discovery_2 on 2026-05-16 per AUDIT_local_pca_merge_vs_rename.md §Q3). Future additions: page_pca_comparator (per SPEC_local_pca_comparator.md). Atlas-core shell may render this stage as a vertical sidebar rather than horizontal pills — that's a shell-side change tracked separately."
     },
     {
       "id": "classification",
