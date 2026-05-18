@@ -74,7 +74,7 @@ Current contents:
 - `inversion_atlas_v3.4_DROP/` — 2026-05-08 v3.4 banding-pipeline drop (README + HANDOFF only; code already shipped to `shared/band_tracking/`)
 - `banding_unified_v3.4_AUDIT_BUNDLE/` — 2026-05-08 audit-revision of same (README + HANDOFF + SERVER_README)
 - `mgl_adapter_v22_dragdrop_fixed/` — full extracted tree (mgl_adapter v22 multi-repo drop)
-- `HOW_TO_USE_page22.md` — user guide for page22 (only end-user docs for any page right now)
+- `HOW_TO_USE_haplotype_regimes.md` — user guide for page22 (only end-user docs for any page right now)
 
 ## SPECs **referenced in shipping code but missing from disk**
 

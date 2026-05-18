@@ -1,14 +1,16 @@
 {
-  "page_id": "page22",
+  "page_id": "haplotype_regimes",
+  "was_page_id": "page22",
+  "slug": "haplotype_regimes",
   "label": "haplotype regimes — Stage 4 bruteforce projection",
   "page_type": "core_page",
   "stage": "discovery_2",
   "owner_atlas": "inversion",
-  "status": "active",
+  "status": "active (renamed from page22 on 2026-05-16)",
   "current_path": {
-    "html": "atlases/inversion/pages/discovery/page22.html",
-    "js_entry": "atlases/inversion/pages/discovery/page22.js",
-    "js_subdir": "atlases/inversion/pages/discovery/page22/"
+    "html": "atlases/inversion/pages/discovery/haplotype_regimes.html",
+    "js_entry": "atlases/inversion/pages/discovery/haplotype_regimes.js",
+    "js_subdir": "atlases/inversion/pages/discovery/haplotype_regimes/"
   },
   "bundle_source": "imported from inversion_atlas_v3.4_DROP (2026-05-08) + banding_unified_v3.4_AUDIT_BUNDLE",
   "legacy_source": "n/a — this page was new in v3.4 (not in legacy/Inversion_atlas.html)",
@@ -21,11 +23,11 @@
   "requires_operations": [],
 
   "panels": [
-    {"id": "regimes_panel_chrom_lanes", "module": "page22/regimes_panel.js", "purpose": "target-band lanes panel at chromosome scope"},
-    {"id": "regimes_pc1_panel_chrom", "module": "page22/regimes_pc1_panel.js", "purpose": "PC1 lines at chromosome scope (per-sample lines coloured by voter band)"},
-    {"id": "regimes_panel_genome_lanes", "module": "page22/regimes_panel.js (genome opt-in)", "purpose": "target-band lanes at genome scope (toggled via 'g' key)"},
-    {"id": "regimes_pc1_panel_genome", "module": "page22/regimes_pc1_panel.js (genome opt-in)", "purpose": "PC1 lines at genome scope"},
-    {"id": "action_bar", "module": "page22/regimes_page.js", "purpose": "run pipeline button + export catalogue button + focal-voter controls"}
+    {"id": "regimes_panel_chrom_lanes", "module": "haplotype_regimes/regimes_panel.js", "purpose": "target-band lanes panel at chromosome scope"},
+    {"id": "regimes_pc1_panel_chrom", "module": "haplotype_regimes/regimes_pc1_panel.js", "purpose": "PC1 lines at chromosome scope (per-sample lines coloured by voter band)"},
+    {"id": "regimes_panel_genome_lanes", "module": "haplotype_regimes/regimes_panel.js (genome opt-in)", "purpose": "target-band lanes at genome scope (toggled via 'g' key)"},
+    {"id": "regimes_pc1_panel_genome", "module": "haplotype_regimes/regimes_pc1_panel.js (genome opt-in)", "purpose": "PC1 lines at genome scope"},
+    {"id": "action_bar", "module": "haplotype_regimes/regimes_page.js", "purpose": "run pipeline button + export catalogue button + focal-voter controls"}
   ],
 
   "subdir_files": [
@@ -78,7 +80,7 @@
   "three_cohort_discipline": "cohort_id + reference_id tagged from active dataset; catalogue does NOT aggregate across reference assemblies (F1 hybrid ≠ 226 pure C.gariepinus ≠ wild C.macrocephalus)",
 
   "documents": {
-    "page_registry_doc": "atlases/inversion/registries/data/pages.registry.json -> pages.page22._doc",
+    "page_registry_doc": "atlases/inversion/registries/data/pages.registry.json -> pages.haplotype_regimes._doc",
     "specs_done": [
       "specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md (parent SPEC — band-track skeleton)"
     ],
@@ -92,12 +94,12 @@
       "specs_done/_bundles/inversion_atlas_v3.4_DROP/README.md (full pipeline diagram)",
       "specs_done/_bundles/inversion_atlas_v3.4_DROP/HANDOFF.md (audit checklist)",
       "specs_done/_bundles/banding_unified_v3.4_AUDIT_BUNDLE/README.md (audit revision)",
-      "specs_done/_bundles/HOW_TO_USE_page22.md (user guide — the ONLY end-user docs for any page right now)"
+      "specs_done/_bundles/HOW_TO_USE_haplotype_regimes.md (user guide — the ONLY end-user docs for any page right now)"
     ],
     "handoffs": [
       "_handoff_docs/HANDOFF_2026-05-14_seeds_to_candidates_wiring.md (wiring stage3_loci → state.candidateList; not yet implemented)"
     ],
-    "user_guide": "specs_done/_bundles/HOW_TO_USE_page22.md (full end-user guide; rare)"
+    "user_guide": "specs_done/_bundles/HOW_TO_USE_haplotype_regimes.md (full end-user guide; rare)"
   },
 
   "calibration_target": "LG28 prototype 15.115-18.005 Mb, 60/106/60 karyotype",

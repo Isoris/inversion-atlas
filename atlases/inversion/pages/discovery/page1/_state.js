@@ -217,7 +217,7 @@ export function getSampleColor(si, mode, groupLabels) {
 // --- _resolveSampleScopeColor — page1-flavoured wrapper ---
 // Uses page1's _lineageColor (with the auto-trigger scheduling) for
 // 'lineage' mode, otherwise defers to the pure shared resolver. The
-// shared resolver alone is what page22 and any future page consumes
+// shared resolver alone is what haplotype_regimes and any future page consumes
 // — they import resolveSampleScopeColor from shared/sample_color.js
 // and never reach into this module.
 export function _resolveSampleScopeColor(si, mode) {

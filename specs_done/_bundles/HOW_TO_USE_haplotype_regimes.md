@@ -1,4 +1,4 @@
-# How to use page22 — haplotype regimes
+# How to use haplotype_regimes — haplotype regimes
 
 **Page**: `page22` · stage `discovery` · label "haplotype regimes"
 **Atlas**: `inversion` (the C. gariepinus 226-cohort atlas)
@@ -17,8 +17,8 @@ atlases/inversion/
 ├── manifest.json                          ← page22 entry added
 ├── registries/data/pages.registry.json    ← page22 entry added
 ├── pages/discovery/
-│   ├── page22.html                        ← the fragment (4-canvas grid + action bar)
-│   ├── page22.js                          ← module entry (mount / unmount)
+│   ├── haplotype_regimes.html                        ← the fragment (4-canvas grid + action bar)
+│   ├── haplotype_regimes.js                          ← module entry (mount / unmount)
 │   └── page22/
 │       ├── regimes_page.js                ← 4-panel orchestrator
 │       ├── regimes_panel.js               ← chrom + genome lanes panels
@@ -48,7 +48,7 @@ The atlas already had `partition_consensus.js`, `partition_enumerate.js`, `vote_
    ```
    No `atlas-core` changes were needed — the existing `atlas_router` and `loadAtlasStylesheets` machinery picks page22 up automatically from the manifest.
 
-2. **Start the shell** (e.g. `python -m http.server` from the atlas-core directory) and open `index.html`. The discovery tab now shows **page22 — haplotype regimes** alongside the existing pages.
+2. **Start the shell** (e.g. `python -m http.server` from the atlas-core directory) and open `index.html`. The discovery tab now shows **haplotype_regimes — haplotype regimes** alongside the existing pages.
 
 3. **Pick a chromosome** in the topbar (the page reads `atlasState.shared.activeChrom`). Click the page22 tab.
 
@@ -151,7 +151,7 @@ The audit recommends fixing 2 and 3 before LG28 deployment. **As of the page22 d
 ## Smoke-test checklist before declaring this page "live"
 
 1. ☐ Boot the atlas with the new bundle. Topbar shows "haplotype regimes" in the discovery group.
-2. ☐ Pick a chromosome with `scrubber_main` data. Click page22. The four canvas containers render with placeholder content; status reads "loaded {chrom} … ready".
+2. ☐ Pick a chromosome with `scrubber_main` data. Click haplotype_regimes. The four canvas containers render with placeholder content; status reads "loaded {chrom} … ready".
 3. ☐ Click "run pipeline". Pipeline completes in < 5 s for one chromosome of the 226-sample cohort. Status reflects seed/loci counts.
 4. ☐ The four canvases populate. Top-left shows target-band lanes; bottom-left shows PC1 lines. (Genome panels remain empty until `g` is pressed.)
 5. ☐ Press `g`. The two right-column panels appear with placeholder text.
@@ -173,11 +173,11 @@ The audit recommends fixing 2 and 3 before LG28 deployment. **As of the page22 d
 ## File diff summary
 
 ```
-NEW    atlases/inversion/pages/discovery/page22.html
-NEW    atlases/inversion/pages/discovery/page22.js
-NEW    atlases/inversion/pages/discovery/page22/regimes_page.js
-NEW    atlases/inversion/pages/discovery/page22/regimes_panel.js
-NEW    atlases/inversion/pages/discovery/page22/regimes_pc1_panel.js
+NEW    atlases/inversion/pages/discovery/haplotype_regimes.html
+NEW    atlases/inversion/pages/discovery/haplotype_regimes.js
+NEW    atlases/inversion/pages/discovery/haplotype_regimes/regimes_page.js
+NEW    atlases/inversion/pages/discovery/haplotype_regimes/regimes_panel.js
+NEW    atlases/inversion/pages/discovery/haplotype_regimes/regimes_pc1_panel.js
 NEW    atlases/inversion/shared/band_tracking/anchor_signals.js
 NEW    atlases/inversion/shared/band_tracking/banding_pipeline.js
 NEW    atlases/inversion/shared/band_tracking/breadth_voting.js
@@ -188,8 +188,8 @@ NEW    atlases/inversion/shared/band_tracking/regime_catalogue.js
 NEW    atlases/inversion/shared/band_tracking/seed_discovery.js
 NEW    atlases/inversion/shared/band_tracking/window_classification.js
 EDIT   atlases/inversion/shared/band_tracking/projection.js  (stub → full)
-EDIT   atlases/inversion/manifest.json                       (added page22)
-EDIT   atlases/inversion/registries/data/pages.registry.json (added page22)
+EDIT   atlases/inversion/manifest.json                       (added haplotype_regimes)
+EDIT   atlases/inversion/registries/data/pages.registry.json (added haplotype_regimes)
 
 UNCHANGED  everything in atlas-core/
 UNCHANGED  every other page

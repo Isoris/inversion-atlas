@@ -310,8 +310,9 @@
       ],
       "preloads": []
     },
-    "page22": {
+    "haplotype_regimes": {
       "_label": "haplotype regimes — Stage 4 bruteforce projection",
+      "_was_id": "page22",
       "_doc": "Long-range haplotype regimes page. Wires the v3.4 banding pipeline (Stage 1 seed discovery + Stage 2 cross-seed voting + Stage 3 chain walk + Stage 4 bruteforce projection) into the atlas-core shell. Per-window labels come from the existing per-L2 K-means via shared/per_l2_cluster.js (cached by ClusterCache). The four-canvas layout shows chrom-scope and genome-scope versions of target-band lanes and PC1 lines. Genome-scope panels are opt-in via the g key. The action bar exposes \"run pipeline\" and \"export catalogue\" buttons. Cohort-level catalogue export uses shared/band_tracking/regime_catalogue.js (deterministic JSON keyed by interval_id × cohort_id × reference_id × pipeline_version × knob_hash). Three-cohort discipline: cohort_id and reference_id are tagged from the active dataset; the catalogue does not aggregate across reference assemblies. Empirical work plan calibration target: LG28 prototype 15.115-18.005 Mb, 60/106/60 karyotype.",
       "requires_layers": [
         "scrubber_main"

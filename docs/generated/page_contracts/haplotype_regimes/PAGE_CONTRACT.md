@@ -1,4 +1,4 @@
-# page22 — haplotype regimes (Stage 4 bruteforce projection) — Page Capability Contract
+# haplotype_regimes (was haplotype_regimes) — Stage 4 bruteforce projection — Page Capability Contract
 
 **Atlas**: inversion
 **Stage**: discovery_2 (round 2)
@@ -16,7 +16,7 @@ regimes_page (chrom-lanes, chrom-PC1, genome-lanes, genome-PC1) plus
 the catalogue-export action bar.
 
 This is the **only page in the atlas that ships its own end-user
-user guide** — see `specs_done/_bundles/HOW_TO_USE_page22.md`.
+user guide** — see `specs_done/_bundles/HOW_TO_USE_haplotype_regimes.md`.
 
 ## Capabilities
 
@@ -121,7 +121,7 @@ atlas) ≠ pure *C. macrocephalus* wild (future paper).
 - `regime_catalogue.js` — `buildCatalogue`, `computeKnobHash`
 - `dosage_overlay.js` — HOM_REF/HET/HOM_INV classifier
 
-## Sub-modules in `page22/`
+## Sub-modules in `haplotype_regimes/`
 
 | file | purpose |
 |------|---------|
@@ -147,7 +147,7 @@ LG28 prototype 15.115–18.005 Mb, 60/106/60 karyotype.
 
 ## Documents
 
-- **Registry doc**: `atlases/inversion/registries/data/pages.registry.json` → `pages.page22._doc`
+- **Registry doc**: `atlases/inversion/registries/data/pages.registry.json` → `pages.haplotype_regimes._doc`
 - **Specs (done)**: `specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md`
 - **Specs (todo)**: `specs_todo/SPEC_regime_annotation_v34.md`,
   `specs_todo/SPEC_copy_origin_painting.md`,
@@ -155,7 +155,7 @@ LG28 prototype 15.115–18.005 Mb, 60/106/60 karyotype.
 - **Bundle meta-docs**:
   `specs_done/_bundles/inversion_atlas_v3.4_DROP/{README, HANDOFF}.md`,
   `specs_done/_bundles/banding_unified_v3.4_AUDIT_BUNDLE/{README, HANDOFF}.md`
-- **User guide**: `specs_done/_bundles/HOW_TO_USE_page22.md` (rare —
+- **User guide**: `specs_done/_bundles/HOW_TO_USE_haplotype_regimes.md` (rare —
   end-user docs)
 - **Handoffs**: `_handoff_docs/HANDOFF_2026-05-14_seeds_to_candidates_wiring.md`
 - **Legacy source**: n/a — this page was new in v3.4

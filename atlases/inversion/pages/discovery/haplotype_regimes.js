@@ -1,6 +1,7 @@
-// pages/discovery/page22.js
+// pages/discovery/haplotype_regimes.js
 // =============================================================================
-// page22 — Long-range haplotype regimes (Stage 4 bruteforce projection)
+// haplotype_regimes (was page22, renamed 2026-05-16) —
+//   Long-range haplotype regimes (Stage 4 bruteforce projection)
 //
 // Wires the v3.4 banding pipeline into the atlas-core shell. Hosts the four-
 // canvas regimes_page (chrom-lanes, chrom-PC1, genome-lanes, genome-PC1) plus
@@ -38,7 +39,7 @@
 import { contextFromState, ClusterCache } from '../../shared/per_l2_cluster.js';
 
 // Sample-color resolution is now in shared/sample_color.js. The regimes
-// panels pass their own page22 state to resolveSampleScopeColor, so this
+// panels pass their own state to resolveSampleScopeColor, so this
 // module no longer needs to set page1's _pageState as a side effect.
 // Page-isolation per specs_todo/SPEC_registry_write_and_page_isolation.md.
 
@@ -50,10 +51,10 @@ import { runBandingPipeline, BANDING_PIPELINE_DEFAULTS }
 import { buildCatalogue, computeKnobHash }
   from '../../shared/band_tracking/regime_catalogue.js';
 
-// Panel modules (sibling files in page22/)
-import { initRegimesPage, computeGenomeView } from './page22/regimes_page.js';
+// Panel modules (sibling files in haplotype_regimes/)
+import { initRegimesPage, computeGenomeView } from './haplotype_regimes/regimes_page.js';
 import { classifyProjection } from '../../shared/band_tracking/projection.js';
-import { _dosageClassColour } from './page22/regimes_panel.js';
+import { _dosageClassColour } from './haplotype_regimes/regimes_panel.js';
 
 // ---------------------------------------------------------------------------
 // Page-local state. Set on mount, cleared on unmount. The regime panels

@@ -38,7 +38,7 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | discovery | page12 | local PCA θπ | active (empty-state until layers) | high | [page.manifest.json](page_contracts/page12/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page12/PAGE_CONTRACT.md) |
 | discovery | page15 | local PCA GHSL | stub (renderers TODO) | high | [page.manifest.json](page_contracts/page15/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page15/PAGE_CONTRACT.md) |
 | discovery_2 | page2 | candidate focus | active | high | [page.manifest.json](page_contracts/page2/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page2/PAGE_CONTRACT.md) |
-| discovery_2 | page22 | haplotype regimes | active (Phase 1) | high | [page.manifest.json](page_contracts/page22/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page22/PAGE_CONTRACT.md) |
+| discovery_2 | haplotype_regimes | haplotype regimes | active (Phase 1) | high | [page.manifest.json](page_contracts/haplotype_regimes/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/haplotype_regimes/PAGE_CONTRACT.md) |
 | discovery_2 | page_tree_panel | tree panel | active (Phase 1) | high | [page.manifest.json](page_contracts/page_tree_panel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_tree_panel/PAGE_CONTRACT.md) |
 | discovery_2 | page_fingerprint_track | fingerprint track | active (Phase 1) | high | [page.manifest.json](page_contracts/page_fingerprint_track/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_fingerprint_track/PAGE_CONTRACT.md) |
 | discovery_2 | page_similarity_panel | similarity matrix | active (Phase 1) | high | [page.manifest.json](page_contracts/page_similarity_panel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_similarity_panel/PAGE_CONTRACT.md) |
@@ -171,7 +171,7 @@ All 3 fall back to empty-state when their external module is absent.
 ### User-guide documents
 
 Only one page in the entire atlas has end-user documentation:
-- **page22** — `specs_done/_bundles/HOW_TO_USE_page22.md` (13 KB)
+- **page22** — `specs_done/_bundles/HOW_TO_USE_haplotype_regimes.md` (13 KB)
 
 The rest are `unknown` for user guide. **page5 itself is the
 in-app help page** — it has ~1158 LOC of static HTML covering help,
@@ -223,5 +223,5 @@ help, not a manual.
    `registries/schemas/` into a prose document so the §N cross-refs
    resolve.
 7. **Generate page user-guides** in the style of
-   `specs_done/_bundles/HOW_TO_USE_page22.md`. Pair each with the
+   `specs_done/_bundles/HOW_TO_USE_haplotype_regimes.md`. Pair each with the
    per-page `PAGE_CONTRACT.md` to seed the manual.

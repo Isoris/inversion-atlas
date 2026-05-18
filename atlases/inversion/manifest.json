@@ -54,12 +54,13 @@
       "module": "atlases/inversion/pages/discovery/page19.js"
     },
     {
-      "id": "page22",
+      "id": "haplotype_regimes",
       "slug": "haplotype_regimes",
+      "_was_id": "page22",
       "label": "haplotype regimes",
       "stage": "discovery_2",
-      "fragment": "atlases/inversion/pages/discovery/page22.html",
-      "module": "atlases/inversion/pages/discovery/page22.js",
+      "fragment": "atlases/inversion/pages/discovery/haplotype_regimes.html",
+      "module": "atlases/inversion/pages/discovery/haplotype_regimes.js",
       "tooltip": "Long-range haplotype regimes (Stage 4 bruteforce projection). Run runBandingPipeline on the active chromosome and explore where each seed-band voter lands across target windows. Export the result as a regime catalogue JSON."
     },
     {
@@ -389,7 +390,7 @@
       "id": "discovery_2",
       "label": "discovery 2",
       "order": 2,
-      "_doc": "Round-2 discovery: workflow surfaces for per-candidate deep-dive and the v3.4 banding pipeline runner. Currently page2 (candidate focus) + page22 (haplotype regimes). The utility / inspector cartridges (tree panel, fingerprint track, similarity matrix, PCA scatter, dosage heatmap, nested detector, dosage cluster) moved to 'tooling' on 2026-05-16 — see AUDIT_local_pca_merge_vs_rename.md §Q3."
+      "_doc": "Round-2 discovery: workflow surfaces for per-candidate deep-dive and the v3.4 banding pipeline runner. Currently page2 (candidate focus) + haplotype_regimes (was page22 until 2026-05-16). The utility / inspector cartridges (tree panel, fingerprint track, similarity matrix, PCA scatter, dosage heatmap, nested detector, dosage cluster) moved to 'tooling' on 2026-05-16 — see AUDIT_local_pca_merge_vs_rename.md §Q3."
     },
     {
       "id": "tooling",

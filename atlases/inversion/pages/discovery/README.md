@@ -56,7 +56,7 @@ HANDOFF_5 / 6 / 7 / 8 / 10 SPECs).
 | page | label | summary |
 |------|-------|---------|
 | `page2` | candidate focus | per-candidate deep-dive (~15 sub-panels); reads `state.candidate` |
-| `page22` | haplotype regimes | wires the v3.4 banding pipeline (Stage 1-4) into the atlas-core shell; has end-user docs at `specs_done/_bundles/HOW_TO_USE_page22.md` |
+| `page22` | haplotype regimes | wires the v3.4 banding pipeline (Stage 1-4) into the atlas-core shell; has end-user docs at `specs_done/_bundles/HOW_TO_USE_haplotype_regimes.md` |
 
 ### Stage `tooling` — utility / inspector cartridges (re-staged 2026-05-16)
 
@@ -87,7 +87,7 @@ stage is now `tooling`. The shell groups them into a separate tab.
 
 - **`shared/per_l2_cluster.js`** — `ClusterCache`, `contextFromState`,
   `clusterL2` — per-window K-means cache that bridges atlas-side
-  state to pipeline ctx (used by page1, page2, page22)
+  state to pipeline ctx (used by page1, page2, haplotype_regimes)
 - **`shared/band_tracking/`** (32 modules) — the v3.4 banding pipeline
   (Stage 1-4 + dosage overlay); page22 wires the orchestrator
 - **`shared/kmeans.js`** — `kmeans1D`, `kmeans2D`, `silhouette1D`,
@@ -151,7 +151,7 @@ has a `page.manifest.json` (machine-readable capabilities) and a
 - **Read page1 first.** The other pages mostly follow its patterns
   (state.cur cursor, _pageState live binding, _setActiveState in
   mount, panel sub-modules under page<X>/).
-- **page22 has a user guide** — `specs_done/_bundles/HOW_TO_USE_page22.md`.
+- **page22 has a user guide** — `specs_done/_bundles/HOW_TO_USE_haplotype_regimes.md`.
   It's the only end-user-facing docs in the repo. Use it as the
   template for future user guides.
 - **The dir ≠ stage discrepancies (page8, page19) are intentional**

@@ -63,7 +63,7 @@ export function familyColor(state, si) {
  * available — the caller decides whether to schedule a compute.
  *
  * The legacy page1 path wraps this with a requestIdleCallback auto-
- * trigger; page22 uses the pure version (degrades gracefully when no
+ * trigger; haplotype_regimes uses the pure version (degrades gracefully when no
  * result is loaded).
  */
 export function lineageColor(state, si) {
@@ -86,7 +86,7 @@ export function lineageColor(state, si) {
 
 /**
  * Resolve a sample's color for one of the page-agnostic "scope" modes
- * that page22's regime panels and page1's lines panel both consume.
+ * that haplotype_regimes' regime panels and page1's lines panel both consume.
  *
  * Modes today: 'family', 'lineage'. Other modes return null (caller
  * uses a fallback color). Future modes can grow the switch without

@@ -1,20 +1,21 @@
-// tests/test_discovery_page22.js
+// tests/test_discovery_haplotype_regimes.js (renamed from
+// test_discovery_page22.js 2026-05-16 alongside page22 → haplotype_regimes).
 //
-// Unit coverage for page22 — long-range haplotype regimes (Stage 4 bruteforce
-// projection). Verifies the page module loads cleanly, exposes the atlas-router
-// lifecycle (mount/unmount), and that its panel sub-modules export the surface
-// the page wires together at runtime.
+// Unit coverage for the haplotype_regimes page — long-range haplotype regimes
+// (Stage 4 bruteforce projection). Verifies the page module loads cleanly,
+// exposes the atlas-router lifecycle (mount/unmount), and that its panel
+// sub-modules export the surface the page wires together at runtime.
 //
-// Page22 keeps `_pageState` as a module-local closure (not exported via a
+// The page keeps `_pageState` as a module-local closure (not exported via a
 // `_state.js` partner — that pattern is the one used by page1/12/16/16b/17/18/21
 // which expose a `_setActiveState` setter). So state-side coverage here is
 // limited to lifecycle smoke; pipeline behaviour is exercised by the
 // underlying shared/band_tracking/ tests (test_band_consensus.js).
 
-import * as page22 from '../atlases/inversion/pages/discovery/page22.js';
-import * as regimesPage from '../atlases/inversion/pages/discovery/page22/regimes_page.js';
-import * as regimesPanel from '../atlases/inversion/pages/discovery/page22/regimes_panel.js';
-import * as regimesPC1 from '../atlases/inversion/pages/discovery/page22/regimes_pc1_panel.js';
+import * as haplotypeRegimes from '../atlases/inversion/pages/discovery/haplotype_regimes.js';
+import * as regimesPage from '../atlases/inversion/pages/discovery/haplotype_regimes/regimes_page.js';
+import * as regimesPanel from '../atlases/inversion/pages/discovery/haplotype_regimes/regimes_panel.js';
+import * as regimesPC1 from '../atlases/inversion/pages/discovery/haplotype_regimes/regimes_pc1_panel.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {
@@ -24,9 +25,9 @@ function check(label, cond, extra) {
 function group(name) { console.log('\n--- ' + name + ' ---'); }
 
 // -----------------------------------------------------------------------------
-group('page22.js: atlas-router lifecycle');
-check('exports mount',   typeof page22.mount === 'function');
-check('exports unmount', typeof page22.unmount === 'function');
+group('haplotype_regimes.js: atlas-router lifecycle');
+check('exports mount',   typeof haplotypeRegimes.mount === 'function');
+check('exports unmount', typeof haplotypeRegimes.unmount === 'function');
 
 // -----------------------------------------------------------------------------
 group('regimes_page.js: orchestrator');
@@ -105,10 +106,10 @@ check('PATTERN_CLASS_COLORS is frozen',
 // -----------------------------------------------------------------------------
 group('Behavioural: unmount tolerates being called without a prior mount');
 // unmount nulls the module-local _pageState; calling it stand-alone should
-// not throw (page22 stores no Set-of-listeners that needs teardown).
+// not throw (haplotypeRegimes stores no Set-of-listeners that needs teardown).
 {
   let threw = false;
-  try { await page22.unmount(/* root */ null); }
+  try { await haplotypeRegimes.unmount(/* root */ null); }
   catch (e) { threw = true; }
   check('unmount(null) does not throw', !threw);
 }

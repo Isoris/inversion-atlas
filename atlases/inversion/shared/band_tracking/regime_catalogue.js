@@ -50,7 +50,7 @@
 //     transitively).
 //   - `globalThis.crypto.subtle.digest` is async-only, which would force
 //     computeKnobHash → buildCatalogue → caller into async, rippling
-//     through page22.js's export-catalogue handler.
+//     through haplotype_regimes.js's export-catalogue handler.
 // A 12-char hex prefix of SHA-1 gives ~48 bits of entropy — comfortable
 // for cache keys at this scale.
 
