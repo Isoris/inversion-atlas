@@ -59,7 +59,7 @@ atlases/inversion/
 
 2. **Pick a candidate** in one of these ways:
    - On page1, click a candidate rectangle on the |Z| strip
-   - On page3's catalogue table, click a row's candidate id
+   - On catalogue's catalogue table, click a row's candidate id
    - Drag-drop a `candidates.json` to load a full list
    - The candidate list pane in the page2 left sidebar
      (`#candListPane`) — click a row
@@ -100,7 +100,7 @@ The header carries a **Confirm** button. Click it to flip
 `candidate.confirmed = true`. This:
 
 - Drops the dashed outline / 🤖 prefix
-- Adds the candidate to page9's confirmed carousel
+- Adds the candidate to confirmed_carousel's confirmed carousel
 - Makes the candidate visible in page1's inheritance pills strip
 - Makes the candidate visible in page1's lines-panel vertical
   band highlights (per
@@ -161,9 +161,9 @@ the atlas:
 | **page1** | inspect the candidate in context of the rest of the chromosome |
 | **page4** | karyotype rows + 14-axis tier grid |
 | **page11** | refine the boundary zones (E/F/B/R/A hotkeys; 9 scan radii) |
-| **page_sv_evidence** | SV calls clustered around the breakpoints |
-| **page21** | annotation cockpit shows this candidate's mb-strip |
-| **page9** | (if confirmed) prev/next walk through confirmed candidates |
+| **sv_evidence** | SV calls clustered around the breakpoints |
+| **annotation_cockpit** | annotation cockpit shows this candidate's mb-strip |
+| **confirmed_carousel** | (if confirmed) prev/next walk through confirmed candidates |
 
 ## Common gotchas
 
@@ -202,7 +202,7 @@ the atlas:
   a manual gesture (per `specs_done/SPEC_l2_sweep_inheritance §6`).
 - **It does NOT classify on the 14 axes** — that's `page4`'s Tier
   sub-view.
-- **It does NOT show cohort-wide stats** — that's `page17` (stats
+- **It does NOT show cohort-wide stats** — that's `stats_profile` (stats
   profile).
 
 ## Related specs

@@ -34,7 +34,7 @@ draft mislabelled it; see HANDOFF_2026-05-07_chat36_round5_step2).
   - age origin
   - notes editor
   - …and others composed via the 16 `*Html` builders
-- Mark a candidate `confirmed` (drives page9's confirmed carousel).
+- Mark a candidate `confirmed` (drives confirmed_carousel's confirmed carousel).
 - Edit candidate notes / regime / age_origin metadata.
 
 ## Required data
@@ -71,7 +71,7 @@ draft mislabelled it; see HANDOFF_2026-05-07_chat36_round5_step2).
 - ancestry confound bar
 
 **Committable (manual gesture)**:
-- `candidate.confirmed` flag (drives page9)
+- `candidate.confirmed` flag (drives confirmed_carousel)
 - candidate metadata updates (notes, regime, age_origin)
 - candidate list import / export via JSON
 

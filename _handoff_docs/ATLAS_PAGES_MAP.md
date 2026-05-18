@@ -146,39 +146,39 @@ seed for per-page READMEs.
 - **Subdir**: `_state.js`, `boundaries.js` (pure helpers — binary search, smoothing, MAD), `boundaries_ui.js` (toolbar + actions).
 - ⚠️ Registry mismatch flagged: declares `candidate_final_class + candidate_breeding_card` — possible swap with page4's declared `candidate_sv_counts + candidate_boundaries`.
 
-### page_sv_evidence — SV calls × karyotype  🔵
-- **HTML/JS**: `pages/review/page_sv_evidence.{html,js}` · **Subdir**: `page_sv_evidence/` (`_state.js` only)
+### sv_evidence — SV calls × karyotype  🔵
+- **HTML/JS**: `pages/review/sv_evidence.{html,js}` · **Subdir**: `sv_evidence/` (`_state.js` only)
 - **What it does**: read-only candidate-level view of SV calls clustered around boundaries, scored against karyotype groups. Three stacked panels: SV table, UpSet plot of caller intersections, dosage heatmap. Thin loader for `window.AtlasSVEvidence` object (`init` / `loadCandidate` / `destroy`). Loads `json/sv_genotype_counts/<cid>.json` per candidate. Registry alignment ✅.
 
 ---
 
 ## CATALOGUE (8 pages — cohort-level catalogues + annotation cockpit)
 
-### page3 — catalogue  ✅
-- **HTML/JS**: `pages/catalogue/page3.{html,js}` · **Subdir**: `page3/` (3 modules)
+### catalogue — catalogue  ✅
+- **HTML/JS**: `pages/catalogue/catalogue.{html,js}` · **Subdir**: `catalogue/` (3 modules)
 - **What it does**: sortable/filterable catalogue of all L2 envelopes (or L1-merged inversions). Hover any column header for definition; export selected rows as TSV / Markdown. Bulk breeding-card export (HTML + JSON) via Turn-146 pipeline.
 - **Subdir**: `_state.js`, `catalogue.js` (the rendering pipeline legacy never shipped), `_breeding_export.js` (Turn-146 export pipeline).
 
-### page9 — confirmed carousel  ✅
-- **HTML/JS**: `pages/catalogue/page9.{html,js}` · **Subdir**: `page9/` (2 modules)
+### confirmed_carousel — confirmed carousel  ✅
+- **HTML/JS**: `pages/catalogue/confirmed_carousel.{html,js}` · **Subdir**: `confirmed_carousel/` (2 modules)
 - **What it does**: prev/next carousel through `state.candidateList.filter(c => c.confirmed === true)`. Reuses page2's candidate-detail rendering for each card. The legacy `confirmedNav*` JS never existed — this is a fresh implementation.
 
-### page10 — marker panels  ✅
-- **HTML/JS**: `pages/catalogue/page10.{html,js}` · **Subdir**: `page10/` (`_state.js` only)
+### marker_panels — marker panels  ✅
+- **HTML/JS**: `pages/catalogue/marker_panels.{html,js}` · **Subdir**: `marker_panels/` (`_state.js` only)
 - **What it does**: diagnostic PCR marker panel cards for each candidate's regime call (g0/g1/g2 from `fish_regime_calls.tsv`). Reproduces the genome-based regime call with 3–10 markers per candidate. Card content: tier badge (HIGH/MEDIUM/LOW), expected accuracy, n markers, panel class, per-regime marker counts, Tm range + multiplex spread, warning tags, optional per-marker table.
 
-### page17 — stats profile  ✅
-- **HTML/JS**: `pages/catalogue/page17.{html,js}` · **Subdir**: `page17/` (`_state.js` only)
+### stats_profile — stats profile  ✅
+- **HTML/JS**: `pages/catalogue/stats_profile.{html,js}` · **Subdir**: `stats_profile/` (`_state.js` only)
 - **Stage in manifest**: `classification` (NB: stage value disagrees with directory location; both kept here under catalogue for narrative coherence with the manifest dir layout).
 - **What it does**: statistical profile of inversion-associated genomic features — comparative summary of breakpoint context, genomic composition, functional cargo, population variation, breeding burden. Auto-derives rows from `cs_breakpoints + candidate list`; overlay `stats_profile` JSON/TSV for annotated rows (gene density, GO/KEGG, ROH, deleterious burden, F_ST). Synthesis figure for the manuscript.
 
-### page18 — marker readiness panel  ✅
-- **HTML/JS**: `pages/catalogue/page18.{html,js}` · **Subdir**: `page18/` (`_state.js` only)
+### marker_readiness — marker readiness panel  ✅
+- **HTML/JS**: `pages/catalogue/marker_readiness.{html,js}` · **Subdir**: `marker_readiness/` (`_state.js` only)
 - **Stage in manifest**: `classification`.
 - **What it does**: private-indel marker readiness — Tier 1 (clean dosage AF + controls + bighead specificity), Tier 2 (multi-marker or strong tag), Tier 3 (breakpoint PCR, DEMOTED), Tier 4 (exploratory). Atlas computes `private_score / dosage_score / gel_visibility` live from `variant_afs.json`. Auto-suggests positive/negative control samples. Includes 5-step pilot validation checklist with cross-species controls.
 
-### page21 — annotation cockpit  ✅
-- **HTML/JS**: `pages/catalogue/page21.{html,js}` · **Subdir**: `page21/` (`_state.js` only)
+### annotation_cockpit — annotation cockpit  ✅
+- **HTML/JS**: `pages/catalogue/annotation_cockpit.{html,js}` · **Subdir**: `annotation_cockpit/` (`_state.js` only)
 - **What it does**: per-sample-lines canvas with cursor-driven candidate selection. Every promoted candidate is a faint rectangle in mb-space; per-sample PC1 trajectories drawn beneath. ←/→ moves cursor (Shift jumps boundaries, Esc clears); digit keys 0–9 select a band of the candidate under the cursor → linkage shading + linkage table + haplotype-annotation panel.
 
 ### page8 — per-window summary table  ✅
@@ -187,11 +187,11 @@ seed for per-page READMEs.
 
 ### page19 — negative regions catalogue  ✅
 - **HTML/JS**: `pages/discovery/page19.{html,js}` (stage = `catalogue` in manifest) · **Subdir**: `page19/` (2 modules)
-- **What it does**: region-level catalogue of "no detectable inversion" calls — complement of page3. Each region carries a `region_status` (e.g. `no_detectable_inversion_high_confidence`); static caution banner explicitly warns against binary positive/negative misreading. Drag-drop `negative_regions.json/.tsv`; summary cards per `region_status`; CSV export.
+- **What it does**: region-level catalogue of "no detectable inversion" calls — complement of catalogue. Each region carries a `region_status` (e.g. `no_detectable_inversion_high_confidence`); static caution banner explicitly warns against binary positive/negative misreading. Drag-drop `negative_regions.json/.tsv`; summary cards per `region_status`; CSV export.
 
-### page_overview — synthesis overview  🟡
-- **HTML/JS**: `pages/catalogue/page_overview.{html,js}` · **Subdir**: `page_overview/` (`_state.js` only)
-- **What it does**: registered but EMPTY in legacy — the synthesis-stage tab. Body is `<div id='page_overview'></div>`. Reserved for future high-level workflow summary, candidate counts per stage, layer-presence checklist.
+### overview — synthesis overview  🟡
+- **HTML/JS**: `pages/catalogue/overview.{html,js}` · **Subdir**: `overview/` (`_state.js` only)
+- **What it does**: registered but EMPTY in legacy — the synthesis-stage tab. Body is `<div id='overview'></div>`. Reserved for future high-level workflow summary, candidate counts per stage, layer-presence checklist.
 
 ---
 
@@ -248,21 +248,21 @@ All evolution cartridges consume `mgl_adapter` primitives (PCA / dosage / heatma
 
 ## COMPARATIVE (2 pages — cross-species)
 
-### page16 — cross-species breakpoints (Cgar × Cmac)  ✅
-- **HTML/JS**: `pages/comparative/page16.{html,js}` · **Subdir**: `page16/` (`_state.js` only)
+### cross_species_breakpoints — cross-species breakpoints (Cgar × Cmac)  ✅
+- **HTML/JS**: `pages/comparative/cross_species_breakpoints.{html,js}` · **Subdir**: `cross_species_breakpoints/` (`_state.js` only)
 - **What it does**: chromosome-scale rearrangements between Cgar and Cmac from a wfmash 1-to-1 alignment (`cs_breakpoints_v1` schema). Each breakpoint renders both species' coordinates, a syntenic-block linking line, and flanking repeat-element density on both species. Six-panel layout: toolbar, catalogue table, focus card, synteny, dotplot, focal-vs-bg. Spalax-style TE enrichment at breakpoints is the manuscript hook.
 - **Three-cohort discipline** (critical): F1 hybrid (assembly paper) ≠ 226-sample pure C. gariepinus (current inversion atlas) ≠ pure C. macrocephalus wild (future paper).
 
-### page16b — multi-species classification cockpit  ✅
-- **HTML/JS**: `pages/comparative/page16b.{html,js}` · **Subdir**: `page16b/` (`_state.js` only)
+### multi_species_cockpit — multi-species classification cockpit  ✅
+- **HTML/JS**: `pages/comparative/multi_species_cockpit.{html,js}` · **Subdir**: `multi_species_cockpit/` (`_state.js` only)
 - **What it does**: place each Cgar↔Cmac breakpoint on the catfish phylogeny; click a species in the tree to see how its homologous region compares (chromosome context, orientation, boundary status). Auto-suggests architecture class (A–F) from lineage distribution. Owns 6 JSON layers: `dotplot_mashmap_v1`, `synteny_multispecies_v1`, `phylo_tree_v1`, `dxy_per_inversion_v1`, `comparative_te_breakpoint_fragility_v1`, `karyotype_lineage_v1`. Default 9-species reference tree (Tros, Smer, Tfulv, Ipun, Hwyc, Phyp, Capus, Cfus, Cmac, Cgar) when no `phylo_tree_v1` is loaded. Persists classifications to `localStorage`.
 
 ---
 
 ## HELP (1 page)
 
-### page5 — help  ✅
-- **HTML/JS**: `pages/comparative/page5.{html,js}` · **Subdir**: `page5/` (`_state.js` only)
+### help — help  ✅
+- **HTML/JS**: `pages/comparative/help.{html,js}` · **Subdir**: `help/` (`_state.js` only)
 - **What it does**: static quick-reference / help page — purely declarative HTML with help / vocabulary / hotkeys / pipeline reference content (~1158 LOC HTML). `renderPage5()` is a true no-op. `PAGE5_META` carries `{id, stage, label, num:16, static:true}` for the tab router.
 
 ---
@@ -271,9 +271,9 @@ All evolution cartridges consume `mgl_adapter` primitives (PCA / dosage / heatma
 
 The following directory exists under `pages/` but is **not in the manifest** (so the shell will not mount it):
 
-### `pages/review/page_ancestry_scroller/` (4 modules)
+### `pages/review/fish_ancestry_scroller/` (4 modules)
 - `_state.js`, `layers.js` (3 numbered layers + brick-metrics block), `right_panel.js` (3 blocks: context / view-mode / overlay), `selection.js` (brick hit-test).
-- Backed by `SPEC_fish_ancestry_scroller.md`. Either in-progress (needs a manifest entry + a top-level `page_ancestry_scroller.{js,html}`) or deprecated.
+- Backed by `SPEC_fish_ancestry_scroller.md`. Either in-progress (needs a manifest entry + a top-level `fish_ancestry_scroller.{js,html}`) or deprecated.
 
 ---
 
@@ -284,7 +284,7 @@ The following directory exists under `pages/` but is **not in the manifest** (so
 - **Tier breakdown** (rough):
   - ✅ shipped: ~18 pages
   - 🟡 stub / renderers TODO: ~14 pages (mostly evolution + classification stage-2 pages)
-  - 🔵 thin-loader: 3 pages (page6, page7, page_sv_evidence)
+  - 🔵 thin-loader: 3 pages (page6, page7, sv_evidence)
 
 ---
 

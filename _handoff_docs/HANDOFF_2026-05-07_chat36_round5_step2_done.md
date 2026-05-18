@@ -1,4 +1,4 @@
-# HANDOFF — page2 candidate-detail page MIGRATED; next is page3 (catalogue)
+# HANDOFF — page2 candidate-detail page MIGRATED; next is catalogue (catalogue)
 
 **Date:** 2026-05-07 (chat ~36, round 5 step 2)
 **Reads:** This file FIRST, then the audit log top entry, then
@@ -120,9 +120,9 @@ panel is independent).
   re-exported names from the shared module's expansion. Bodies untouched.
 - **The 4 still-degraded sub-panels.** Future rounds.
 - **Pages 3, 4, 6, 7, 8, 9, 10, 11, 12, 15, 16, 16b, 17, 18, 19, 21,
-  page_overview, page_sv_evidence** — only parse-checked.
+  overview, sv_evidence** — only parse-checked.
 - **Page renumbering**. Quentin's directive: defer to the COMPLETE END
-  of all migrations. Pages keep their current "page1, page2, page3, ..."
+  of all migrations. Pages keep their current "page1, page2, catalogue, ..."
   IDs throughout the migration; the renumbering is a final
   reorganization pass.
 - **Toolkit-registry vs Atlas-state cache decisions.** Quentin's stated
@@ -131,14 +131,14 @@ panel is independent).
 
 ---
 
-## What to do NEXT (round 5 step 3: page3 migration)
+## What to do NEXT (round 5 step 3: catalogue migration)
 
 **Page3 is the catalogue page** — sortable/filterable table of L2
 envelopes (or L1-merged inversions). Different shape from page2:
 
-- **Location: `atlases/inversion/pages/catalogue/page3.js`**
+- **Location: `atlases/inversion/pages/catalogue/catalogue.js`**
   (NOT `pages/discovery/`).
-- Legacy line 5051: `<button data-page="page3">` titled *"Sortable,
+- Legacy line 5051: `<button data-page="catalogue">` titled *"Sortable,
   filterable catalogue of all L2 envelopes (or L1-merged inversions).
   Hover any column header for definition. Export selected rows as
   TSV or Markdown."*
@@ -152,19 +152,19 @@ envelopes (or L1-merged inversions). Different shape from page2:
 
 1. **Step 0 — registry sanity check.** Page3's registry entry looks
    right (chromosome-scoped, no active candidate). Verify against
-   legacy line 7263+ (`<div id="page3"`).
+   legacy line 7263+ (`<div id="catalogue"`).
 
-2. **Step 1 — Audit page3.html fragment.** Currently in `pages/catalogue/page3.html`.
+2. **Step 1 — Audit catalogue.html fragment.** Currently in `pages/catalogue/catalogue.html`.
    Compare with legacy. Likely contains a toolbar (view-mode buttons,
    simple/detailed toggle) plus an empty `<table id="catTable">` that
    gets filled by the renderer.
 
-3. **Step 2 — Audit CSS.** Look for `#page3 table.cat`-prefixed selectors.
+3. **Step 2 — Audit CSS.** Look for `#catalogue table.cat`-prefixed selectors.
    Round-5-step-2 audit showed plenty already (49 `.cand-*` rules; the
-   `#page3 table.cat` is its own family).
+   `#catalogue table.cat` is its own family).
 
 4. **Step 3 — Extract helpers.** Run the smart brace-matching extractor
-   from `/home/claude/work/extract_page2.py` (renamed for page3) over
+   from `/home/claude/work/extract_page2.py` (renamed for catalogue) over
    the catalogue functions. Likely targets:
    - `renderCatalogue()` — the main render entry point (legacy line ~62700+; the page2 plan flagged this as "page-4 territory" but it's actually page-3).
    - `renderCatalogueRow(env, mode)` — per-row HTML.
@@ -175,11 +175,11 @@ envelopes (or L1-merged inversions). Different shape from page2:
    - Hover-tooltip column-definition logic.
 
 5. **Step 4 — Bucket.** Likely 4 buckets:
-   - `_state.js` — `_pageState` + setter (page3 owns its own).
+   - `_state.js` — `_pageState` + setter (catalogue owns its own).
    - `_table.js` — row rendering, column definitions, sort logic.
    - `_filter.js` — favorites filter, simple/detailed display toggle, filter state.
    - `_export.js` — TSV + Markdown export.
-   - Main `page3.js` — `renderCatalogue` orchestrator + mount/unmount.
+   - Main `catalogue.js` — `renderCatalogue` orchestrator + mount/unmount.
 
 6. **Step 5 — Cross-page imports.** Page3 reads `state.data` (the chromosome precomp). Imports from `shared/page1_data_helpers.js`:
    - `getL2Cluster`, `getActiveSimScale`, `currentMbRange` for L2 row metrics.
@@ -198,7 +198,7 @@ envelopes (or L1-merged inversions). Different shape from page2:
 
 9. **Step 8 — Update audit log + recipe + handoff.** Same pattern this round used.
 
-**Estimate**: page3 should be smaller than page2 because it's table-based
+**Estimate**: catalogue should be smaller than page2 because it's table-based
 (less HTML construction variance). Maybe 1500-2500 LOC of bodies
 distributed across 4 sub-modules + main. Legacy line range to scan:
 `grep -n "function renderCatalogue\|function.*Catalogue" legacy/Inversion_atlas.html`.

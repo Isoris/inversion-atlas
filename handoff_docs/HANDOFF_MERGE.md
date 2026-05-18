@@ -37,15 +37,15 @@ What's left: **resolve TODO markers** and **assemble 4 working sub-atlas HTMLs**
 │   │   └── BATCH_1_NOTES.md             ← read this for batch-1 context
 │   ├── inversion_review/
 │   │   ├── page11.{js,html}, page4.{js,html}, page6.{js,html}, page7.{js,html},
-│   │   ├── page_sv_evidence.{js,html}
+│   │   ├── sv_evidence.{js,html}
 │   │   └── BATCH_2_NOTES.md
 │   ├── inversion_catalogue/
-│   │   ├── page3.{js,html}, page9.{js,html}, page10.{js,html}, page17.{js,html},
-│   │   ├── page18.{js,html}, page21.{js,html}, page_overview.{js,html}
+│   │   ├── catalogue.{js,html}, confirmed_carousel.{js,html}, marker_panels.{js,html}, stats_profile.{js,html},
+│   │   ├── marker_readiness.{js,html}, annotation_cockpit.{js,html}, overview.{js,html}
 │   │   └── BATCH_3_NOTES.md, BATCH_4_NOTES.md
 │   ├── inversion_comparative/
-│   │   ├── page5.{js,html} ← STUB! help page, NOT multi-species. See HANDOFF_SUPPLEMENT.md
-│   │   ├── page16.{js,html}, page16b.{js,html} ← multi-species lives in page16b
+│   │   ├── help.{js,html} ← STUB! help page, NOT multi-species. See HANDOFF_SUPPLEMENT.md
+│   │   ├── cross_species_breakpoints.{js,html}, multi_species_cockpit.{js,html} ← multi-species lives in multi_species_cockpit
 │   │   └── BATCH_5_NOTES.md
 │   ├── tests/
 │   │   ├── test_shared_*.js (8 files)   ← READ-ONLY foundation regression tests

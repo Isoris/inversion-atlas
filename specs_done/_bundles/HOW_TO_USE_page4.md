@@ -45,8 +45,8 @@ atlases/inversion/
    slot). Routes that populate this slot:
    - page1: click a candidate rectangle on the |Z| strip
    - page2: prev/next in candidate-list
-   - page3: click a row's id in the catalogue table
-   - page21: navigate the annotation cockpit cursor
+   - catalogue: click a row's id in the catalogue table
+   - annotation_cockpit: navigate the annotation cockpit cursor
 
 2. **Open page4** — the tab is in the classification stage group.
 
@@ -164,8 +164,8 @@ allowed but the override flag is recorded.
 |-------------|--------|
 | **page2** | edit notes, regime, age_origin (the "detail card" fields) |
 | **page11** | refine boundary zones; the Tier grid's `boundary_quality` axis reads page11's output |
-| **page_sv_evidence** | drives Layer B (SV callers) — open to inspect |
-| **page17** | stats profile across all candidates, cohort-wide |
+| **sv_evidence** | drives Layer B (SV callers) — open to inspect |
+| **stats_profile** | stats profile across all candidates, cohort-wide |
 | **page1** | back to the chromosome scrubber to verify in context |
 
 ## Critical: registry mismatch flagged
@@ -228,7 +228,7 @@ what the layer-status indicator says.
 - **It does NOT confirm candidates** — confirmation happens on
   page2.
 - **It does NOT refine boundaries** — that's page11.
-- **It does NOT call SV evidence** — that's page_sv_evidence.
+- **It does NOT call SV evidence** — that's sv_evidence.
 
 ## Related specs
 

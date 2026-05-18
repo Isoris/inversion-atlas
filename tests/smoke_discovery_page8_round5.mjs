@@ -35,7 +35,7 @@ function check(label, cond, extra) {
 function group(name) { console.log('\n--- ' + name + ' ---'); }
 
 // -----------------------------------------------------------------------------
-// Minimal DOM polyfill — same shape as page9/17/18/21 smoke harnesses.
+// Minimal DOM polyfill — same shape as confirmed_carousel/17/18/21 smoke harnesses.
 // Page8's mount doesn't touch the DOM in this round (no render) but the
 // polyfill is here for future-proofing when renderers land.
 // -----------------------------------------------------------------------------

@@ -328,7 +328,7 @@ In `specs_done/`:
 - `SPEC_l2_sweep_inheritance.md` (the auto-promote pipeline that
   produces the candidates page11 then refines; defines the
   `confirmed: false` discipline)
-- `SPEC_sv_evidence_page.md` (page_sv_evidence's per-SV
+- `SPEC_sv_evidence_page.md` (sv_evidence's per-SV
   classification feeds the `sv_anchor` track at weight 0.02 +
   the user's decision to promote to `SV_supported`)
 - `SCHEMA.md` (§12 / §20 reserve sections for SV evidence + the

@@ -56,7 +56,7 @@
 // **The activeCandidate slot is correct** — page4 IS a candidate-level
 // view (reads state.candidate.id/.chrom/.start_bp/.end_bp/.K). But the
 // requires_layers values look misplaced: candidate_sv_counts is
-// page_sv_evidence's territory, candidate_boundaries looks like it
+// sv_evidence's territory, candidate_boundaries looks like it
 // belongs on a different (likely page11 boundaries) page. What page4
 // actually reads is state.data.final_classification (the planned R-
 // pipeline output) plus state.data.classification (§9 cluster-emit
@@ -93,7 +93,7 @@
 // _renderCandidateKaryotypeBody throws ReferenceError (still missing).
 // With Tier subview active, _renderTierAxesGrid throws ReferenceError
 // inside the template literal. mount() wraps the dispatcher call in
-// try/catch (matching page16/page16b's pattern) so the empty-state path
+// try/catch (matching cross_species_breakpoints/multi_species_cockpit's pattern) so the empty-state path
 // is exercisable while the populated path is still gated on the missing
 // helpers landing.
 // =============================================================================
@@ -464,7 +464,7 @@ export function refreshPage4(state) {
  *     .classification consumed by renderCandidateTier)
  *
  * mount-time render: try/catch wraps the dispatcher call (matching
- * page16/page16b). Rationale: with state.candidate=null (typical
+ * cross_species_breakpoints/multi_species_cockpit). Rationale: with state.candidate=null (typical
  * empty mount), both renderers exit cleanly via the
  * `if (!state.candidate) return` branch. With state.candidate set
  * AND Karyotype subview active, _renderCandidateKaryotypeBody is

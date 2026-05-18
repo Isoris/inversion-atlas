@@ -88,10 +88,10 @@ knowing the comparator isn't enough.
 
 - The numeric ids are opaque. You've said multiple times:
   - "I don't know what is what"
-  - page21 was mislabelled "Manual karyotype groups" (corrected in
+  - annotation_cockpit was mislabelled "Manual karyotype groups" (corrected in
     its module header)
-  - page5 was mislabelled "Multi-species comparison" (it's the help
-    page; the actual multi-species cockpit is page16b)
+  - help was mislabelled "Multi-species comparison" (it's the help
+    page; the actual multi-species cockpit is multi_species_cockpit)
   - The page4/6/7/11 swap-hypothesis registry mismatches partly
     come from the numeric confusion
 - Self-documenting URLs reduce mental overhead: `/inversion#local_pca_z`
@@ -191,19 +191,19 @@ Examples:
 | `page6` | popstats | `popstats` |
 | `page7` | ancestry | `ancestry_per_window` |
 | `page11` | boundaries | `boundary_refinement` |
-| `page_sv_evidence` | SV evidence | `sv_evidence` (drop the `page_` prefix) |
-| `page3` | catalogue | `catalogue` |
-| `page9` | confirmed carousel | `confirmed_carousel` |
-| `page10` | marker panels | `marker_panels` |
-| `page17` | stats profile | `stats_profile` |
-| `page18` | marker readiness panel | `marker_readiness` |
-| `page21` | annotation cockpit | `annotation_cockpit` |
+| `sv_evidence` | SV evidence | `sv_evidence` (drop the `page_` prefix) |
+| `catalogue` | catalogue | `catalogue` |
+| `confirmed_carousel` | confirmed carousel | `confirmed_carousel` |
+| `marker_panels` | marker panels | `marker_panels` |
+| `stats_profile` | stats profile | `stats_profile` |
+| `marker_readiness` | marker readiness panel | `marker_readiness` |
+| `annotation_cockpit` | annotation cockpit | `annotation_cockpit` |
 | `page8` | per-window summary table | `window_summary_table` |
 | `page19` | negative regions catalogue | `negative_regions` |
-| `page_overview` | overview | `overview` |
-| `page16` | cross-species breakpoints | `cross_species_breakpoints` |
-| `page16b` | multi-species | `multi_species_cockpit` |
-| `page5` | help | `help` |
+| `overview` | overview | `overview` |
+| `cross_species_breakpoints` | cross-species breakpoints | `cross_species_breakpoints` |
+| `multi_species_cockpit` | multi-species | `multi_species_cockpit` |
+| `help` | help | `help` |
 | `tree_panel` | tree panel | `tree_panel` |
 | `fingerprint_track` | fingerprint track | `fingerprint_track` |
 | `similarity_matrix` | similarity matrix | `similarity_matrix` |
@@ -211,7 +211,7 @@ Examples:
 | `dosage_heatmap` | dosage heatmap | `dosage_heatmap` |
 | `nested_inversion_detector` | nested detector | `nested_inversion_detector` |
 | `dosage_cluster_adaptive_k` | dosage cluster | `dosage_cluster_adaptive_k` |
-| `page_ancestry_scroller` | ancestry scroller | `fish_ancestry_scroller` |
+| `fish_ancestry_scroller` | ancestry scroller | `fish_ancestry_scroller` |
 | `polarize_msa_stacked` | polarize · MSA | `polarize_msa_stacked` |
 | `haplotype_network` | haplotype network | `haplotype_network` |
 | `polarize_synteny_vote` | polarize · synteny | `polarize_synteny_vote` |

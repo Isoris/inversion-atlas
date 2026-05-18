@@ -41,10 +41,10 @@ The directory a page lives in does **NOT** always match its
 |------|-----|---------------|
 | page8 | `pages/discovery/` | `catalogue` |
 | page19 | `pages/discovery/` | `catalogue` |
-| page17 | `pages/catalogue/` | `classification` |
-| page18 | `pages/catalogue/` | `classification` |
-| page_overview | `pages/catalogue/` | `classification` |
-| page5 | `pages/comparative/` | `help` |
+| stats_profile | `pages/catalogue/` | `classification` |
+| marker_readiness | `pages/catalogue/` | `classification` |
+| overview | `pages/catalogue/` | `classification` |
+| help | `pages/comparative/` | `help` |
 
 The **stage** is authoritative for the shell's tab grouping.
 
@@ -100,6 +100,6 @@ sub-modules see the active mount's state via ES module live-binding.
 - 🟡 **stub / empty-state / Phase 1** (renderers TODO or
   partial): ~10 pages
 - 🔵 **thin-loader** (external `window.*` renderer): 3 pages
-  (page6, page7, page_sv_evidence)
+  (page6, page7, sv_evidence)
 - 🆕 **fresh implementations** (legacy shipped HTML shell only):
-  4 pages (page3, page8, page9, page19)
+  4 pages (catalogue, page8, confirmed_carousel, page19)

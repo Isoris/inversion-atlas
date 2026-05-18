@@ -130,7 +130,7 @@ In `specs_todo/`:
   SPEC ONLY)
 - `SPEC_copy_origin_painting.md` (Stage 5.6 — SPEC ONLY)
 - `SPEC_fish_ancestry_scroller.md` (Stage 5.7 — partial; the
-  page is now registered as `page_ancestry_scroller` in the
+  page is now registered as `fish_ancestry_scroller` in the
   classification stage, NOT evolution)
 - `SPEC_inversion_age_atlas_surface_AMENDMENT.md` (parent SPEC
   missing on disk — flagged in `_handoff_docs/SPECS_AUDIT.md`)

@@ -1,6 +1,6 @@
 // tests/test_page3_catalogue.js
 //
-// Unit coverage for pages/catalogue/page3/catalogue.js.
+// Unit coverage for pages/catalogue/catalogue/catalogue.js.
 //
 // Legacy referenced renderCatalogue / _buildCatalogueRows / _sortCatalogueRows
 // throughout the file via `typeof renderCatalogue === 'function'` guards but
@@ -25,7 +25,7 @@
 //   - teardownCatalogueToolbar: idempotent + handler removal
 //   - Headless tolerance: no document → silent return
 
-import * as CAT from '../atlases/inversion/pages/catalogue/page3/catalogue.js';
+import * as CAT from '../atlases/inversion/pages/catalogue/catalogue/catalogue.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

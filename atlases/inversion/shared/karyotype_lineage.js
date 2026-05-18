@@ -6,7 +6,7 @@
 // "other") with optional higher-resolution wfmash refinement on each
 // (focal_chr, species) cell.
 //
-// Used by the multi-species classification cockpit (page16b) to
+// Used by the multi-species classification cockpit (multi_species_cockpit) to
 // polarize karyotype events (fission/fusion across the catfish
 // phylogeny) — see _msPolarizeKaryotypeEvent in legacy. This module
 // ships the data + pure lookup helpers; the polarization rules emit

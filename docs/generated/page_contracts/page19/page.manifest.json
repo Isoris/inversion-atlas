@@ -12,7 +12,7 @@
   },
   "legacy_source": "legacy/Inversion_atlas.html lines 7378-7572 (HTML shell ONLY — no JS in legacy; inline HTML comment references planned future renderer name _nrRender but no impl)",
 
-  "purpose": "Region-level catalogue of 'no detectable inversion' calls — complement of the page3 positive catalogue. Each region carries a region_status field (e.g. no_detectable_inversion_high_confidence) — NOT a binary positive/negative. Static caution banner explicitly warns against that misreading.",
+  "purpose": "Region-level catalogue of 'no detectable inversion' calls — complement of the catalogue positive catalogue. Each region carries a region_status field (e.g. no_detectable_inversion_high_confidence) — NOT a binary positive/negative. Static caution banner explicitly warns against that misreading.",
 
   "important_caveat": "The complement framing is deliberate: 'no detectable inversion' means no signal above the study's resolution / sample size / callability limits — tiny inversions, very rare inversions (1-2 fish), inversions in repetitive or low-callability regions, and inversions whose breakpoints fall outside short-read mappability can all be missed.",
 

@@ -26,7 +26,7 @@ stage4           — per-target consensus_partition, voter records
 (== "which fish carry which arrangement at this locus") and link to
 long-range haplotype regimes via `stage2_linkage_group` — but they
 never reach `state.candidateList`. Downstream pages (page4 karyotype,
-page17 stats, page_evolution_*) read `state.candidateList`, so the
+stats_profile stats, page_evolution_*) read `state.candidateList`, so the
 seeds-to-regimes work is a dead-end output.
 
 This handoff specs **`analysis/seeds_to_candidates`** — a JSON-in /
@@ -60,7 +60,7 @@ state._regimesResult   (page22-private)
   │     (filesystem export; downloads regime catalogue)
   │
   └── ??? — stage3.loci[] NEVER reach state.candidateList
-            page4 / page17 / page_evolution_* therefore have no
+            page4 / stats_profile / page_evolution_* therefore have no
             seed-derived candidates to operate on.
 ```
 
@@ -72,7 +72,7 @@ After this handoff lands, the second branch becomes:
         → state.candidateList    (via adapter.saveOutput with promote=true)
             ↓
         page4 (karyotype/tier)          via PR #13 karyotype_assignment
-        page17 (stats profile)          via existing legacy
+        stats_profile (stats profile)          via existing legacy
         polarize_msa_stacked     via canonical candidate shape
         archaeology_synthesis_card etc.
 ```

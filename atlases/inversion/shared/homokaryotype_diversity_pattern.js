@@ -26,7 +26,7 @@
 //   π_homA high, π_homB high         | both arrangements internally diverse;
 //                                    | old/persistent polymorphism
 //
-// Pure compute. Renders into the [evo] hover pill on page17's
+// Pure compute. Renders into the [evo] hover pill on stats_profile's
 // karyotype-aware stat cells.
 // =====================================================================
 
@@ -44,7 +44,7 @@ export const HOMOKARYOTYPE_DIVERSITY_PATTERNS = Object.freeze({
   INSUFFICIENT_DATA:     'insufficient_data',
 });
 
-/** Plain-language interpretations for the hover pill. The page17
+/** Plain-language interpretations for the hover pill. The stats_profile
  *  renderer reads this map to populate the tooltip. */
 export const HOMOKARYOTYPE_PATTERN_INTERPRETATIONS = Object.freeze({
   both_low_divergent:

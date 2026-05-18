@@ -5,7 +5,7 @@
 // page). **THE FINAL MIGRATION** (review group: 4 of 5 → 5 of 5;
 // MIGRATION COMPLETE 21/21). Pattern 2 (single-file with _state.js)
 // applied; closest peers are page4 (step 21, the direct template),
-// page12 (step 10), page17 (step 5).
+// page12 (step 10), stats_profile (step 5).
 //
 // page11 has 4 chat-33 functions, all preserved verbatim. Unlike
 // page4 (which got manual AST shims into 2 of 4 helpers), page11

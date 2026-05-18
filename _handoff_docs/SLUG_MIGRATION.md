@@ -11,12 +11,12 @@ User-reported pain (`AUDIT_local_pca_merge_vs_rename.md` §Q2):
 > "rename page 1 and every number by simply the name of the page bc
 > I don't know what is what."
 
-Numeric ids (`page1`, `page12`, `page16b`, etc.) are opaque. They
+Numeric ids (`page1`, `page12`, `multi_species_cockpit`, etc.) are opaque. They
 caused real bugs:
-- page21 mislabelled "Manual karyotype groups" in HANDOFF_BATCH_3
+- annotation_cockpit mislabelled "Manual karyotype groups" in HANDOFF_BATCH_3
   (it's the annotation cockpit)
-- page5 mislabelled "Multi-species comparison" (it's the help page;
-  the actual multi-species cockpit is page16b)
+- help mislabelled "Multi-species comparison" (it's the help page;
+  the actual multi-species cockpit is multi_species_cockpit)
 - The page4 / page6 / page7 / page11 swap-hypothesis registry
   mismatches partly come from numeric confusion
 
@@ -59,20 +59,20 @@ no tests fail.
 | `page6` | `popstats` | popstats track stack |
 | `page7` | `ancestry_per_window` | per-window ancestry view |
 | `page11` | `boundary_refinement` | boundary zone refinement |
-| `page_sv_evidence` | `sv_evidence` | (drop the `page_` prefix) |
-| `page_ancestry_scroller` | `fish_ancestry_scroller` | per-fish ancestry painting |
-| `page3` | `catalogue` | L2 envelopes table |
-| `page9` | `confirmed_carousel` | walk through confirmed candidates |
-| `page10` | `marker_panels` | diagnostic PCR marker cards |
-| `page17` | `stats_profile` | manuscript synthesis figure |
-| `page18` | `marker_readiness` | private-indel tier panel |
-| `page21` | `annotation_cockpit` | per-sample lines + cursor-driven candidate selection |
+| `sv_evidence` | `sv_evidence` | (drop the `page_` prefix) |
+| `fish_ancestry_scroller` | `fish_ancestry_scroller` | per-fish ancestry painting |
+| `catalogue` | `catalogue` | L2 envelopes table |
+| `confirmed_carousel` | `confirmed_carousel` | walk through confirmed candidates |
+| `marker_panels` | `marker_panels` | diagnostic PCR marker cards |
+| `stats_profile` | `stats_profile` | manuscript synthesis figure |
+| `marker_readiness` | `marker_readiness` | private-indel tier panel |
+| `annotation_cockpit` | `annotation_cockpit` | per-sample lines + cursor-driven candidate selection |
 | `page8` | `window_summary_table` | per-window \|Z\| / λ / SNP counts |
 | `page19` | `negative_regions` | complement of catalogue |
-| `page_overview` | `overview` | synthesis-stage overview (empty stub) |
-| `page16` | `cross_species_breakpoints` | Cgar × Cmac wfmash |
-| `page16b` | `multi_species_cockpit` | catfish phylogeny classifier |
-| `page5` | `help` | static help page |
+| `overview` | `overview` | synthesis-stage overview (empty stub) |
+| `cross_species_breakpoints` | `cross_species_breakpoints` | Cgar × Cmac wfmash |
+| `multi_species_cockpit` | `multi_species_cockpit` | catfish phylogeny classifier |
+| `help` | `help` | static help page |
 | `tree_panel` | `tree_panel` | NJ sample tree |
 | `fingerprint_track` | `fingerprint_track` | diversity-regime fingerprint |
 | `similarity_matrix` | `similarity_matrix` | sample × sample heatmap |

@@ -5,7 +5,7 @@
 ## Purpose
 
 Region-level catalogue of "no detectable inversion" calls —
-**complement of the page3 positive catalogue**. Each region carries
+**complement of the catalogue positive catalogue**. Each region carries
 a `region_status` field (e.g. `no_detectable_inversion_high_confidence`)
 — **NOT** a binary positive/negative. A static caution banner
 explicitly warns against that misreading.

@@ -136,7 +136,7 @@ Comment block grew while constant block shrunk — same total LOC.
   (refactor to take `state` as first arg) — defer until a page actually
   needs them shared.
 - **HTML, CSS, server, schemas, master_config** — JS-only round.
-- **Sibling pages** (page8, page12, page15, page19, page2-stub, page3,
+- **Sibling pages** (page8, page12, page15, page19, page2-stub, catalogue,
   4, 5, 6, 7, 9, 10, 11, 16, 16b, 17, 18, 21, _overview) — only
   parse-checked.
 

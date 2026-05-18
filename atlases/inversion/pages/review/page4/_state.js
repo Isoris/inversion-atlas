@@ -2,14 +2,14 @@
 //
 // State module for the page4 karyotype/tier candidate-level view
 // (chat 39 cont. round 5 step 21, 2026-05-07). Canonical shape;
-// mirrors page16/page16b/page12/page17/_state.js.
+// mirrors cross_species_breakpoints/multi_species_cockpit/page12/stats_profile/_state.js.
 //
 // _pageState: module-level reference. Page4's mount + entry points
 // call _setActiveState(state) on entry so the helper bodies see the
 // active mount's state via ES module live-binding semantics.
 //
 // Page4 has its OWN _pageState (separate from sibling review pages
-// page6/page7/page_sv_evidence). Page4 reads state.candidate (cross-
+// page6/page7/sv_evidence). Page4 reads state.candidate (cross-
 // atlas slot) for the active candidate, and state.data (transient
 // slot) for state.data.final_classification — the per-candidate
 // 14-axis classification keyed by candidate id, produced by the

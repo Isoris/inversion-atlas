@@ -1,4 +1,4 @@
-# HANDOFF — page21 annotation cockpit MIGRATED; 6 of 22 pages done
+# HANDOFF — annotation_cockpit annotation cockpit MIGRATED; 6 of 22 pages done
 
 **Date:** 2026-05-07 (chat ~36, round 5 step 6)
 **Reads:** This file FIRST, then the audit log top entry, then
@@ -22,14 +22,14 @@ under the cursor (state.tracked → linkage shading + linkage table panel
 
 The chat-33 stub already had ~720 LOC of body extracted from legacy
 (lines 46938–47616). This round refactored it for atlas-router
-compatibility — same single-file refactor pattern as page17 (round 5
-step 5) and page18 (round 5 step 4).
+compatibility — same single-file refactor pattern as stats_profile (round 5
+step 5) and marker_readiness (round 5 step 4).
 
 ```
 atlases/inversion/pages/catalogue/
-├── page21.js                       776 LOC ← refactored in-place
-└── page21/
-    └── _state.js                    16 LOC ← _pageState + setter (page21's own)
+├── annotation_cockpit.js                       776 LOC ← refactored in-place
+└── annotation_cockpit/
+    └── _state.js                    16 LOC ← _pageState + setter (annotation_cockpit's own)
 ```
 
 **Verifications passed (447/447 from a clean tarball reassembly):**
@@ -55,17 +55,17 @@ atlases/inversion/pages/catalogue/
 
 ### Step 0 — registry + manifest fix
 
-- `pages.registry.json` page21: added `_label` ("annotation cockpit") +
+- `pages.registry.json` annotation_cockpit: added `_label` ("annotation cockpit") +
   `_doc` documenting the legacy tab definition + line range provenance
   + the cursor / digit-key / band-pick UX.
-- `manifest.json` page21: label "page 21" → **"annotation cockpit"**.
+- `manifest.json` annotation_cockpit: label "page 21" → **"annotation cockpit"**.
   (Stage stays "catalogue".)
 
-### Step 1 — page21.js refactored in-place
+### Step 1 — annotation_cockpit.js refactored in-place
 
-Same single-file pattern as page17/page18:
+Same single-file pattern as stats_profile/marker_readiness:
 - Replaced `const state = (typeof window !== 'undefined' && window.state) ? window.state : {};`
-  with `import { _pageState, _setActiveState } from './page21/_state.js';`.
+  with `import { _pageState, _setActiveState } from './annotation_cockpit/_state.js';`.
 - Rewrote `_ackEnsureState()` to read from `_pageState` (was reading from
   `window.state`). It still lazy-inits `cockpitCursor` and falls back to
   a transient `{}` if no mount has happened — keeps pure helpers callable
@@ -74,29 +74,29 @@ Same single-file pattern as page17/page18:
   function reading state directly without going through `_ackEnsureState`).
 - Renamed verbatim `function refreshAnnotationCockpit()` →
   `function _refreshAnnotationCockpit()` (underscore-prefixed legacy
-  body, matching page17/18 convention).
+  body, matching stats_profile/18 convention).
 - Added state-aware `export function refreshAnnotationCockpit(state)`
   wrapper that calls `_setActiveState(state)` then delegates.
 - Removed the chat-33 `__MODULE_ID__` export.
 - Added `mount(root, atlasState, registry)`, `unmount(root)`, and
-  `_buildLegacyState(atlasState)` (mirrors page17/18 lifecycle, but
+  `_buildLegacyState(atlasState)` (mirrors stats_profile/18 lifecycle, but
   builds a wider state shape: tracked, cockpitCursor, cockpitSelectedBand,
   candidates, candidates_detailed, activeMode, data).
 
 **No `const state = _pageState;` shim injection was needed.** Unlike
-page17/page18, page21's body was already written to access state through
+stats_profile/marker_readiness, annotation_cockpit's body was already written to access state through
 the local accessor pattern (`const _state = _ackEnsureState();` at the
 top of each function). Once `_ackEnsureState` was rewired to read
 `_pageState`, every consumer flowed through correctly.
 
-### Step 2 — page21/_state.js (NEW, 16 LOC)
+### Step 2 — annotation_cockpit/_state.js (NEW, 16 LOC)
 
-Same shape as page17/_state.js and page18/_state.js.
+Same shape as stats_profile/_state.js and marker_readiness/_state.js.
 
 ### Step 3 — Tests
 
 - `tests/test_catalogue_page21.js`: replaced (was a stale chat-33 test
-  that imported from the wrong path `../inversion_catalogue/page21.js`
+  that imported from the wrong path `../inversion_catalogue/annotation_cockpit.js`
   and asserted removed `__MODULE_ID__`). New version: 41 assertions
   covering exports, helpers, constants, `_state.js` live-binding,
   `_ackBandColor` purity, `_annoCockpitCandidateAtCursor` cursor lookup,
@@ -117,9 +117,9 @@ Same shape as page17/_state.js and page18/_state.js.
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1/page2/page3/page17/page18 modules** — completely unchanged.
+- **page1/page2/catalogue/stats_profile/marker_readiness modules** — completely unchanged.
 - **`shared/page1_data_helpers.js`** — unchanged. Page21 doesn't call
-  `_esc` (the one shared helper that page17 picked up).
+  `_esc` (the one shared helper that stats_profile picked up).
 - **The 4 external runtime-guarded helpers**
   (`_gatherActiveCandidatesForInheritance`,
   `_wireCandidateHaplotypeAnnotations`,
@@ -129,7 +129,7 @@ Same shape as page17/_state.js and page18/_state.js.
   focus) lands the first three, and when the linkage projection
   helper gets promoted to `shared/`.
 - **Pages 4, 6, 7, 8, 9, 10, 11, 12, 15, 16, 16b, 19,
-  page_overview, page_sv_evidence** — only parse-checked.
+  overview, sv_evidence** — only parse-checked.
 - **Page renumbering** — deferred per Quentin's directive.
 - **Toolkit-registry vs Atlas-state cache decisions** — deferred.
 
@@ -141,22 +141,22 @@ Same shape as page17/_state.js and page18/_state.js.
 |---|---|---|---|---|
 | page1 | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
 | page2 | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
-| page3 | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
-| page17 | catalogue (synthesis) | ✅ step 5 (single file + state bridge) | ~1009 across main + _state | 34+20 |
-| page18 | catalogue (synthesis) | ✅ step 4 (single file) | ~984 across main + _state | 46+20 |
-| page21 | catalogue | ✅ step 6 (single file) | ~792 across main + _state | 41+20 |
+| catalogue | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
+| stats_profile | catalogue (synthesis) | ✅ step 5 (single file + state bridge) | ~1009 across main + _state | 34+20 |
+| marker_readiness | catalogue (synthesis) | ✅ step 4 (single file) | ~984 across main + _state | 46+20 |
+| annotation_cockpit | catalogue | ✅ step 6 (single file) | ~792 across main + _state | 41+20 |
 
 **Total assertions: 447/447 across 12 test runs.**
 
 **Pages remaining (16 of 22):** page4, 5, 6, 7, 8, 9, 10, 11, 12, 15,
-16, 16b, 19, page_overview, page_sv_evidence.
+16, 16b, 19, overview, sv_evidence.
 
 ---
 
 ## Architectural notes
 
 **Single-file refactor pattern is now a routine.** Page21 was the third
-page in a row (after page18 round-5-step-4 and page17 round-5-step-5)
+page in a row (after marker_readiness round-5-step-4 and stats_profile round-5-step-5)
 that used the "extract verbatim body + add `_pageState` live-binding +
 add atlas-router lifecycle" pattern. The pattern works cleanly for
 pages with cohesive single-concern code under ~3000 LOC.
@@ -164,16 +164,16 @@ pages with cohesive single-concern code under ~3000 LOC.
 **Page21 confirmed a useful shortcut.** When a page's body already
 accesses state through a single accessor (`_ackEnsureState()` here),
 the refactor only needs to rewire that accessor. No per-function shim
-injection was needed — saving the AST-walking step from page17/18.
+injection was needed — saving the AST-walking step from stats_profile/18.
 For future pages, check the accessor pattern first; if it exists, the
 refactor is shorter.
 
 **Runtime guards stay runtime guards.** Page21's 4 external helpers
 (`_gatherActiveCandidatesForInheritance` etc.) are kept as runtime
 guards because each call site already handles the missing case
-gracefully. Same approach as page17 with `_csGetSyntenyBlocks` /
-`_csPermutationTest`. They'll land naturally with page2 / page16 /
-page16b migration.
+gracefully. Same approach as stats_profile with `_csGetSyntenyBlocks` /
+`_csPermutationTest`. They'll land naturally with page2 / cross_species_breakpoints /
+multi_species_cockpit migration.
 
 ---
 
@@ -184,28 +184,28 @@ page16b migration.
 | Page | Folder | LOC | Notes |
 |---|---|---|---|
 | **page12** | discovery | 1008 | 18 TODOs — substantial work |
-| **page16, page16b** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest`, AND likely `computeTrackedLinkageProjection`** |
-| **page8, 9, 15, 19, page_overview** | various | <105 each | tiny stubs; quick router-wiring rounds — could batch several in one round |
+| **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest`, AND likely `computeTrackedLinkageProjection`** |
+| **page8, 9, 15, 19, overview** | various | <105 each | tiny stubs; quick router-wiring rounds — could batch several in one round |
 | **page4, 6, 7, 11** | review | 122-301 | review-stage pages |
-| **page_sv_evidence** | review | 148 | SV evidence review |
-| **page10** | catalogue | TBD | catalogue completion |
-| **page5** | comparative | small (stub) | help-page stub |
+| **sv_evidence** | review | 148 | SV evidence review |
+| **marker_panels** | catalogue | TBD | catalogue completion |
+| **help** | comparative | small (stub) | help-page stub |
 
 Logical next priorities depending on goal:
 
-- **Catalogue completion** — page9, page10, page_overview would round
-  out the catalogue group. page_overview is the smallest, page10/9
+- **Catalogue completion** — confirmed_carousel, marker_panels, overview would round
+  out the catalogue group. overview is the smallest, marker_panels/9
   are medium.
 - **Resolve cross-page runtime guards** — page2 (candidate focus deep
-  dive) is already migrated, but the 3 helpers page21 stubs
+  dive) is already migrated, but the 3 helpers annotation_cockpit stubs
   (`_gatherActiveCandidatesForInheritance` etc.) live somewhere page2
   hasn't surfaced yet — likely they need extraction from legacy line
   41196+ into `shared/`.
-- **Quick wins / coverage** — tiny stubs (page8/9/15/19/page_overview)
+- **Quick wins / coverage** — tiny stubs (page8/9/15/19/overview)
   can be batched in a single round.
-- **Comparative cockpit** — page16/page16b is the most ambitious
+- **Comparative cockpit** — cross_species_breakpoints/multi_species_cockpit is the most ambitious
   remaining; landing it resolves the most runtime guards across
-  page17 + page21.
+  stats_profile + annotation_cockpit.
 
 ---
 

@@ -1,6 +1,6 @@
 // Atlas/inversion_discovery/page19.js
 // =============================================================================
-// page19 — Negative regions catalogue (complement of page3 catalogue)
+// page19 — Negative regions catalogue (complement of catalogue catalogue)
 // (`<div id="page19">` — toolbar with load/export/reset buttons,
 //  caution banner, summary cards, region table)
 //
@@ -23,7 +23,7 @@
 // What the page is supposed to do (per the title at legacy line 7382 and
 // the caution banner copy at 7389-7402):
 //   - Display a region-level catalogue of "no detectable inversion" calls,
-//     i.e. the complement of page3's positive catalogue.
+//     i.e. the complement of catalogue's positive catalogue.
 //   - Each region carries a region_status field (e.g.
 //     no_detectable_inversion_high_confidence) — NOT a binary positive/
 //     negative; the banner explicitly warns against that misreading.

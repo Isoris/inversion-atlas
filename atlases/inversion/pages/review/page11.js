@@ -35,7 +35,7 @@
 //
 // New: _state.js sub-module + state-aware wrapper refreshPage11 +
 // mount/unmount lifecycle. mount-time render wrapped in try/catch
-// (matching page16/page16b/page4) because the populated path hits 31
+// (matching cross_species_breakpoints/multi_species_cockpit/page4) because the populated path hits 31
 // TODO_MISSING `_bnd*` helpers which throw ReferenceError until a
 // follow-up extraction round lands them. With state.candidate=null
 // (typical empty mount), renderBoundariesPage early-returns at
@@ -404,7 +404,7 @@ export function refreshPage11(state) {
  *   - state.ncRNADensity  (ncRNA density layer)
  *
  * mount-time render: try/catch wraps the dispatcher call (matching
- * page16/page16b/page4). Rationale: even with state.candidate=null,
+ * cross_species_breakpoints/multi_species_cockpit/page4). Rationale: even with state.candidate=null,
  * renderBoundariesPage's first non-DOM-guard line is
  * `_ensureBoundariesState()` — which is TODO_MISSING and throws
  * ReferenceError. The try/catch guards mount() so it never propagates.

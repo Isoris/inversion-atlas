@@ -137,15 +137,15 @@ page modules):
 
 | Step | Round | What landed |
 |---|---|---|
-| 12 | page17 guard promotion | `_csGetSyntenyBlocks` + `_csPermutationTest` promoted from `typeof X === 'function'` runtime guards to ES imports from `page16` |
+| 12 | stats_profile guard promotion | `_csGetSyntenyBlocks` + `_csPermutationTest` promoted from `typeof X === 'function'` runtime guards to ES imports from `cross_species_breakpoints` |
 | 13 | page8 migration | discovery stub |
 | 14 | page19 migration | discovery stub |
 | 15 | page15 migration | GHSL mirror |
-| 16 | page5 migration | comparative help |
+| 16 | help migration | comparative help |
 | 17 | page7 migration | review ancestry |
 | 18 | page6 migration | review popstats |
-| 19 | page_sv_evidence | review SV evidence |
-| 20 | page16b migration | comparative multi-species (2744 LOC) |
+| 19 | sv_evidence | review SV evidence |
+| 20 | multi_species_cockpit migration | comparative multi-species (2744 LOC) |
 | 21 | page4 migration | review karyotype/tier |
 | 22 | runner annotation | "MIGRATION COMPLETE 21/21" |
 | 23 | qopt loader pattern | first activate/extract two-schema example |

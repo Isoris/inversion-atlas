@@ -82,8 +82,8 @@ discovery → classification → catalogue → comparative → help
 ```
 
 Help is rightmost. The `synthesis` stage from earlier drafts has
-been folded into `classification` (page17 stats profile, page18
-marker panel, page_overview overview now all live in
+been folded into `classification` (stats_profile stats profile, marker_readiness
+marker panel, overview overview now all live in
 `classification`).
 
 Other atlases can declare different stages — the chrome CSS reads

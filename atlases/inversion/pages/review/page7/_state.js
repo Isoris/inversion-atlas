@@ -1,7 +1,7 @@
 // pages/review/page7/_state.js
 //
 // State module for the page7 ancestry view (chat 38 round 5 step 17,
-// 2026-05-07). Mirrors page5/page8/page15/page19/_state.js — same
+// 2026-05-07). Mirrors help/page8/page15/page19/_state.js — same
 // shape, distinct module, distinct _pageState reference.
 //
 // Page7's chat-33 exports (showAncestryPage, refreshAncestryPage) are

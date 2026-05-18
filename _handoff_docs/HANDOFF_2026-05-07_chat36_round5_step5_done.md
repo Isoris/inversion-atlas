@@ -1,4 +1,4 @@
-# HANDOFF — page17 stats profile MIGRATED + cross-page state bridge; 5 of 22 pages done
+# HANDOFF — stats_profile stats profile MIGRATED + cross-page state bridge; 5 of 22 pages done
 
 **Date:** 2026-05-07 (chat ~36, round 5 step 5)
 **Reads:** This file FIRST, then the audit log top entry, then
@@ -21,14 +21,14 @@ is statistically special about inversion regions?"
 The chat-33 stub already had ~939 LOC of body extracted from legacy
 (lines 28420-29306). This round refactored it for atlas-router
 compatibility AND introduced the **first cross-page state bridge**
-(page17→page18) so page17 can call page18's `_mpDeriveAutoPanel()` to
+(stats_profile→marker_readiness) so stats_profile can call marker_readiness's `_mpDeriveAutoPanel()` to
 compute the marker-tier breakdown row of the stats table.
 
 ```
 atlases/inversion/pages/catalogue/
-├── page17.js                       994 LOC ← refactored in-place + state bridge
-└── page17/
-    └── _state.js                    15 LOC ← _pageState + setter (page17's own)
+├── stats_profile.js                       994 LOC ← refactored in-place + state bridge
+└── stats_profile/
+    └── _state.js                    15 LOC ← _pageState + setter (stats_profile's own)
 ```
 
 **Verifications passed (386/386 from a clean tarball reassembly):**
@@ -43,7 +43,7 @@ atlases/inversion/pages/catalogue/
 - `tests/smoke_catalogue_page3_round5.mjs`: **29/29** unchanged.
 - `tests/smoke_catalogue_page17_round5.mjs`: **20/20** — NEW. Mount
   empty + populated, `_pageState` live-binding, `_spDeriveAllRows()`
-  via `_pageState`, state bridge to page18 verified.
+  via `_pageState`, state bridge to marker_readiness verified.
 - `tests/smoke_catalogue_page18_round5.mjs`: **20/20** unchanged.
 
 ---
@@ -52,19 +52,19 @@ atlases/inversion/pages/catalogue/
 
 ### Step 0 — registry + manifest fix
 
-- `pages.registry.json` page17: added `_label` ("14 stats profile") + `_doc`.
-- `manifest.json` page17: label "page 17" → **"stats profile"**;
+- `pages.registry.json` stats_profile: added `_label` ("14 stats profile") + `_doc`.
+- `manifest.json` stats_profile: label "page 17" → **"stats profile"**;
   stage "catalogue" → **"synthesis"** (matching legacy `data-stage="synthesis"`).
 
-### Step 1 — page17.js refactored in-place
+### Step 1 — stats_profile.js refactored in-place
 
-Same Python AST-aware patcher as page18 round-5-step-4:
+Same Python AST-aware patcher as marker_readiness round-5-step-4:
 - Replaced `const state = window.state ?? {}` with proper imports.
 - Added 4 imports:
-  - `_pageState`, `_setActiveState` from `./page17/_state.js`
+  - `_pageState`, `_setActiveState` from `./stats_profile/_state.js`
   - `_esc` from `../../shared/page1_data_helpers.js` (18 sites)
-  - `_mpDeriveAutoPanel` from `./page18.js` (was typeof-guarded)
-  - `_setActiveState as _setPage18State` from `./page18/_state.js`
+  - `_mpDeriveAutoPanel` from `./marker_readiness.js` (was typeof-guarded)
+  - `_setActiveState as _setPage18State` from `./marker_readiness/_state.js`
     (for the cross-page state bridge)
 - State shim injection: 7 functions got `const state = _pageState;`.
 - Replaced `renderStatsProfilePage()` with state-aware variant that
@@ -73,27 +73,27 @@ Same Python AST-aware patcher as page18 round-5-step-4:
 
 ### Step 2 — Cross-page state bridge (NEW pattern)
 
-Page17 calls page18's `_mpDeriveAutoPanel()` to compute the marker-tier
-breakdown. `_mpDeriveAutoPanel` reads page18's `_pageState`. If page17
-mounts but page18 doesn't, page18's `_pageState` is null and the call
+Page17 calls marker_readiness's `_mpDeriveAutoPanel()` to compute the marker-tier
+breakdown. `_mpDeriveAutoPanel` reads marker_readiness's `_pageState`. If stats_profile
+mounts but marker_readiness doesn't, marker_readiness's `_pageState` is null and the call
 throws (caught gracefully but degrades the row).
 
-**Solution:** page17's mount also calls page18's `_setActiveState(legacyState)`
+**Solution:** stats_profile's mount also calls marker_readiness's `_setActiveState(legacyState)`
 with the SAME legacy state object. Both pages read the same shape
-(`candidateList`, `crossSpecies`, `_markerPanel`); page17 doesn't
+(`candidateList`, `crossSpecies`, `_markerPanel`); stats_profile doesn't
 mutate either, so sharing is safe.
 
-Page17's unmount deliberately does NOT clear page18's state — if page18
+Page17's unmount deliberately does NOT clear marker_readiness's state — if marker_readiness
 is currently mounted (or will be), it manages its own state.
 
-### Step 3 — page17/_state.js (NEW, 15 LOC)
+### Step 3 — stats_profile/_state.js (NEW, 15 LOC)
 
 Same shape as the other pages.
 
 ### Step 4 — Tests
 
 - `tests/test_catalogue_page17.js`: 34 assertions including
-  cross-page import verification (`page18._mpDeriveAutoPanel` is callable).
+  cross-page import verification (`marker_readiness._mpDeriveAutoPanel` is callable).
 - `tests/smoke_catalogue_page17_round5.mjs`: 20 assertions including
   populated-candidate stats table render and `_spDeriveAllRows()` via `_pageState`.
 
@@ -102,14 +102,14 @@ Same shape as the other pages.
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1/page2/page3/page18 modules** — completely unchanged (page17
-  IMPORTS from page18 but doesn't modify page18's source).
+- **page1/page2/catalogue/marker_readiness modules** — completely unchanged (stats_profile
+  IMPORTS from marker_readiness but doesn't modify marker_readiness's source).
 - **`shared/page1_data_helpers.js`** — unchanged (`_esc` was added in
   round 5 step 2).
 - **`_csGetSyntenyBlocks` / `_csPermutationTest`** — runtime-guarded
-  cross-species helpers; will land naturally with page16/16b migration.
+  cross-species helpers; will land naturally with cross_species_breakpoints/16b migration.
 - **Pages 4, 6, 7, 8, 9, 10, 11, 12, 15, 16, 16b, 19, 21,
-  page_overview, page_sv_evidence** — only parse-checked.
+  overview, sv_evidence** — only parse-checked.
 - **Page renumbering** — deferred per Quentin's directive.
 - **Toolkit-registry vs Atlas-state cache decisions** — deferred.
 
@@ -121,23 +121,23 @@ Same shape as the other pages.
 |---|---|---|---|---|
 | page1 | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
 | page2 | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
-| page3 | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
-| page17 | catalogue (synthesis) | ✅ step 5 (single file + bridge) | ~1009 | 34+20 |
-| page18 | catalogue (synthesis) | ✅ step 4 (single file) | ~984 | 46+20 |
+| catalogue | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
+| stats_profile | catalogue (synthesis) | ✅ step 5 (single file + bridge) | ~1009 | 34+20 |
+| marker_readiness | catalogue (synthesis) | ✅ step 4 (single file) | ~984 | 46+20 |
 
 **Total assertions: 386/386 across 10 test runs.**
 
 **Pages remaining (17 of 22):** page4, 5, 6, 7, 8, 9, 10, 11, 12, 15,
-16, 16b, 19, 21, page_overview, page_sv_evidence.
+16, 16b, 19, 21, overview, sv_evidence.
 
 ---
 
 ## Architectural note: cross-page state bridges
 
-Page17→page18 is the first migrated example of one page reading
-another's state. The pattern (`page17.mount` calls `page18._setActiveState`
+Page17→marker_readiness is the first migrated example of one page reading
+another's state. The pattern (`stats_profile.mount` calls `marker_readiness._setActiveState`
 with the same state object) works because both pages read the same
-shape and page17 doesn't mutate.
+shape and stats_profile doesn't mutate.
 
 For pages that mutate state, this pattern would need rethinking —
 probably a shared registry-managed state slot rather than per-page
@@ -152,23 +152,23 @@ question Quentin deferred to end-of-migration.
 
 | Page | Folder | LOC | Notes |
 |---|---|---|---|
-| **page21** | catalogue | 721 | pre-extracted body — same refactor pattern as 17/18 |
+| **annotation_cockpit** | catalogue | 721 | pre-extracted body — same refactor pattern as 17/18 |
 | **page12** | discovery | 1008 | 18 TODOs — substantial work |
-| **page16, page16b** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks` and `_csPermutationTest`** |
-| **page8, 9, 15, 19, page_overview** | various | <105 each | tiny stubs; quick router-wiring rounds |
+| **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks` and `_csPermutationTest`** |
+| **page8, 9, 15, 19, overview** | various | <105 each | tiny stubs; quick router-wiring rounds |
 | **page4, 6, 7, 11** | review | 122-301 | review-stage pages |
-| **page_sv_evidence** | review | 148 | SV evidence review |
+| **sv_evidence** | review | 148 | SV evidence review |
 
-The **page17/18 pair is now properly wired** — synthesis-stage
+The **stats_profile/18 pair is now properly wired** — synthesis-stage
 manuscript figures are accessible through the modular shell. Logical
 next priorities depending on goal:
 
-- **Manuscript figure completeness** — page16/16b (multi-species
+- **Manuscript figure completeness** — cross_species_breakpoints/16b (multi-species
   cockpit) is the most synthesis-relevant remaining; landing it would
   also resolve the cross-species cs* helpers.
-- **Quick wins / coverage** — tiny stubs (8/9/15/19/page_overview)
+- **Quick wins / coverage** — tiny stubs (8/9/15/19/overview)
   can be batched in a single round.
-- **Catalogue completion** — page21, page9 if you want the catalogue
+- **Catalogue completion** — annotation_cockpit, confirmed_carousel if you want the catalogue
   group fully migrated before moving to discovery/comparative/review.
 
 ---

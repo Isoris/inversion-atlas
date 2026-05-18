@@ -81,7 +81,7 @@
     "ancestry confound bar"
   ],
   "committable_outputs": [
-    "candidate.confirmed flag (drives page9 carousel)",
+    "candidate.confirmed flag (drives confirmed_carousel carousel)",
     "candidate metadata updates (notes, regime, age_origin) — persisted via registry write"
   ],
   "commit_policy": "manual_only",

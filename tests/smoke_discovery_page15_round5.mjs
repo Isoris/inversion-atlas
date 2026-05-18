@@ -9,7 +9,7 @@
 // style.color between "🟢 loaded" / "⚪ not loaded" based on
 // state.layersPresent (a Set). The state-aware public wrapper
 // refreshGhslLayerStatus(state) sets _pageState before delegating
-// (mirrors page9's refreshConfirmedCarousel pattern).
+// (mirrors confirmed_carousel's refreshConfirmedCarousel pattern).
 //
 // What this smoke verifies:
 //   - module loads cleanly, lifecycle + wrapper + underscore-helper

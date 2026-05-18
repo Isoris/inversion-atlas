@@ -199,7 +199,7 @@ This is the per-axis classification; the full 14-axis grid lives in
 
 ## §10. Marker layer column contracts
 
-**Source**: cluster-side; per-candidate. **Consumers**: `page10`
+**Source**: cluster-side; per-candidate. **Consumers**: `marker_panels`
 (marker panels).
 
 `marker_panel_summary.json` (per-candidate row):
@@ -259,8 +259,8 @@ sample's dosage falls in the heterozygous range (typically
 ## §12. Cross-species breakpoints (`cs_breakpoints_v1`)
 
 **Source**: `STEP_CS01_extract_breakpoints.py` (cluster-side wfmash
-1-to-1 alignment of Cgar × Cmac). **Consumers**: `page16`,
-indirectly `page16b` + `page17`.
+1-to-1 alignment of Cgar × Cmac). **Consumers**: `cross_species_breakpoints`,
+indirectly `multi_species_cockpit` + `stats_profile`.
 
 See `registries/schemas/cross_species_breakpoint_reuse.schema.json`
 for the JSON shape. Three-cohort discipline: F1 hybrid ≠ 226 pure
@@ -498,7 +498,7 @@ by section:
 | `lof_burden.schema.json` | pending | §19 axis `burden_class` |
 | `marker_panel.schema.json` | pending | §10 |
 | `mendelian_test.schema.json` | pending | §17 (inheritance) |
-| `permutation.schema.json` | pending | §13 (page17 evidence) |
+| `permutation.schema.json` | pending | §13 (stats_profile evidence) |
 | `pseudogenisation.schema.json` | pending | §13 |
 | `relatedness.schema.json` | unknown | §23 |
 | `relatedness_ngsrelate.schema.json` | unknown | §23 (Mode B) |
@@ -548,7 +548,7 @@ this doc solves.
 
 **Authored**: 2026-05-15 to resolve the SCHEMA / SCHEMA_V2.md
 references from `pages.registry.json` page4 _doc + page12 _doc +
-page10 module header + `shared/regimes_registry.js:49` +
+marker_panels module header + `shared/regimes_registry.js:49` +
 `shared/scale_stability.js:3, 33, 298`. Also pulls in the 14-axis
 schema from `pages/review/page4/tier_axes.js#TIER_AXES`.
 

@@ -13,7 +13,7 @@
 // state.layersPresent (a Set). The chat-33 helper signature is
 // preserved verbatim (takes state as explicit first arg). A new public
 // wrapper refreshGhslLayerStatus(state) sets _pageState as a side
-// effect before delegating, mirroring page9's refreshConfirmedCarousel
+// effect before delegating, mirroring confirmed_carousel's refreshConfirmedCarousel
 // pattern.
 //
 // This is the "stub-preserving + one wired entry" pattern (pattern 4

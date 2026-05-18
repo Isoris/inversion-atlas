@@ -96,103 +96,115 @@
       "module": "atlases/inversion/pages/review/page11.js"
     },
     {
-      "id": "page_sv_evidence",
+      "id": "sv_evidence",
       "slug": "sv_evidence",
       "label": "SV evidence",
       "stage": "classification",
-      "fragment": "atlases/inversion/pages/review/page_sv_evidence.html",
-      "module": "atlases/inversion/pages/review/page_sv_evidence.js"
+      "fragment": "atlases/inversion/pages/review/sv_evidence.html",
+      "module": "atlases/inversion/pages/review/sv_evidence.js",
+      "_was_id": "page_sv_evidence"
     },
     {
-      "id": "page_ancestry_scroller",
+      "id": "fish_ancestry_scroller",
       "slug": "fish_ancestry_scroller",
       "label": "ancestry scroller",
       "stage": "classification",
-      "fragment": "atlases/inversion/pages/review/page_ancestry_scroller.html",
-      "module": "atlases/inversion/pages/review/page_ancestry_scroller.js",
-      "tooltip": "Fish Ancestry Scroller \u2014 per-fish ancestry painting across one selected inversion candidate (one chromosome viewport). Three numbered layers (PC1 Band / Ancestry Bricks / Brick summary cohort) + 5-row brick-metrics heatmap + tab strip. Headline metric: mean |\u0394Q| (global vs local). Consumes shared/ancestry_alignment.js (F-based label-switching alignment) + shared/ancestry_bricks.js (per-fish bricks + flags). See specs_todo/SPEC_fish_ancestry_scroller.md for UI layout v2."
+      "fragment": "atlases/inversion/pages/review/fish_ancestry_scroller.html",
+      "module": "atlases/inversion/pages/review/fish_ancestry_scroller.js",
+      "tooltip": "Fish Ancestry Scroller \u2014 per-fish ancestry painting across one selected inversion candidate (one chromosome viewport). Three numbered layers (PC1 Band / Ancestry Bricks / Brick summary cohort) + 5-row brick-metrics heatmap + tab strip. Headline metric: mean |\u0394Q| (global vs local). Consumes shared/ancestry_alignment.js (F-based label-switching alignment) + shared/ancestry_bricks.js (per-fish bricks + flags). See specs_todo/SPEC_fish_ancestry_scroller.md for UI layout v2.",
+      "_was_id": "page_ancestry_scroller"
     },
     {
-      "id": "page3",
+      "id": "catalogue",
       "slug": "catalogue",
       "label": "catalogue",
       "stage": "catalogue",
-      "fragment": "atlases/inversion/pages/catalogue/page3.html",
-      "module": "atlases/inversion/pages/catalogue/page3.js"
+      "fragment": "atlases/inversion/pages/catalogue/catalogue.html",
+      "module": "atlases/inversion/pages/catalogue/catalogue.js",
+      "_was_id": "page3"
     },
     {
-      "id": "page9",
+      "id": "confirmed_carousel",
       "slug": "confirmed_carousel",
       "label": "confirmed carousel",
       "stage": "catalogue",
-      "fragment": "atlases/inversion/pages/catalogue/page9.html",
-      "module": "atlases/inversion/pages/catalogue/page9.js"
+      "fragment": "atlases/inversion/pages/catalogue/confirmed_carousel.html",
+      "module": "atlases/inversion/pages/catalogue/confirmed_carousel.js",
+      "_was_id": "page9"
     },
     {
-      "id": "page10",
+      "id": "marker_panels",
       "slug": "marker_panels",
       "label": "marker panels",
       "stage": "catalogue",
-      "fragment": "atlases/inversion/pages/catalogue/page10.html",
-      "module": "atlases/inversion/pages/catalogue/page10.js"
+      "fragment": "atlases/inversion/pages/catalogue/marker_panels.html",
+      "module": "atlases/inversion/pages/catalogue/marker_panels.js",
+      "_was_id": "page10"
     },
     {
-      "id": "page17",
+      "id": "stats_profile",
       "slug": "stats_profile",
       "label": "stats profile",
       "stage": "classification",
-      "fragment": "atlases/inversion/pages/catalogue/page17.html",
-      "module": "atlases/inversion/pages/catalogue/page17.js"
+      "fragment": "atlases/inversion/pages/catalogue/stats_profile.html",
+      "module": "atlases/inversion/pages/catalogue/stats_profile.js",
+      "_was_id": "page17"
     },
     {
-      "id": "page18",
+      "id": "marker_readiness",
       "slug": "marker_readiness",
       "label": "marker panel",
       "stage": "classification",
-      "fragment": "atlases/inversion/pages/catalogue/page18.html",
-      "module": "atlases/inversion/pages/catalogue/page18.js"
+      "fragment": "atlases/inversion/pages/catalogue/marker_readiness.html",
+      "module": "atlases/inversion/pages/catalogue/marker_readiness.js",
+      "_was_id": "page18"
     },
     {
-      "id": "page21",
+      "id": "annotation_cockpit",
       "slug": "annotation_cockpit",
       "label": "annotation cockpit",
       "stage": "catalogue",
-      "fragment": "atlases/inversion/pages/catalogue/page21.html",
-      "module": "atlases/inversion/pages/catalogue/page21.js"
+      "fragment": "atlases/inversion/pages/catalogue/annotation_cockpit.html",
+      "module": "atlases/inversion/pages/catalogue/annotation_cockpit.js",
+      "_was_id": "page21"
     },
     {
-      "id": "page_overview",
+      "id": "overview",
       "slug": "overview",
       "label": "overview",
       "stage": "classification",
-      "fragment": "atlases/inversion/pages/catalogue/page_overview.html",
-      "module": "atlases/inversion/pages/catalogue/page_overview.js"
+      "fragment": "atlases/inversion/pages/catalogue/overview.html",
+      "module": "atlases/inversion/pages/catalogue/overview.js",
+      "_was_id": "page_overview"
     },
     {
-      "id": "page5",
+      "id": "help",
       "slug": "help",
       "label": "help",
       "stage": "help",
-      "fragment": "atlases/inversion/pages/comparative/page5.html",
-      "module": "atlases/inversion/pages/comparative/page5.js",
-      "tooltip": "Quick-reference / help page (static HTML, no JS render). NB: legacy 'page5' is the help page, NOT multi-species \u2014 the multi-species cockpit is page16b."
+      "fragment": "atlases/inversion/pages/comparative/help.html",
+      "module": "atlases/inversion/pages/comparative/help.js",
+      "tooltip": "Quick-reference / help page (static HTML, no JS render). NB: legacy 'help' is the help page, NOT multi-species \u2014 the multi-species cockpit is multi_species_cockpit.",
+      "_was_id": "page5"
     },
     {
-      "id": "page16",
+      "id": "cross_species_breakpoints",
       "slug": "cross_species_breakpoints",
       "label": "cross-species breakpoints",
       "stage": "comparative",
-      "fragment": "atlases/inversion/pages/comparative/page16.html",
-      "module": "atlases/inversion/pages/comparative/page16.js"
+      "fragment": "atlases/inversion/pages/comparative/cross_species_breakpoints.html",
+      "module": "atlases/inversion/pages/comparative/cross_species_breakpoints.js",
+      "_was_id": "page16"
     },
     {
-      "id": "page16b",
+      "id": "multi_species_cockpit",
       "slug": "multi_species_cockpit",
       "label": "multi-species",
       "stage": "comparative",
-      "fragment": "atlases/inversion/pages/comparative/page16b.html",
-      "module": "atlases/inversion/pages/comparative/page16b.js",
-      "tooltip": "Multi-species comparative atlas page (per HANDOFF_SUPPLEMENT)."
+      "fragment": "atlases/inversion/pages/comparative/multi_species_cockpit.html",
+      "module": "atlases/inversion/pages/comparative/multi_species_cockpit.js",
+      "tooltip": "Multi-species comparative atlas page (per HANDOFF_SUPPLEMENT).",
+      "_was_id": "page16b"
     },
     {
       "id": "tree_panel",

@@ -48,18 +48,18 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | discovery_2 | dosage_cluster_adaptive_k | dosage cluster | active (Phase 1) | high | [page.manifest.json](page_contracts/dosage_cluster_adaptive_k/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/dosage_cluster_adaptive_k/PAGE_CONTRACT.md) |
 | catalogue | page8 | per-window summary table | active (fresh) | high | [page.manifest.json](page_contracts/page8/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page8/PAGE_CONTRACT.md) |
 | catalogue | page19 | negative regions catalogue | active (fresh) | high | [page.manifest.json](page_contracts/page19/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page19/PAGE_CONTRACT.md) |
-| catalogue | page3 | catalogue | active | high | [page.manifest.json](page_contracts/page3/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page3/PAGE_CONTRACT.md) |
-| catalogue | page9 | confirmed carousel | active (fresh) | high | [page.manifest.json](page_contracts/page9/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page9/PAGE_CONTRACT.md) |
-| catalogue | page10 | marker panels | active | high | [page.manifest.json](page_contracts/page10/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page10/PAGE_CONTRACT.md) |
-| catalogue | page21 | annotation cockpit | active | high | [page.manifest.json](page_contracts/page21/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page21/PAGE_CONTRACT.md) |
-| classification | page17 | stats profile | active | high | [page.manifest.json](page_contracts/page17/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page17/PAGE_CONTRACT.md) |
-| classification | page18 | marker readiness panel | active | high | [page.manifest.json](page_contracts/page18/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page18/PAGE_CONTRACT.md) |
-| classification | page_overview | overview | empty stub | high | [page.manifest.json](page_contracts/page_overview/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_overview/PAGE_CONTRACT.md) |
+| catalogue | catalogue | catalogue | active | high | [page.manifest.json](page_contracts/catalogue/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/catalogue/PAGE_CONTRACT.md) |
+| catalogue | confirmed_carousel | confirmed carousel | active (fresh) | high | [page.manifest.json](page_contracts/confirmed_carousel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/confirmed_carousel/PAGE_CONTRACT.md) |
+| catalogue | marker_panels | marker panels | active | high | [page.manifest.json](page_contracts/marker_panels/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/marker_panels/PAGE_CONTRACT.md) |
+| catalogue | annotation_cockpit | annotation cockpit | active | high | [page.manifest.json](page_contracts/annotation_cockpit/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/annotation_cockpit/PAGE_CONTRACT.md) |
+| classification | stats_profile | stats profile | active | high | [page.manifest.json](page_contracts/stats_profile/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/stats_profile/PAGE_CONTRACT.md) |
+| classification | marker_readiness | marker readiness panel | active | high | [page.manifest.json](page_contracts/marker_readiness/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/marker_readiness/PAGE_CONTRACT.md) |
+| classification | overview | overview | empty stub | high | [page.manifest.json](page_contracts/overview/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/overview/PAGE_CONTRACT.md) |
 | classification | page4 | karyotype / tier | active | high | [page.manifest.json](page_contracts/page4/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page4/PAGE_CONTRACT.md) |
 | classification | page6 | popstats | active (thin loader) | high | [page.manifest.json](page_contracts/page6/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page6/PAGE_CONTRACT.md) |
 | classification | page7 | ancestry | active (thin loader) | high | [page.manifest.json](page_contracts/page7/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page7/PAGE_CONTRACT.md) |
 | classification | page11 | boundaries | active | high | [page.manifest.json](page_contracts/page11/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page11/PAGE_CONTRACT.md) |
-| classification | page_sv_evidence | SV evidence | active (thin loader) | high | [page.manifest.json](page_contracts/page_sv_evidence/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_sv_evidence/PAGE_CONTRACT.md) |
+| classification | sv_evidence | SV evidence | active (thin loader) | high | [page.manifest.json](page_contracts/sv_evidence/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/sv_evidence/PAGE_CONTRACT.md) |
 | evolution | polarize_msa_stacked | polarize · MSA | active | high | [page.manifest.json](page_contracts/polarize_msa_stacked/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/polarize_msa_stacked/PAGE_CONTRACT.md) |
 | evolution | haplotype_network | haplotype network | active | high | [page.manifest.json](page_contracts/haplotype_network/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/haplotype_network/PAGE_CONTRACT.md) |
 | evolution | polarize_synteny_vote | polarize · synteny | active | medium | [page.manifest.json](page_contracts/polarize_synteny_vote/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/polarize_synteny_vote/PAGE_CONTRACT.md) |
@@ -69,14 +69,14 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | evolution | layer_cleaning | layer cleaning | active | high | [page.manifest.json](page_contracts/layer_cleaning/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/layer_cleaning/PAGE_CONTRACT.md) |
 | evolution | event_tree_relative_ordering | event tree | active | medium | [page.manifest.json](page_contracts/event_tree_relative_ordering/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/event_tree_relative_ordering/PAGE_CONTRACT.md) |
 | evolution | archaeology_synthesis_card | archaeology card | active | high | [page.manifest.json](page_contracts/archaeology_synthesis_card/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/archaeology_synthesis_card/PAGE_CONTRACT.md) |
-| comparative | page16 | cross-species breakpoints | active | high | [page.manifest.json](page_contracts/page16/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page16/PAGE_CONTRACT.md) |
-| comparative | page16b | multi-species cockpit | active | high | [page.manifest.json](page_contracts/page16b/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page16b/PAGE_CONTRACT.md) |
-| help | page5 | help | active (static) | high | [page.manifest.json](page_contracts/page5/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page5/PAGE_CONTRACT.md) |
-| classification | page_ancestry_scroller | Fish Ancestry Scroller | active (registered 2026-05-15) | high | [page.manifest.json](page_contracts/page_ancestry_scroller/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_ancestry_scroller/PAGE_CONTRACT.md) |
+| comparative | cross_species_breakpoints | cross-species breakpoints | active | high | [page.manifest.json](page_contracts/cross_species_breakpoints/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/cross_species_breakpoints/PAGE_CONTRACT.md) |
+| comparative | multi_species_cockpit | multi-species cockpit | active | high | [page.manifest.json](page_contracts/multi_species_cockpit/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/multi_species_cockpit/PAGE_CONTRACT.md) |
+| help | help | help | active (static) | high | [page.manifest.json](page_contracts/help/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/help/PAGE_CONTRACT.md) |
+| classification | fish_ancestry_scroller | Fish Ancestry Scroller | active (registered 2026-05-15) | high | [page.manifest.json](page_contracts/fish_ancestry_scroller/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/fish_ancestry_scroller/PAGE_CONTRACT.md) |
 
 **Progress**: 38 / 38 pages contracted. ✅ **Complete first pass.**
 All 38 pages registered in `manifest.json` + `pages.registry.json`
-(page_ancestry_scroller registered 2026-05-15 — was on-disk-but-unregistered until then).
+(fish_ancestry_scroller registered 2026-05-15 — was on-disk-but-unregistered until then).
 
 ## Cross-cutting findings (rollup)
 
@@ -101,10 +101,10 @@ Closed entries:
 
 - **page8**, **page19** live under `pages/discovery/` but
   `manifest.json` says `stage: "catalogue"`.
-- **page17**, **page18**, **page_overview** live under
+- **stats_profile**, **marker_readiness**, **overview** live under
   `pages/catalogue/` but `manifest.json` says `stage:
   "classification"`.
-- **page5** lives under `pages/comparative/` but `manifest.json`
+- **help** lives under `pages/comparative/` but `manifest.json`
   says `stage: "help"`.
 
 **Implication**: directory does not equal stage. The stage is
@@ -136,7 +136,7 @@ with page11's. Deferred to a future renumbering round.
 - `SPEC_l2_sweep_inheritance.md` (page1)
 - `SPEC_l3_het_dosage_coloring.md` (page1)
 - `SPEC_lasso_inheritance_backgrounds.md` (page1)
-- `SPEC_sv_evidence_page.md` (page_sv_evidence + producer)
+- `SPEC_sv_evidence_page.md` (sv_evidence + producer)
 - `SPEC_DEFERRED.md` (general)
 - `SPEC_distant_band_concordance_fish_trajectory.md` (band-track parent)
 - `SPEC_review_surfaces_auto_and_lineages.md`
@@ -145,7 +145,7 @@ with page11's. Deferred to a future renumbering round.
 
 - `SCHEMA.md` / `SCHEMA_V2.md` — referenced from
   `pages.registry.json` (e.g. page4 _doc cites `SCHEMA_V2.md §19`)
-  and from page10 module header (`SCHEMA §10`) but no prose schema
+  and from marker_panels module header (`SCHEMA §10`) but no prose schema
   doc exists. The 26 JSON schemas in `registries/schemas/` cover
   layer formats but not the prose explanation.
 
@@ -153,7 +153,7 @@ with page11's. Deferred to a future renumbering round.
 
 - **page6** — `window.renderPopstatsPage` in `js/atlas_page6_wiring.js`
 - **page7** — `window.renderAncestryPage` in sibling external file
-- **page_sv_evidence** — `window.AtlasSVEvidence` object in
+- **sv_evidence** — `window.AtlasSVEvidence` object in
   `js/atlas_sv_evidence.js`
 
 All 3 fall back to empty-state when their external module is absent.
@@ -162,10 +162,10 @@ All 3 fall back to empty-state when their external module is absent.
 
 - **page8** — per-window summary table (legacy had `#winSumNoChrom`
   empty state only)
-- **page9** — confirmed carousel (no JS in legacy; built from spec)
+- **confirmed_carousel** — confirmed carousel (no JS in legacy; built from spec)
 - **page19** — negative regions catalogue (legacy referenced
   `_nrRender` in HTML comment, never implemented)
-- **page3** — catalogue rendering pipeline (legacy referenced
+- **catalogue** — catalogue rendering pipeline (legacy referenced
   `renderCatalogue` via typeof guards, never defined)
 
 ### User-guide documents
@@ -173,20 +173,20 @@ All 3 fall back to empty-state when their external module is absent.
 Only one page in the entire atlas has end-user documentation:
 - **page22** — `specs_done/_bundles/HOW_TO_USE_haplotype_regimes.md` (13 KB)
 
-The rest are `unknown` for user guide. **page5 itself is the
+The rest are `unknown` for user guide. **help itself is the
 in-app help page** — it has ~1158 LOC of static HTML covering help,
 vocabulary, hotkeys, pipeline reference. But this is the in-app
 help, not a manual.
 
 ### Cross-page dependencies
 
-- **page17** → page16 (`_csGetSyntenyBlocks`, `_csPermutationTest`
+- **stats_profile** → cross_species_breakpoints (`_csGetSyntenyBlocks`, `_csPermutationTest`
   — promoted to ES exports round 5 step 11; still imported via
   typeof guards)
-- **page16b** → page16 (`state.crossSpecies` — fragile coupling)
+- **multi_species_cockpit** → cross_species_breakpoints (`state.crossSpecies` — fragile coupling)
 - **page12** + **page15** → page1 (`page1.applyData()` dispatches
   panel renderers when θπ / GHSL layers are present)
-- **page9** → page2 (reuses `renderCandidateMetadata`)
+- **confirmed_carousel** → page2 (reuses `renderCandidateMetadata`)
 - **polarize_msa_stacked** → dosage_heatmap (reuses
   painter)
 
@@ -198,11 +198,11 @@ help, not a manual.
 - **Low confidence**: 0
 - **Active / shipped**: 32
 - **Stubs / empty / Phase 1 with deferred work**: 5
-  (page12, page15, page_overview, page_ancestry_scroller; page22
+  (page12, page15, overview, fish_ancestry_scroller; page22
   Phase 1 only)
-- **Thin loaders**: 3 (page6, page7, page_sv_evidence)
-- **Fresh implementations (legacy was HTML shell)**: 4 (page3,
-  page8, page9, page19)
+- **Thin loaders**: 3 (page6, page7, sv_evidence)
+- **Fresh implementations (legacy was HTML shell)**: 4 (catalogue,
+  page8, confirmed_carousel, page19)
 
 ## Next steps (for reviewer)
 

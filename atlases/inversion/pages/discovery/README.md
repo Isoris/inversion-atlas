@@ -81,7 +81,7 @@ stage is now `tooling`. The shell groups them into a separate tab.
 | page | manifest stage | lives here because |
 |------|---------------|--------------------|
 | `page8` | `catalogue` | per-window summary table — discovery-side metrics (\|Z\|, λ, eigen, ANGSD bi-SNP) historically grouped near page1 |
-| `page19` | `catalogue` | negative regions catalogue — complement of page3's positive catalogue; historically grouped near the scanners |
+| `page19` | `catalogue` | negative regions catalogue — complement of catalogue's positive catalogue; historically grouped near the scanners |
 
 ## Key shared modules consumed by discovery pages
 

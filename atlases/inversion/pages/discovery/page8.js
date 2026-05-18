@@ -44,7 +44,7 @@
 // Decision for this round (chat 38 round 5 step 13, 2026-05-07): ship a
 // no-op shell with the lifecycle (mount/unmount), matching the legacy
 // behaviour. The merge chat — or a follow-up batch — implements the real
-// renderers. This is the page9 stub-preserving migration template
+// renderers. This is the confirmed_carousel stub-preserving migration template
 // (pattern 3 in CONTINUE_HERE).
 // =============================================================================
 

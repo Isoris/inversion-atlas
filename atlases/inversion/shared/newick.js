@@ -1,7 +1,7 @@
 // shared/newick.js
 //
 // Minimal Newick parser → flat list of leaves with depth approximation.
-// Used by the multi-species UI tree rendering (page16) to derive leaf
+// Used by the multi-species UI tree rendering (cross_species_breakpoints) to derive leaf
 // order + relative depth from a phylo_tree_v1 newick string. Does NOT
 // reconstruct full topology — only what's needed to render a left-
 // rooted cladogram from a sorted leaf list.

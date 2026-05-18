@@ -15,8 +15,8 @@
 //
 // Legacy origin: lines 21647-21748 of legacy/Inversion_atlas.html
 // (_wilcoxonRankSumP). Also previously duplicated in
-// pages/catalogue/page3/_breeding_export.js — this hoist eliminates
-// that copy AND fixes a latent bug: the page3 copy guarded normalCDF
+// pages/catalogue/catalogue/_breeding_export.js — this hoist eliminates
+// that copy AND fixes a latent bug: the catalogue copy guarded normalCDF
 // with `typeof normalCDF === 'function'` but never imported it, so in
 // the cartridge it always fell through to NaN. With this module,
 // normalCDF is resolved at module load time.

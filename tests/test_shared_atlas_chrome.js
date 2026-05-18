@@ -145,7 +145,7 @@ function buildTabBar() {
   for (const [page, stage] of [
     ['page1', 'discovery'], ['page2', 'discovery'],
     ['page4', 'classification'], ['page6', 'classification'],
-    ['page5', 'help'], ['page_help2', 'help'],
+    ['help', 'help'], ['page_help2', 'help'],
   ]) {
     const btn = new FakeNode('button');
     btn.setAttribute('data-page', page);

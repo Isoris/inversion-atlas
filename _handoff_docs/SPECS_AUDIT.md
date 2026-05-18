@@ -161,7 +161,7 @@ These names appear in code or docs but have **no on-disk file** with that name:
 | `SPEC_lasso_inheritance_backgrounds.md` | `handoff_docs/HANDOFF_2026-05-05_turn164_lasso_linkage.md`, `page1.html` | **RESOLVED 2026-05-15** — Slices 1 + 3 SPEC authored from turn-164 handoff + page1.html into `specs_done/SPEC_lasso_inheritance_backgrounds.md`. Slices 2/4/5 deferred. |
 | `SPEC_lines_panel_candidate_bands.md` | `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — SPEC authored from page1/lines_panel.js + page1/candidates.js into `specs_done/SPEC_lines_panel_candidate_bands.md` |
 | `SPEC_review_surfaces_auto_and_lineages.md` | `css/inversion.css`, `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — Slices 0-2 SPEC authored from CSS lines 947-960 + turn-130 + turn-165 handoffs into `specs_done/SPEC_review_surfaces_auto_and_lineages.md`. Slice 3 (lineages tab) deferred. |
-| `SPEC_sv_evidence_page.md` | `engines/producers/sv_evidence/STEP_SV_GT_AGG_aggregate_genotype_counts.py`, `pages/review/page_sv_evidence.js` | **RESOLVED 2026-05-15** — authored from shipped code into `specs_done/SPEC_sv_evidence_page.md` |
+| `SPEC_sv_evidence_page.md` | `engines/producers/sv_evidence/STEP_SV_GT_AGG_aggregate_genotype_counts.py`, `pages/review/sv_evidence.js` | **RESOLVED 2026-05-15** — authored from shipped code into `specs_done/SPEC_sv_evidence_page.md` |
 
 **Also missing — STATUS UPDATE 2026-05-15**:
 - `SCHEMA_V2.md` / `SCHEMA.md` — **RESOLVED 2026-05-15** — authored

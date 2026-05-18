@@ -176,12 +176,12 @@ When all 6 gates pass:
 
 Auto-promoted candidates land with `confirmed: false`. This means:
 
-- They appear in the review UI (page2 candidate-list, page3
-  catalogue, page21 annotation cockpit).
+- They appear in the review UI (page2 candidate-list, catalogue
+  catalogue, annotation_cockpit annotation cockpit).
 - They do **NOT** participate in the inheritance pills painted on
   page1's lines_panel — those only show confirmed candidates so the
   visual cohort isn't polluted by unverified auto-suggestions.
-- They do **NOT** appear in page9's confirmed-carousel.
+- They do **NOT** appear in confirmed_carousel's confirmed-carousel.
 - The user's gesture to confirm flips `confirmed: true` (typically
   on page2 or page4).
 

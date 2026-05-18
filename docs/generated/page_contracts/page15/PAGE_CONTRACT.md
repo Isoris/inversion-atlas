@@ -77,7 +77,7 @@ primitives as page12:
   renderers can't be authored against real data.
 - Round-5-step-15 status: stub-preserving + one wired entry pattern
   applied; `_refreshGhslLayerStatus` preserved verbatim, public
-  `refreshGhslLayerStatus` wrapper added (mirrors page9's
+  `refreshGhslLayerStatus` wrapper added (mirrors confirmed_carousel's
   `refreshConfirmedCarousel` pattern), `mount()` calls the wrapper.
 
 ## Documents

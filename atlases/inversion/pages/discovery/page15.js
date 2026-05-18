@@ -42,7 +42,7 @@
 // Decision for this round (chat 38 round 5 step 15, 2026-05-07): preserve
 // the chat-33 _refreshGhslLayerStatus body VERBATIM (it already takes
 // state as an explicit arg per HANDOFF_BATCH_1 convention), add a
-// state-aware public wrapper refreshGhslLayerStatus that mirrors page9's
+// state-aware public wrapper refreshGhslLayerStatus that mirrors confirmed_carousel's
 // refreshConfirmedCarousel pattern, and call it from mount() so the chips
 // render at mount time. This is the "stub-preserving + one wired entry"
 // hybrid pattern (pattern 4 in CONTINUE_HERE, first instance).
@@ -108,7 +108,7 @@ export function _refreshGhslLayerStatus(state) {
  * Public entry — state-aware wrapper around _refreshGhslLayerStatus.
  *
  * If `state` is passed, sets _pageState as a side effect before
- * delegating (mirrors page9's refreshConfirmedCarousel(state) pattern).
+ * delegating (mirrors confirmed_carousel's refreshConfirmedCarousel(state) pattern).
  * If called without args, falls back to _pageState set by mount().
  *
  * Returns the underlying call's return value (currently undefined).

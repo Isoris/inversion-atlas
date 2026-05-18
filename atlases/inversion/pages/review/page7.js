@@ -148,7 +148,7 @@ export function refreshAncestryPage() {
  * Public entry — state-aware wrapper around showAncestryPage.
  *
  * If `state` is passed, sets _pageState as a side effect before delegating
- * (mirrors page9/page15/page5 wrapper pattern). The chat-33
+ * (mirrors confirmed_carousel/page15/help wrapper pattern). The chat-33
  * showAncestryPage signature already takes state as an explicit arg, so
  * the wrapper just threads _pageState into it.
  */

@@ -2,7 +2,7 @@
 //
 // Multi-species synteny data layer + companion phylo-tree layer +
 // multi-species UI prefs. These three layers ship together as one
-// module because they're consumed as a triple by the page16 comparative
+// module because they're consumed as a triple by the cross_species_breakpoints comparative
 // dashboard (active breakpoint × species list × tree topology).
 //
 // Layers:

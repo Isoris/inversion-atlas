@@ -3,7 +3,7 @@
 // Repeat-density (TE) data layer + user prefs. Consumed by:
 //   - page11 (boundaries) — renders the per-chrom TE density panel
 //     beside the boundary auto-propose evidence
-//   - page16 / page16b (comparative) — uses state.repeatDensity for
+//   - cross_species_breakpoints / multi_species_cockpit (comparative) — uses state.repeatDensity for
 //     flank charts at cross-species breakpoints
 //
 // Legacy origin: lines 14236-14501 (data layer) + 18962-19083 (prefs

@@ -80,7 +80,7 @@ atlases/inversion/pages/discovery/
   helpers in order (refresh layer status → refresh panel visibility →
   draw the 6 panels). Each helper call is wrapped in a try/catch with
   a console.warn fallback so one panel's render error doesn't block
-  the others (matches the "graceful degradation" pattern from page17/18).
+  the others (matches the "graceful degradation" pattern from stats_profile/18).
 - Added `mount(root, atlasState, registry)`, `unmount(root)`, and
   `_buildLegacyState(atlasState)`. `_buildLegacyState` uses page1's
   pattern as reference: cross-atlas slots (`candidate`, `candidateList`,
@@ -90,7 +90,7 @@ atlases/inversion/pages/discovery/
   caches (`_simGeom`, `_thSimGeom`, `_zGeom`) pass through.
 
 **Why preserve the underscore-prefixed verbatim?** Same reason as
-page17/18: legacy callers reference `_refreshThetaPiLayerStatus()`
+stats_profile/18: legacy callers reference `_refreshThetaPiLayerStatus()`
 etc. directly. The underscore-prefixed exports stay; the new
 non-prefixed wrappers are purely additive.
 
@@ -130,7 +130,7 @@ Same shape as the other pages.
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1/page2/page3/page9/page10/page17/page18/page21/page_overview modules** — completely unchanged.
+- **page1/page2/catalogue/confirmed_carousel/marker_panels/stats_profile/marker_readiness/annotation_cockpit/overview modules** — completely unchanged.
 - **`shared/page1_data_helpers.js` / `shared/per_l2_cluster.js` /
   `shared/het_rate.js` / `shared/hungarian.js` / `shared/contingency.js`
   / `shared/kmeans.js` / `shared/color_helpers.js`** — unchanged.
@@ -144,7 +144,7 @@ Same shape as the other pages.
   merge chat decides whether to formalize them in
   `shared/state.js` SLOT_REGISTRY. `_buildLegacyState` passes them
   through correctly.
-- **Pages 4, 5, 6, 7, 8, 11, 15, 16, 16b, 19, page_sv_evidence** —
+- **Pages 4, 5, 6, 7, 8, 11, 15, 16, 16b, 19, sv_evidence** —
   only parse-checked.
 - **Page renumbering** — deferred per Quentin's directive.
 - **Toolkit-registry vs Atlas-state cache decisions** — deferred.
@@ -157,19 +157,19 @@ Same shape as the other pages.
 |---|---|---|---|---|
 | page1 | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
 | page2 | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
-| page3 | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
-| page9 | catalogue | ✅ step 7 (single file, stub-preserving) | ~166 | 14+22 |
-| page10 | catalogue | ✅ step 9 (factory + new lifecycle) | ~344 | 25+26 |
+| catalogue | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
+| confirmed_carousel | catalogue | ✅ step 7 (single file, stub-preserving) | ~166 | 14+22 |
+| marker_panels | catalogue | ✅ step 9 (factory + new lifecycle) | ~344 | 25+26 |
 | page12 | discovery | ✅ step 10 (verbatim + state-aware wrappers + lifecycle) | ~1189 | 32+29 |
-| page17 | synthesis | ✅ step 5 (single file + state bridge) | ~1009 | 34+20 |
-| page18 | synthesis | ✅ step 4 (single file) | ~984 | 46+20 |
-| page21 | catalogue | ✅ step 6 (single file) | ~792 | 41+20 |
-| page_overview | synthesis | ✅ step 8 (factory + new lifecycle) | ~123 | 18+15 |
+| stats_profile | synthesis | ✅ step 5 (single file + state bridge) | ~1009 | 34+20 |
+| marker_readiness | synthesis | ✅ step 4 (single file) | ~984 | 46+20 |
+| annotation_cockpit | catalogue | ✅ step 6 (single file) | ~792 | 41+20 |
+| overview | synthesis | ✅ step 8 (factory + new lifecycle) | ~123 | 18+15 |
 
 **Total assertions: 628/628 across 20 test runs.**
 
 **Pages remaining (12 of 22):** page4, 5, 6, 7, 8, 11, 15, 16, 16b,
-19, page_sv_evidence.
+19, sv_evidence.
 
 **Discovery group status:** 3 of 4 migrated (page1, page2, page12).
 Only **page8, page15, page19** remain in discovery — all are tiny
@@ -184,9 +184,9 @@ shape — top-level exports each taking `state` as first argument — is
 the cleanest refactor target encountered so far. The migration just
 adds wrappers (one per verbatim helper) that set `_pageState` then
 delegate. This is a third migration shape alongside:
-- **single-file accessor** (page9/page21 — single accessor function
+- **single-file accessor** (confirmed_carousel/annotation_cockpit — single accessor function
   rewired to read `_pageState`)
-- **factory + new lifecycle** (page10/page_overview — factory verbatim,
+- **factory + new lifecycle** (marker_panels/overview — factory verbatim,
   add direct exports alongside)
 - **verbatim helpers + state-aware wrappers** (page12 — 8 helpers each
   get a wrapper)
@@ -198,7 +198,7 @@ in the header that has a local `const`/`let` declaration in every call
 site is a false positive — delete the marker, leave the body alone.
 
 **Canvas-shim test pattern.** Page12's smoke test uses the same
-FakeContext shim as page21 (round 5 step 6) and page10 (round 5 step 9),
+FakeContext shim as annotation_cockpit (round 5 step 6) and marker_panels (round 5 step 9),
 extended with `document.querySelectorAll('[data-th-layer]')` for the
 layer-status indicator query. The pattern is now reusable across any
 canvas-rendering page.
@@ -221,10 +221,10 @@ do the same.
 | Page | Folder | LOC | Notes |
 |---|---|---|---|
 | **page8, 15, 19** | discovery | <50 each | tiny stubs; would close out the discovery group entirely (page8 + page15 + page19 in 1-3 quick rounds) |
-| **page16, page16b** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest` (page17), AND likely `computeTrackedLinkageProjection` (page21)** |
-| **page5** | comparative | 34 | tiny help-page stub |
+| **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest` (stats_profile), AND likely `computeTrackedLinkageProjection` (annotation_cockpit)** |
+| **help** | comparative | 34 | tiny help-page stub |
 | **page4, 6, 7, 11** | review | 122-301 | review-stage pages |
-| **page_sv_evidence** | review | 148 | SV evidence review |
+| **sv_evidence** | review | 148 | SV evidence review |
 
 Logical next priorities:
 
@@ -232,8 +232,8 @@ Logical next priorities:
   stubs. Closing them out (in 1-3 rounds depending on Quentin's
   one-page-at-a-time tempo) would mean the entire discovery group is
   migrated.
-- **Comparative cockpit** — page16/page16b is the most ambitious
-  remaining; resolves the most runtime guards across page17 + page21.
+- **Comparative cockpit** — cross_species_breakpoints/multi_species_cockpit is the most ambitious
+  remaining; resolves the most runtime guards across stats_profile + annotation_cockpit.
   Each is 2400+ LOC, so each gets its own round.
 - **Review pages** — 5 pages, manageable in a few rounds.
 

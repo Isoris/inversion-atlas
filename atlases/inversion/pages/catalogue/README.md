@@ -12,12 +12,12 @@ pages whose manifest stage is `classification` but live here on disk.
 
 Catalogue answers that. The user works through:
 
-1. **Browse** the full catalogue (`page3`).
-2. **Walk** through confirmed candidates one at a time (`page9`).
-3. **Annotate** with cursor-driven candidate selection (`page21`).
-4. **Diagnose** with PCR marker panels (`page10`).
-5. **Profile** statistically across the cohort (`page17`).
-6. **Plan** marker readiness for breeding (`page18`).
+1. **Browse** the full catalogue (`catalogue`).
+2. **Walk** through confirmed candidates one at a time (`confirmed_carousel`).
+3. **Annotate** with cursor-driven candidate selection (`annotation_cockpit`).
+4. **Diagnose** with PCR marker panels (`marker_panels`).
+5. **Profile** statistically across the cohort (`stats_profile`).
+6. **Plan** marker readiness for breeding (`marker_readiness`).
 
 ## Pages in this directory
 
@@ -25,20 +25,20 @@ Catalogue answers that. The user works through:
 
 | page | label | summary |
 |------|-------|---------|
-| `page3` | catalogue | sortable / filterable table of L2 envelopes (or L1-merged inversions); Turn-146 breeding-card export pipeline (HTML + JSON, tier-gated) |
-| `page9` | confirmed carousel | prev/next walk through `state.candidateList.filter(c => c.confirmed === true)`; reuses page2's renderer |
-| `page10` | marker panels | diagnostic PCR marker panel cards per candidate; activates when `marker_panel_summary` layer ships |
-| `page21` | annotation cockpit | per-sample-lines canvas with cursor-driven candidate selection (←/→ + Shift / Esc / 0..9 hotkeys); drives `state.tracked` |
+| `catalogue` | catalogue | sortable / filterable table of L2 envelopes (or L1-merged inversions); Turn-146 breeding-card export pipeline (HTML + JSON, tier-gated) |
+| `confirmed_carousel` | confirmed carousel | prev/next walk through `state.candidateList.filter(c => c.confirmed === true)`; reuses page2's renderer |
+| `marker_panels` | marker panels | diagnostic PCR marker panel cards per candidate; activates when `marker_panel_summary` layer ships |
+| `annotation_cockpit` | annotation cockpit | per-sample-lines canvas with cursor-driven candidate selection (←/→ + Shift / Esc / 0..9 hotkeys); drives `state.tracked` |
 
 ### Stage `classification` (live here for historical reasons)
 
 | page | label | summary |
 |------|-------|---------|
-| `page17` | stats profile | manuscript synthesis figure — comparative stats profile across cohort (breakpoint context, genomic composition, functional cargo, population variation, breeding burden); cross-page dep on page16 |
-| `page18` | marker readiness panel | private-indel architecture with 4 tier levels (T1 highest → T4 exploratory); live computes private_score / dosage_score / gel_visibility from `variant_afs.json` |
-| `page_overview` | overview | empty stub (synthesis-stage tab declared but body never shipped even in legacy) |
+| `stats_profile` | stats profile | manuscript synthesis figure — comparative stats profile across cohort (breakpoint context, genomic composition, functional cargo, population variation, breeding burden); cross-page dep on cross_species_breakpoints |
+| `marker_readiness` | marker readiness panel | private-indel architecture with 4 tier levels (T1 highest → T4 exploratory); live computes private_score / dosage_score / gel_visibility from `variant_afs.json` |
+| `overview` | overview | empty stub (synthesis-stage tab declared but body never shipped even in legacy) |
 
-## Tier hierarchy (page18, per its module header)
+## Tier hierarchy (marker_readiness, per its module header)
 
 | tier | criterion |
 |------|-----------|
@@ -49,13 +49,13 @@ Catalogue answers that. The user works through:
 
 ## Cross-page dependencies
 
-- **page9** reuses **page2**'s `renderCandidateMetadata` (each
+- **confirmed_carousel** reuses **page2**'s `renderCandidateMetadata` (each
   carousel card is a full page2 detail card).
-- **page17** calls **page16**'s `_csGetSyntenyBlocks` +
+- **stats_profile** calls **cross_species_breakpoints**'s `_csGetSyntenyBlocks` +
   `_csPermutationTest` (cross-page runtime dep; round 5 step 11
   promoted these from typeof-guarded calls to proper ES exports;
-  page17's import-promote is a follow-up task).
-- **page21** mutates `state.tracked` which drives **page1**'s
+  stats_profile's import-promote is a follow-up task).
+- **annotation_cockpit** mutates `state.tracked` which drives **page1**'s
   linkage shading + linkage table.
 
 ## Fresh-implementation pages (legacy was HTML shell only)
@@ -65,11 +65,11 @@ Three pages in this dir have **no JS heritage from
 wired IDs but no JS handlers. The current modules are **fresh
 implementations**, not verbatim ports:
 
-- **page3** — `renderCatalogue` was referenced via typeof guards
+- **catalogue** — `renderCatalogue` was referenced via typeof guards
   in legacy but never defined. Current implementation in
-  `page3/catalogue.js`.
-- **page9** — confirmed-carousel JS does NOT exist in legacy
-  (confirmed by grep). Current in `page9/carousel.js`.
+  `catalogue/catalogue.js`.
+- **confirmed_carousel** — confirmed-carousel JS does NOT exist in legacy
+  (confirmed by grep). Current in `confirmed_carousel/carousel.js`.
 - **page19** lives on disk in `pages/discovery/` but its manifest
   stage is `catalogue` — fresh implementation in
   `pages/discovery/page19/negative_regions.js`.
@@ -80,12 +80,12 @@ In `specs_done/`:
 - `SCHEMA.md` (§10 marker layer column contracts; §19 14-axis
   classification carried over from page4)
 - `SPEC_l2_sweep_inheritance.md` (the auto-promote pipeline that
-  populates `candidateList` — page3 sorts auto candidates to the
+  populates `candidateList` — catalogue sorts auto candidates to the
   bottom per `SPEC_review_surfaces_auto_and_lineages`)
 
 In `specs_todo/`:
 - `SPEC_arrangement_color_mode_and_arrangement_calls_v1.md` (would
-  add an arrangement-color mode to page21's annotation cockpit
+  add an arrangement-color mode to annotation_cockpit's annotation cockpit
   once the `arrangement_calls_v1.json` producer ships)
 
 ## Per-page contracts
@@ -95,11 +95,11 @@ has a contract.
 
 ## Notes for new contributors
 
-- **page21 was mislabelled in HANDOFF_BATCH_3.md** as "Manual
+- **annotation_cockpit was mislabelled in HANDOFF_BATCH_3.md** as "Manual
   karyotype groups list" — that is WRONG. Per the line-range check
-  in the module header, page21 IS the annotation cockpit. Don't
+  in the module header, annotation_cockpit IS the annotation cockpit. Don't
   rename. The handoff label is the bug.
-- **page_overview is empty by design** — legacy never shipped a
+- **overview is empty by design** — legacy never shipped a
   body. Reserved for a future synthesis overview (workflow summary,
   candidate counts per stage, layer-presence checklist). Module
   exists so the page registry has a non-throwing entry.
@@ -110,8 +110,8 @@ has a contract.
 ## Stage discrepancies summary
 
 Of the 9 pages logically in catalogue stage:
-- 5 live in `pages/catalogue/` (page3, page9, page10, page21, page_overview where the stage is classification but historically grouped here)
-- 3 live in `pages/catalogue/` but have stage=`classification` (page17, page18, page_overview)
+- 5 live in `pages/catalogue/` (catalogue, confirmed_carousel, marker_panels, annotation_cockpit, overview where the stage is classification but historically grouped here)
+- 3 live in `pages/catalogue/` but have stage=`classification` (stats_profile, marker_readiness, overview)
 - 2 live in `pages/discovery/` but have stage=`catalogue` (page8, page19)
 
 The stage is authoritative for the shell's tab grouping. The dir is historical.

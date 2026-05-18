@@ -240,8 +240,8 @@ When you commit a candidate or change `state.candidate`:
 - **page2** shows the per-candidate deep-dive (~15 sub-panels)
 - **page4** shows the karyotype rows + 14-axis tier grid
 - **page11** lets you refine the boundary zones
-- **page_sv_evidence** loads SV calls clustered around boundaries
-- **page21** annotation cockpit highlights this candidate on the
+- **sv_evidence** loads SV calls clustered around boundaries
+- **annotation_cockpit** annotation cockpit highlights this candidate on the
   chromosome strip
 
 All of these read `state.candidate` from the cross-atlas slot.
@@ -320,5 +320,5 @@ required layers, interactions, hotkeys, outputs, commit policy.
 This page operates on the **226-sample pure C. gariepinus hatchery
 cohort**. Do NOT load F1 hybrid data, do NOT load C. macrocephalus
 wild data into the same atlas instance — three cohorts never
-conflate. Use the comparative pages (page16 / page16b) for
+conflate. Use the comparative pages (cross_species_breakpoints / multi_species_cockpit) for
 cross-species comparisons.

@@ -1,6 +1,6 @@
 # Batch 2 — extraction notes
 
-`inversion_review/` pages: page11, page_sv_evidence, page4, page6, page7.
+`inversion_review/` pages: page11, sv_evidence, page4, page6, page7.
 
 All shared regression tests pass (455/455). All per-page module tests pass
 (24/24). `shared/` was not modified.
@@ -13,8 +13,8 @@ All shared regression tests pass (455/455). All per-page module tests pass
 |---|---|---|---|
 | `inversion_review/page11.html` | 16 | 7906–7921 | DOM mount slot for "4 boundaries" |
 | `inversion_review/page11.js` | ~245 | 30175–30314 (`renderBoundariesPage`) + 30318–30345 (hotkey wiring) | Verbatim entry-point + 5-key hotkey handler. ~25 `_bnd*` helpers marked TODO_MISSING. |
-| `inversion_review/page_sv_evidence.html` | 3 | 9329–9331 | Mount slot only (`#sv_evidence_root`). |
-| `inversion_review/page_sv_evidence.js` | ~135 | (none — external `js/atlas_sv_evidence.js`) | Lifecycle wrapper around `window.AtlasSVEvidence`. |
+| `inversion_review/sv_evidence.html` | 3 | 9329–9331 | Mount slot only (`#sv_evidence_root`). |
+| `inversion_review/sv_evidence.js` | ~135 | (none — external `js/atlas_sv_evidence.js`) | Lifecycle wrapper around `window.AtlasSVEvidence`. |
 | `inversion_review/page4.html` | 73 | 7573–7645 | Two-pane DOM: cand-list pane (left) + karyotype/tier pane (right). |
 | `inversion_review/page4.js` | ~250 | 62508–62526 (`karyoState`) + 62800–62836 (`renderCandidateKaryotype`) + 62840–62861 (`_refreshSubviewButtonStyles`) + 63411–63492 (`renderCandidateTier`) | Verbatim dispatcher, tier renderer, button styler, page-local state. Body + grid helpers marked TODO_MISSING. |
 | `inversion_review/page6.html` | 12 | 7647–7658 | Popstats stack DOM (toolbar + ps-stack + no-chrom + gallery tray). |
@@ -84,7 +84,7 @@ Page-local UI helpers (probably stay in `page11.js`):
 - `_bndRefreshUI` — legacy 18911
 
 Side panels on the boundary page:
-- `_renderBndFocalVsBg` — legacy 20507 (focal-vs-bg widget; also used by page16)
+- `_renderBndFocalVsBg` — legacy 20507 (focal-vs-bg widget; also used by cross_species_breakpoints)
 - `_wireRepeatDensityEscapeReset` — legacy 20583
 - `_wireRepeatDensityClassCycle` — legacy 20856
 - `_wireRepeatDensityAllTeToggle` — legacy 20895
@@ -110,7 +110,7 @@ Tier-specific:
 - `_renderTierAxesGrid` — legacy ~63495 (immediately after
   `renderCandidateTier`, not yet line-confirmed)
 
-### SV evidence (page_sv_evidence) — 3 markers
+### SV evidence (sv_evidence) — 3 markers
 
 External-file deps (live in `js/atlas_sv_evidence.js`, not in legacy HTML):
 - `AtlasSVEvidence.init`

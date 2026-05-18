@@ -6,7 +6,7 @@
 // Round 5 step 13 (chat 38, 2026-05-07): page8 promoted from chat-33
 // "0-function pure-HTML-scaffold" stub to the _pageState live-binding
 // pattern + atlas-router mount/unmount lifecycle. This is the discovery-
-// group counterpart of the page9 stub-preserving migration (round 5
+// group counterpart of the confirmed_carousel stub-preserving migration (round 5
 // step 7).
 //
 // Page8 has no JS handlers in legacy/Inversion_atlas.html (confirmed by

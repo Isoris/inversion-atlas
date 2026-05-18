@@ -56,7 +56,7 @@
 // Inside Inversion_atlas.html itself there is NO `function renderPopstatsPage`
 // — the legacy code only references it via `if (typeof renderPopstatsPage
 // === 'function')` guards. So the page module here is a thin lifecycle
-// wrapper, like page_sv_evidence.js + page7.js.
+// wrapper, like sv_evidence.js + page7.js.
 //
 // Decision (BATCH_2_NOTES): kept the popstats stack as an external-script
 // dep rather than promoting to shared. The whole thing depends on a
@@ -163,7 +163,7 @@ export function refreshPopstatsPage() {
  * Public entry — state-aware wrapper around showPopstatsPage.
  *
  * If `state` is passed, sets _pageState as a side effect before delegating
- * (mirrors page7/page9/page15/page5 wrapper pattern). The chat-33
+ * (mirrors page7/confirmed_carousel/page15/help wrapper pattern). The chat-33
  * showPopstatsPage signature already takes state as an explicit arg, so
  * the wrapper just threads _pageState into it.
  */

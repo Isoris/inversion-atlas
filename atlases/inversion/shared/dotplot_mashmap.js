@@ -4,7 +4,7 @@
 // alignments between the focal species (Cgar) and one comparison
 // species (Cmac). Each resolution is a different mashmap parameter
 // sweep (segment size + percent-identity threshold). Consumed by
-// page16's dotplot panel.
+// cross_species_breakpoints's dotplot panel.
 //
 // Legacy origin: lines 26017-26078 of legacy/Inversion_atlas.html.
 //

@@ -20,14 +20,14 @@ pages to:
 
 1. Verify the karyotype assignment (`page4` karyotype sub-view).
 2. Read population stats around the candidate (`page6` popstats).
-3. Check ancestry confound (`page7` ancestry + `page_ancestry_scroller`).
+3. Check ancestry confound (`page7` ancestry + `fish_ancestry_scroller`).
 4. Refine the boundary zones (`page11` boundaries).
-5. Inspect SV evidence around the breakpoints (`page_sv_evidence`).
+5. Inspect SV evidence around the breakpoints (`sv_evidence`).
 6. Score the candidate on 14 axes (`page4` Tier sub-view).
 
 Once a candidate passes review, it's flipped to `confirmed: true`
 (typically on page2) and becomes visible to the inheritance pipeline
-+ lines-panel highlights + page9 confirmed carousel.
++ lines-panel highlights + confirmed_carousel confirmed carousel.
 
 ## Pages in this directory
 
@@ -37,8 +37,8 @@ Once a candidate passes review, it's flipped to `confirmed: true`
 | `page6` | popstats | per-window track stack (\|Z\|, SNP density, BEAGLE uncertainty, depth, θπ, F_ST, Hobs/Hexp, ancestry Δ12); thin loader for `window.renderPopstatsPage` |
 | `page7` | ancestry | per-window ancestry view (K-cluster label / Q-value heatmap / Δ12 confidence); thin loader for `window.renderAncestryPage` |
 | `page11` | boundaries | boundary-zone refinement (9 scan radii; E/F/B/R/A hotkeys; TE + ncRNA + focal-vs-bg panels) |
-| `page_sv_evidence` | SV evidence | per-candidate SV table + UpSet + dosage heatmap; thin loader for `window.AtlasSVEvidence` object |
-| `page_ancestry_scroller` | Fish Ancestry Scroller | per-fish ancestry painting with F-based label-switching alignment + ancestry bricks (3 numbered layers + brick-metrics heatmap) |
+| `sv_evidence` | SV evidence | per-candidate SV table + UpSet + dosage heatmap; thin loader for `window.AtlasSVEvidence` object |
+| `fish_ancestry_scroller` | Fish Ancestry Scroller | per-fish ancestry painting with F-based label-switching alignment + ancestry bricks (3 numbered layers + brick-metrics heatmap) |
 
 ## Vocabulary contracts (critical)
 
@@ -69,7 +69,7 @@ persistence: localStorage.
 
 | `confirmed` value | implications |
 |-------------------|--------------|
-| `false` | candidate visible in review UI; NOT visible in inheritance pills, NOT in lines-panel highlights, NOT in page9 carousel |
+| `false` | candidate visible in review UI; NOT visible in inheritance pills, NOT in lines-panel highlights, NOT in confirmed_carousel carousel |
 | `true` | full visibility everywhere |
 
 ### Pattern-label discipline (per `specs_done/SPEC_sv_evidence_page §3.3`)
@@ -87,10 +87,10 @@ labels gate on `fdr < fdr_cutoff` (default 0.05).
 - **page11** owns the **boundary annotation** that lives on the
   candidate (`state.candidate.boundary_zone`). E/F/B/R/A hotkeys
   install a document-level keydown listener.
-- **page_sv_evidence** loads `json/sv_genotype_counts/<cid>.json`
+- **sv_evidence** loads `json/sv_genotype_counts/<cid>.json`
   per candidate; producer pipeline at
   `engines/producers/sv_evidence/` (4 Python scripts).
-- **page_ancestry_scroller** consumes `instant_q` (Engine B) per-RF
+- **fish_ancestry_scroller** consumes `instant_q` (Engine B) per-RF
   output — cluster-side producer integration pending.
 
 ## Known registry mismatches (flagged for renumbering round)
@@ -116,7 +116,7 @@ fix because downstream code may rely on the current declaration.
 ## SPECs relevant to classification
 
 In `specs_done/`:
-- `SPEC_sv_evidence_page.md` (page_sv_evidence + producer pipeline)
+- `SPEC_sv_evidence_page.md` (sv_evidence + producer pipeline)
 - `SPEC_review_surfaces_auto_and_lineages.md` (auto-promoted
   candidate review surfaces — dashed CSS + G-panel auto tab)
 - `SCHEMA.md` (§9 cluster-emit `classification` layer + §13
@@ -124,7 +124,7 @@ In `specs_done/`:
   schema)
 
 In `specs_todo/`:
-- `SPEC_fish_ancestry_scroller.md` (page_ancestry_scroller UI v2;
+- `SPEC_fish_ancestry_scroller.md` (fish_ancestry_scroller UI v2;
   page registered 2026-05-15 but `model` derivation pipeline still
   pending)
 - `SPEC_busco_anchors_v1.md` (page-16 ribbon-plot integration —
@@ -138,7 +138,7 @@ page has a contract.
 
 ## Notes for new contributors
 
-- **The 3 thin-loader pages** (page6, page7, page_sv_evidence)
+- **The 3 thin-loader pages** (page6, page7, sv_evidence)
   depend on external `js/atlas_*.js` files NOT inlined in the
   modular tree. When mounted with the external module absent, they
   show empty-state fallback messages. Migrating these into the

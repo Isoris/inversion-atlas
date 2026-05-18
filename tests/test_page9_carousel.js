@@ -1,6 +1,6 @@
 // tests/test_page9_carousel.js
 //
-// Unit tests for pages/catalogue/page9/carousel.js — the
+// Unit tests for pages/catalogue/confirmed_carousel/carousel.js — the
 // confirmed-candidates carousel logic that legacy never implemented.
 //
 // Pure-function tests run headlessly; DOM-renderer tests use a
@@ -49,7 +49,7 @@ function makeMockDoc() {
     confirmedNavInfo:         makeMockEl(),
     confirmedCandidateMeta:   makeMockEl(),
     confirmedEmpty:           makeMockEl(),
-    page9:                    makeMockEl(),
+    confirmed_carousel:                    makeMockEl(),
   };
   const docListeners = new Map();
   return {
@@ -85,7 +85,7 @@ const {
   renderConfirmedCarousel,
   wireConfirmedCarouselNav,
   teardownConfirmedCarouselNav,
-} = await import('../atlases/inversion/pages/catalogue/page9/carousel.js');
+} = await import('../atlases/inversion/pages/catalogue/confirmed_carousel/carousel.js');
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {
@@ -262,7 +262,7 @@ group('wireConfirmedCarouselNav — click + keydown');
 {
   // Reset doc fixture freshly
   globalThis.document = makeMockDoc();
-  globalThis.document._els.page9.classList.add('active');
+  globalThis.document._els.confirmed_carousel.classList.add('active');
   const state = makeFixture();
   state.confirmedCarouselIndex = 0;
   renderConfirmedCarousel(state);
@@ -285,19 +285,19 @@ group('wireConfirmedCarouselNav — click + keydown');
   check('Enter ignored',                        state.confirmedCarouselIndex === 0);
 }
 {
-  // Keydown ignored when page9 not active
+  // Keydown ignored when confirmed_carousel not active
   globalThis.document = makeMockDoc();
-  // page9 has no 'active' class
+  // confirmed_carousel has no 'active' class
   const state = makeFixture();
   state.confirmedCarouselIndex = 0;
   wireConfirmedCarouselNav(state);
   globalThis.document._fireKey('ArrowRight');
-  check('page9 not active: key ignored',        state.confirmedCarouselIndex === 0);
+  check('confirmed_carousel not active: key ignored',        state.confirmedCarouselIndex === 0);
 }
 {
   // Idempotent: calling twice doesn't accumulate handlers
   globalThis.document = makeMockDoc();
-  globalThis.document._els.page9.classList.add('active');
+  globalThis.document._els.confirmed_carousel.classList.add('active');
   const state = makeFixture();
   state.confirmedCarouselIndex = 0;
   wireConfirmedCarouselNav(state);
@@ -309,7 +309,7 @@ group('wireConfirmedCarouselNav — click + keydown');
 {
   // Teardown removes handlers
   globalThis.document = makeMockDoc();
-  globalThis.document._els.page9.classList.add('active');
+  globalThis.document._els.confirmed_carousel.classList.add('active');
   const state = makeFixture();
   state.confirmedCarouselIndex = 0;
   wireConfirmedCarouselNav(state);

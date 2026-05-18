@@ -1,7 +1,7 @@
 // pages/discovery/page8/_state.js
 //
 // State module for the page8 per-window summary table (chat 38 round 5
-// step 13, 2026-05-07). Mirrors page9/_state.js — same shape, distinct
+// step 13, 2026-05-07). Mirrors confirmed_carousel/_state.js — same shape, distinct
 // module, distinct _pageState reference.
 //
 // _pageState: module-level reference. Page8's mount sets it on entry so

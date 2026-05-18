@@ -1,4 +1,4 @@
-# HANDOFF — page9 confirmed carousel MIGRATED; 7 of 22 pages done
+# HANDOFF — confirmed_carousel confirmed carousel MIGRATED; 7 of 22 pages done
 
 **Date:** 2026-05-07 (chat ~36, round 5 step 7)
 **Reads:** This file FIRST, then the audit log top entry, then
@@ -22,17 +22,17 @@ atlas-router compatibility, preserving the verbatim stub semantics.
 
 ```
 atlases/inversion/pages/catalogue/
-├── page9.js              153 LOC ← refactored in-place
-└── page9/
+├── confirmed_carousel.js              153 LOC ← refactored in-place
+└── confirmed_carousel/
     └── _state.js          13 LOC ← _pageState + setter
 ```
 
 **Verifications passed (483/483 from a clean tarball reassembly):**
 - `node --check` clean on every JS file under `atlases/inversion/`.
-- 7 unit tests: page1 (103) + page2 (58) + page3 (19) + page9 (14) +
-  page17 (34) + page18 (46) + page21 (41) = **315**.
-- 7 smokes: page1 (33) + page2 (24) + page3 (29) + page9 (22) +
-  page17 (20) + page18 (20) + page21 (20) = **168**.
+- 7 unit tests: page1 (103) + page2 (58) + catalogue (19) + confirmed_carousel (14) +
+  stats_profile (34) + marker_readiness (46) + annotation_cockpit (41) = **315**.
+- 7 smokes: page1 (33) + page2 (24) + catalogue (29) + confirmed_carousel (22) +
+  stats_profile (20) + marker_readiness (20) + annotation_cockpit (20) = **168**.
 
 ---
 
@@ -40,18 +40,18 @@ atlases/inversion/pages/catalogue/
 
 ### Step 0 — registry + manifest fix
 
-- `pages.registry.json` page9: added `_label` ("confirmed carousel") +
+- `pages.registry.json` confirmed_carousel: added `_label` ("confirmed carousel") +
   `_doc` documenting the legacy stub status (carousel JS does NOT exist
   in legacy/Inversion_atlas.html — confirmed by `grep confirmedNav`)
   and the deferred TODO_MISSING items for the full implementation.
-- `manifest.json` page9: label "page 9" → **"confirmed carousel"**.
+- `manifest.json` confirmed_carousel: label "page 9" → **"confirmed carousel"**.
   Stage stays "catalogue".
 
-### Step 1 — page9.js refactored in-place
+### Step 1 — confirmed_carousel.js refactored in-place
 
-Same accessor-shortcut pattern as page21 (round 5 step 6):
+Same accessor-shortcut pattern as annotation_cockpit (round 5 step 6):
 - Replaced `const state = (typeof window !== 'undefined' && window.state) ? window.state : {};`
-  with `import { _pageState, _setActiveState } from './page9/_state.js';`.
+  with `import { _pageState, _setActiveState } from './confirmed_carousel/_state.js';`.
 - Renamed the legacy verbatim `function refreshConfirmedCarousel()` →
   internal `function _refreshConfirmedCarousel()`. Its single bare
   `state.candidateList` read becomes `(_pageState || {}).candidateList`
@@ -69,14 +69,14 @@ Same accessor-shortcut pattern as page21 (round 5 step 6):
 **Single bare state read** — the entire body had only one bare `state.X`
 reference. Trivial refactor.
 
-### Step 2 — page9/_state.js (NEW, 13 LOC)
+### Step 2 — confirmed_carousel/_state.js (NEW, 13 LOC)
 
 Same shape as the other pages.
 
 ### Step 3 — Tests
 
 - `tests/test_catalogue_page9.js`: replaced (was a stale chat-33 test
-  that imported from the wrong path `../inversion_catalogue/page9.js`
+  that imported from the wrong path `../inversion_catalogue/confirmed_carousel.js`
   and asserted removed `__MODULE_ID__`). New version: 14 assertions
   covering exports, lifecycle entry-points, `__MODULE_ID__` removal,
   `_state.js` live-binding, no-document early-return safety,
@@ -97,7 +97,7 @@ Same shape as the other pages.
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1/page2/page3/page17/page18/page21 modules** — completely unchanged.
+- **page1/page2/catalogue/stats_profile/marker_readiness/annotation_cockpit modules** — completely unchanged.
 - **`shared/page1_data_helpers.js`** — unchanged.
 - **The TODO_MISSING items** (`_renderConfirmedCarousel`,
   `_wireConfirmedCarouselNav`, `renderCandidateFocus`) — kept as
@@ -106,7 +106,7 @@ Same shape as the other pages.
   task. Will be picked up by a follow-up round once page2's
   candidate-focus renderer is more accessible.
 - **Pages 4, 6, 7, 8, 10, 11, 12, 15, 16, 16b, 19,
-  page_overview, page_sv_evidence** — only parse-checked.
+  overview, sv_evidence** — only parse-checked.
 - **Page renumbering** — deferred per Quentin's directive.
 - **Toolkit-registry vs Atlas-state cache decisions** — deferred.
 
@@ -118,20 +118,20 @@ Same shape as the other pages.
 |---|---|---|---|---|
 | page1 | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
 | page2 | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
-| page3 | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
-| page9 | catalogue | ✅ step 7 (single file, stub-preserving) | ~166 across main + _state | 14+22 |
-| page17 | catalogue (synthesis) | ✅ step 5 (single file + state bridge) | ~1009 across main + _state | 34+20 |
-| page18 | catalogue (synthesis) | ✅ step 4 (single file) | ~984 across main + _state | 46+20 |
-| page21 | catalogue | ✅ step 6 (single file) | ~792 across main + _state | 41+20 |
+| catalogue | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
+| confirmed_carousel | catalogue | ✅ step 7 (single file, stub-preserving) | ~166 across main + _state | 14+22 |
+| stats_profile | catalogue (synthesis) | ✅ step 5 (single file + state bridge) | ~1009 across main + _state | 34+20 |
+| marker_readiness | catalogue (synthesis) | ✅ step 4 (single file) | ~984 across main + _state | 46+20 |
+| annotation_cockpit | catalogue | ✅ step 6 (single file) | ~792 across main + _state | 41+20 |
 
 **Total assertions: 483/483 across 14 test runs.**
 
 **Pages remaining (15 of 22):** page4, 5, 6, 7, 8, 10, 11, 12, 15, 16,
-16b, 19, page_overview, page_sv_evidence.
+16b, 19, overview, sv_evidence.
 
-**Catalogue group status:** 5 of 6 catalogue pages migrated (page3,
-page9, page17, page18, page21). Only **page10** + **page_overview**
-remain in catalogue/synthesis. *(page17 and page18 are tagged
+**Catalogue group status:** 5 of 6 catalogue pages migrated (catalogue,
+confirmed_carousel, stats_profile, marker_readiness, annotation_cockpit). Only **marker_panels** + **overview**
+remain in catalogue/synthesis. *(stats_profile and marker_readiness are tagged
 "synthesis" in the manifest but still live under pages/catalogue/.)*
 
 ---
@@ -158,24 +158,24 @@ inside it, add the lifecycle. No AST-walking patcher needed.
 
 | Page | Folder | LOC | Notes |
 |---|---|---|---|
-| **page_overview** | catalogue | 35 | Tiny stub — also empty in legacy. Pure router-wiring. **Would close out the catalogue group.** |
-| **page10** | catalogue | 244 | Substantial-but-quick. **Would close out the catalogue group.** |
+| **overview** | catalogue | 35 | Tiny stub — also empty in legacy. Pure router-wiring. **Would close out the catalogue group.** |
+| **marker_panels** | catalogue | 244 | Substantial-but-quick. **Would close out the catalogue group.** |
 | **page12** | discovery | 1008 | 18 TODOs — substantial work |
-| **page16, page16b** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest` (page17), AND likely `computeTrackedLinkageProjection` (page21)** |
-| **page8, 15, 19, page5** | various | <50 each | tiny stubs; quick router-wiring rounds |
+| **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest` (stats_profile), AND likely `computeTrackedLinkageProjection` (annotation_cockpit)** |
+| **page8, 15, 19, help** | various | <50 each | tiny stubs; quick router-wiring rounds |
 | **page4, 6, 7, 11** | review | 122-301 | review-stage pages |
-| **page_sv_evidence** | review | 148 | SV evidence review |
+| **sv_evidence** | review | 148 | SV evidence review |
 
 Logical next priorities:
 
-- **Catalogue completion** — page10 + page_overview would finish the
-  catalogue group entirely. page_overview is trivially small (legacy
-  empty <div>), page10 is medium size.
-- **Stub batch** — page8, 15, 19, page5, page_overview are all
+- **Catalogue completion** — marker_panels + overview would finish the
+  catalogue group entirely. overview is trivially small (legacy
+  empty <div>), marker_panels is medium size.
+- **Stub batch** — page8, 15, 19, help, overview are all
   sub-50 LOC; could batch in one round if Quentin's "one at a time"
   directive permits a stub batch.
-- **Comparative cockpit** — page16/page16b is the most ambitious
-  remaining; resolves the most runtime guards across page17 + page21.
+- **Comparative cockpit** — cross_species_breakpoints/multi_species_cockpit is the most ambitious
+  remaining; resolves the most runtime guards across stats_profile + annotation_cockpit.
 
 ---
 

@@ -1,4 +1,4 @@
-# HANDOFF — page16 cross-species breakpoints MIGRATED; page17 guard-resolution unblocked; 11 of 22 pages done
+# HANDOFF — cross_species_breakpoints cross-species breakpoints MIGRATED; stats_profile guard-resolution unblocked; 11 of 22 pages done
 
 **Date:** 2026-05-07 (chat ~36, round 5 step 11)
 **Reads:** This file FIRST, then the audit log top entry, then
@@ -21,12 +21,12 @@ linking line, and the flanking repeat-element density on both species
 `state.repeatDensity`). Spalax-style enrichment of all_TE at
 breakpoints is the manuscript hook.
 
-**Strategic value: page17 guard-resolution unblocked.** Page16 owns
+**Strategic value: stats_profile guard-resolution unblocked.** Page16 owns
 `_csGetSyntenyBlocks` (legacy line 1488) and `_csPermutationTest`
-(legacy line 1791), previously runtime-guarded in page17 (synthesis
+(legacy line 1791), previously runtime-guarded in stats_profile (synthesis
 stats profile) via `typeof X === 'function'`. Round 5 step 5 noted
-these would land naturally with page16 migration. **This round makes
-them explicit ES exports.** A follow-up round can promote page17's
+these would land naturally with cross_species_breakpoints migration. **This round makes
+them explicit ES exports.** A follow-up round can promote stats_profile's
 runtime guards to imports.
 
 The chat-33 stub had ~2556 LOC of body extracted from legacy lines
@@ -34,12 +34,12 @@ The chat-33 stub had ~2556 LOC of body extracted from legacy lines
 runtime) + 28367-28419 (`_csBuildPermResultHtml`). **0 explicit
 exports**, 50 top-level helpers using bare `state.X` references
 (no top-level `state` declaration; no first-arg pattern). Same
-shape as page17/page18 — full AST-shim-injection refactor.
+shape as stats_profile/marker_readiness — full AST-shim-injection refactor.
 
 ```
 atlases/inversion/pages/comparative/
-├── page16.js              2750 LOC ← refactored (was 2556)
-└── page16/
+├── cross_species_breakpoints.js              2750 LOC ← refactored (was 2556)
+└── cross_species_breakpoints/
     └── _state.js            26 LOC ← _pageState + setter
 ```
 
@@ -54,22 +54,22 @@ atlases/inversion/pages/comparative/
 
 ### Step 0 — registry + manifest fix
 
-- `pages.registry.json` page16: added `_label` ("cross-species
+- `pages.registry.json` cross_species_breakpoints: added `_label` ("cross-species
   breakpoints") + long `_doc` documenting the cs_breakpoints_v1
   pipeline, six-panel layout, manuscript hook (Spalax-style all_TE
-  enrichment), page17 guard-resolution context, and the three-cohort
+  enrichment), stats_profile guard-resolution context, and the three-cohort
   discipline reminder.
-- `manifest.json` page16: label "page 16" → **"cross-species breakpoints"**.
+- `manifest.json` cross_species_breakpoints: label "page 16" → **"cross-species breakpoints"**.
   Stage stays "comparative" (correct).
 
-### Step 1 — page16.js refactored in-place (2556 → 2750 LOC)
+### Step 1 — cross_species_breakpoints.js refactored in-place (2556 → 2750 LOC)
 
-Same playbook as page17/18 (rounds 5 step 4-5):
+Same playbook as stats_profile/18 (rounds 5 step 4-5):
 
 1. **Header replaced**: rewrote the `TODO_MISSING markers` block as
    "RESOLVED 2026-05-07 round 5 step 11" documenting each marker's
    resolution status. Added imports for `_pageState`/`_setActiveState`
-   from `./page16/_state.js` and `_esc` from
+   from `./cross_species_breakpoints/_state.js` and `_esc` from
    `../../shared/page1_data_helpers.js`.
 
 2. **AST shim injection** (`/home/claude/work/patch_page16.py`):
@@ -89,7 +89,7 @@ Same playbook as page17/18 (rounds 5 step 4-5):
      `CROSS_SPECIES_FLANK_DEFAULT_BP`, `CS_EVENT_DEF`.
    - **Render entries**: `_renderCrossSpeciesPage` (main),
      `_renderCrossSpeciesToolbar/Catalogue/Focus/Synteny/Dotplot/FocalVsBg`.
-   - **Cross-page helpers** (page17 guard targets):
+   - **Cross-page helpers** (stats_profile guard targets):
      `_csGetSyntenyBlocks`, `_csPermutationTest`, `_csComputeSynteny`,
      `_csSyntenyEdgesByChrom`, `_csInversionContexts`,
      `_csBuildPermResultHtml`.
@@ -118,28 +118,28 @@ Same playbook as page17/18 (rounds 5 step 4-5):
   triggering a cross-panel re-render after a cs-bp click jumps the
   scrubber. Page1 NOW exports all four (`drawSim`, `drawZ`,
   `drawLinesPanel`, `setCur`), but promoting these to imports would
-  couple page16 to page1's module load order. Runtime guards preserve
+  couple cross_species_breakpoints to page1's module load order. Runtime guards preserve
   graceful degradation when page1 isn't mounted. (`drawWinSumStrip` is
   not defined in legacy at all — optional hook.)
 - **`window.popgenDotplot`, `window.popgenFocalVsBg`** — KEPT as
   runtime guards. External vendor libs.
 
 **Why preserve all the underscore-prefixed bodies?** Same reason as
-page17/18: legacy callers reference `_renderCrossSpeciesPage()` etc.
+stats_profile/18: legacy callers reference `_renderCrossSpeciesPage()` etc.
 directly; the underscore-prefixed exports stay; the new non-prefixed
 `renderCrossSpeciesPage(state)` is purely additive.
 
-### Step 2 — page16/_state.js (NEW, 26 LOC)
+### Step 2 — cross_species_breakpoints/_state.js (NEW, 26 LOC)
 
 Same shape as the other pages. Includes a documentation note about
-the strategic value (page17 guard-resolution).
+the strategic value (stats_profile guard-resolution).
 
 ### Step 3 — Tests
 
 - `tests/test_comparative_page16.js`: replaced (was a 62-LOC
   parse-check + dynamic-import + content-scanning stub from chat-33
   that imported from the wrong path
-  `../inversion_comparative/page16.js`). New version: 40 assertions
+  `../inversion_comparative/cross_species_breakpoints.js`). New version: 40 assertions
   covering ALL 27 explicit exports (5 groups: lifecycle, render
   entries, cross-page helpers, IO helpers, hover/event-wiring,
   constants), `_state.js` live-binding, behavioural exercises:
@@ -152,7 +152,7 @@ the strategic value (page17 guard-resolution).
   **40/40**.
 - `tests/smoke_comparative_page16_round5.mjs`: NEW (~340 LOC). Full
   mount/render/unmount lifecycle with FakeContext canvas shim +
-  insertAdjacentHTML polyfill (page16's ideogram building uses it).
+  insertAdjacentHTML polyfill (cross_species_breakpoints's ideogram building uses it).
   Empty-crossSpecies mount runs without throwing. **Populated mount
   with synthetic cs_breakpoints_v1** (single inversion bp on LG12,
   5-12 Mb, with prev_block + next_block on CMA01, all_TE flanking
@@ -173,24 +173,24 @@ the strategic value (page17 guard-resolution).
 - **`shared/page1_data_helpers.js`** — unchanged. Page16's new
   `_esc` import resolves to the existing export.
 - **Other shared/ modules** — unchanged.
-- **The 50 verbatim helper bodies inside page16.js** — only the
+- **The 50 verbatim helper bodies inside cross_species_breakpoints.js** — only the
   AST-injected `const state = _pageState;` shim was added (28 of
   50 functions). Everything else (constants, render bodies, IO
   helpers, etc.) is byte-identical to chat-33.
-- **page16b** (multi-species cockpit, 2417 LOC) — separate page,
+- **multi_species_cockpit** (multi-species cockpit, 2417 LOC) — separate page,
   separate _pageState. Will be migrated in a future round. Confirmed
-  during audit: page16b does NOT own the cs* helpers — page16 does.
-- **page17's runtime guards for `_csGetSyntenyBlocks` and
+  during audit: multi_species_cockpit does NOT own the cs* helpers — cross_species_breakpoints does.
+- **stats_profile's runtime guards for `_csGetSyntenyBlocks` and
   `_csPermutationTest`** — kept in place. Promotion to imports is a
-  follow-up task. The page17 unit/smoke tests still pass (page17
+  follow-up task. The stats_profile unit/smoke tests still pass (stats_profile
   unchanged).
-- **Pages 4, 5, 6, 7, 8, 11, 15, 19, page_sv_evidence, page16b** —
+- **Pages 4, 5, 6, 7, 8, 11, 15, 19, sv_evidence, multi_species_cockpit** —
   only parse-checked.
 - **Page renumbering** — deferred per Quentin's directive.
 - **Toolkit-registry vs Atlas-state cache decisions** — deferred.
 - **`computeTrackedLinkageProjection`** — confirmed during audit:
   this function lives at legacy line 46751, inside page2-territory
-  chunks (not page16/page16b). Will land when page2's missing
+  chunks (not cross_species_breakpoints/multi_species_cockpit). Will land when page2's missing
   helpers eventually surface. Not part of this round.
 
 ---
@@ -201,33 +201,33 @@ the strategic value (page17 guard-resolution).
 |---|---|---|---|---|
 | page1 | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
 | page2 | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
-| page3 | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
-| page9 | catalogue | ✅ step 7 (single file, stub-preserving) | ~166 | 14+22 |
-| page10 | catalogue | ✅ step 9 (factory + new lifecycle) | ~344 | 25+26 |
+| catalogue | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
+| confirmed_carousel | catalogue | ✅ step 7 (single file, stub-preserving) | ~166 | 14+22 |
+| marker_panels | catalogue | ✅ step 9 (factory + new lifecycle) | ~344 | 25+26 |
 | page12 | discovery | ✅ step 10 (verbatim + state-aware wrappers + lifecycle) | ~1189 | 32+29 |
-| **page16** | **comparative** | **✅ step 11 (AST shim injection + explicit exports + lifecycle)** | **~2776** | **40+23** |
-| page17 | synthesis | ✅ step 5 (single file + state bridge) | ~1009 | 34+20 |
-| page18 | synthesis | ✅ step 4 (single file) | ~984 | 46+20 |
-| page21 | catalogue | ✅ step 6 (single file) | ~792 | 41+20 |
-| page_overview | synthesis | ✅ step 8 (factory + new lifecycle) | ~123 | 18+15 |
+| **cross_species_breakpoints** | **comparative** | **✅ step 11 (AST shim injection + explicit exports + lifecycle)** | **~2776** | **40+23** |
+| stats_profile | synthesis | ✅ step 5 (single file + state bridge) | ~1009 | 34+20 |
+| marker_readiness | synthesis | ✅ step 4 (single file) | ~984 | 46+20 |
+| annotation_cockpit | catalogue | ✅ step 6 (single file) | ~792 | 41+20 |
+| overview | synthesis | ✅ step 8 (factory + new lifecycle) | ~123 | 18+15 |
 
 **Total assertions: 691/691 across 22 test runs.**
 
 **Pages remaining (11 of 22):** page4, 5, 6, 7, 8, 11, 15, 16b, 19,
-page_sv_evidence.
+sv_evidence.
 
 **Discovery group status:** 3 of 4 migrated (page1, page2, page12).
 Only **page8 (23 LOC stub), page15 (42 LOC stub), page19 (23 LOC stub)**
 remain in discovery — all sub-50-LOC stubs.
 
-**Comparative group status:** 1 of 3 migrated (page16). Remaining:
-**page5 (34 LOC stub), page16b (2417 LOC, multi-species cockpit)**.
+**Comparative group status:** 1 of 3 migrated (cross_species_breakpoints). Remaining:
+**help (34 LOC stub), multi_species_cockpit (2417 LOC, multi-species cockpit)**.
 
 ---
 
 ## Architectural notes
 
-**Cross-page guard resolution mechanic.** Page16 → page17 is the
+**Cross-page guard resolution mechanic.** Page16 → stats_profile is the
 first migration that closes a cross-page runtime-guard. The pattern
 is repeatable: when page A's verbatim helpers are runtime-guarded
 in page B, migrating A makes the helpers explicit exports, and B
@@ -236,7 +236,7 @@ same shape will surface as more pages migrate (e.g., page2's
 `computeTrackedLinkageProjection` will eventually unblock something).
 
 **AST shim injection scaling.** The patcher used here (50 functions,
-28 patched) is the same shape as page17/18's (round 5 step 4/5).
+28 patched) is the same shape as stats_profile/18's (round 5 step 4/5).
 Reverse-walk through matches keeps positions valid; brace-matching
 with string/comment awareness handles JS quirks. The "already
 patched" check needs to look for the actual injection (`)\s*\{\s*\n\s*const state = _pageState;`)
@@ -244,8 +244,8 @@ rather than substring matches because the docstring now mentions the
 shim text.
 
 **The "preserved underscore-prefix" pattern is mature.** Every
-verbatim-body migration round (page17, page18, page21, page12,
-page16) keeps the chat-33 underscore-prefixed bodies AS exports for
+verbatim-body migration round (stats_profile, marker_readiness, annotation_cockpit, page12,
+cross_species_breakpoints) keeps the chat-33 underscore-prefixed bodies AS exports for
 backward compat with legacy direct callers, and adds non-prefixed
 state-aware wrappers (`renderXxx(state)`) for the new lifecycle. Cost:
 ~5-30 LOC per page; benefit: zero breakage for any legacy caller.
@@ -256,7 +256,7 @@ the AST shim works end-to-end: `_csGetSyntenyBlocks()` and
 `_pageState`, with the synteny_blocks array threading correctly into
 the per-(gar,mac) tally logic. This is the strongest proof yet that
 the AST injection preserves semantics. Future migrations of
-substantial state-reading bodies (page16b, eventually) should use
+substantial state-reading bodies (multi_species_cockpit, eventually) should use
 the same proof pattern.
 
 ---
@@ -267,22 +267,22 @@ the same proof pattern.
 
 | Page | Folder | LOC | Notes |
 |---|---|---|---|
-| **page17 guard promotion** | synthesis (post-migration cleanup) | ~5 LOC delta | promote page17's runtime guards for `_csGetSyntenyBlocks` + `_csPermutationTest` to imports — payoff round for step 11 |
+| **stats_profile guard promotion** | synthesis (post-migration cleanup) | ~5 LOC delta | promote stats_profile's runtime guards for `_csGetSyntenyBlocks` + `_csPermutationTest` to imports — payoff round for step 11 |
 | **page8, 15, 19** | discovery | <50 each | tiny stubs; would close out discovery group entirely (3 quick rounds) |
-| **page16b** | comparative | 2417 LOC | multi-species cockpit; no cross-page helper exposures, but second-largest unmigrated page |
-| **page5** | comparative | 34 LOC | tiny help-page stub |
+| **multi_species_cockpit** | comparative | 2417 LOC | multi-species cockpit; no cross-page helper exposures, but second-largest unmigrated page |
+| **help** | comparative | 34 LOC | tiny help-page stub |
 | **page4, 6, 7, 11** | review | 122-301 LOC | review-stage pages |
-| **page_sv_evidence** | review | 148 LOC | SV evidence review |
+| **sv_evidence** | review | 148 LOC | SV evidence review |
 
 Logical next priorities:
 
-- **page17 guard promotion** — small, fast payoff round. Promotes 2
+- **stats_profile guard promotion** — small, fast payoff round. Promotes 2
   runtime guards to imports, removes the `typeof X === 'function'`
-  pattern in page17, and demonstrates the cross-page guard-resolution
+  pattern in stats_profile, and demonstrates the cross-page guard-resolution
   mechanic end-to-end.
 - **Discovery group completion** — page8, 15, 19 are all sub-50-LOC.
   Closing them out would mean the entire discovery group is migrated.
-- **page16b** — most ambitious remaining pre-cleanup migration.
+- **multi_species_cockpit** — most ambitious remaining pre-cleanup migration.
 - **Review pages** — 5 pages, manageable.
 
 ---

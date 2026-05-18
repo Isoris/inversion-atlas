@@ -1,10 +1,10 @@
-# SPEC — SV Evidence Page (`page_sv_evidence`)
+# SPEC — SV Evidence Page (`sv_evidence`)
 
 **Status**: SHIPPED — was SPEC ONLY (referenced from page + producer
 without an on-disk doc) until 2026-05-15.
 **Authored from shipped code** (recovery of a missing SPEC).
 **Implemented in**:
-- Page (browser): `atlases/inversion/pages/review/page_sv_evidence.{html,js}`
+- Page (browser): `atlases/inversion/pages/review/sv_evidence.{html,js}`
   + external renderer `js/atlas_sv_evidence.js`
 - Producer pipeline (cluster-side): `atlases/inversion/engines/producers/sv_evidence/`
   - `STEP_SV_GT_AGG_aggregate_genotype_counts.py`
@@ -13,7 +13,7 @@ without an on-disk doc) until 2026-05-15.
   - `write_candidate_folder.py` (shared library)
   - `run_sv_evidence_pipeline.slurm` (LANTA wrapper)
 
-**Page contract**: `docs/generated/page_contracts/page_sv_evidence/`
+**Page contract**: `docs/generated/page_contracts/sv_evidence/`
 
 ---
 
@@ -57,7 +57,7 @@ inside) **or** dropping a single layer at a time.
 |------|----------|-------------|
 | `--vcf` or `--tsv` | one of | merged DELLY+Manta VCF (with GT field) OR tabular TSV: `sv_id chrom position_bp end_bp sv_type sample_id GT [quality] [callers]` |
 | `--candidate` | yes | candidate JSON (must include `candidate_id`, `chrom`, `boundary_left_bp`, `boundary_right_bp`; optional `zone_definitions_bp`) |
-| `--karyotype` | yes | TSV: `sample_id <tab> label` where label ∈ {`HOMO_1`, `HET`, `HOMO_2`} (the page21 lock format) |
+| `--karyotype` | yes | TSV: `sample_id <tab> label` where label ∈ {`HOMO_1`, `HET`, `HOMO_2`} (the annotation_cockpit lock format) |
 | `--out-root` | yes | output root directory |
 | `--fdr-cutoff` | no | FDR threshold for "associated" classification (default 0.05) |
 | `--indent` | no | JSON indent (default: compact one-line; use 2 for debug) |
@@ -229,7 +229,7 @@ Per-sample SV support across the candidate's flanking + body zones.
 
 ### §6.1 Architecture
 
-`page_sv_evidence` is a **thin loader stub**. The renderer is
+`sv_evidence` is a **thin loader stub**. The renderer is
 `window.AtlasSVEvidence` — an **object** with `.init` /
 `.loadCandidate` / `.destroy` methods (distinct from page6/page7's
 single-function renderers). Defined externally in
@@ -308,18 +308,18 @@ precomputed JSONs.
 
 ## §9. References
 
-- **Page contract**: `docs/generated/page_contracts/page_sv_evidence/`
+- **Page contract**: `docs/generated/page_contracts/sv_evidence/`
 - **Producer README**: `atlases/inversion/engines/producers/sv_evidence/README.md`
 - **Server**: `atlases/inversion/server/SERVER_README.md` (the
   popstats live server; no SV endpoint today)
-- **Karyotype lock format**: page21 / page4 produce the
+- **Karyotype lock format**: annotation_cockpit / page4 produce the
   `HOMO_1` / `HET` / `HOMO_2` locked labels consumed by `--karyotype`
 - **Three-cohort discipline**: see `atlases/inversion/manifest.json`
   + `_handoff_docs/SCAFFOLDING_NOTES.md`
 
 ---
 
-**Authored**: 2026-05-15 from shipped code (page_sv_evidence.js +
+**Authored**: 2026-05-15 from shipped code (sv_evidence.js +
 STEP_SV_GT_AGG_aggregate_genotype_counts.py:208-265 + producer
 README). One of the 8 SPECs identified as missing on disk in
 `_handoff_docs/SPECS_AUDIT.md`.

@@ -1,6 +1,6 @@
 // shared/classifications.js
 //
-// Per-breakpoint manual classification overrides. The page16 multi-
+// Per-breakpoint manual classification overrides. The cross_species_breakpoints multi-
 // species UI auto-suggests both an architecture class (A-F) and an
 // age model (YOUNG-POP / OLD-POLY / OLD-BP-YOUNG-INV / LINEAGE-KARYO
 // / MULTI-AGE-HOTSPOT) for every cross-species breakpoint; this

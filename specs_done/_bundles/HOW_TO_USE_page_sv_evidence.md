@@ -1,6 +1,6 @@
-# How to use page_sv_evidence — SV evidence
+# How to use sv_evidence — SV evidence
 
-**Page**: `page_sv_evidence` · stage `classification` · label "SV evidence"
+**Page**: `sv_evidence` · stage `classification` · label "SV evidence"
 **Atlas**: `inversion` (the C. gariepinus 226-cohort atlas)
 
 ## What this page does
@@ -19,7 +19,7 @@ The full schema + classification rules are in
 
 ## Architecture: thin loader for an external module
 
-The atlas-side module (`page_sv_evidence.js`) is a **thin loader
+The atlas-side module (`sv_evidence.js`) is a **thin loader
 stub**. The actual rendering lives in
 `window.AtlasSVEvidence` — an OBJECT with `.init`,
 `.loadCandidate(cid)`, and `.destroy()` methods, defined in
@@ -44,10 +44,10 @@ once per page mount.
 ```
 atlases/inversion/
 ├── pages/review/
-│   ├── page_sv_evidence.html               ← shell — 2 DOM ids only
-│   │                                         (#page_sv_evidence, #sv_evidence_root)
-│   ├── page_sv_evidence.js                 ← thin loader (3 exports)
-│   └── page_sv_evidence/
+│   ├── sv_evidence.html               ← shell — 2 DOM ids only
+│   │                                         (#sv_evidence, #sv_evidence_root)
+│   ├── sv_evidence.js                 ← thin loader (3 exports)
+│   └── sv_evidence/
 │       └── _state.js                         ← _pageState + setter
 ├── engines/producers/sv_evidence/         ← cluster-side producers
 │   ├── STEP_SV_GT_AGG_aggregate_genotype_counts.py
@@ -64,13 +64,13 @@ atlases/inversion/
 
 | id | role |
 |----|------|
-| `#page_sv_evidence` | page wrapper (visibility toggled by router) |
+| `#sv_evidence` | page wrapper (visibility toggled by router) |
 | `#sv_evidence_root` | single inner mount slot — owned by AtlasSVEvidence |
 
 That's it. Everything else inside `#sv_evidence_root` is built by
 the external `AtlasSVEvidence` module.
 
-## Lifecycle (verified from `page_sv_evidence.js`)
+## Lifecycle (verified from `sv_evidence.js`)
 
 | event | what runs |
 |-------|-----------|
@@ -130,7 +130,7 @@ The producer classifies each SV into one of:
 
 1. **Pick a candidate** — the page reads `state.candidate.id` and
    calls `AtlasSVEvidence.loadCandidate(cid)`. Routes that populate
-   `state.candidate`: page1 click, page2 prev/next, page3 row click,
+   `state.candidate`: page1 click, page2 prev/next, catalogue row click,
    etc.
 
 2. **Open the SV evidence tab.**
@@ -168,7 +168,7 @@ Required inputs (per the producer's README):
   `boundary_left_bp`, `boundary_right_bp`, optional
   `zone_definitions_bp`
 - `--karyotype` — TSV `sample_id <tab> label` where label ∈
-  `{HOMO_1, HET, HOMO_2}` (the page21 / page4 lock format)
+  `{HOMO_1, HET, HOMO_2}` (the annotation_cockpit / page4 lock format)
 - `--out-root` — output root
 
 Optional:
@@ -220,7 +220,7 @@ AtlasSVEvidence module.
    modest, the rule falls through to `dominant_presence_marker`.
    See SPEC §3.3 for the exact decision tree.
 
-## What page_sv_evidence does NOT do
+## What sv_evidence does NOT do
 
 - **It does NOT compute live** — everything is precomputed by the
   producer pipeline. The atlas reads the JSON. If you want live
@@ -253,7 +253,7 @@ explanation, the FDR rationale, and the per-step CLI examples.
 
 ## Per-page contract
 
-`docs/generated/page_contracts/page_sv_evidence/PAGE_CONTRACT.md`
+`docs/generated/page_contracts/sv_evidence/PAGE_CONTRACT.md`
 
 ## Cohort discipline
 
@@ -263,8 +263,8 @@ F1 hybrid; NOT C. macrocephalus wild)."*
 
 ---
 
-**Authored**: 2026-05-15 from `pages/review/page_sv_evidence.js`
-(lines 32-48, 127-191) + `pages/review/page_sv_evidence.html` (2
+**Authored**: 2026-05-15 from `pages/review/sv_evidence.js`
+(lines 32-48, 127-191) + `pages/review/sv_evidence.html` (2
 DOM ids confirmed) + `specs_done/SPEC_sv_evidence_page.md` (the
 SPEC authored earlier today from shipped producer code). All
 lifecycle behaviour + DOM ids + state slot usage verified against

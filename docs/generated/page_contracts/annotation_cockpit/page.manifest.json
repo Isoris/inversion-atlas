@@ -1,0 +1,62 @@
+{
+  "page_id": "annotation_cockpit",
+  "label": "annotation cockpit",
+  "page_type": "core_page",
+  "stage": "catalogue",
+  "owner_atlas": "inversion",
+  "status": "active",
+  "current_path": {
+    "html": "atlases/inversion/pages/catalogue/annotation_cockpit.html",
+    "js_entry": "atlases/inversion/pages/catalogue/annotation_cockpit.js",
+    "js_subdir": "atlases/inversion/pages/catalogue/annotation_cockpit/"
+  },
+  "legacy_source": "legacy/Inversion_atlas.html lines 46938-47616 (JS body) + 7822-7859 (HTML shell). Public entry: refreshAnnotationCockpit (legacy line 47590)",
+  "naming_note": "HANDOFF_BATCH_3.md mislabelled this as 'Manual karyotype groups list' — that is incorrect; the line ranges are authoritative — this IS the annotation cockpit",
+
+  "purpose": "Per-sample-lines canvas with cursor-driven candidate selection. The chromosome-wide annotation cockpit: each promoted candidate appears as a faint rectangle in mb-space; per-sample PC1 trajectories drawn beneath, optionally colored by the active candidate's K-means band assignment. ←/→ steps the cursor, digit keys 0-9 select a band, drives state.tracked → linkage shading + linkage table + haplotype-annotation panel.",
+
+  "required_layers": ["scrubber_main"],
+  "required_slots": ["activeChrom"],
+  "preloads": ["scrubber_main"],
+
+  "panels": [
+    {"id": "anno_cockpit_canvas", "dom_id": "annoCockpitCanvas", "purpose": "main per-sample-lines canvas with candidate rectangles"},
+    {"id": "footer_panels", "purpose": "linkage table panel + haplotype-annotation panel (footer)"}
+  ],
+
+  "subdir_files": ["_state.js — _pageState + setter"],
+
+  "primitives_used": ["unknown — uses page1's color/band machinery; cross-page imports yet to be promoted"],
+  "adapters_used": [],
+
+  "interactions": [
+    {"id": "cursor_arrow_keys", "type": "hotkey", "purpose": "←/→ step cursor"},
+    {"id": "shift_arrow", "type": "hotkey", "purpose": "jump boundaries"},
+    {"id": "esc_key", "type": "hotkey", "purpose": "clear cursor"},
+    {"id": "digit_keys_0_9", "type": "hotkey", "purpose": "select band of candidate under cursor → state.tracked update"}
+  ],
+  "hotkeys": ["←/→ — step cursor", "Shift+arrow — jump boundaries", "Esc — clear", "0..9 — band select"],
+
+  "computed_preview_outputs": [
+    "per-sample PC1 trajectory canvas",
+    "candidate rectangle overlay in mb-space",
+    "K-means band shading on hover/select",
+    "linkage table (samples linked to active band)",
+    "haplotype-annotation panel"
+  ],
+  "committable_outputs": ["state.tracked updates (linkage assignments) — persisted via registry write path or localStorage; unknown which"],
+  "commit_policy": "manual_only",
+
+  "documents": {
+    "page_registry_doc": "pages.registry.json -> pages.annotation_cockpit._doc",
+    "specs_done": [],
+    "specs_todo": [],
+    "handoffs": ["atlases/inversion/pages/catalogue/BATCH_3_NOTES.md (NB the label mismatch noted in module header)"],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [
+    "HANDOFF_BATCH_3.md mislabels this as 'Manual karyotype groups list' — corrected in module header. The page IS the annotation cockpit."
+  ],
+  "confidence": "high"
+}
