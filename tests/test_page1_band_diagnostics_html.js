@@ -1,12 +1,12 @@
 // tests/test_page1_band_diagnostics_html.js
 //
-// Unit tests for pages/discovery/page1/band_diagnostics_html.js —
+// Unit tests for pages/discovery/local_pca_dosage/band_diagnostics_html.js —
 // the HTML renderers that consume computeBandDiagnostics output.
 
 import {
   bandDiagsMiniChipsHtml,
   bandDiagsPanelHtml,
-} from '../atlases/inversion/pages/discovery/page1/band_diagnostics_html.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/band_diagnostics_html.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

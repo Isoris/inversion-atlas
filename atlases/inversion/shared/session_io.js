@@ -116,7 +116,7 @@ function _serializeFavorites(favs) {
  *
  * `opts.onCandidatesMerged(state)` fires AFTER state.candidates +
  * state.candidateList have been written but before the function returns.
- * Used by page1 to call _rebuildCandidateRegistries() so the cross-page
+ * Used by local_pca_dosage to call _rebuildCandidateRegistries() so the cross-page
  * registries stay in sync. Pure-data callers can omit this.
  *
  * @param {Object} state

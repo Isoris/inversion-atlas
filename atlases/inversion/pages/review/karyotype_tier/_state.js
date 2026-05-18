@@ -2,7 +2,7 @@
 //
 // State module for the karyotype_tier karyotype/tier candidate-level view
 // (chat 39 cont. round 5 step 21, 2026-05-07). Canonical shape;
-// mirrors cross_species_breakpoints/multi_species_cockpit/page12/stats_profile/_state.js.
+// mirrors cross_species_breakpoints/multi_species_cockpit/local_pca_theta_pi/stats_profile/_state.js.
 //
 // _pageState: module-level reference. Page4's mount + entry points
 // call _setActiveState(state) on entry so the helper bodies see the

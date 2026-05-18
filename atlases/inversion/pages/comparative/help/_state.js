@@ -1,7 +1,7 @@
 // pages/comparative/help/_state.js
 //
 // State module for the help quick-reference / help page (chat 38
-// round 5 step 16, 2026-05-07). Mirrors page8/page15/page19/_state.js
+// round 5 step 16, 2026-05-07). Mirrors window_summary_table/local_pca_ghsl/negative_regions/_state.js
 // — same shape, distinct module, distinct _pageState reference.
 //
 // Page5 is a static help page (purely declarative HTML) — its

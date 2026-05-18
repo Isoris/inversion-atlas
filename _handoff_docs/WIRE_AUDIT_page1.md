@@ -1,13 +1,13 @@
-# WIRE_AUDIT — page1 broken / missing wires
+# WIRE_AUDIT — local_pca_dosage broken / missing wires
 
 **Authored**: 2026-05-15 (chat continuation)
-**Scope**: page1 (the local PCA |Z| big-page scrubber). Catalogues
+**Scope**: local_pca_dosage (the local PCA |Z| big-page scrubber). Catalogues
 every visible control that doesn't work, with diagnosis + the fix
 pattern.
 
 **Root cause** (consistent across this audit): during the chat-35
 round-4 split of the legacy `Inversion_atlas.html` monolith into
-the modular tree under `atlases/inversion/pages/discovery/page1/`,
+the modular tree under `atlases/inversion/pages/discovery/local_pca_dosage/`,
 many click/change handlers from the legacy `wireBindings()`-style
 init code were NOT extracted. Symptoms vary:
 
@@ -45,7 +45,7 @@ Group A — Lines-panel header buttons (all Type A unless noted):
 |----|-------------------|----------|-------|
 | `linesTransRateToggle` | toggle structural-haplotype transition-rate strip | **high** | user-reported 2026-05-15 |
 | `linesRegimeBreadthToggle` | toggle regime-breadth strip (narrow / medium / wide) | high | |
-| `linesPanelLineageToggle` (?) | toggle lineage strip | medium | id may be different — locate in page1.html |
+| `linesPanelLineageToggle` (?) | toggle lineage strip | medium | id may be different — locate in local_pca_dosage.html |
 | `linesBandTraceToggle` | toggle the band-trace strip globally | high | per SPEC_distant_band_concordance_fish_trajectory §5 |
 | `linesBandTraceTraceBtn` (🔍 trace) | set state.bandTraceFishSet from current tracked / lassoed set | **high** | user-reported 2026-05-15 |
 | `linesBandTraceLargestBtn` (largest ▾) | dropdown — pick the largest cohort by some metric | medium | |
@@ -94,7 +94,7 @@ Group D — Color modes on PCA scatter (#colorModeBar):
 | `q_ancestry` button (already has #colorModeBar `ancestry`?) | yes — line 210 | low | verify the existing `data-mode="ancestry"` button routes to q_ancestry vs the older ancestryColor |
 
 **Important**: the user said "for every local pca panel whether page
-1 2 3 of local PCA" — meaning ALSO page12 (θπ) and page15 (GHSL).
+1 2 3 of local PCA" — meaning ALSO local_pca_theta_pi (θπ) and local_pca_ghsl (GHSL).
 The dispatch should mirror across all three. Page22's PCA is
 separate (its color modes are different — keep as-is).
 
@@ -114,7 +114,7 @@ Group F — Cross-page features:
 
 | feature | what it should do | priority | notes |
 |---------|-------------------|----------|-------|
-| Connect dosage heatmap | add a "show dosage" button somewhere that opens `dosage_heatmap` for the active candidate | medium | user-requested 2026-05-15 "can you connect the dosage heatmap so that we can have it." The page exists at `pages/discovery/dosage_heatmap.{html,js}` — just needs an entry point from page1 / page2 |
+| Connect dosage heatmap | add a "show dosage" button somewhere that opens `dosage_heatmap` for the active candidate | medium | user-requested 2026-05-15 "can you connect the dosage heatmap so that we can have it." The page exists at `pages/discovery/dosage_heatmap.{html,js}` — just needs an entry point from local_pca_dosage / candidate_focus |
 | Silhouette display in L3 + tracked-samples | render the `cl.silhouette` value next to K-badge in L3 slab; add a row in tracked-samples panel | high | compute is now wired (637169f); display TBD |
 | **Hotkey scheme: G / U / Shift / CTRL** | refined 2026-05-15 (supersedes the earlier "CTRL cycles cluster-label notation" entry — kept as Group G below): G opens the G-panel popup (already per `specs_done/SPEC_g_panel_unified_groups.md`); U enters selection mode; Shift+drag within selection mode = lasso-select samples; CTRL opens the lateral bar to send the selected group to another atlas (cross-atlas group transfer) | **high** | This is the canonical hotkey design. Each key has a single function — no more cycling on CTRL. The cluster-label-notation feature (if still wanted) needs a different key (suggestion: tap-G inside the G-panel cycles the active notation mode, since G already opens that surface). |
 
@@ -125,13 +125,13 @@ Group G — Selection mode + cross-atlas group transfer (NEW 2026-05-15):
 | **U key — enter / exit selection mode** | document-level keydown handler (gated on active page + not in INPUT/TEXTAREA/SELECT); flips `state.selectionMode` boolean | **high** | persisted across page switches; visible-state cursor change (crosshair on any plot). |
 | **Shift+drag (in selection mode) — lasso samples** | when `state.selectionMode === true`, Shift+drag on PCA scatter / lines panel / heatmap selects samples by enclosure | **high** | reuses existing `attachPcaLasso` + `attachLinesLasso` plumbing but with a new gate: instead of writing to `state.manualGroups` directly, write to a transient `state.selectionGroup = {ids, source_atlas, source_page, source_window, ts}`. The G-panel's Manual tab can promote `selectionGroup` to a named manual group via a "save selection as group" button. |
 | **CTRL — open lateral bar (cross-atlas group transfer)** | when `state.selectionGroup` is non-empty, CTRL toggles a right-side lateral bar listing other registered atlases; click an atlas name → "send group to {atlas}" | **high** | needs: (1) atlas-core API to enumerate sibling atlases mounted in the same workspace (e.g. inversion + diversity + genome); (2) a serialization format for the group (sample ids + provenance: source atlas, source candidate, source K-mode); (3) receiving atlas inbox — when the user switches to the target atlas, an "incoming group" banner offers to materialize the group on the target atlas's canvas. **Spec needed**: file as `specs_todo/SPEC_cross_atlas_group_transfer.md` before implementation. Related to `docs/ATLAS_FAMILY_ROADMAP.md`. |
-| **Lateral bar UI** | right-side slide-in panel (~280 px wide); lists target atlases + recent transfers; "recover group" button on the receiving side | high | mirrors page1's existing right aside pattern (`#pcaTrackedAside`); persist last-N transfers to localStorage as `inversion_atlas.crossAtlasInbox.v1`. |
+| **Lateral bar UI** | right-side slide-in panel (~280 px wide); lists target atlases + recent transfers; "recover group" button on the receiving side | high | mirrors local_pca_dosage's existing right aside pattern (`#pcaTrackedAside`); persist last-N transfers to localStorage as `inversion_atlas.crossAtlasInbox.v1`. |
 
 Group H — Cluster-label notation overlay (LOWER PRIORITY since CTRL is now reserved for cross-atlas):
 
 | feature | what it should do | priority | notes |
 |---------|-------------------|----------|-------|
-| **Cluster-label notation on PCA scatter** | overlay group labels around K-means cluster centroids; cycle through notation modes via a NEW key (G-panel tap? dedicated `N` key? user to choose) | medium | per the original 2026-05-15 spec: cycle through `default (none)` → `g1/g2/g3` → `HOMO_1/HET/HOMO_2` → `H1/H1 H1/H2 H2/H2`. Needs: (1) state slot `state.pcaClusterLabelMode`, persisted to localStorage. (2) render hook in `drawPCA` (page1/pca_panel.js) at cluster centroid (from `cl.centers`) with halo. (3) label sources: `g1/g2/g3` literal; `HOMO_1/HET/HOMO_2` from `pages/review/karyotype_tier/karyo_labels.js#K3_H_SYSTEM`; `H1/H1` H-pair notation (inline or in karyo_labels.js). (4) Mirror across page1 / page12 (θπ) / page15 (GHSL) / page2 (candidate focus) local PCAs. |
+| **Cluster-label notation on PCA scatter** | overlay group labels around K-means cluster centroids; cycle through notation modes via a NEW key (G-panel tap? dedicated `N` key? user to choose) | medium | per the original 2026-05-15 spec: cycle through `default (none)` → `g1/g2/g3` → `HOMO_1/HET/HOMO_2` → `H1/H1 H1/H2 H2/H2`. Needs: (1) state slot `state.pcaClusterLabelMode`, persisted to localStorage. (2) render hook in `drawPCA` (local_pca_dosage/pca_panel.js) at cluster centroid (from `cl.centers`) with halo. (3) label sources: `g1/g2/g3` literal; `HOMO_1/HET/HOMO_2` from `pages/review/karyotype_tier/karyo_labels.js#K3_H_SYSTEM`; `H1/H1` H-pair notation (inline or in karyo_labels.js). (4) Mirror across local_pca_dosage / local_pca_theta_pi (θπ) / local_pca_ghsl (GHSL) / candidate_focus (candidate focus) local PCAs. |
 
 Group I — Cross-evidence PCA comparator (NEW 2026-05-15):
 
@@ -145,7 +145,7 @@ Group I — Cross-evidence PCA comparator (NEW 2026-05-15):
 
 | symptom | diagnosis | fix |
 |---------|-----------|-----|
-| Fixed layout: panels overflow above viewport, black space at top of cartridge area | `main#page1` grid was `grid-template-rows: 40px 520px 100px auto 0px 28px 1fr 360px` — fixed pixels totalling 1048 px minimum. On <1100px viewports, the `auto + 1fr` cells collapse to 0 and rows overflow. | **Fixed** in this session — changed to `minmax(MIN, FRAC)` pattern in `css/inversion.css` lines 363, 503. |
+| Fixed layout: panels overflow above viewport, black space at top of cartridge area | `main#local_pca_dosage` grid was `grid-template-rows: 40px 520px 100px auto 0px 28px 1fr 360px` — fixed pixels totalling 1048 px minimum. On <1100px viewports, the `auto + 1fr` cells collapse to 0 and rows overflow. | **Fixed** in this session — changed to `minmax(MIN, FRAC)` pattern in `css/inversion.css` lines 363, 503. |
 | Per-sample-lines header wraps to 3 rows | Too many controls in `#linesYsourceBar` for one row; `flex-wrap: wrap` lets them spill | **PENDING** — collapse all "secondary" controls (everything after `color:` picker) into a `<details>` element or a "⋯ more" disclosure. Pattern already exists in L3 toolbar (`l3-more-item` class + disclosure button). |
 | Tracked-samples panel styling less advanced than legacy | The legacy had per-K coloring on the K-band buttons, richer per-sample chips, etc. The round-4 port simplified. | **PENDING** — review `legacy/Inversion_atlas.html` `_drawTrackedAside` (or similar function) for the original styling. The K-color palette is in `shared/page1_data_helpers.js#groupColor`. |
 
@@ -205,7 +205,7 @@ Per-group commit lets reviewer audit each change cleanly.
   `HOW_TO_USE_page2.md`, `HOW_TO_USE_page4.md`,
   `HOW_TO_USE_page11.md`, `HOW_TO_USE_page_sv_evidence.md`,
   `HOW_TO_USE_page22.md`
-- Page contract: `docs/generated/page_contracts/page1/`
+- Page contract: `docs/generated/page_contracts/local_pca_dosage/`
 
 Each broken wire fix should:
 - Match the established pattern (idempotent `dataset.wired = '1'`

@@ -81,7 +81,7 @@ separated into distinct buckets. Core-dependent tests skip with a
 
 ### Table-based metrics extracted from legacy (round 3)
 
-`page1/l3_panel.js` had five TODO_MISSING markers referencing
+`local_pca_dosage/l3_panel.js` had five TODO_MISSING markers referencing
 table-based contingency metrics (chiSquare, nmiFromTable, amiFromTable,
 ariFromTable, restrictedConcord). All five legacy implementations exist
 at lines 30915–31178 of `legacy/Inversion_atlas.html` and are pure
@@ -113,9 +113,9 @@ expected labels (`TWO_INVERSIONS` / `CROSSOVER_ARTIFACTS` /
 shared to return top_high. Comment updated to describe the gap.
 
 `computeBandDiagnostics` (legacy 15254–15583, ~330 LOC) is the largest
-remaining TODO_MISSING in l3_panel. It depends on page1-specific
+remaining TODO_MISSING in l3_panel. It depends on local_pca_dosage-specific
 `state.data` slots (ghsl_panel, theta_pi_panel, roh_intervals,
-sample_froh) and belongs in a page1 sub-module rather than `shared/`.
+sample_froh) and belongs in a local_pca_dosage sub-module rather than `shared/`.
 Deferred to a separate round.
 
 40 new contingency-table assertions added to
@@ -138,9 +138,9 @@ page modules):
 | Step | Round | What landed |
 |---|---|---|
 | 12 | stats_profile guard promotion | `_csGetSyntenyBlocks` + `_csPermutationTest` promoted from `typeof X === 'function'` runtime guards to ES imports from `cross_species_breakpoints` |
-| 13 | page8 migration | discovery stub |
-| 14 | page19 migration | discovery stub |
-| 15 | page15 migration | GHSL mirror |
+| 13 | window_summary_table migration | discovery stub |
+| 14 | negative_regions migration | discovery stub |
+| 15 | local_pca_ghsl migration | GHSL mirror |
 | 16 | help migration | comparative help |
 | 17 | ancestry_per_window migration | review ancestry |
 | 18 | popstats migration | review popstats |
@@ -158,19 +158,19 @@ wasn't documented in any handoff doc. It's now under test.
 several pages still have `TODO_MISSING(…)` markers documenting helpers
 that need to be extracted from the legacy monolith. Notable gaps:
 
-- `page1` has many `typeof X === 'function'` graceful-degradation guards
+- `local_pca_dosage` has many `typeof X === 'function'` graceful-degradation guards
   (lineage cache, band trace cache, θπ panels, GHSL panels) — these are
   follow-up extractions, not blockers.
-- `page1/l3_panel.js` has TODO_MISSING for `_l2InvariantStats`,
+- `local_pca_dosage/l3_panel.js` has TODO_MISSING for `_l2InvariantStats`,
   `computeBandDiagnostics`, `sigmaProfileL2`, `chiSquare`/`nmiFromTable`/
   etc., `restrictedConcord`, and the L3 heavy overlays (~440 LOC at
   legacy 51179–51720).
-- `page8` (windows table) has `_renderWinSumTable`,
+- `window_summary_table` (windows table) has `_renderWinSumTable`,
   `_drawWinSumStripCanvas`, `_wireWinSumFilters`, `_wireWinSumBisnpInfo`
   flagged.
-- `page15` (GHSL mirror) has `_drawGhslZPanel` + 5 sibling panel
+- `local_pca_ghsl` (GHSL mirror) has `_drawGhslZPanel` + 5 sibling panel
   renderers and `_refreshGhslPanelVisibility` flagged.
-- `page19` (negatives) has `_nrRender`, `_nrLoadFile`, `_nrExportCsv`,
+- `negative_regions` (negatives) has `_nrRender`, `_nrLoadFile`, `_nrExportCsv`,
   `_nrReset` flagged.
 - `shared/band_tracking/` is missing six upstream pipeline modules
   (`single_band.js`, `het.js`, `hom.js`, `iv.js`, `trajectory.js`,
@@ -186,11 +186,11 @@ that need to be extracted from the legacy monolith. Notable gaps:
   `atlases/inversion/shared/` (excluding band_tracking) are byte-for-byte
   identical to step 11.
 - **atlas-core dependency** — `core/` is still missing from the
-  cartridge. The 4 core-dependent tests (page1, page2, master_config,
+  cartridge. The 4 core-dependent tests (local_pca_dosage, candidate_focus, master_config,
   registry_master_config + 4 smokes) skip. To unblock them, check out
   atlas-core to `../atlas-core/` and symlink `core` →
   `../atlas-core/core` at the cartridge root.
-- **page1/page2 functional gaps** — these pages depend on
+- **local_pca_dosage/candidate_focus functional gaps** — these pages depend on
   `core/atlas_api.js` and have unported helpers. Out of scope here.
 
 ## Three-cohort discipline (CRITICAL — never violate)
@@ -205,12 +205,12 @@ that need to be extracted from the legacy monolith. Notable gaps:
 
 | Priority | Work | Effort | Notes |
 |---|---|---|---|
-| 1 | Resolve `page8` / `page15` / `page19` TODO_MISSING markers | per page | extract small renderers from the legacy monolith into the page modules; same pattern as steps 13–15 used for the lifecycle |
-| 2 | Resolve `page1/l3_panel.js` TODO_MISSING set | larger | five named markers, each in legacy ~31xxx–52xxx range |
-| 3 | Promote `page1`'s `typeof X === 'function'` guards to explicit imports | per guard | same mechanic as step 12; each guard points at a function whose owner page exposes (or will expose) the symbol |
+| 1 | Resolve `window_summary_table` / `local_pca_ghsl` / `negative_regions` TODO_MISSING markers | per page | extract small renderers from the legacy monolith into the page modules; same pattern as steps 13–15 used for the lifecycle |
+| 2 | Resolve `local_pca_dosage/l3_panel.js` TODO_MISSING set | larger | five named markers, each in legacy ~31xxx–52xxx range |
+| 3 | Promote `local_pca_dosage`'s `typeof X === 'function'` guards to explicit imports | per guard | same mechanic as step 12; each guard points at a function whose owner page exposes (or will expose) the symbol |
 | 4 | Extract `shared/band_tracking/` upstream pipeline | substantial | six modules — `single_band` → `het` → `hom` → `iv` plus `trajectory` and `karyotype_model`. Restores the full pipeline that `regime_catalogue` documents |
 | 5 | Wire atlas-core into the cartridge for local testing | trivial after atlas-core is present | clone or copy atlas-core; symlink `core/` |
 
-The cheapest visible next round is **page19's `_nr*` renderers** — page19
+The cheapest visible next round is **negative_regions's `_nr*` renderers** — negative_regions
 is a small (96 LOC) negatives-region page and the four markers are
 self-contained.

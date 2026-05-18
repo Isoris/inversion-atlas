@@ -27,12 +27,12 @@ an on-disk doc) until 2026-05-15.
   layout
 - `legacy/Inversion_atlas.html` line 33148 — `'lineage'` entry in
   `_LINES_COLOR_MODES`
-- `pages/discovery/page1/lineage.js` — state-managed lineage compute
+- `pages/discovery/local_pca_dosage/lineage.js` — state-managed lineage compute
   wrapper (round-4 split brought it across)
 - `shared/clustering.js` — pure clustering primitives
-- `pages/discovery/page1/band_trace_state.js` — band-trace state +
+- `pages/discovery/local_pca_dosage/band_trace_state.js` — band-trace state +
   cache (per `state.bandTraceCacheKey`)
-- `pages/discovery/page1/band_trace_tooltip.js` — band-trace tooltip
+- `pages/discovery/local_pca_dosage/band_trace_tooltip.js` — band-trace tooltip
   + hit-test (legacy lines 40026-40202)
 
 **Companion specs**:
@@ -75,7 +75,7 @@ representation:
 
 ### §2.1 Pure compute
 
-Location: `pages/discovery/page1/lineage.js` (state-managed wrapper)
+Location: `pages/discovery/local_pca_dosage/lineage.js` (state-managed wrapper)
 + `shared/clustering.js` (pure primitives).
 
 Inputs:
@@ -260,22 +260,22 @@ specific group sticks together"). They're complementary.
 ## §9. Migration into atlas-core
 
 Most of this SPEC's pieces are still in `legacy/Inversion_atlas.html`
-or in the round-4 splits inside `pages/discovery/page1/`. When the
+or in the round-4 splits inside `pages/discovery/local_pca_dosage/`. When the
 remaining migration happens:
 
 - **Lineage compute** → already at
-  `pages/discovery/page1/lineage.js` ✅
+  `pages/discovery/local_pca_dosage/lineage.js` ✅
 - **Lineage palette + color mode resolver** → should land in
   `shared/lineage_palette.js` (golden-angle PRNG)
-- **Lineage strip painter** → already part of `pages/discovery/page1/z_panel.js`
+- **Lineage strip painter** → already part of `pages/discovery/local_pca_dosage/z_panel.js`
   via the strip overlays ✅
 - **Band-trace compute** → should land in `shared/band_trace.js` ✅
-  (already there per `pages/discovery/page1/band_trace_state.js`'s
+  (already there per `pages/discovery/local_pca_dosage/band_trace_state.js`'s
   imports)
 - **Band-trace strip painter** → already part of
-  `pages/discovery/page1/z_panel.js#_drawBandTraceStrip` ✅
+  `pages/discovery/local_pca_dosage/z_panel.js#_drawBandTraceStrip` ✅
 - **Band-trace tooltip** → already at
-  `pages/discovery/page1/band_trace_tooltip.js` ✅
+  `pages/discovery/local_pca_dosage/band_trace_tooltip.js` ✅
 - **TSV export** → currently in legacy; migration TBD
 
 ## §10. References
@@ -283,18 +283,18 @@ remaining migration happens:
 - **Parent SPEC**: `specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md`
   (the cohort-paths dual)
 - **Compute (lineage)**:
-  `pages/discovery/page1/lineage.js#runLineageCompute`
+  `pages/discovery/local_pca_dosage/lineage.js#runLineageCompute`
 - **Compute (band-trace)**:
-  `pages/discovery/page1/band_trace_state.js` +
+  `pages/discovery/local_pca_dosage/band_trace_state.js` +
   `shared/band_trace.js`
 - **Color mode entry**: `_LINES_COLOR_MODES` in
-  `pages/discovery/page1/lines_panel.js` (search `'lineage'`)
+  `pages/discovery/local_pca_dosage/lines_panel.js` (search `'lineage'`)
 - **Lineage strip painter**:
-  `pages/discovery/page1/z_panel.js#_drawLineageStrip`
+  `pages/discovery/local_pca_dosage/z_panel.js#_drawLineageStrip`
 - **Band-trace strip painter**:
-  `pages/discovery/page1/z_panel.js#_drawBandTraceStrip`
+  `pages/discovery/local_pca_dosage/z_panel.js#_drawBandTraceStrip`
 - **Band-trace tooltip**:
-  `pages/discovery/page1/band_trace_tooltip.js`
+  `pages/discovery/local_pca_dosage/band_trace_tooltip.js`
 - **TSV export**: `_bandTraceDownloadTSV` (legacy turn 162)
 - **State slots**:
   - `state.lineageResult`, `state.lineageCacheKey`
@@ -305,7 +305,7 @@ remaining migration happens:
 
 **Authored**: 2026-05-15 from `legacy/Inversion_atlas.html`
 lines 5722-5729 + 9521+ + 9630 + 33148 + the round-4 splits inside
-`pages/discovery/page1/`. The LAST of the 8 SPECs identified as
+`pages/discovery/local_pca_dosage/`. The LAST of the 8 SPECs identified as
 missing on disk in `_handoff_docs/SPECS_AUDIT.md`. **All 8 missing
 SPECs now resolved.** Slices 1 + 2 + 3 + 4 + 5 SHIPPED; Slice 6
 (cross-strip chaining) deferred until parent SPEC's L3

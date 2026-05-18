@@ -1,6 +1,6 @@
 // tests/test_page1_inheritance.js
 //
-// Unit tests for pages/discovery/page1/inheritance.js — state-managed
+// Unit tests for pages/discovery/local_pca_dosage/inheritance.js — state-managed
 // inheritance-group orchestrator. Wraps shared/inheritance_groups.js
 // with item gathering, cache management, and last-compute status.
 
@@ -17,7 +17,7 @@ import {
   runInheritanceCompute,
   invalidateInheritanceCache,
   formatInheritanceLabel,
-} from '../atlases/inversion/pages/discovery/page1/inheritance.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/inheritance.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

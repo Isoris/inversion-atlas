@@ -25,7 +25,7 @@
   ],
 
   "subdir_files": [
-    "_state.js — _pageState + setter (mirrors page8/_state.js pattern)",
+    "_state.js — _pageState + setter (mirrors window_summary_table/_state.js pattern)",
     "layers.js — renderers for the 3 numbered layers + brick metrics block",
     "right_panel.js — 3-block right side panel",
     "selection.js — brick hit-test (Layer 2 canvas click → brick under pixel)"

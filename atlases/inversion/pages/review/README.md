@@ -15,7 +15,7 @@ consolidation.)
 > commit to it as a real call."
 
 The classification stage answers that. The user opens a candidate
-on page2 (discovery_2 deep-dive), then walks through the review
+on candidate_focus (discovery_2 deep-dive), then walks through the review
 pages to:
 
 1. Verify the karyotype assignment (`karyotype_tier` karyotype sub-view).
@@ -26,7 +26,7 @@ pages to:
 6. Score the candidate on 14 axes (`karyotype_tier` Tier sub-view).
 
 Once a candidate passes review, it's flipped to `confirmed: true`
-(typically on page2) and becomes visible to the inheritance pipeline
+(typically on candidate_focus) and becomes visible to the inheritance pipeline
 + lines-panel highlights + confirmed_carousel confirmed carousel.
 
 ## Pages in this directory

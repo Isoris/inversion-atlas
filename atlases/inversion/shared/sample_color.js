@@ -9,7 +9,7 @@
 // Legacy source: lines 33287-33298 (_resolveSampleScopeColor),
 // 36303-36311 (familyColor), 33220-33254 (_lineageColor). The
 // auto-trigger requestIdleCallback wrapping around _lineageColor
-// stays in page1/_state.js because it's page1-specific scheduling
+// stays in local_pca_dosage/_state.js because it's local_pca_dosage-specific scheduling
 // behavior — the pure resolver here returns null when the lineage
 // result isn't ready and lets the caller decide whether to schedule
 // a compute.
@@ -59,10 +59,10 @@ export function familyColor(state, si) {
 /**
  * Resolve a sample's color by lineage assignment. Reads
  * state.lineageResult (populated by runLineageCompute in
- * page1/lineage.js). Returns null when the lineage result isn't
+ * local_pca_dosage/lineage.js). Returns null when the lineage result isn't
  * available — the caller decides whether to schedule a compute.
  *
- * The legacy page1 path wraps this with a requestIdleCallback auto-
+ * The legacy local_pca_dosage path wraps this with a requestIdleCallback auto-
  * trigger; haplotype_regimes uses the pure version (degrades gracefully when no
  * result is loaded).
  */
@@ -86,7 +86,7 @@ export function lineageColor(state, si) {
 
 /**
  * Resolve a sample's color for one of the page-agnostic "scope" modes
- * that haplotype_regimes' regime panels and page1's lines panel both consume.
+ * that haplotype_regimes' regime panels and local_pca_dosage's lines panel both consume.
  *
  * Modes today: 'family', 'lineage'. Other modes return null (caller
  * uses a fallback color). Future modes can grow the switch without

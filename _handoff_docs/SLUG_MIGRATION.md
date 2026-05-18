@@ -11,7 +11,7 @@ User-reported pain (`AUDIT_local_pca_merge_vs_rename.md` §Q2):
 > "rename page 1 and every number by simply the name of the page bc
 > I don't know what is what."
 
-Numeric ids (`page1`, `page12`, `multi_species_cockpit`, etc.) are opaque. They
+Numeric ids (`local_pca_dosage`, `local_pca_theta_pi`, `multi_species_cockpit`, etc.) are opaque. They
 caused real bugs:
 - annotation_cockpit mislabelled "Manual karyotype groups" in HANDOFF_BATCH_3
   (it's the annotation cockpit)
@@ -21,7 +21,7 @@ caused real bugs:
   mismatches partly come from numeric confusion
 
 Self-documenting slugs solve this:
-`#inversion/local_pca_dosage` is unambiguous; `#inversion/page1`
+`#inversion/local_pca_dosage` is unambiguous; `#inversion/local_pca_dosage`
 requires a lookup.
 
 ## What stage 1 shipped
@@ -50,10 +50,10 @@ no tests fail.
 
 | current id | slug | rationale |
 |---|---|---|
-| `page1` | `local_pca_dosage` | the big page — dosage local PCA scanner |
-| `page12` | `local_pca_theta_pi` | sister scanner driven by θπ |
-| `page15` | `local_pca_ghsl` | third evidence axis (GHSL) |
-| `page2` | `candidate_focus` | per-candidate deep dive |
+| `local_pca_dosage` | `local_pca_dosage` | the big page — dosage local PCA scanner |
+| `local_pca_theta_pi` | `local_pca_theta_pi` | sister scanner driven by θπ |
+| `local_pca_ghsl` | `local_pca_ghsl` | third evidence axis (GHSL) |
+| `candidate_focus` | `candidate_focus` | per-candidate deep dive |
 | `page22` | `haplotype_regimes` | v3.4 banding pipeline runner |
 | `karyotype_tier` | `karyotype_tier` | review-stage 2-tab page |
 | `popstats` | `popstats` | popstats track stack |
@@ -67,8 +67,8 @@ no tests fail.
 | `stats_profile` | `stats_profile` | manuscript synthesis figure |
 | `marker_readiness` | `marker_readiness` | private-indel tier panel |
 | `annotation_cockpit` | `annotation_cockpit` | per-sample lines + cursor-driven candidate selection |
-| `page8` | `window_summary_table` | per-window \|Z\| / λ / SNP counts |
-| `page19` | `negative_regions` | complement of catalogue |
+| `window_summary_table` | `window_summary_table` | per-window \|Z\| / λ / SNP counts |
+| `negative_regions` | `negative_regions` | complement of catalogue |
 | `overview` | `overview` | synthesis-stage overview (empty stub) |
 | `cross_species_breakpoints` | `cross_species_breakpoints` | Cgar × Cmac wfmash |
 | `multi_species_cockpit` | `multi_species_cockpit` | catfish phylogeny classifier |
@@ -159,7 +159,7 @@ Practice run before bulk renames.
 - **Why not just URL-redirect from id to slug?** Atlas-core shell
   change. Same blocker. The cartridge can't unilaterally change
   routing logic. When the shell ships a "accept either id or slug"
-  patch, both URL forms work; until then `#page1` is what the
+  patch, both URL forms work; until then `#local_pca_dosage` is what the
   shell understands.
 
 ## References

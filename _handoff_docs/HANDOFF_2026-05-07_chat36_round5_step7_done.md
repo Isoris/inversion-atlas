@@ -29,9 +29,9 @@ atlases/inversion/pages/catalogue/
 
 **Verifications passed (483/483 from a clean tarball reassembly):**
 - `node --check` clean on every JS file under `atlases/inversion/`.
-- 7 unit tests: page1 (103) + page2 (58) + catalogue (19) + confirmed_carousel (14) +
+- 7 unit tests: local_pca_dosage (103) + candidate_focus (58) + catalogue (19) + confirmed_carousel (14) +
   stats_profile (34) + marker_readiness (46) + annotation_cockpit (41) = **315**.
-- 7 smokes: page1 (33) + page2 (24) + catalogue (29) + confirmed_carousel (22) +
+- 7 smokes: local_pca_dosage (33) + candidate_focus (24) + catalogue (29) + confirmed_carousel (22) +
   stats_profile (20) + marker_readiness (20) + annotation_cockpit (20) = **168**.
 
 ---
@@ -97,13 +97,13 @@ Same shape as the other pages.
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1/page2/catalogue/stats_profile/marker_readiness/annotation_cockpit modules** — completely unchanged.
+- **local_pca_dosage/candidate_focus/catalogue/stats_profile/marker_readiness/annotation_cockpit modules** — completely unchanged.
 - **`shared/page1_data_helpers.js`** — unchanged.
 - **The TODO_MISSING items** (`_renderConfirmedCarousel`,
   `_wireConfirmedCarouselNav`, `renderCandidateFocus`) — kept as
   TODOs in the source comments. The full carousel was never
   implemented in legacy and is a fresh-write task, not a migration
-  task. Will be picked up by a follow-up round once page2's
+  task. Will be picked up by a follow-up round once candidate_focus's
   candidate-focus renderer is more accessible.
 - **Pages 4, 6, 7, 8, 10, 11, 12, 15, 16, 16b, 19,
   overview, sv_evidence** — only parse-checked.
@@ -116,8 +116,8 @@ Same shape as the other pages.
 
 | Page | Folder (logical stage) | Status | LOC | Tests |
 |---|---|---|---|---|
-| page1 | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
-| page2 | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
+| local_pca_dosage | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
+| candidate_focus | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
 | catalogue | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
 | confirmed_carousel | catalogue | ✅ step 7 (single file, stub-preserving) | ~166 across main + _state | 14+22 |
 | stats_profile | catalogue (synthesis) | ✅ step 5 (single file + state bridge) | ~1009 across main + _state | 34+20 |
@@ -142,7 +142,7 @@ remain in catalogue/synthesis. *(stats_profile and marker_readiness are tagged
 refactor preserves that stub behaviour exactly — the smoke test
 verifies the populated-mount path still shows the "Carousel rendering
 is not yet wired" placeholder. The full carousel is a fresh-write task
-that requires page2's candidate-focus renderer to be exposed; that's a
+that requires candidate_focus's candidate-focus renderer to be exposed; that's a
 separate decision deferred to a follow-up round.
 
 **Accessor-shortcut continues to work for tiny pages.** Page9 had a
@@ -160,9 +160,9 @@ inside it, add the lifecycle. No AST-walking patcher needed.
 |---|---|---|---|
 | **overview** | catalogue | 35 | Tiny stub — also empty in legacy. Pure router-wiring. **Would close out the catalogue group.** |
 | **marker_panels** | catalogue | 244 | Substantial-but-quick. **Would close out the catalogue group.** |
-| **page12** | discovery | 1008 | 18 TODOs — substantial work |
+| **local_pca_theta_pi** | discovery | 1008 | 18 TODOs — substantial work |
 | **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest` (stats_profile), AND likely `computeTrackedLinkageProjection` (annotation_cockpit)** |
-| **page8, 15, 19, help** | various | <50 each | tiny stubs; quick router-wiring rounds |
+| **window_summary_table, 15, 19, help** | various | <50 each | tiny stubs; quick router-wiring rounds |
 | **karyotype_tier, 6, 7, 11** | review | 122-301 | review-stage pages |
 | **sv_evidence** | review | 148 | SV evidence review |
 
@@ -171,7 +171,7 @@ Logical next priorities:
 - **Catalogue completion** — marker_panels + overview would finish the
   catalogue group entirely. overview is trivially small (legacy
   empty <div>), marker_panels is medium size.
-- **Stub batch** — page8, 15, 19, help, overview are all
+- **Stub batch** — window_summary_table, 15, 19, help, overview are all
   sub-50 LOC; could batch in one round if Quentin's "one at a time"
   directive permits a stub batch.
 - **Comparative cockpit** — cross_species_breakpoints/multi_species_cockpit is the most ambitious

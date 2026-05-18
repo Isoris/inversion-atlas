@@ -13,7 +13,7 @@
 // because the page-loader's tabBar router reads PAGE5_META.id/stage/
 // static at legacy line 5142.
 //
-// What this smoke verifies (lighter than page15's behavioural smoke
+// What this smoke verifies (lighter than local_pca_ghsl's behavioural smoke
 // because help has no DOM behaviour to assert):
 //   - module loads cleanly, lifecycle + wrapper + chat-33 exports all
 //     present
@@ -38,7 +38,7 @@ function check(label, cond, extra) {
 function group(name) { console.log('\n--- ' + name + ' ---'); }
 
 // -----------------------------------------------------------------------------
-// Minimal DOM polyfill — same shape as page8/9/19 smoke harnesses.
+// Minimal DOM polyfill — same shape as window_summary_table/9/19 smoke harnesses.
 // Page5's mount doesn't touch the DOM (renderPage5 is a no-op) but the
 // polyfill is here for uniformity + future-proofing.
 // -----------------------------------------------------------------------------

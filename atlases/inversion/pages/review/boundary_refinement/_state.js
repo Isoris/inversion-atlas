@@ -2,7 +2,7 @@
 //
 // State module for the boundary_refinement boundaries refinement view
 // (chat 39 cont. round 5 step 22, 2026-05-07). Canonical shape;
-// mirrors karyotype_tier/popstats/ancestry_per_window/sv_evidence/page12/stats_profile/_state.js.
+// mirrors karyotype_tier/popstats/ancestry_per_window/sv_evidence/local_pca_theta_pi/stats_profile/_state.js.
 //
 // _pageState: module-level reference. Page11's mount + entry points
 // call _setActiveState(state) on entry so the helper bodies see the

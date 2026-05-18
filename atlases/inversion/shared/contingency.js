@@ -318,7 +318,7 @@ export function lnGamma(x) {
 // (window._scaleStabilityVerdict = ...) still resolves. A bare
 // `export { X } from '...'` re-exports without creating a local
 // binding, which made the debug-window assignment throw ReferenceError
-// the moment page1 imported contingency.js.
+// the moment local_pca_dosage imported contingency.js.
 import { scaleStabilityVerdict } from './scale_stability.js';
 export { scaleStabilityVerdict };
 

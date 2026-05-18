@@ -8,7 +8,7 @@
 // sequence numbers (I1, I2, ...).
 //
 // The output shape feeds inheritanceGroupClustering, the tracked-
-// linkage projection, the I·g pills on page2, and the
+// linkage projection, the I·g pills on candidate_focus, and the
 // inheritance-cache-key hashing pipeline.
 
 import { isAutoCandidate } from './candidate_predicates.js';

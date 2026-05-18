@@ -17,7 +17,7 @@
 //   - Lifecycle exports present (mount + unmount + refreshPage5).
 //   - _state.js live-binding pattern.
 //   - refreshPage5(state) sets _pageState as side effect (mirrors confirmed_carousel /
-//     page15 wrapper pattern).
+//     local_pca_ghsl wrapper pattern).
 //
 // Replaces the chat-33 test_comparative_page5.js, which imported from the
 // pre-migration path `../inversion_comparative/help.js` and was not

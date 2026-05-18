@@ -1,7 +1,7 @@
 // shared/candidate_lanes.js
 //
 // Pure lane-stacking helper for candidate bars (legacy lines 32503-32562:
-// _assignCandidateLanes + _candidateAtClick). The Z panel + page1
+// _assignCandidateLanes + _candidateAtClick). The Z panel + local_pca_dosage
 // candidate-strip stack overlapping candidates into vertical lanes so
 // every candidate gets its own un-clobbered rectangle.
 //

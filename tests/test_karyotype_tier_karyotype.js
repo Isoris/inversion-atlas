@@ -38,7 +38,7 @@ function check(label, cond, extra) {
 }
 function group(name) { console.log('\n--- ' + name + ' ---'); }
 
-// localStorage shim — same shape page2 uses
+// localStorage shim — same shape candidate_focus uses
 const _store = {};
 global.localStorage = {
   getItem: (k) => Object.prototype.hasOwnProperty.call(_store, k) ? _store[k] : null,

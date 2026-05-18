@@ -142,13 +142,13 @@ realizing population analysis already exists in:
 
 - `data/cohort/sample_groups.tsv` (NGSadmix K=8 groups)
 - `engines/...` (the upstream NGSadmix pipeline outputs)
-- Any existing `pages/discovery/page2.html` or similar
+- Any existing `pages/discovery/candidate_focus.html` or similar
 
 Audit-first catches that the inputs are already there.
 
 ### Example 4 (round 2, 2026-05-06)
 
-The page1 migration had 49 `TODO_MISSING(X)` markers. A future chat
+The local_pca_dosage migration had 49 `TODO_MISSING(X)` markers. A future chat
 might extract bodies for all 49 from legacy. Audit-first catches
 that 15 of the 49 are FALSE POSITIVES:
 - 10 are closure-scoped (a local `const X = ...` in the parent

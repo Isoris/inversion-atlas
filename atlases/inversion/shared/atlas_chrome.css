@@ -27,7 +27,7 @@
                data-expanded="1">discover</button>
        <button class="tab-stage-pill" data-stage="classification">…</button>
        …
-       <button data-page="page1" data-stage="discovery"
+       <button data-page="local_pca_dosage" data-stage="discovery"
                class="active">1 local PCA |z|</button>
        …
      </nav>

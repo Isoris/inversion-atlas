@@ -7,7 +7,7 @@
 // sub-modules export the surface the page wires together at runtime.
 //
 // The page keeps `_pageState` as a module-local closure (not exported via a
-// `_state.js` partner — that pattern is the one used by page1/12/16/16b/17/18/21
+// `_state.js` partner — that pattern is the one used by local_pca_dosage/12/16/16b/17/18/21
 // which expose a `_setActiveState` setter). So state-side coverage here is
 // limited to lifecycle smoke; pipeline behaviour is exercised by the
 // underlying shared/band_tracking/ tests (test_band_consensus.js).

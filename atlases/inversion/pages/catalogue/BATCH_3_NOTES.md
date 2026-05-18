@@ -105,10 +105,10 @@ merge chat can route them.
 |---------------------------------------------|----------|------|
 | `_csGetSyntenyBlocks`                       | Batch 5  | Cross-species synteny lookup |
 | `_csPermutationTest`                        | Batch 5  | Cross-species permutation test |
-| `renderCandidateFocus`                      | Batch 1  | page2 candidate-focus renderer (confirmed_carousel carousel reuses it) |
+| `renderCandidateFocus`                      | Batch 1  | candidate_focus candidate-focus renderer (confirmed_carousel carousel reuses it) |
 | `_gatherActiveCandidatesForInheritance`     | shared?  | Legacy line 41196; gathers active candidates for current chrom |
 | `computeTrackedLinkageProjection`           | shared?  | Legacy line ~46912; tracked-fish band purity |
-| `_wireCandidateHaplotypeAnnotations`        | Batch 1  | Band-annotation UI (probably page2) |
+| `_wireCandidateHaplotypeAnnotations`        | Batch 1  | Band-annotation UI (probably candidate_focus) |
 | `candidateHaplotypeAnnotationsHtml`         | Batch 1  | HTML builder for haplotype-annotation panel |
 
 ### Internal to this batch (cross-module)

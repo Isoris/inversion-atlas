@@ -1,4 +1,4 @@
-// pages/discovery/page1/regimes_panel.js
+// pages/discovery/local_pca_dosage/regimes_panel.js
 //
 // Per-sample lines panel — LONG-RANGE HAPLOTYPE REGIMES VIEW.
 //
@@ -35,7 +35,7 @@
 //
 // The seed catalogue and per-band sample sets are passed in via a
 // ctx-style object (mirrors lines_panel's `state` shape but without the
-// page1-specific globals). The host page wires these from
+// local_pca_dosage-specific globals). The host page wires these from
 // state.bandingPipelineResult — the cached output of
 // runBandingPipeline().
 // =====================================================================
@@ -418,7 +418,7 @@ export function _dosageClassColour(cls, alpha) {
 //   5. Voter-bands legend top-left
 //   6. Chromosome boundary ticks on the x-axis
 //
-// `state` here is a small subset of the page1 state object — the
+// `state` here is a small subset of the local_pca_dosage state object — the
 // minimum fields the panel needs to function. The host page populates
 // it from runBandingPipeline()'s output before calling drawRegimesPanel.
 // ---------------------------------------------------------------------

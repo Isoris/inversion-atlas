@@ -1,7 +1,7 @@
 # SPEC — Lasso Inheritance Backgrounds (fish-set linkage)
 
 **Status**: SHIPPED partially (Slices 1 + 3) — was SPEC ONLY
-(referenced from `pages/discovery/page1.html` +
+(referenced from `pages/discovery/local_pca_dosage.html` +
 `handoff_docs/HANDOFF_2026-05-05_turn164_lasso_linkage.md` without an
 on-disk doc) until 2026-05-15.
 **Authored from shipped code + the turn-164 handoff** (recovery of a
@@ -21,8 +21,8 @@ missing SPEC).
 
 **Slices 2, 4, 5 deferred** (see §6 below).
 
-**Page contract**: `docs/generated/page_contracts/page1/`
-(linkage table is part of page1's lines panel header)
+**Page contract**: `docs/generated/page_contracts/local_pca_dosage/`
+(linkage table is part of local_pca_dosage's lines panel header)
 
 **Companion specs**:
 - `specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md`
@@ -236,7 +236,7 @@ navigator (out of scope for the current modal).
 
 ### §6.3 Slice 5 — candidate-page integration
 
-Auto-lasso on band click in page2 + open the modal showing other
+Auto-lasso on band click in candidate_focus + open the modal showing other
 candidates that share that band's fish-set. Depends on Slices 2 + 4
 being further along.
 
@@ -276,9 +276,9 @@ into the modular tree, they should land roughly:
 - **Pure compute + cache layer + TSV** → `shared/lasso_linkage.js`
   (or `analysis/lasso_linkage/{compute, schema, adapter}.js` per
   the analysis-module recipe)
-- **Modal popover** → `pages/discovery/page1/lasso_linkage_modal.js`
+- **Modal popover** → `pages/discovery/local_pca_dosage/lasso_linkage_modal.js`
   (a new sibling to `band_trace_state.js`, `band_trace_tooltip.js`)
-- **Lines header trigger** → wire from `pages/discovery/page1/sidebar.js`
+- **Lines header trigger** → wire from `pages/discovery/local_pca_dosage/sidebar.js`
 
 ## §10. References
 
@@ -300,7 +300,7 @@ into the modular tree, they should land roughly:
 ---
 
 **Authored**: 2026-05-15 from `handoff_docs/HANDOFF_2026-05-05_turn164_lasso_linkage.md`
-+ inline citations from `pages/discovery/page1.html`. One of the 8
++ inline citations from `pages/discovery/local_pca_dosage.html`. One of the 8
 SPECs identified as missing on disk in
 `_handoff_docs/SPECS_AUDIT.md`. Slices 1 + 3 SHIPPED in legacy turn
 164; migration into the modular tree is a follow-up task (§9).

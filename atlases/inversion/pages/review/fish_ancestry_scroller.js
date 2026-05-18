@@ -16,7 +16,7 @@
 //
 // The page does NOT compute alignment or bricks; the caller supplies a
 // fully prepared `model` to mount(). When the model is missing, the
-// page renders an empty-state stub (page8 pattern).
+// page renders an empty-state stub (window_summary_table pattern).
 // =====================================================================
 
 import { _pageState, _setActiveState } from './fish_ancestry_scroller/_state.js';

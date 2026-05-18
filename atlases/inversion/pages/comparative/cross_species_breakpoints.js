@@ -26,22 +26,22 @@
 // =============================================================================
 //
 //  _esc                — RESOLVED via import from shared/page1_data_helpers.js
-//                        (added round 5 step 2 for page2). 61 unguarded uses
+//                        (added round 5 step 2 for candidate_focus). 61 unguarded uses
 //                        throughout cross_species_breakpoints now resolve to the shared helper.
 //
 //  _getRepeatDensity   — KEPT as runtime guard. 3 sites at lines 494/826/1080,
 //                        all `(typeof _getRepeatDensity === 'function') ?
 //                        _getRepeatDensity(chrom) : null`. Lives at legacy
-//                        line 14477 (page2/repeat_density territory).
+//                        line 14477 (candidate_focus/repeat_density territory).
 //                        Graceful degradation when not loaded.
 //
 //  setCur, drawZ, drawSim, drawLinesPanel — KEPT as runtime guards. Each
 //                        has a single typeof-guarded call site that triggers
 //                        a cross-panel re-render after a cs-bp click jumps
 //                        the scrubber. Page1 now exports all four; promoting
-//                        these to imports would couple cross_species_breakpoints to page1's
+//                        these to imports would couple cross_species_breakpoints to local_pca_dosage's
 //                        module load order. Runtime guards preserve graceful
-//                        degradation when page1 isn't mounted.
+//                        degradation when local_pca_dosage isn't mounted.
 //
 //  drawWinSumStrip     — KEPT as runtime guard. Not defined in legacy
 //                        (optional hook).
@@ -1719,7 +1719,7 @@ function _csDistanceToNearestEdge(chrom, pos) {
 }
 
 // For each promoted inversion candidate, compute its synteny context.
-// `state.candidateList` is the canonical source — same as on page2/catalogue.
+// `state.candidateList` is the canonical source — same as on candidate_focus/catalogue.
 // Returns a list of:
 //   { candidate_id, chrom, start_bp, end_bp, len_bp, center_bp,
 //     dist_left_edge_bp, dist_right_edge_bp, dist_min_edge_bp,
@@ -2668,7 +2668,7 @@ export {
   _clearCrossSpecies,
 };
 
-// Hover / event-wiring helpers (referenced by page1 canvases)
+// Hover / event-wiring helpers (referenced by local_pca_dosage canvases)
 export {
   _wireCsBpHoverOnCanvas,
   _wireCrossSpeciesKeys,

@@ -123,7 +123,7 @@ inheritance pills strip + L2-sweep group-touching gate).
 
 `_paintCandidateBands` skips any candidate where
 `c.confirmed !== true` (legacy line 33960; canonical version at
-`pages/discovery/page1/candidates.js#_paintCandidateBands` per
+`pages/discovery/local_pca_dosage/candidates.js#_paintCandidateBands` per
 `specs_done/SPEC_lines_panel_candidate_bands.md` §4 filter rule 1).
 
 This means: **auto candidates are invisible in the lines-panel
@@ -198,7 +198,7 @@ The auto tab re-renders when:
 ## §5. Slice 3 — Lineages tab (deferred)
 
 Not yet implemented. When it ships, the tab body will surface
-`state.lineageResult` (per `pages/discovery/page1/lineage.js`) with:
+`state.lineageResult` (per `pages/discovery/local_pca_dosage/lineage.js`) with:
 
 - One row per lineage cluster
 - Members: sample list + per-candidate share

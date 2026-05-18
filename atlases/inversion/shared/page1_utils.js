@@ -1,7 +1,7 @@
 // atlases/inversion/shared/page1_utils.js
 //
 // Utility functions extracted from legacy/Inversion_atlas.html during
-// the page1 migration. These are pure helpers — no state dependency —
+// the local_pca_dosage migration. These are pure helpers — no state dependency —
 // so they live in shared/ and can be reused by other pages.
 //
 // Origin: each function has its legacy line number in a comment for

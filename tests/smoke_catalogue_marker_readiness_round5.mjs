@@ -31,7 +31,7 @@ function check(label, cond, extra) {
 function group(name) { console.log('\n--- ' + name + ' ---'); }
 
 // -----------------------------------------------------------------------------
-// Minimal DOM polyfill — same shape as page1/2/3 smoke harnesses.
+// Minimal DOM polyfill — same shape as local_pca_dosage/2/3 smoke harnesses.
 // -----------------------------------------------------------------------------
 
 class FakeNode {
@@ -162,7 +162,7 @@ const synthCand = {
   start_bp: 5_000_000,
   end_bp: 12_000_000,
   start_w: 25, end_w: 35,
-  source: 'page1.lock',
+  source: 'local_pca_dosage.lock',
   K: 3,
   confirmed: true,
   notes: '',

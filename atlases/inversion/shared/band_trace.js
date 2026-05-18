@@ -13,7 +13,7 @@
 // be explicit (K + l2_indices + getLabelsForL2), making the function
 // pure and trivially testable. The state-managed wrapper
 // (_bandTraceGetOrCompute) is a separate concern and lives in
-// page1/band_trace_state.js (todo).
+// local_pca_dosage/band_trace_state.js (todo).
 //
 // Pipeline:
 //   fishSet × l2_indices × getLabelsForL2

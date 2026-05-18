@@ -29,7 +29,7 @@
 // Round-5-step-16 status: stub-preserving + lifecycle scaffolding (confirmed_carousel
 // template applied to a page where the chat-33 export is also a no-op).
 // This is a degenerate case of the "stub-preserving + one wired entry"
-// pattern (round-5-step-15 page15) — the wired entry exists and is
+// pattern (round-5-step-15 local_pca_ghsl) — the wired entry exists and is
 // called from mount(), but the entry itself is a no-op so mount()
 // effectively does nothing beyond setting _pageState. The wrapper +
 // lifecycle exist for future-proofing if help ever gains real
@@ -79,7 +79,7 @@ export const PAGE5_META = {
 
 /**
  * Public entry — state-aware wrapper around renderPage5. Mirrors the
- * confirmed_carousel / page15 wrapper pattern: if `state` is passed, sets _pageState
+ * confirmed_carousel / local_pca_ghsl wrapper pattern: if `state` is passed, sets _pageState
  * before delegating. Currently a degenerate case because renderPage5
  * itself is a no-op; the wrapper exists for future-proofing if help
  * ever gains real renderable content.

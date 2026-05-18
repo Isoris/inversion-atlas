@@ -2,7 +2,7 @@
 //
 // Per-sample σ of sign-aligned PC1 across an arbitrary window range
 // (legacy lines 10294-10330: sampleSpreadL2 + sampleSpreadRange).
-// Used by candidate page2 (σ across a candidate's full span, possibly
+// Used by candidate candidate_focus (σ across a candidate's full span, possibly
 // multiple L2s), the karyotype subview's high-σ marker, and the
 // sigma-profile classifier.
 //

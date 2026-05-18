@@ -102,7 +102,7 @@ Same shape as the other pages.
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1/page2/catalogue/marker_readiness modules** — completely unchanged (stats_profile
+- **local_pca_dosage/candidate_focus/catalogue/marker_readiness modules** — completely unchanged (stats_profile
   IMPORTS from marker_readiness but doesn't modify marker_readiness's source).
 - **`shared/page1_data_helpers.js`** — unchanged (`_esc` was added in
   round 5 step 2).
@@ -119,8 +119,8 @@ Same shape as the other pages.
 
 | Page | Folder (logical stage) | Status | LOC | Tests |
 |---|---|---|---|---|
-| page1 | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
-| page2 | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
+| local_pca_dosage | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
+| candidate_focus | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
 | catalogue | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
 | stats_profile | catalogue (synthesis) | ✅ step 5 (single file + bridge) | ~1009 | 34+20 |
 | marker_readiness | catalogue (synthesis) | ✅ step 4 (single file) | ~984 | 46+20 |
@@ -153,9 +153,9 @@ question Quentin deferred to end-of-migration.
 | Page | Folder | LOC | Notes |
 |---|---|---|---|
 | **annotation_cockpit** | catalogue | 721 | pre-extracted body — same refactor pattern as 17/18 |
-| **page12** | discovery | 1008 | 18 TODOs — substantial work |
+| **local_pca_theta_pi** | discovery | 1008 | 18 TODOs — substantial work |
 | **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks` and `_csPermutationTest`** |
-| **page8, 9, 15, 19, overview** | various | <105 each | tiny stubs; quick router-wiring rounds |
+| **window_summary_table, 9, 15, 19, overview** | various | <105 each | tiny stubs; quick router-wiring rounds |
 | **karyotype_tier, 6, 7, 11** | review | 122-301 | review-stage pages |
 | **sv_evidence** | review | 148 | SV evidence review |
 

@@ -30,15 +30,15 @@ That doesn't happen again.
 | SPEC | what it covers | implementation |
 |------|----------------|----------------|
 | `SPEC_registry_v2.md` | 9-item registry v2 design (versioning + write contract + cache invalidation) | `atlases/inversion/registries/data/*.registry.json` + atlas-core registry runtime |
-| `SPEC_band_track_extraction_and_l3_single_band_rows.md` | het-anchored band-track skeleton + L3 single-band-rows contingency view | `shared/band_tracking/` (32 modules) + `pages/discovery/page1/l3_panel.js` + `page1/band_diagnostics.js` |
+| `SPEC_band_track_extraction_and_l3_single_band_rows.md` | het-anchored band-track skeleton + L3 single-band-rows contingency view | `shared/band_tracking/` (32 modules) + `pages/discovery/local_pca_dosage/l3_panel.js` + `local_pca_dosage/band_diagnostics.js` |
 | `SPEC_sv_evidence_page.md` | SV evidence page + producer pipeline | `pages/review/sv_evidence.js` + `js/atlas_sv_evidence.js` + `engines/producers/sv_evidence/` |
-| `SPEC_l2_sweep_inheritance.md` | L2-sweep auto-promote pipeline (page1 candidate discovery: 6 gates) | `pages/discovery/page1/l2_sweep.js` |
-| `SPEC_g_panel_unified_groups.md` | G-panel unified-groups popup (Karyotype / Inheritance / Manual tabs; Slice 1 shipped) | `pages/discovery/page1/{pca_panel.js, manual_groups.js}` + `page1.html#gPanelOpenBtn` |
-| `SPEC_lines_panel_candidate_bands.md` | Per-candidate vertical band highlights on lines panel (confirmed-only, palette stable across zoom, default-ON) | `pages/discovery/page1/{lines_panel.js, candidates.js}` |
+| `SPEC_l2_sweep_inheritance.md` | L2-sweep auto-promote pipeline (local_pca_dosage candidate discovery: 6 gates) | `pages/discovery/local_pca_dosage/l2_sweep.js` |
+| `SPEC_g_panel_unified_groups.md` | G-panel unified-groups popup (Karyotype / Inheritance / Manual tabs; Slice 1 shipped) | `pages/discovery/local_pca_dosage/{pca_panel.js, manual_groups.js}` + `local_pca_dosage.html#gPanelOpenBtn` |
+| `SPEC_lines_panel_candidate_bands.md` | Per-candidate vertical band highlights on lines panel (confirmed-only, palette stable across zoom, default-ON) | `pages/discovery/local_pca_dosage/{lines_panel.js, candidates.js}` |
 | `SPEC_lasso_inheritance_backgrounds.md` | Fish-set linkage table (Slices 1 + 3 shipped: pure compute + cache + TSV + modal; Slices 2/4/5 deferred) | legacy turn 164 (migration to modular tree TBD) |
-| `SPEC_l3_het_dosage_coloring.md` | L3 mini-PCA dot fill by per-sample het rate (cold blue → warm red); halo stays K-coloured | `pages/discovery/page1/l3_panel.js` + `shared/het_rate.js` + `page1.html#l3HetToggle` |
+| `SPEC_l3_het_dosage_coloring.md` | L3 mini-PCA dot fill by per-sample het rate (cold blue → warm red); halo stays K-coloured | `pages/discovery/local_pca_dosage/l3_panel.js` + `shared/het_rate.js` + `local_pca_dosage.html#l3HetToggle` |
 | `SPEC_review_surfaces_auto_and_lineages.md` | Review surfaces for L2-sweep auto-promoted candidates (Slices 0-2 shipped: dashed CSS + filter pipelines + G-panel auto tab; Slice 3 lineages tab deferred) | `css/inversion.css` + legacy turn 130 + turn 165 (G-panel auto tab) |
-| `SPEC_distant_band_concordance_fish_trajectory.md` | Fish-paths dual of band-track (Slices 1-5 shipped: lineage compute, lines color mode, \|Z\| strip, band-trace UI, TSV; Slice 6 cross-strip chaining deferred) | `pages/discovery/page1/{lineage.js, band_trace_*.js}` + `shared/{band_trace.js, clustering.js}` |
+| `SPEC_distant_band_concordance_fish_trajectory.md` | Fish-paths dual of band-track (Slices 1-5 shipped: lineage compute, lines color mode, \|Z\| strip, band-trace UI, TSV; Slice 6 cross-strip chaining deferred) | `pages/discovery/local_pca_dosage/{lineage.js, band_trace_*.js}` + `shared/{band_trace.js, clustering.js}` |
 | `SCHEMA.md` | Prose schema reference — resolves all "SCHEMA §N" / "SCHEMA_V2.md §N" cross-refs from code; carries §9 cluster-emit, §10 marker columns, §13 evidence framework, §19 14-axis tier, §22 structural scaffold, §26 axis_topology vocab, §27 scale_stability verdicts; reserves §0-§30 for future | `registries/schemas/*.schema.json` (26 files) + `registries/data/*.registry.json` (5 files) + `pages/review/karyotype_tier/tier_axes.js#TIER_AXES` |
 
 ### Pending — `specs_todo/`

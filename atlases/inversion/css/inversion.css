@@ -8,7 +8,7 @@
  *   - tabBar styles (legacy topbar — currently inert under new shell;
  *     kept for reference / when a future page renders an inline toolbar)
  *   - widget styles: #candKaryoPane, #candListContainer, .cli-*, .ck-*
- *   - per-page styles: #page1, #page2, #catalogue, ..., #annotation_cockpit
+ *   - per-page styles: #local_pca_dosage, #candidate_focus, #catalogue, ..., #annotation_cockpit
  *   - synteny / cross-species / multi-species rules
  *   - light + academic theme overrides for the above
  *
@@ -195,7 +195,7 @@
 #l3FocalCol {
   transition: box-shadow 0.18s ease;
 }
-/* v4 turn 82: negative-regions page (page19, visible "6 negative regions").
+/* v4 turn 82: negative-regions page (negative_regions, visible "6 negative regions").
    Inversion-negative inventory with multi-layer evidence battery and
    5-value region_status field. Borrows visual language from the catalogue
    page but uses card-based layout (closer to the population atlas) so
@@ -226,7 +226,7 @@
 body.light-theme .caution-banner { background: rgba(245, 165, 36, 0.10); }
 
 /* Negative regions page layout */
-#page19 { overflow: auto; }
+#negative_regions { overflow: auto; }
 .nr-content { padding: 18px 22px; max-width: 1400px; }
 .nr-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
 .nr-title { font-size: 17px; font-weight: 700; color: var(--ink); }
@@ -242,27 +242,27 @@ body.light-theme .caution-banner { background: rgba(245, 165, 36, 0.10); }
 /* Generic .card / .card-header / .card-stripe-roh / .pg / .pg-header
    classes are reused from the existing atlas CSS where they already exist;
    if not, the negative regions page shows its own card lookalikes. */
-#page19 .card {
+#negative_regions .card {
   background: var(--panel-2); border: 1px solid var(--rule);
   border-radius: 4px; padding: 14px 16px; margin-bottom: 14px;
 }
-#page19 .card-stripe-roh { border-left: 3px solid var(--accent); }
-#page19 .card-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
-#page19 .card-title { font-size: 13px; font-weight: 600; color: var(--ink); }
-#page19 .card-status {
+#negative_regions .card-stripe-roh { border-left: 3px solid var(--accent); }
+#negative_regions .card-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+#negative_regions .card-title { font-size: 13px; font-weight: 600; color: var(--ink); }
+#negative_regions .card-status {
   font-family: var(--mono); font-size: 10px;
   color: var(--ink-dimmer); letter-spacing: 0.04em;
 }
-#page19 .pg {
+#negative_regions .pg {
   display: grid; gap: 0;
   border: 1px solid var(--rule); border-radius: 3px;
   background: var(--panel);
   font-family: var(--mono); font-size: 10.5px;
 }
-#page19 .pg > div { padding: 7px 10px; border-bottom: 1px solid var(--rule); }
-#page19 .pg > .pg-header { background: var(--panel-3); font-weight: 600; color: var(--ink); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; }
-#page19 .pg > div:nth-last-child(-n+3) { border-bottom: none; }
-#page19 code {
+#negative_regions .pg > div { padding: 7px 10px; border-bottom: 1px solid var(--rule); }
+#negative_regions .pg > .pg-header { background: var(--panel-3); font-weight: 600; color: var(--ink); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; }
+#negative_regions .pg > div:nth-last-child(-n+3) { border-bottom: none; }
+#negative_regions code {
   background: var(--panel-3); color: var(--ink); padding: 1px 5px;
   border-radius: 2px; font-size: 10px;
 }
@@ -351,14 +351,14 @@ body.light-theme .caution-banner { background: rgba(245, 165, 36, 0.10); }
 /* v4 turn 73 / 73b: long-form scaffold pages (θπ landing, GHSL landing,
    diversity atlas, genome atlas) need vertical scroll because their
    content (intro + required-layers table + panel-layout description)
-   is taller than the viewport. The page1 grid layout overrides this
+   is taller than the viewport. The local_pca_dosage grid layout overrides this
    to manage its own canvas-fit constraint.
    v4 turn 73b: !important on overflow-y because some browsers in
    compositing edge cases compute the .page rule's overflow:hidden
    after the .active rule's overflow-y:auto, leaving scroll disabled. */
-.page#page12.active,
-.page#page15.active { overflow-y: auto !important; overflow-x: hidden; }
-.page#page1 { display: none; }       /* will be flipped by tab init */
+.page#local_pca_theta_pi.active,
+.page#local_pca_ghsl.active { overflow-y: auto !important; overflow-x: hidden; }
+.page#local_pca_dosage { display: none; }       /* will be flipped by tab init */
 /* 2026-05-15 fix: fixed-layout grid heights were hardcoded pixels
    (40 + 520 + 100 + 28 + 360 = 1048 px of fixed minimums). On viewports
    shorter than that total, the `auto` + `1fr` rows collapse to 0 and
@@ -378,7 +378,7 @@ body.light-theme .caution-banner { background: rgba(245, 165, 36, 0.10); }
    The fractional sums (2.0 + 0.4 + 1.6 + 1.6 = 5.6) keep proportions
    similar to the original ratios (520/100/...360); the minmax floor
    prevents any row from collapsing to nothing. */
-.page#page1.active { display: grid;
+.page#local_pca_dosage.active { display: grid;
                      grid-template-rows: 40px
                                          minmax(180px, 2.0fr)
                                          minmax(90px,  0.4fr)
@@ -399,7 +399,7 @@ body.light-theme .caution-banner { background: rgba(245, 165, 36, 0.10); }
         /* v4 turn 73b: explicit single-row template + min-height:0 so
            child .page elements that ask for height:100% resolve against
            a definite container, NOT against their own auto content
-           height. Without this, scaffold pages (page12, 13, 14, 15)
+           height. Without this, scaffold pages (local_pca_theta_pi, 13, 14, 15)
            refuse to scroll at high zoom because their height matches
            content and overflow-y: auto never engages. */
         grid-template-rows: minmax(0, 1fr);
@@ -524,13 +524,13 @@ aside .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .mono { font-family: var(--mono); }
 
 /* Layout: scrubber bar (top) + sim + Z + tracks (variable) + PCA + L3 panel */
-/* main is page1; display rules below override the default grid display when
+/* main is local_pca_dosage; display rules below override the default grid display when
    the tab is inactive. */
-/* 2026-05-15 fix: see .page#page1.active above for the rationale. The
+/* 2026-05-15 fix: see .page#local_pca_dosage.active above for the rationale. The
    same hardcoded-pixel template lived here too (duplicate declaration
    from the legacy split). Replaced with the same minmax pattern so
    panels scale with viewport in fixed layout. */
-main#page1 { grid-template-rows: 40px
+main#local_pca_dosage { grid-template-rows: 40px
                                  minmax(180px, 2.0fr)
                                  minmax(90px,  0.4fr)
                                  auto
@@ -545,7 +545,7 @@ main#page1 { grid-template-rows: 40px
    fixed/free toggle in the top toolbar. The grid template is overridden to
    `none` so panels lose grid-row constraints; each panel gets a min-height
    so they don't collapse to nothing. */
-body[data-layout-mode="free"] main#page1.active {
+body[data-layout-mode="free"] main#local_pca_dosage.active {
   display: block;
   grid-template-rows: none;
   overflow-y: auto;
@@ -553,12 +553,12 @@ body[data-layout-mode="free"] main#page1.active {
      is flex:1-sized to fill whatever remains after header + tabBar. */
   height: 100%;
 }
-body[data-layout-mode="free"] main#page1 .panel,
-body[data-layout-mode="free"] main#page1 #tracksContainer,
-body[data-layout-mode="free"] main#page1 #ctrlBar {
+body[data-layout-mode="free"] main#local_pca_dosage .panel,
+body[data-layout-mode="free"] main#local_pca_dosage #tracksContainer,
+body[data-layout-mode="free"] main#local_pca_dosage #ctrlBar {
   flex: none;
 }
-body[data-layout-mode="free"] main#page1 #ctrlBar { min-height: 40px; }
+body[data-layout-mode="free"] main#local_pca_dosage #ctrlBar { min-height: 40px; }
 /* v4 turn 14: simPanel min-height in free layout must NOT apply when the
    sim heatmap has been moved to the sidebar minimap. Without this guard,
    the free-mode min-height: 360px overrides the data-sim-in-minimap=1
@@ -566,12 +566,12 @@ body[data-layout-mode="free"] main#page1 #ctrlBar { min-height: 40px; }
    later one wins, which was the 360px rule). Leaves a ~360px empty gap
    between the toolbar and the |z| panel. The `:not()` makes the free-mode
    rule only apply when sim is still in its main-panel position. */
-body[data-layout-mode="free"]:not([data-sim-in-minimap="1"]) main#page1 #simPanel { min-height: 360px; }
-body[data-layout-mode="free"] main#page1 #zPanel { min-height: 200px; }
-body[data-layout-mode="free"] main#page1 #linesPanel { min-height: 200px; }
-body[data-layout-mode="free"] main#page1 #anchorStripPanel { min-height: 24px; }
-body[data-layout-mode="free"] main#page1 #pcaPanel { min-height: 360px; }
-body[data-layout-mode="free"] main#page1 #l3Panel { min-height: 360px; }
+body[data-layout-mode="free"]:not([data-sim-in-minimap="1"]) main#local_pca_dosage #simPanel { min-height: 360px; }
+body[data-layout-mode="free"] main#local_pca_dosage #zPanel { min-height: 200px; }
+body[data-layout-mode="free"] main#local_pca_dosage #linesPanel { min-height: 200px; }
+body[data-layout-mode="free"] main#local_pca_dosage #anchorStripPanel { min-height: 24px; }
+body[data-layout-mode="free"] main#local_pca_dosage #pcaPanel { min-height: 360px; }
+body[data-layout-mode="free"] main#local_pca_dosage #l3Panel { min-height: 360px; }
 /* In free mode the resize handles still work; we don't need to disable them */
 
 /* v3.63: compact layout. 2-column upper region + L3 spanning both at bottom.
@@ -632,7 +632,7 @@ body[data-layout-mode="free"] main#page1 #l3Panel { min-height: 360px; }
    Non-compact modes apply `display: contents` to #compactLeftStack so the
    wrapper is invisible to layout — its children behave as direct children
    of <main> (preserving the existing fixed/free layouts). */
-body[data-layout-mode="compact"] main#page1.active {
+body[data-layout-mode="compact"] main#local_pca_dosage.active {
   display: grid;
   --compact-leftpct: 50%;
   /* v3.99 turn 4: tracked-samples menu shrunk — was 60% (PCA) / 40% (tracked),
@@ -658,9 +658,9 @@ body[data-layout-mode="compact"] main#page1.active {
   grid-template-rows: 40px 28px 1.5fr auto 1fr 4px var(--compact-l3fr);
   overflow: hidden;
 }
-body[data-layout-mode="compact"] main#page1 #ctrlBar          { grid-column: 1 / 4; grid-row: 1; }
-body[data-layout-mode="compact"] main#page1 #simPanel         { display: none; }
-body[data-layout-mode="compact"] main#page1 #compactLeftStack {
+body[data-layout-mode="compact"] main#local_pca_dosage #ctrlBar          { grid-column: 1 / 4; grid-row: 1; }
+body[data-layout-mode="compact"] main#local_pca_dosage #simPanel         { display: none; }
+body[data-layout-mode="compact"] main#local_pca_dosage #compactLeftStack {
                                                                  grid-column: 1; grid-row: 2 / 6;
                                                                  display: flex;
                                                                  flex-direction: column;
@@ -669,11 +669,11 @@ body[data-layout-mode="compact"] main#page1 #compactLeftStack {
 /* In non-compact modes the wrapper is invisible to layout so pcaPanel
    and trackedSamplesPanelCompact behave as direct children of <main>. */
 body:not([data-layout-mode="compact"]) #compactLeftStack { display: contents; }
-body[data-layout-mode="compact"] main#page1 #compactLeftStack > #pcaPanel {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactLeftStack > #pcaPanel {
                                                                  flex: 1 1 var(--compact-leftupperpct);
                                                                  min-height: 80px;
                                                                  min-width: 0; }
-body[data-layout-mode="compact"] main#page1 #compactLeftStack > #trackedSamplesPanelCompact {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactLeftStack > #trackedSamplesPanelCompact {
                                                                  flex: 1 1 calc(100% - var(--compact-leftupperpct) - 8px);
                                                                  min-height: 80px;
                                                                  min-width: 0;
@@ -682,7 +682,7 @@ body[data-layout-mode="compact"] main#page1 #compactLeftStack > #trackedSamplesP
                                                                  background: var(--panel);
                                                                  border-top: 1px solid var(--rule);
                                                                  overflow-y: auto; }
-body[data-layout-mode="compact"] main#page1 #compactLeftStack > #compactStackResize {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactLeftStack > #compactStackResize {
                                                                  flex: 0 0 8px;
                                                                  background: var(--panel-2);
                                                                  border-top: 1px solid var(--rule);
@@ -694,16 +694,16 @@ body[data-layout-mode="compact"] main#page1 #compactLeftStack > #compactStackRes
                                                                  transition: background 100ms;
                                                                  user-select: none;
                                                                  position: relative; }
-body[data-layout-mode="compact"] main#page1 #compactStackResize:hover,
-body[data-layout-mode="compact"] main#page1 #compactStackResize.dragging {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactStackResize:hover,
+body[data-layout-mode="compact"] main#local_pca_dosage #compactStackResize.dragging {
                                                                  background: rgba(245,165,36,0.15); }
-body[data-layout-mode="compact"] main#page1 #compactStackResize::after {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactStackResize::after {
                                                                  content: ""; height: 3px; width: 28px;
                                                                  background: var(--ink-dimmer);
                                                                  border-radius: 1px;
                                                                  transition: background 100ms; }
-body[data-layout-mode="compact"] main#page1 #compactStackResize:hover::after,
-body[data-layout-mode="compact"] main#page1 #compactStackResize.dragging::after {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactStackResize:hover::after,
+body[data-layout-mode="compact"] main#local_pca_dosage #compactStackResize.dragging::after {
                                                                  background: var(--accent); }
 body:not([data-layout-mode="compact"]) #compactStackResize { display: none; }
 /* v3.99 turn 9: when the tracked-samples panel is collapsed via the header
@@ -714,25 +714,25 @@ body:not([data-layout-mode="compact"]) #compactStackResize { display: none; }
    need to take the tracked panel out of the flex math by setting flex
    to a fixed-height auto. */
 body[data-layout-mode="compact"][data-tracked-compact-collapsed="1"]
-  main#page1 #compactLeftStack > #trackedSamplesPanelCompact {
+  main#local_pca_dosage #compactLeftStack > #trackedSamplesPanelCompact {
     flex: 0 0 auto;
     min-height: 0;
     overflow: hidden;
   }
 body[data-layout-mode="compact"][data-tracked-compact-collapsed="1"]
-  main#page1 #compactLeftStack > #compactStackResize {
+  main#local_pca_dosage #compactLeftStack > #compactStackResize {
     display: none;
   }
-body[data-layout-mode="compact"] main#page1 #anchorStripPanel { grid-column: 3; grid-row: 2;
+body[data-layout-mode="compact"] main#local_pca_dosage #anchorStripPanel { grid-column: 3; grid-row: 2;
                                                                  min-height: 0; }
-body[data-layout-mode="compact"] main#page1 #zPanel           { grid-column: 3; grid-row: 3;
+body[data-layout-mode="compact"] main#local_pca_dosage #zPanel           { grid-column: 3; grid-row: 3;
                                                                  min-height: 0;
                                                                  border-bottom: none; }
-body[data-layout-mode="compact"] main#page1 #tracksContainer  { grid-column: 3; grid-row: 4; }
-body[data-layout-mode="compact"] main#page1 #linesPanel       { grid-column: 3; grid-row: 5;
+body[data-layout-mode="compact"] main#local_pca_dosage #tracksContainer  { grid-column: 3; grid-row: 4; }
+body[data-layout-mode="compact"] main#local_pca_dosage #linesPanel       { grid-column: 3; grid-row: 5;
                                                                  min-height: 0;
                                                                  border-top: none; }
-body[data-layout-mode="compact"] main#page1 #compactColumnResize {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactColumnResize {
                                                                  grid-column: 2; grid-row: 2 / 6;
                                                                  min-height: 0;
                                                                  background: var(--panel-2);
@@ -746,20 +746,20 @@ body[data-layout-mode="compact"] main#page1 #compactColumnResize {
                                                                  user-select: none;
                                                                  position: relative;
                                                                  z-index: 5; }
-body[data-layout-mode="compact"] main#page1 #compactColumnResize:hover,
-body[data-layout-mode="compact"] main#page1 #compactColumnResize.dragging {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactColumnResize:hover,
+body[data-layout-mode="compact"] main#local_pca_dosage #compactColumnResize.dragging {
                                                                  background: rgba(245,165,36,0.15); }
-body[data-layout-mode="compact"] main#page1 #compactColumnResize::after {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactColumnResize::after {
                                                                  content: ""; width: 3px; height: 28px;
                                                                  background: var(--ink-dimmer);
                                                                  border-radius: 1px;
                                                                  transition: background 100ms; }
-body[data-layout-mode="compact"] main#page1 #compactColumnResize:hover::after,
-body[data-layout-mode="compact"] main#page1 #compactColumnResize.dragging::after {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactColumnResize:hover::after,
+body[data-layout-mode="compact"] main#local_pca_dosage #compactColumnResize.dragging::after {
                                                                  background: var(--accent); }
 /* In non-compact modes hide the resize seam */
-body:not([data-layout-mode="compact"]) main#page1 #compactColumnResize { display: none; }
-body[data-layout-mode="compact"] main#page1 #l3Panel          { grid-column: 1 / 4; grid-row: 7;
+body:not([data-layout-mode="compact"]) main#local_pca_dosage #compactColumnResize { display: none; }
+body[data-layout-mode="compact"] main#local_pca_dosage #l3Panel          { grid-column: 1 / 4; grid-row: 7;
                                                                  min-height: 0;
                                                                  /* v3.99: align-self stretch ensures the panel always fills its grid
                                                                     row vertically — defensive against any parent that might shrink it. */
@@ -773,7 +773,7 @@ body[data-layout-mode="compact"] main#page1 #l3Panel          { grid-column: 1 /
    it doesn't read as a heavy band across the whole window. The grip
    centerpiece (::after) is the only visible affordance. Hit area is
    still the full 8px row height. */
-body[data-layout-mode="compact"] main#page1 #compactL3Resize {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactL3Resize {
                                                                  grid-column: 1 / 4; grid-row: 6;
                                                                  background: transparent;
                                                                  cursor: ns-resize;
@@ -784,42 +784,42 @@ body[data-layout-mode="compact"] main#page1 #compactL3Resize {
                                                                  user-select: none;
                                                                  position: relative;
                                                                  z-index: 6; }
-body[data-layout-mode="compact"] main#page1 #compactL3Resize:hover,
-body[data-layout-mode="compact"] main#page1 #compactL3Resize.dragging {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactL3Resize:hover,
+body[data-layout-mode="compact"] main#local_pca_dosage #compactL3Resize.dragging {
                                                                  background: rgba(245,165,36,0.10); }
-body[data-layout-mode="compact"] main#page1 #compactL3Resize::after {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactL3Resize::after {
                                                                  /* v3.99 turn 9: 3px → 2px to fit the thinner 4px handle row. */
                                                                  content: ""; height: 2px; width: 28px;
                                                                  background: var(--ink-dimmer);
                                                                  border-radius: 1px;
                                                                  transition: background 100ms; }
-body[data-layout-mode="compact"] main#page1 #compactL3Resize:hover::after,
-body[data-layout-mode="compact"] main#page1 #compactL3Resize.dragging::after {
+body[data-layout-mode="compact"] main#local_pca_dosage #compactL3Resize:hover::after,
+body[data-layout-mode="compact"] main#local_pca_dosage #compactL3Resize.dragging::after {
                                                                  background: var(--accent); }
 /* In non-compact modes the handle is hidden (no L3 row to resize). */
-body:not([data-layout-mode="compact"]) main#page1 #compactL3Resize { display: none; }
+body:not([data-layout-mode="compact"]) main#local_pca_dosage #compactL3Resize { display: none; }
 /* In non-compact modes the compact-only tracked samples panel is hidden. */
-body:not([data-layout-mode="compact"]) main#page1 #trackedSamplesPanelCompact { display: none; }
+body:not([data-layout-mode="compact"]) main#local_pca_dosage #trackedSamplesPanelCompact { display: none; }
 /* v3.99 turn 4: PCA-side band-pick column — compact-mode only. Hidden in
    fixed (where #pcaTrackedAside handles tracked-samples controls full
    width) and free mode (sidebar handles it). */
-body[data-layout-mode="compact"] main#page1 #pcaBandPickColCompact { display: flex; }
-body:not([data-layout-mode="compact"]) main#page1 #pcaBandPickColCompact { display: none; }
+body[data-layout-mode="compact"] main#local_pca_dosage #pcaBandPickColCompact { display: flex; }
+body:not([data-layout-mode="compact"]) main#local_pca_dosage #pcaBandPickColCompact { display: none; }
 /* Hide panel-resize handles in compact mode — the layout is structural */
-body[data-layout-mode="compact"] main#page1 #zResize,
-body[data-layout-mode="compact"] main#page1 #linesResize,
-body[data-layout-mode="compact"] main#page1 #l3Resize,
-body[data-layout-mode="compact"] main#page1 #simResize { display: none; }
+body[data-layout-mode="compact"] main#local_pca_dosage #zResize,
+body[data-layout-mode="compact"] main#local_pca_dosage #linesResize,
+body[data-layout-mode="compact"] main#local_pca_dosage #l3Resize,
+body[data-layout-mode="compact"] main#local_pca_dosage #simResize { display: none; }
 /* Hide panel-reorder buttons in compact mode (positions are fixed) */
-body[data-layout-mode="compact"] main#page1 .panel-reorder { display: none; }
+body[data-layout-mode="compact"] main#local_pca_dosage .panel-reorder { display: none; }
 /* v3.70: in compact mode the controls header bar already says "per-sample
    lines: ☑ PC1 ☐ PC2", which is more informative than the inner-canvas
    PC1/PC2 label. Hide the inner label so the controls bar IS the title. */
-body[data-layout-mode="compact"] main#page1 .lines-subpanel-label { display: none; }
+body[data-layout-mode="compact"] main#local_pca_dosage .lines-subpanel-label { display: none; }
 /* v3.70: tighten the per-sample-lines header bar in compact mode (smaller
    padding, no bottom border so it sits on the same row as where the inner
    PC1 label used to be). */
-body[data-layout-mode="compact"] main#page1 #linesYsourceBar {
+body[data-layout-mode="compact"] main#local_pca_dosage #linesYsourceBar {
   padding: 3px 10px !important;
   border-bottom: none !important;
   font-size: 11px !important;
@@ -1517,181 +1517,181 @@ html[data-theme="light"] .cli-subband[data-verdict="CROSS_CUTTING"] { color: #b9
 #candKaryoPane table.ck-table td.high-sigma { color: var(--accent); font-weight: 500; }
 
 /* Candidate focus (page 2) — deep-dive panels */
-#page2 { padding: 24px 32px; overflow: auto; height: 100%;
+#candidate_focus { padding: 24px 32px; overflow: auto; height: 100%;
          box-sizing: border-box; background: var(--bg); color: var(--ink); }
-#page2 .cand-section { background: var(--panel); border: 1px solid var(--rule);
+#candidate_focus .cand-section { background: var(--panel); border: 1px solid var(--rule);
                        border-radius: 4px; padding: 18px; margin-bottom: 16px; }
-#page2 .cand-eyebrow { font-family: var(--mono); font-size: 10px;
+#candidate_focus .cand-eyebrow { font-family: var(--mono); font-size: 10px;
                        color: var(--ink-dim); text-transform: uppercase;
                        letter-spacing: 0.1em; margin-bottom: 8px; }
 /* v4 turn 24: dimmed internal candidate ID shown next to the display name
    in the candidate-focus eyebrow. */
-#page2 .cand-internal-id { color: var(--ink-dimmer); font-size: 9px;
+#candidate_focus .cand-internal-id { color: var(--ink-dimmer); font-size: 9px;
                            font-weight: 400; margin-left: 8px; cursor: help;
                            text-transform: none; letter-spacing: 0; }
-#page2 .cand-h3 { margin: 0 0 12px; font-family: var(--serif); font-weight: 500;
+#candidate_focus .cand-h3 { margin: 0 0 12px; font-family: var(--serif); font-weight: 500;
                   font-size: 18px; }
-#page2 .cand-h4 { margin: 0 0 10px; font-family: var(--mono); font-weight: 500;
+#candidate_focus .cand-h4 { margin: 0 0 10px; font-family: var(--mono); font-weight: 500;
                   font-size: 11px; text-transform: uppercase;
                   letter-spacing: 0.08em; color: var(--ink); }
 /* turn 119: age & origin panel (cheat30 GDS by genotype). */
-#page2 .ageorig-section { /* inherits cand-section */ }
-#page2 .ageorig-empty { color: var(--ink-dim); font-size: 11px; line-height: 1.6;
+#candidate_focus .ageorig-section { /* inherits cand-section */ }
+#candidate_focus .ageorig-empty { color: var(--ink-dim); font-size: 11px; line-height: 1.6;
                         padding: 8px 0; font-family: var(--mono); }
-#page2 .ageorig-empty code { color: var(--ink); }
-#page2 .ageorig-grid { display: grid; grid-template-columns: 400px 1fr; gap: 18px;
+#candidate_focus .ageorig-empty code { color: var(--ink); }
+#candidate_focus .ageorig-grid { display: grid; grid-template-columns: 400px 1fr; gap: 18px;
                        margin-top: 8px; align-items: start; }
 @media (max-width: 900px) {
-  #page2 .ageorig-grid { grid-template-columns: 1fr; }
+  #candidate_focus .ageorig-grid { grid-template-columns: 1fr; }
 }
-#page2 .ageorig-left { min-width: 0; }
-#page2 .ageorig-right { display: flex; flex-direction: column; gap: 8px;
+#candidate_focus .ageorig-left { min-width: 0; }
+#candidate_focus .ageorig-right { display: flex; flex-direction: column; gap: 8px;
                         min-width: 0; }
-#page2 .ageorig-ridgeline { border: 1px solid var(--rule); border-radius: 3px;
+#candidate_focus .ageorig-ridgeline { border: 1px solid var(--rule); border-radius: 3px;
                             background: var(--bg); padding: 4px;
                             display: flex; justify-content: center; }
-#page2 .ageorig-ridgeline-svg { display: block; max-width: 100%; height: auto; }
-#page2 .ageorig-ridgeline-empty { color: var(--ink-dim); font-size: 11px;
+#candidate_focus .ageorig-ridgeline-svg { display: block; max-width: 100%; height: auto; }
+#candidate_focus .ageorig-ridgeline-empty { color: var(--ink-dim); font-size: 11px;
                                   padding: 30px; text-align: center; }
-#page2 .ageorig-verdict-pill { display: inline-block; padding: 4px 10px;
+#candidate_focus .ageorig-verdict-pill { display: inline-block; padding: 4px 10px;
                                border-radius: 3px; font-family: var(--mono);
                                font-size: 11px; font-weight: 700;
                                letter-spacing: 0.08em; align-self: flex-start; }
-#page2 .ageorig-verdict-explain { color: var(--ink); font-size: 11px;
+#candidate_focus .ageorig-verdict-explain { color: var(--ink); font-size: 11px;
                                   line-height: 1.55; }
-#page2 .ageorig-bimodal-warn { color: var(--ink); background: rgba(224, 122, 122, 0.10);
+#candidate_focus .ageorig-bimodal-warn { color: var(--ink); background: rgba(224, 122, 122, 0.10);
                                border-left: 2px solid #e07a7a; padding: 6px 8px;
                                font-size: 10px; font-family: var(--mono);
                                line-height: 1.4; border-radius: 0 3px 3px 0; }
-#page2 .ageorig-numbers { display: flex; flex-direction: column; gap: 0;
+#candidate_focus .ageorig-numbers { display: flex; flex-direction: column; gap: 0;
                           border-top: 1px dashed var(--rule); padding-top: 6px;
                           margin-top: 4px; }
-#page2 .ageorig-num-row { display: flex; justify-content: space-between;
+#candidate_focus .ageorig-num-row { display: flex; justify-content: space-between;
                           align-items: baseline; padding: 3px 0;
                           border-bottom: 1px dotted var(--rule);
                           font-family: var(--mono); font-size: 11px; cursor: help; }
-#page2 .ageorig-num-row:last-child { border-bottom: none; }
-#page2 .ageorig-num-label { color: var(--ink-dim); }
-#page2 .ageorig-num-value { color: var(--ink); font-weight: 600; }
-#page2 .ageorig-caveat { margin-top: 12px; color: var(--ink-dimmer);
+#candidate_focus .ageorig-num-row:last-child { border-bottom: none; }
+#candidate_focus .ageorig-num-label { color: var(--ink-dim); }
+#candidate_focus .ageorig-num-value { color: var(--ink); font-weight: 600; }
+#candidate_focus .ageorig-caveat { margin-top: 12px; color: var(--ink-dimmer);
                          font-size: 10px; line-height: 1.5; font-style: italic;
                          padding-top: 8px; border-top: 1px dashed var(--rule); }
-#page2 .cand-meta-row { font-family: var(--mono); font-size: 11.5px;
+#candidate_focus .cand-meta-row { font-family: var(--mono); font-size: 11.5px;
                         line-height: 1.8; color: var(--ink-dim); }
-#page2 .cand-meta-row > div span:first-child { display: inline-block;
+#candidate_focus .cand-meta-row > div span:first-child { display: inline-block;
                         width: 130px; color: var(--ink-dimmer); }
-#page2 .cand-actions { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
-#page2 .cand-actions button { background: var(--panel-2);
+#candidate_focus .cand-actions { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+#candidate_focus .cand-actions button { background: var(--panel-2);
                         border: 1px solid var(--rule); color: var(--ink);
                         padding: 6px 12px; font-family: var(--mono); font-size: 11px;
                         border-radius: 3px; cursor: pointer; }
-#page2 .cand-actions button:hover { background: var(--panel-3); }
-#page2 .cand-actions button.danger { color: var(--bad); border-color: var(--bad); }
-#page2 .cand-actions button.danger:hover { background: rgba(224,85,92,0.08); }
+#candidate_focus .cand-actions button:hover { background: var(--panel-3); }
+#candidate_focus .cand-actions button.danger { color: var(--bad); border-color: var(--bad); }
+#candidate_focus .cand-actions button.danger:hover { background: rgba(224,85,92,0.08); }
 /* σ chart */
-#page2 .sigma-chart { position: relative; height: 160px; padding: 4px 0;
+#candidate_focus .sigma-chart { position: relative; height: 160px; padding: 4px 0;
                       border: 1px solid var(--rule); background: var(--panel-2);
                       border-radius: 3px; overflow: hidden; }
-#page2 .sigma-chart canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
-#page2 .sigma-stats { display: flex; gap: 24px; margin-top: 10px;
+#candidate_focus .sigma-chart canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+#candidate_focus .sigma-stats { display: flex; gap: 24px; margin-top: 10px;
                       font-family: var(--mono); font-size: 11px; color: var(--ink-dim); }
-#page2 .sigma-stats b { color: var(--ink); font-weight: 500; }
+#candidate_focus .sigma-stats b { color: var(--ink); font-weight: 500; }
 /* Verdict badges */
-#page2 .verdict-badge { display: inline-block; padding: 4px 10px;
+#candidate_focus .verdict-badge { display: inline-block; padding: 4px 10px;
                         font-family: var(--mono); font-size: 11px;
                         font-weight: 500; border-radius: 3px;
                         letter-spacing: 0.04em; margin-left: 8px;
                         vertical-align: middle; }
-#page2 .verdict-badge.two_inversions { background: #7c3aed; color: #fff; }
-#page2 .verdict-badge.crossover_artifacts { background: var(--accent); color: #0e1116; }
-#page2 .verdict-badge.noisy_region { background: var(--bad); color: #fff; }
-#page2 .verdict-badge.na, #page2 .verdict-badge.undetermined {
+#candidate_focus .verdict-badge.two_inversions { background: #7c3aed; color: #fff; }
+#candidate_focus .verdict-badge.crossover_artifacts { background: var(--accent); color: #0e1116; }
+#candidate_focus .verdict-badge.noisy_region { background: var(--bad); color: #fff; }
+#candidate_focus .verdict-badge.na, #candidate_focus .verdict-badge.undetermined {
                         background: var(--panel-3); color: var(--ink-dim); }
 /* v4 turn 9: ancestry-confound panel */
-#page2 .anc-confound-grid { display: grid; grid-template-columns: 1fr 1fr 1fr;
+#candidate_focus .anc-confound-grid { display: grid; grid-template-columns: 1fr 1fr 1fr;
                         gap: 12px; margin: 8px 0 14px; }
-#page2 .anc-test-card { background: var(--panel-2); border: 1px solid var(--rule);
+#candidate_focus .anc-test-card { background: var(--panel-2); border: 1px solid var(--rule);
                         border-radius: 4px; padding: 12px; }
-#page2 .anc-test-card .anc-test-name { font-family: var(--mono); font-size: 10px;
+#candidate_focus .anc-test-card .anc-test-name { font-family: var(--mono); font-size: 10px;
                         color: var(--ink-dim); text-transform: uppercase;
                         letter-spacing: 0.08em; margin-bottom: 8px; }
-#page2 .anc-test-card .anc-test-source { font-family: var(--mono); font-size: 10px;
+#candidate_focus .anc-test-card .anc-test-source { font-family: var(--mono); font-size: 10px;
                         color: var(--ink-dimmer); margin-bottom: 10px; }
-#page2 .anc-test-card .anc-test-metric { font-family: var(--mono); font-size: 11.5px;
+#candidate_focus .anc-test-card .anc-test-metric { font-family: var(--mono); font-size: 11.5px;
                         line-height: 1.7; color: var(--ink); }
-#page2 .anc-test-card .anc-test-metric span:first-child { display: inline-block;
+#candidate_focus .anc-test-card .anc-test-metric span:first-child { display: inline-block;
                         width: 82px; color: var(--ink-dimmer); }
-#page2 .anc-test-card .anc-test-empty { font-family: var(--mono); font-size: 11px;
+#candidate_focus .anc-test-card .anc-test-empty { font-family: var(--mono); font-size: 11px;
                         color: var(--ink-dimmer); font-style: italic; padding: 6px 0; }
-#page2 .anc-verdict-pill { display: inline-block; padding: 3px 9px;
+#candidate_focus .anc-verdict-pill { display: inline-block; padding: 3px 9px;
                         font-family: var(--mono); font-size: 10.5px; font-weight: 500;
                         border-radius: 3px; letter-spacing: 0.04em; margin-top: 10px; }
-#page2 .anc-verdict-pill.suspect       { background: rgba(224,85,92,0.18);
+#candidate_focus .anc-verdict-pill.suspect       { background: rgba(224,85,92,0.18);
                         color: var(--bad); border: 1px solid rgba(224,85,92,0.4); }
-#page2 .anc-verdict-pill.independent   { background: rgba(60,192,138,0.18);
+#candidate_focus .anc-verdict-pill.independent   { background: rgba(60,192,138,0.18);
                         color: var(--good); border: 1px solid rgba(60,192,138,0.4); }
-#page2 .anc-verdict-pill.inconclusive  { background: rgba(245,196,58,0.15);
+#candidate_focus .anc-verdict-pill.inconclusive  { background: rgba(245,196,58,0.15);
                         color: var(--accent); border: 1px solid rgba(245,196,58,0.35); }
-#page2 .anc-verdict-pill.empty         { background: var(--panel-3);
+#candidate_focus .anc-verdict-pill.empty         { background: var(--panel-3);
                         color: var(--ink-dimmer); border: 1px solid var(--rule); }
-#page2 .anc-combined-row { display: flex; align-items: center; gap: 14px;
+#candidate_focus .anc-combined-row { display: flex; align-items: center; gap: 14px;
                         padding: 10px 14px; background: var(--panel-2);
                         border: 1px solid var(--rule); border-radius: 4px;
                         margin-top: 6px; }
-#page2 .anc-combined-row .anc-combined-label { font-family: var(--mono);
+#candidate_focus .anc-combined-row .anc-combined-label { font-family: var(--mono);
                         font-size: 11px; color: var(--ink-dim);
                         text-transform: uppercase; letter-spacing: 0.06em; }
-#page2 .anc-combined-row .anc-combined-text { font-family: var(--mono);
+#candidate_focus .anc-combined-row .anc-combined-text { font-family: var(--mono);
                         font-size: 11.5px; color: var(--ink); flex: 1; }
-#page2 .anc-confound-help { font-family: var(--mono); font-size: 10px;
+#candidate_focus .anc-confound-help { font-family: var(--mono); font-size: 10px;
                         color: var(--ink-dimmer); line-height: 1.6;
                         margin-top: 10px; }
 /* Drifter chips */
-#page2 .drifter-chip { display: inline-block; padding: 3px 8px; margin: 3px;
+#candidate_focus .drifter-chip { display: inline-block; padding: 3px 8px; margin: 3px;
                        background: var(--panel-2); border: 1px solid var(--rule);
                        border-radius: 3px; font-family: var(--mono); font-size: 10.5px;
                        cursor: pointer; }
-#page2 .drifter-chip:hover { background: var(--panel-3); border-color: var(--accent); }
+#candidate_focus .drifter-chip:hover { background: var(--panel-3); border-color: var(--accent); }
 /* Band cards (one per K band) */
-#page2 .band-grid { display: grid; gap: 12px;
+#candidate_focus .band-grid { display: grid; gap: 12px;
                     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-#page2 .band-card { background: var(--panel-2); border: 1px solid var(--rule);
+#candidate_focus .band-card { background: var(--panel-2); border: 1px solid var(--rule);
                     border-radius: 3px; padding: 12px; }
-#page2 .band-card .band-head { display: flex; align-items: center; gap: 10px;
+#candidate_focus .band-card .band-head { display: flex; align-items: center; gap: 10px;
                      margin-bottom: 10px; }
-#page2 .band-card .band-swatch { width: 14px; height: 14px; border-radius: 2px; }
-#page2 .band-card .band-title { font-family: var(--mono); font-size: 12px;
+#candidate_focus .band-card .band-swatch { width: 14px; height: 14px; border-radius: 2px; }
+#candidate_focus .band-card .band-title { font-family: var(--mono); font-size: 12px;
                      font-weight: 500; color: var(--ink); }
-#page2 .band-card .band-count { margin-left: auto; font-family: var(--mono);
+#candidate_focus .band-card .band-count { margin-left: auto; font-family: var(--mono);
                      font-size: 11px; color: var(--ink-dim); }
-#page2 .band-card .compo-row { font-family: var(--mono); font-size: 10.5px;
+#candidate_focus .band-card .compo-row { font-family: var(--mono); font-size: 10.5px;
                      line-height: 1.5; color: var(--ink-dim); margin-top: 4px; }
-#page2 .band-card .compo-row b { color: var(--ink); font-weight: 500; }
-#page2 .band-card .compo-bar { display: inline-block; height: 6px;
+#candidate_focus .band-card .compo-row b { color: var(--ink); font-weight: 500; }
+#candidate_focus .band-card .compo-bar { display: inline-block; height: 6px;
                      background: var(--rule); border-radius: 1px; vertical-align: middle;
                      margin: 0 6px; }
-#page2 .band-card .compo-bar > span { display: block; height: 100%;
+#candidate_focus .band-card .compo-bar > span { display: block; height: 100%;
                      background: var(--accent); border-radius: 1px; }
 /* Notes textarea */
-#page2 textarea.cand-notes { width: 100%; min-height: 80px;
+#candidate_focus textarea.cand-notes { width: 100%; min-height: 80px;
                      background: var(--panel-2); border: 1px solid var(--rule);
                      color: var(--ink); padding: 8px 10px; box-sizing: border-box;
                      font-family: var(--mono); font-size: 11px; line-height: 1.5;
                      border-radius: 3px; resize: vertical; }
-#page2 textarea.cand-notes:focus { outline: none; border-color: var(--accent); }
+#candidate_focus textarea.cand-notes:focus { outline: none; border-color: var(--accent); }
 /* Summary card grid */
-#page2 .summary-grid { display: grid;
+#candidate_focus .summary-grid { display: grid;
                      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
                      gap: 10px; }
-#page2 .sum-cell { background: var(--panel-2); border: 1px solid var(--rule);
+#candidate_focus .sum-cell { background: var(--panel-2); border: 1px solid var(--rule);
                    border-radius: 3px; padding: 10px 12px; }
-#page2 .sum-label { font-family: var(--mono); font-size: 10px;
+#candidate_focus .sum-label { font-family: var(--mono); font-size: 10px;
                     color: var(--ink-dimmer); text-transform: uppercase;
                     letter-spacing: 0.06em; margin-bottom: 4px; }
-#page2 .sum-value { font-family: var(--mono); font-size: 12px;
+#candidate_focus .sum-value { font-family: var(--mono); font-size: 12px;
                     color: var(--ink); line-height: 1.4; }
-#page2 .sum-value b { color: var(--ink); font-weight: 600; }
-#page2 .sum-sub { color: var(--ink-dim); font-size: 10.5px; }
+#candidate_focus .sum-value b { color: var(--ink); font-weight: 600; }
+#candidate_focus .sum-sub { color: var(--ink-dim); font-size: 10.5px; }
 
 /* Help (page 5) — quick reference */
 #help { padding: 24px 32px; overflow: auto; height: 100%;
@@ -1800,79 +1800,79 @@ html[data-theme="light"] .cli-subband[data-verdict="CROSS_CUTTING"] { color: #b9
                             border-radius: 3px; font-family: var(--mono);
                             font-size: 11px; color: var(--ink); }
 /* Per-window summary (page 8) — compressed precomp inspector */
-#page8 { padding: 16px 24px; overflow: auto; height: 100%;
+#window_summary_table { padding: 16px 24px; overflow: auto; height: 100%;
          box-sizing: border-box; background: var(--bg); color: var(--ink); }
-#page8 .winsum-toolbar { display: flex; gap: 8px; align-items: center;
+#window_summary_table .winsum-toolbar { display: flex; gap: 8px; align-items: center;
                          flex-wrap: wrap; margin-bottom: 14px; padding-bottom: 10px;
                          border-bottom: 1px solid var(--rule); }
-#page8 .winsum-toolbar .label { font-family: var(--mono); font-size: 11px;
+#window_summary_table .winsum-toolbar .label { font-family: var(--mono); font-size: 11px;
                                 color: var(--ink-dim); margin-right: 4px; }
-#page8 .winsum-meta { margin-left: auto; font-family: var(--mono); font-size: 11px;
+#window_summary_table .winsum-meta { margin-left: auto; font-family: var(--mono); font-size: 11px;
                      color: var(--ink-dim); }
-#page8 .winsum-no-chrom { padding: 60px 20px; text-align: center;
+#window_summary_table .winsum-no-chrom { padding: 60px 20px; text-align: center;
                           color: var(--ink-dim); font-style: italic; }
-#page8 .winsum-strip { background: var(--panel); border: 1px solid var(--rule);
+#window_summary_table .winsum-strip { background: var(--panel); border: 1px solid var(--rule);
                       border-radius: 4px; padding: 8px 6px; margin-bottom: 14px;
                       position: relative; }
-#page8 .winsum-strip canvas { display: block; width: 100%; height: 110px;
+#window_summary_table .winsum-strip canvas { display: block; width: 100%; height: 110px;
                               cursor: crosshair; }
-#page8 .winsum-strip-label { font-family: var(--mono); font-size: 10.5px;
+#window_summary_table .winsum-strip-label { font-family: var(--mono); font-size: 10.5px;
                              color: var(--ink-dim); margin-top: 6px;
                              padding-left: 4px; }
-#page8 .winsum-table-wrap { background: var(--panel); border: 1px solid var(--rule);
+#window_summary_table .winsum-table-wrap { background: var(--panel); border: 1px solid var(--rule);
                             border-radius: 4px; padding: 12px 14px; }
-#page8 .winsum-table-controls { display: flex; gap: 8px; align-items: center;
+#window_summary_table .winsum-table-controls { display: flex; gap: 8px; align-items: center;
                                 flex-wrap: wrap; margin-bottom: 10px;
                                 padding-bottom: 10px; border-bottom: 1px solid var(--rule); }
-#page8 .winsum-table-controls select { background: var(--panel-2); color: var(--ink);
+#window_summary_table .winsum-table-controls select { background: var(--panel-2); color: var(--ink);
                                        border: 1px solid var(--rule); border-radius: 3px;
                                        padding: 2px 6px; font-family: var(--mono);
                                        font-size: 11px; }
-#page8 .winsum-count { margin-left: auto; font-family: var(--mono); font-size: 11px;
+#window_summary_table .winsum-count { margin-left: auto; font-family: var(--mono); font-size: 11px;
                        color: var(--ink-dim); }
-#page8 .winsum-table-scroll { max-height: 60vh; overflow-y: auto;
+#window_summary_table .winsum-table-scroll { max-height: 60vh; overflow-y: auto;
                               border: 1px solid var(--rule); border-radius: 3px; }
-#page8 #winSumTable { width: 100%; border-collapse: collapse; font-family: var(--mono);
+#window_summary_table #winSumTable { width: 100%; border-collapse: collapse; font-family: var(--mono);
                       font-size: 11px; }
-#page8 #winSumTable thead { position: sticky; top: 0; z-index: 1;
+#window_summary_table #winSumTable thead { position: sticky; top: 0; z-index: 1;
                             background: var(--panel-2); }
 /* v3.99 turn 5: per Quentin's request, headers + values centered, so the
    variable name sits directly above the value column. Was text-align:left
    for headers and text-align:right for .num cells. */
-#page8 #winSumTable th { padding: 6px 8px; text-align: center;
+#window_summary_table #winSumTable th { padding: 6px 8px; text-align: center;
                          border-bottom: 1px solid var(--rule);
                          color: var(--ink-dim); font-weight: 600; }
-#page8 #winSumTable th.sortable { cursor: pointer; user-select: none; }
-#page8 #winSumTable th.sortable:hover { color: var(--ink); }
-#page8 #winSumTable th.sortable.sort-asc::after { content: ' ▲'; color: var(--accent); }
-#page8 #winSumTable th.sortable.sort-desc::after { content: ' ▼'; color: var(--accent); }
-#page8 #winSumTable td { padding: 4px 8px;
+#window_summary_table #winSumTable th.sortable { cursor: pointer; user-select: none; }
+#window_summary_table #winSumTable th.sortable:hover { color: var(--ink); }
+#window_summary_table #winSumTable th.sortable.sort-asc::after { content: ' ▲'; color: var(--accent); }
+#window_summary_table #winSumTable th.sortable.sort-desc::after { content: ' ▼'; color: var(--accent); }
+#window_summary_table #winSumTable td { padding: 4px 8px;
                          border-bottom: 1px solid var(--rule); }
-#page8 #winSumTable tbody tr { cursor: pointer; transition: background 80ms; }
-#page8 #winSumTable tbody tr:hover { background: var(--panel-2); }
-#page8 #winSumTable tbody tr.cur { background: var(--panel-3); }
-#page8 #winSumTable tbody tr.cur td:first-child { border-left: 3px solid var(--accent); }
+#window_summary_table #winSumTable tbody tr { cursor: pointer; transition: background 80ms; }
+#window_summary_table #winSumTable tbody tr:hover { background: var(--panel-2); }
+#window_summary_table #winSumTable tbody tr.cur { background: var(--panel-3); }
+#window_summary_table #winSumTable tbody tr.cur td:first-child { border-left: 3px solid var(--accent); }
 /* v4 turn 1 ask 1: brief orange shimmer when setCur lands on a row. The
    class is added by _refreshWinSumCurRow + auto-removed after ~700ms.
    Combined with .cur's persistent background + accent border, this gives
    "the row just became active" feedback without losing the persistent
    "this is currently selected" indicator after the flash fades. The
    box-shadow inset creates a subtle glow without affecting layout. */
-#page8 #winSumTable tbody tr.cur-flash {
+#window_summary_table #winSumTable tbody tr.cur-flash {
   background: rgba(245, 165, 36, 0.28) !important;
   box-shadow: inset 0 0 0 1px rgba(245, 165, 36, 0.55);
   transition: background 600ms ease-out, box-shadow 600ms ease-out;
 }
 /* v3.99 turn 5: numeric cells centered (was right-aligned) so they line
    up under their now-centered headers. */
-#page8 #winSumTable td.num { text-align: center; }
-#page8 #winSumTable td.l1cell, #page8 #winSumTable td.l2cell {
+#window_summary_table #winSumTable td.num { text-align: center; }
+#window_summary_table #winSumTable td.l1cell, #window_summary_table #winSumTable td.l2cell {
   font-size: 10px; color: var(--ink-dim);
 }
-#page8 #winSumTable td .gobtn { background: var(--panel-2); border: 1px solid var(--rule);
+#window_summary_table #winSumTable td .gobtn { background: var(--panel-2); border: 1px solid var(--rule);
                                  border-radius: 3px; padding: 1px 6px; font-family: var(--mono);
                                  font-size: 10px; color: var(--ink-dim); cursor: pointer; }
-#page8 #winSumTable td .gobtn:hover { background: var(--accent); color: #0e1116;
+#window_summary_table #winSumTable td .gobtn:hover { background: var(--accent); color: #0e1116;
                                        border-color: var(--accent); }
 #karyotype_tier .provisional { background: var(--panel); border: 1px dashed var(--rule);
                       border-radius: 4px; padding: 18px; margin-bottom: 16px; }
@@ -2057,7 +2057,7 @@ body.resizing-z, body.resizing-z * { cursor: ns-resize !important; user-select: 
 /* PCA panel's bottom-edge resize sits at the same seam, so hide it
  * in fixed mode — having both stack on top of each other read as
  * a too-thick handle. l3Resize alone is the canonical control here. */
-main#page1 #pcaResize { display: none; }
+main#local_pca_dosage #pcaResize { display: none; }
 #l3Resize {
   position: absolute; left: 0; right: 0; top: -4px; height: 8px;
   cursor: ns-resize; z-index: 10;
@@ -2097,7 +2097,7 @@ main#page1 #pcaResize { display: none; }
   transition: background 100ms;
 }
 #pcaResize:hover::after, #pcaResize.dragging::after { background: var(--accent); }
-body[data-layout-mode="compact"] main#page1 #pcaResize { display: none; }
+body[data-layout-mode="compact"] main#local_pca_dosage #pcaResize { display: none; }
 #l3Panel { position: relative; }
 #l3Panel.collapsed .l3-body { display: none; }
 /* PCA panel collapsed: hide canvas + panel-label, keep only the axis bar */
@@ -2256,15 +2256,15 @@ body.resizing-l3, body.resizing-l3 * { cursor: ns-resize !important; user-select
 /* v3.73: in compact and free modes hide the in-pcaPanel tracked-samples
    aside. Compact uses #trackedSamplesPanelCompact in its own grid cell;
    free mode keeps the sidebar controls so panels can be full-width. */
-body[data-layout-mode="compact"] main#page1 #pcaTrackedAside,
-body[data-layout-mode="free"] main#page1 #pcaTrackedAside { display: none; }
+body[data-layout-mode="compact"] main#local_pca_dosage #pcaTrackedAside,
+body[data-layout-mode="free"] main#local_pca_dosage #pcaTrackedAside { display: none; }
 /* v4 turn 1 ask 4: resize handle between scatter and tracked-samples
    aside. Same flex-item pattern as the aside (4px-wide vertical strip,
    positioned BY the natural flex flow between #pcaCanvasWrap and
    #pcaTrackedAside). Hidden whenever the aside is hidden — same
    compact/free conditions. */
-body[data-layout-mode="compact"] main#page1 #pcaAsideResize,
-body[data-layout-mode="free"] main#page1 #pcaAsideResize { display: none; }
+body[data-layout-mode="compact"] main#local_pca_dosage #pcaAsideResize,
+body[data-layout-mode="free"] main#local_pca_dosage #pcaAsideResize { display: none; }
 #pcaAsideResize {
   flex: 0 0 4px;
   cursor: col-resize;

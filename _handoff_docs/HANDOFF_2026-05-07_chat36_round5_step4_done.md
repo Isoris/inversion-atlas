@@ -22,7 +22,7 @@ the state pattern, and resolved the only cross-module dependency
 **Decision:** kept marker_readiness as a single file (no sub-module split). The
 921 LOC body is cohesive (single concern: marker tier classification +
 HTML render). Sub-module splits are justified at >3000 LOC across
-multiple concerns (page1/page2). Page18 doesn't meet that threshold.
+multiple concerns (local_pca_dosage/candidate_focus). Page18 doesn't meet that threshold.
 Pattern parity isn't a goal in itself.
 
 ```
@@ -81,12 +81,12 @@ it for atlas-router compatibility:
 - Replaced `export function renderMarkerPanelPage()` with the
   state-aware variant `renderMarkerPanelPage(state)`.
 - Added `mount(root, atlasState, registry)`, `unmount(root)`, and
-  `_buildLegacyState(atlasState)` (mirrors page1/page2/catalogue pattern).
+  `_buildLegacyState(atlasState)` (mirrors local_pca_dosage/candidate_focus/catalogue pattern).
 - Removed the chat-33 `__MODULE_ID__` export (no consumers).
 
 ### Step 2 — marker_readiness/_state.js (NEW, 18 LOC)
 
-Same shape as `page1/_state.js`, `page2/_state.js`, `catalogue/_state.js`.
+Same shape as `local_pca_dosage/_state.js`, `candidate_focus/_state.js`, `catalogue/_state.js`.
 Page18 has its OWN `_pageState`.
 
 ### Step 3 — tests
@@ -119,10 +119,10 @@ Page18 has its OWN `_pageState`.
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1/page2/catalogue modules** — completely unchanged.
+- **local_pca_dosage/candidate_focus/catalogue modules** — completely unchanged.
 - **`shared/page1_data_helpers.js`** — unchanged this round (marker_readiness's
   only shared dependency is `_esc`, already added in round 5 step 2
-  for page2).
+  for candidate_focus).
 - **stats_profile (stats profile)** — sibling synthesis page that reads
   marker_readiness's `_mpDeriveAutoPanel` via `typeof X === 'function'` guard.
   Migrating stats_profile (likely next round) will resolve the import properly.
@@ -138,8 +138,8 @@ Page18 has its OWN `_pageState`.
 
 | Page | Folder | Status | LOC | Tests |
 |---|---|---|---|---|
-| page1 | discovery | ✅ migrated rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
-| page2 | discovery | ✅ migrated step 2 | ~3140 across 5 sub-modules | 58+24 |
+| local_pca_dosage | discovery | ✅ migrated rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
+| candidate_focus | discovery | ✅ migrated step 2 | ~3140 across 5 sub-modules | 58+24 |
 | catalogue | catalogue | ✅ migrated step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
 | marker_readiness | catalogue (synthesis) | ✅ migrated step 4 (single file) | ~984 across main + _state | 46+20 |
 
@@ -172,9 +172,9 @@ Reasons:
 |---|---|---|---|
 | stats_profile | catalogue (synthesis) | 939 | sibling of marker_readiness; pre-extracted body |
 | annotation_cockpit | catalogue | 721 | pre-extracted body |
-| page12 | discovery | 1008 | 18 TODOs flagged |
+| local_pca_theta_pi | discovery | 1008 | 18 TODOs flagged |
 | cross_species_breakpoints, multi_species_cockpit | comparative | 2400+ | multi-species cockpit, large |
-| page8/9/15/19 | discovery/catalogue | <105 | tiny stubs, quick router-wiring |
+| window_summary_table/9/15/19 | discovery/catalogue | <105 | tiny stubs, quick router-wiring |
 | overview | catalogue | 35 | empty stub (legacy is empty too) |
 
 ---

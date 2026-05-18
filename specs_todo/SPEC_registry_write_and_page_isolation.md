@@ -41,13 +41,13 @@ Pages should:
 ## What "wired internally" means (anti-patterns to avoid)
 
 ```
-// ❌ page2/_list.js → page1/inheritance.js
-import { isAutoCandidate } from '../page1/inheritance.js';
+// ❌ candidate_focus/_list.js → local_pca_dosage/inheritance.js
+import { isAutoCandidate } from '../local_pca_dosage/inheritance.js';
 
-// ❌ page22.js → page1/_state.js
-import { _setActiveState as _setPage1ActiveState } from './page1/_state.js';
+// ❌ page22.js → local_pca_dosage/_state.js
+import { _setActiveState as _setPage1ActiveState } from './local_pca_dosage/_state.js';
 
-// ❌ page2/_html_builders.js → page2.js's runtime state
+// ❌ candidate_focus/_html_builders.js → candidate_focus.js's runtime state
 const cand = state.candidates[id];   // reading another page's _pageState
 ```
 
@@ -60,7 +60,7 @@ import { isAutoCandidate } from '../../../shared/candidate_predicates.js';
 // ✅ Persistence helpers wrap localStorage / IDB / (future) registry
 import { persistActiveCandidateId } from '../../../shared/active_candidate.js';
 
-// ✅ Within-page imports (page1/lines_panel.js → page1/z_panel.js) are fine
+// ✅ Within-page imports (local_pca_dosage/lines_panel.js → local_pca_dosage/z_panel.js) are fine
 import { drawZ } from './z_panel.js';
 ```
 
@@ -72,11 +72,11 @@ Today, the cartridge can only persist through browser primitives:
 |--------------------|-------------------------------------|-----------------------------------------------|
 | activeCandidateId  | localStorage (shared/active_candidate.js) | `registry.write('state/activeCandidateId', id)` |
 | candidateList      | (in-memory only, not persisted)     | `registry.write('inversion/candidateList', list)` |
-| bandTraceFishSet   | localStorage (page1/band_trace_state.js) | `registry.write('inversion/bandTrace/fishSet', set)` |
+| bandTraceFishSet   | localStorage (local_pca_dosage/band_trace_state.js) | `registry.write('inversion/bandTrace/fishSet', set)` |
 | bandTraceOn        | localStorage                        | `registry.write('inversion/bandTrace/on', bool)` |
 | l2SweepDismissed   | localStorage (per-chrom)            | `registry.write('inversion/l2sweep/dismissed/<chrom>', set)` |
-| activeSampleSet    | localStorage (shared/active_samples? actually page1/active_samples.js) | `registry.write('inversion/activeSamples', set)` |
-| chromCache         | IndexedDB (page1/idb.js)            | `registry.write('inversion/chromCache/<chrom>', data)` |
+| activeSampleSet    | localStorage (shared/active_samples? actually local_pca_dosage/active_samples.js) | `registry.write('inversion/activeSamples', set)` |
+| chromCache         | IndexedDB (local_pca_dosage/idb.js)            | `registry.write('inversion/chromCache/<chrom>', data)` |
 | enrichments        | IndexedDB                           | `registry.write('inversion/enrichments/<name>', data)` |
 | inheritanceResult  | (in-memory, recomputed per session) | possibly cache via registry.write for slow cases |
 | lineageResult      | (in-memory, recomputed per session) | possibly cache via registry.write for slow cases |
@@ -134,8 +134,8 @@ commit `4e695f7`:
       predicates) and persistence helpers (localStorage / IDB).
 - [x] Audit grep `from '\.\./page[0-9]'` in
       `atlases/inversion/pages/` returns zero hits.
-- [x] Audit grep `from '\./page1/'` in
-      `atlases/inversion/pages/` (excluding `page1.js` itself) returns
+- [x] Audit grep `from '\./local_pca_dosage/'` in
+      `atlases/inversion/pages/` (excluding `local_pca_dosage.js` itself) returns
       zero hits.
 
 The Registry.write half (depends on atlas-core changes per SPEC_v2):
@@ -145,8 +145,8 @@ The Registry.write half (depends on atlas-core changes per SPEC_v2):
 - [ ] `registry.invalidateAllForCandidate(cid)` exists per SPEC_v2 §6
 - [ ] Server-side path allowlist on `POST /file/{path}` per SPEC_v2 §9
 - [ ] Every existing `persist*` helper (`shared/active_candidate.js`,
-      `page1/idb.js`, `page1/band_trace_state.js`, `page1/l2_sweep.js`,
-      `page1/active_samples.js`) gets a one-line swap from localStorage
+      `local_pca_dosage/idb.js`, `local_pca_dosage/band_trace_state.js`, `local_pca_dosage/l2_sweep.js`,
+      `local_pca_dosage/active_samples.js`) gets a one-line swap from localStorage
       / IDB to `registry.write`. The call signatures I built were
       designed for this swap — each helper takes the same arguments
       `registry.write` will need, so the change is mechanical per

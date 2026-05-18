@@ -10,9 +10,9 @@ discovery stage docs):
 
 | layer | source | page | data path |
 |-------|--------|------|-----------|
-| Dosage | per-window per-sample dosage K-means | page1 | `state.data.windows[w].pc1[]`, `pc2[]` |
-| θπ | per-sample nucleotide diversity local PCA | page12 | `state.data.theta_pi_local_pca` |
-| GHSL | haplotype-pair sequence divergence | page15 | `state.data.ghsl_panel.div_roll[scale][sample][window]` |
+| Dosage | per-window per-sample dosage K-means | local_pca_dosage | `state.data.windows[w].pc1[]`, `pc2[]` |
+| θπ | per-sample nucleotide diversity local PCA | local_pca_theta_pi | `state.data.theta_pi_local_pca` |
+| GHSL | haplotype-pair sequence divergence | local_pca_ghsl | `state.data.ghsl_panel.div_roll[scale][sample][window]` |
 
 The three are **orthogonal evidence axes** per the discovery doctrine:
 a candidate hit by all three is near-certainly real biology; one hit
@@ -64,7 +64,7 @@ evidence axes, or is it discordant?"
 **Implementation sketch**:
 - New page `page_pca_comparator` (stage `discovery_2`)
 - Subdir: `_state.js`, `renderer.js` (3 canvas painters), `selection.js`
-- Each painter: small adaptation of page1's `drawPCA`, parameterised
+- Each painter: small adaptation of local_pca_dosage's `drawPCA`, parameterised
   on the data source (dosage / θπ / GHSL)
 - Sync layer: shared `state.cur` (window) + `state.hoveredSample`
   drives all 3 simultaneously
@@ -115,14 +115,14 @@ the user doesn't read it as a natural shared space.
 ### Option C — Per-sample trajectory in 3-axis space
 
 For ONE selected sample, show its (PC1, PC2) trajectory across
-windows in each layer's space. Like page1's PC1-lines but stacked
+windows in each layer's space. Like local_pca_dosage's PC1-lines but stacked
 3-way.
 
 **Pros**:
 - Shows time-course (windows) of one sample across all 3 axes
 - Useful for the "is this fish consistently band g0 throughout the
   candidate?" question
-- Reuses page1's `drawLinesPanel` pattern
+- Reuses local_pca_dosage's `drawLinesPanel` pattern
 
 **Cons**:
 - Only useful for ONE sample at a time — not a cohort-wide view
@@ -136,7 +136,7 @@ windows in each layer's space. Like page1's PC1-lines but stacked
 - New page `page_pca_comparator`
 - 3 synchronized mini-PCA panels at the active window (`state.cur`)
 - K-band coloring inherited from dosage clustering (anchor on
-  page1's K=3 H-system)
+  local_pca_dosage's K=3 H-system)
 - Hover sample → highlight in all 3 panels
 - ←/→ scrubs the window across all 3 simultaneously
 
@@ -155,21 +155,21 @@ windows in each layer's space. Like page1's PC1-lines but stacked
 ## What this comparator does NOT do
 
 - It does NOT compute new clustering. K-band labels come from the
-  dosage K-means already on page1 (or whichever layer is the
+  dosage K-means already on local_pca_dosage (or whichever layer is the
   "anchor" — user-selectable).
 - It does NOT claim cross-axis biological identity — the user reads
   the comparison; the page never says "this sample is dosage-band-A
   AND θπ-band-A".
-- It does NOT replace page1/12/15 — those remain the per-axis
+- It does NOT replace local_pca_dosage/12/15 — those remain the per-axis
   scanners. The comparator is the side-by-side summary view.
 
 ## State surface
 
 Reads:
 - `state.cur` — active window (shared cursor)
-- `state.data.windows[w].pc1[]`, `pc2[]` — dosage local PCA (page1 source)
-- `state.data.theta_pi_local_pca` — θπ local PCA (page12 source)
-- `state.data.ghsl_panel.div_roll[scale][sample][window]` — GHSL (page15 source)
+- `state.data.windows[w].pc1[]`, `pc2[]` — dosage local PCA (local_pca_dosage source)
+- `state.data.theta_pi_local_pca` — θπ local PCA (local_pca_theta_pi source)
+- `state.data.ghsl_panel.div_roll[scale][sample][window]` — GHSL (local_pca_ghsl source)
 - `state.tracked` — tracked samples (highlighted in all 3 panels)
 - `state.k` — K-means K used by the dosage anchor
 - `state.candidate` — optional; if set, draws the candidate's
@@ -180,7 +180,7 @@ Writes: nothing — read-only inspector page.
 ## Open questions
 
 1. **Anchor selection**: should the K-color palette come from
-   dosage (page1) always, or be user-selectable via a "anchor: ⊙ dosage  ○ θπ  ○ GHSL" toggle?
+   dosage (local_pca_dosage) always, or be user-selectable via a "anchor: ⊙ dosage  ○ θπ  ○ GHSL" toggle?
 2. **Missing data**: if θπ layer is absent on a chrom, do all 3
    panels render with the dosage one alone, or do we hide the
    comparator entirely?
@@ -196,14 +196,14 @@ Writes: nothing — read-only inspector page.
   — the K-band semantics that drive the colouring
 - `specs_done/SPEC_distant_band_concordance_fish_trajectory.md`
   — lineage / band-trace duo, similar cohort-wide compare concept
-- `docs/generated/page_contracts/page1/PAGE_CONTRACT.md` — page1's
+- `docs/generated/page_contracts/local_pca_dosage/PAGE_CONTRACT.md` — local_pca_dosage's
   drawPCA architecture, reusable for the dosage sub-panel
-- `docs/generated/page_contracts/page12/PAGE_CONTRACT.md` — page12's
+- `docs/generated/page_contracts/local_pca_theta_pi/PAGE_CONTRACT.md` — local_pca_theta_pi's
   per-window θπ panel (the 6 θπ helpers; `_drawThPcaPanel` is the
   closest analog)
-- `docs/generated/page_contracts/page15/PAGE_CONTRACT.md` — page15
+- `docs/generated/page_contracts/local_pca_ghsl/PAGE_CONTRACT.md` — local_pca_ghsl
   (now with 4 panels post-2026-05-15 finish)
-- `pages/discovery/page1/pca_panel.js#drawPCA` — the source panel
+- `pages/discovery/local_pca_dosage/pca_panel.js#drawPCA` — the source panel
   to clone × 3
 
 ---
@@ -212,7 +212,7 @@ Writes: nothing — read-only inspector page.
 
 - Should we ship Phase 1 (3 side-by-side panels) as a new page in
   `pages/discovery/page_pca_comparator/`?
-- Or extend page1 / page12 / page15 with a "compare" mode that
+- Or extend local_pca_dosage / local_pca_theta_pi / local_pca_ghsl with a "compare" mode that
   splits the existing PCA panel into 3 panes?
 
 The new-page approach is cleaner (no risk of breaking the existing

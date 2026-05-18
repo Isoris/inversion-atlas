@@ -111,7 +111,7 @@ refactor.
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1/page2/catalogue/confirmed_carousel/stats_profile/marker_readiness/annotation_cockpit modules** — completely unchanged.
+- **local_pca_dosage/candidate_focus/catalogue/confirmed_carousel/stats_profile/marker_readiness/annotation_cockpit modules** — completely unchanged.
 - **`shared/page1_data_helpers.js`** — unchanged.
 - **The TODO_MISSING(synthesis_overview_design)** — kept as a TODO
   in source comments. The synthesis overview was scoped but never
@@ -129,8 +129,8 @@ refactor.
 
 | Page | Folder (logical stage) | Status | LOC | Tests |
 |---|---|---|---|---|
-| page1 | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
-| page2 | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
+| local_pca_dosage | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
+| candidate_focus | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
 | catalogue | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
 | confirmed_carousel | catalogue | ✅ step 7 (single file, stub-preserving) | ~166 across main + _state | 14+22 |
 | stats_profile | catalogue (synthesis) | ✅ step 5 (single file + state bridge) | ~1009 across main + _state | 34+20 |
@@ -188,9 +188,9 @@ existing tests will keep passing.
 | Page | Folder | LOC | Notes |
 |---|---|---|---|
 | **marker_panels** | catalogue | 244 | Substantial-but-quick. **Would close out the catalogue group entirely.** |
-| **page12** | discovery | 1008 | 18 TODOs — substantial work |
+| **local_pca_theta_pi** | discovery | 1008 | 18 TODOs — substantial work |
 | **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest` (stats_profile), AND likely `computeTrackedLinkageProjection` (annotation_cockpit)** |
-| **page8, 15, 19, help** | various | <50 each | tiny stubs; quick router-wiring rounds |
+| **window_summary_table, 15, 19, help** | various | <50 each | tiny stubs; quick router-wiring rounds |
 | **karyotype_tier, 6, 7, 11** | review | 122-301 | review-stage pages |
 | **sv_evidence** | review | 148 | SV evidence review |
 
@@ -199,7 +199,7 @@ Logical next priorities:
 - **Catalogue completion** — marker_panels is the only catalogue/synthesis
   page left. Closing it out would mean the entire catalogue + synthesis
   groups are 100% migrated.
-- **Stub batch** — page8, 15, 19, help are all tiny stubs. Could
+- **Stub batch** — window_summary_table, 15, 19, help are all tiny stubs. Could
   batch in one round if Quentin's "one at a time" directive permits.
 - **Comparative cockpit** — cross_species_breakpoints/multi_species_cockpit is the most ambitious
   remaining; resolves the most runtime guards across stats_profile + annotation_cockpit.

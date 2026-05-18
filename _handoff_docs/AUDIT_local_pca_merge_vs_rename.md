@@ -2,9 +2,9 @@
 
 **Date**: 2026-05-16
 **User questions** (end-of-session):
-1. Merge page1 (dosage) + page12 (θπ) + page15 (GHSL) into one
+1. Merge local_pca_dosage (dosage) + local_pca_theta_pi (θπ) + local_pca_ghsl (GHSL) into one
    local-PCA page with a toggle (normal / θπ / GHSL)?
-2. Rename `page1`, `page2`, etc. to their actual names so navigation
+2. Rename `local_pca_dosage`, `candidate_focus`, etc. to their actual names so navigation
    is easier?
 
 ---
@@ -25,17 +25,17 @@
   three is real biology" doctrine).
 - **The 3 pages already share architecture**, but their painters are
   separate code paths:
-  - page1: `drawSim` / `drawZ` / `drawLinesPanel` / `drawPCA` /
-    `renderL3Panel` (per `pages/discovery/page1/{sim_panel, z_panel,
+  - local_pca_dosage: `drawSim` / `drawZ` / `drawLinesPanel` / `drawPCA` /
+    `renderL3Panel` (per `pages/discovery/local_pca_dosage/{sim_panel, z_panel,
     lines_panel, pca_panel, l3_panel}.js`)
-  - page12: `_drawThSimMatPanel` / `_drawThZPanel` /
+  - local_pca_theta_pi: `_drawThSimMatPanel` / `_drawThZPanel` /
     `_drawThLinesPanel` / `_drawThPcaPanel` / `_drawThAnchorStripPanel`
-    + `_drawThCusumHero` (8 helpers in `page12.js`)
-  - page15: layer-status chips + 4 new GHSL panels (shipped 56978ed)
+    + `_drawThCusumHero` (8 helpers in `local_pca_theta_pi.js`)
+  - local_pca_ghsl: layer-status chips + 4 new GHSL panels (shipped 56978ed)
   - A toggle would need a runtime dispatcher mapping the active
     layer to the right painter family — more code, more error
     surface, no functional gain over side-by-side
-- **Empty-state visibility matters**. page12 + page15 currently
+- **Empty-state visibility matters**. local_pca_theta_pi + local_pca_ghsl currently
   render explicit "Required JSON layers from cluster-side R-pipeline"
   panels with chips showing which layers are loaded. If you merge,
   toggling to an unloaded layer would either:
@@ -44,11 +44,11 @@
   - Hide it entirely (now the user can't tell whether their R
     pipeline shipped the data — fails the "what's missing?"
     workflow)
-- **Cross-page state pollution risk**: page1's `state.l2GroupCache`,
+- **Cross-page state pollution risk**: local_pca_dosage's `state.l2GroupCache`,
   `state.bandTraceFishSet`, `state.tracked`, etc. are tuned for
   dosage. θπ and GHSL might want different anchor windows, K modes,
   or per-L2 cluster caches. A toggle blurs those boundaries.
-- **Migration cost**: every cross-ref to `page12` / `page15` in the
+- **Migration cost**: every cross-ref to `local_pca_theta_pi` / `local_pca_ghsl` in the
   registry / contracts / SPECs / HOW_TO_USE docs / handoffs breaks.
   ~25+ files touched for no clear win.
 - **Three-cohort discipline**: each page currently declares its
@@ -59,8 +59,8 @@
 
 ### What you actually want (likely)
 
-A **prominent "compare 3" entry point** that lives on page1 /
-page12 / page15 toolbars and routes to the comparator page. That
+A **prominent "compare 3" entry point** that lives on local_pca_dosage /
+local_pca_theta_pi / local_pca_ghsl toolbars and routes to the comparator page. That
 gives you the toggle-like brevity ("press one button to see the
 other axes") without losing the per-axis depth pages.
 
@@ -80,7 +80,7 @@ knowing the comparator isn't enough.
 
 ---
 
-## Q2: Rename `page1`, `page2`, etc. to their actual names?
+## Q2: Rename `local_pca_dosage`, `candidate_focus`, etc. to their actual names?
 
 ### Recommendation: **Yes, eventually.** Stage as a slug migration starting with page22.
 
@@ -95,26 +95,26 @@ knowing the comparator isn't enough.
   - The karyotype_tier/6/7/11 swap-hypothesis registry mismatches partly
     come from the numeric confusion
 - Self-documenting URLs reduce mental overhead: `/inversion#local_pca_z`
-  is unambiguous; `/inversion#page1` requires lookup
+  is unambiguous; `/inversion#local_pca_dosage` requires lookup
 - Easier code navigation: `pages/discovery/local_pca_z.js` beats
-  `pages/discovery/page1.js` for grep + IDE jump
+  `pages/discovery/local_pca_dosage.js` for grep + IDE jump
 
 ### Why this is HARD
 
-Page IDs are everywhere. A `grep -rn "page1\|page2"` across the
+Page IDs are everywhere. A `grep -rn "local_pca_dosage\|candidate_focus"` across the
 repo would return thousands of hits. The high-impact surfaces:
 
 | surface | what's keyed by `page<N>` | rename cost |
 |---|---|---|
 | **`manifest.json`** | 39 entries `id` field | 39 string edits |
 | **`pages.registry.json`** | 40 entries (top-level keys) | 40 string edits + JSON re-validation |
-| **Page directories** | `pages/discovery/page1.{html,js}` + `page1/` subdir | 39 dirs + 78 entry files renamed |
+| **Page directories** | `pages/discovery/local_pca_dosage.{html,js}` + `local_pca_dosage/` subdir | 39 dirs + 78 entry files renamed |
 | **Page contracts** | `docs/generated/page_contracts/<id>/` | 38 dirs renamed |
 | **SPECs** | cross-refs in `specs_done/` + `specs_todo/` | ~50+ references |
 | **HOW_TO_USE docs** | `specs_done/_bundles/HOW_TO_USE_page<N>.md` (6) | 6 files renamed |
 | **Per-stage READMEs** | `pages/<stage>/README.md` (6) + tables | ~50 table edits |
 | **HANDOFFs** | `_handoff_docs/HANDOFF_*.md` (37 files) | hundreds of refs (leave most untouched; they're historical) |
-| **CSS** | `#page1`, `main#page1`, `.page#page1.active` | ~30+ selectors per page |
+| **CSS** | `#local_pca_dosage`, `main#local_pca_dosage`, `.page#local_pca_dosage.active` | ~30+ selectors per page |
 | **DOM ids inside each page** | `#page1Header`, `#page1Content`, etc. | tens per page |
 | **Tests** | `test_discovery_page<N>.js`, `smoke_discovery_page<N>_round5.mjs` | ~76 files renamed |
 | **Atlas-core shell** | URL routing by `id` | needs alignment (separate repo) |
@@ -128,7 +128,7 @@ Don't rename everything at once. Stage it:
 
 ```json
 {
-  "id": "page1",
+  "id": "local_pca_dosage",
   "slug": "local_pca_dosage",
   "label": "local PCA |z|",
   "stage": "discovery",
@@ -136,7 +136,7 @@ Don't rename everything at once. Stage it:
 }
 ```
 
-- Atlas-core shell accepts both `#page1` and `#local_pca_dosage` for
+- Atlas-core shell accepts both `#local_pca_dosage` and `#local_pca_dosage` for
   URL routing
 - Per-page DOM, registry, contracts continue to use `id` internally
 - New code uses `slug`; old code keeps working
@@ -182,10 +182,10 @@ Examples:
 
 | current id | label | proposed slug |
 |---|---|---|
-| `page1` | local PCA \|z\| | `local_pca_dosage` (more semantic than label) |
-| `page12` | local PCA θπ | `local_pca_theta_pi` |
-| `page15` | local PCA GHSL | `local_pca_ghsl` |
-| `page2` | candidate focus | `candidate_focus` |
+| `local_pca_dosage` | local PCA \|z\| | `local_pca_dosage` (more semantic than label) |
+| `local_pca_theta_pi` | local PCA θπ | `local_pca_theta_pi` |
+| `local_pca_ghsl` | local PCA GHSL | `local_pca_ghsl` |
+| `candidate_focus` | candidate focus | `candidate_focus` |
 | `page22` | haplotype regimes | `haplotype_regimes` |
 | `karyotype_tier` | karyotype / tier | `karyotype_tier` |
 | `popstats` | popstats | `popstats` |
@@ -198,8 +198,8 @@ Examples:
 | `stats_profile` | stats profile | `stats_profile` |
 | `marker_readiness` | marker readiness panel | `marker_readiness` |
 | `annotation_cockpit` | annotation cockpit | `annotation_cockpit` |
-| `page8` | per-window summary table | `window_summary_table` |
-| `page19` | negative regions catalogue | `negative_regions` |
+| `window_summary_table` | per-window summary table | `window_summary_table` |
+| `negative_regions` | negative regions catalogue | `negative_regions` |
 | `overview` | overview | `overview` |
 | `cross_species_breakpoints` | cross-species breakpoints | `cross_species_breakpoints` |
 | `multi_species_cockpit` | multi-species | `multi_species_cockpit` |
@@ -261,7 +261,7 @@ utility cartridges.
 The current `discovery_2` stage has **10 pages** (per
 `pages/discovery/README.md` and the manifest):
 
-- page2 — candidate focus (workflow / not a utility)
+- candidate_focus — candidate focus (workflow / not a utility)
 - page22 — haplotype regimes (workflow / not a utility)
 - tree_panel — utility inspector
 - fingerprint_track — utility inspector
@@ -273,7 +273,7 @@ The current `discovery_2` stage has **10 pages** (per
 
 The 7 cartridges are **side-inspector tools** the user opens when
 they want to characterise a candidate, NOT primary discovery
-workflow surfaces. page2 + page22 are real workflow steps
+workflow surfaces. candidate_focus + page22 are real workflow steps
 (per-candidate deep dive + the v3.4 banding pipeline runner).
 
 Mixing them in one stage clutters the tab bar. The user identified
@@ -308,7 +308,7 @@ Pages to re-stage from `discovery_2` → `tooling`:
 
 The remaining `discovery_2` pages stay where they are because they
 ARE workflow:
-- `page2` — candidate focus (the per-candidate deep dive)
+- `candidate_focus` — candidate focus (the per-candidate deep dive)
 - `page22` — haplotype regimes (the v3.4 banding pipeline runner)
 
 ### Vertical-list UI
@@ -352,7 +352,7 @@ ships) belongs in `tooling`:
   axes?" tool — exactly the utility-page pattern
 
 Similarly, when we add a "show dosage heatmap for this candidate"
-shortcut from page1 / page2 / karyotype_tier (per WIRE_AUDIT_page1.md
+shortcut from local_pca_dosage / candidate_focus / karyotype_tier (per WIRE_AUDIT_page1.md
 Group F), the destination is the Tooling stage's
 `dosage_heatmap` page.
 
@@ -380,7 +380,7 @@ improvement of the three, so I'd start there.
 
 - `specs_todo/SPEC_local_pca_comparator.md` — the 3-panel comparator design
 - `_handoff_docs/WIRE_AUDIT_page1.md` — Group I lists the comparator
-- `docs/generated/page_contracts/page1/PAGE_CONTRACT.md` — page1's
+- `docs/generated/page_contracts/local_pca_dosage/PAGE_CONTRACT.md` — local_pca_dosage's
   panel architecture (the template the comparator clones)
 - `atlases/inversion/manifest.json` — where the slug field would live
 - `atlases/inversion/registries/data/pages.registry.json` — every

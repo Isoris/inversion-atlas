@@ -2,7 +2,7 @@
 //
 // Per-window SNP-density resolver + viridis-style color ramp + canvas
 // strip drawer (legacy lines 33801 + 34456-34570). Drives the thin
-// gradient strip drawn at the top of page1's PC1 panel when SNP-
+// gradient strip drawn at the top of local_pca_dosage's PC1 panel when SNP-
 // density mode is 'strip'.
 //
 // All compute is pure: caller passes the window object (or the

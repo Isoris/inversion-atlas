@@ -36,7 +36,7 @@ function check(label, cond, extra) {
 function group(name) { console.log('\n--- ' + name + ' ---'); }
 
 // -----------------------------------------------------------------------------
-// Minimal DOM polyfill — same shape as page8/9/19 smokes plus
+// Minimal DOM polyfill — same shape as window_summary_table/9/19 smokes plus
 // #ancNoChrom + #ancStack accessibility.
 // -----------------------------------------------------------------------------
 

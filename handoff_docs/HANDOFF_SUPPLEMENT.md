@@ -44,8 +44,8 @@ Or alternatively: since help is just static help content, you could put it in an
 The `data-stage` attribute on legacy tab buttons doesn't map cleanly 1-1 to sub-atlases. Here's the actual stage distribution I see in the legacy:
 
 ```
-discovery       → page1, page12, page15, page2, page19, catalogue
-refinement      → boundary_refinement, karyotype_tier, page8
+discovery       → local_pca_dosage, local_pca_theta_pi, local_pca_ghsl, candidate_focus, negative_regions, catalogue
+refinement      → boundary_refinement, karyotype_tier, window_summary_table
 classification  → annotation_cockpit, popstats, ancestry_per_window
 synthesis       → confirmed_carousel, stats_profile, marker_readiness
 compare         → cross_species_breakpoints, multi_species_cockpit
@@ -55,7 +55,7 @@ help            → help, marker_panels, overview, sv_evidence (mixed?)
 vs. the original sub-atlas mapping I wrote:
 
 ```
-inversion_discovery   → page1, page12, page15, page2, page8, page19
+inversion_discovery   → local_pca_dosage, local_pca_theta_pi, local_pca_ghsl, candidate_focus, window_summary_table, negative_regions
 inversion_review      → boundary_refinement, sv_evidence, karyotype_tier, ancestry_per_window, popstats
 inversion_catalogue   → catalogue, confirmed_carousel, annotation_cockpit, stats_profile, marker_readiness, marker_panels, overview
 inversion_comparative → cross_species_breakpoints, multi_species_cockpit, help
@@ -64,7 +64,7 @@ inversion_comparative → cross_species_breakpoints, multi_species_cockpit, help
 **The merge chat decision**: don't try to perfectly align stages with sub-atlases. The sub-atlas split was driven by *workflow*, not stage. Each sub-atlas's HTML should include only the buttons whose pages it owns:
 
 ```
-inversion_discovery.html  buttons: page1, page12, page15, page2, page8, page19
+inversion_discovery.html  buttons: local_pca_dosage, local_pca_theta_pi, local_pca_ghsl, candidate_focus, window_summary_table, negative_regions
 inversion_review.html     buttons: boundary_refinement, sv_evidence, karyotype_tier, ancestry_per_window, popstats
 inversion_catalogue.html  buttons: catalogue, confirmed_carousel, annotation_cockpit, stats_profile, marker_readiness, marker_panels, overview, help  (+ help)
 inversion_comparative.html buttons: cross_species_breakpoints, multi_species_cockpit
@@ -76,9 +76,9 @@ Just literally include the per-page tab `<button>` HTML for the pages that sub-a
 
 ## Correction 3: the "9 confirmed" page is confirmed_carousel in catalogue, but it consumes confirmed candidates produced by the discovery scrubber
 
-Page9 (catalogue) is downstream of page1 (discovery) — it shows confirmed candidates. They're connected via `state.candidateList` (a `cross_atlas` slot in `SLOT_REGISTRY`).
+Page9 (catalogue) is downstream of local_pca_dosage (discovery) — it shows confirmed candidates. They're connected via `state.candidateList` (a `cross_atlas` slot in `SLOT_REGISTRY`).
 
-This means: **the cross-atlas state contract is doing real work** — Quentin promotes a candidate on page2 (discovery), and confirmed_carousel (catalogue) reads that from review/inversion/sessions.
+This means: **the cross-atlas state contract is doing real work** — Quentin promotes a candidate on candidate_focus (discovery), and confirmed_carousel (catalogue) reads that from review/inversion/sessions.
 
 The merge chat doesn't need to do anything special here — the foundation already supports it. Just be aware that the user workflow crosses sub-atlases.
 

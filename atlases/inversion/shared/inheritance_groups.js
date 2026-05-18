@@ -11,8 +11,8 @@
 //     → average-linkage agglomeration + cut at threshold
 //     → inheritance-group assignment per band
 //
-// Pure compute, no state. Consumed by page1's inheritance-labels strip
-// (the "I1·3g" annotations on the lines panel) and by page2's
+// Pure compute, no state. Consumed by local_pca_dosage's inheritance-labels strip
+// (the "I1·3g" annotations on the lines panel) and by candidate_focus's
 // inheritance-group rendering.
 
 import { agglomerativeAverageLinkage, cutDendrogram } from './clustering.js';

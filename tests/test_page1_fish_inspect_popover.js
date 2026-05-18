@@ -1,6 +1,6 @@
 // tests/test_page1_fish_inspect_popover.js
 //
-// Unit tests for pages/discovery/page1/fish_inspect_popover.js.
+// Unit tests for pages/discovery/local_pca_dosage/fish_inspect_popover.js.
 // Covers the DOM-independent surface: fishInspectHitTest +
 // fishInspectBuildHtml + headless tolerance on show/maybeShow.
 
@@ -10,7 +10,7 @@ import {
   fishInspectBuildHtml,
   showFishInspectPopover,
   maybeShowFishInspectPopover,
-} from '../atlases/inversion/pages/discovery/page1/fish_inspect_popover.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/fish_inspect_popover.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

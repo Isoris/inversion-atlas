@@ -26,7 +26,7 @@
 //     <button class="tab-stage-pill" data-stage="classification">…</button>
 //     <!-- one pill per stage -->
 //
-//     <button data-page="page1" data-stage="discovery"
+//     <button data-page="local_pca_dosage" data-stage="discovery"
 //             class="active">1 local PCA |z|</button>
 //     <!-- one page button per page, with data-stage matching one
 //          of the declared stages -->

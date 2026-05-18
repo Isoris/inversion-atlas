@@ -1,8 +1,8 @@
 // tests/test_page1_diag_residuals.js
 //
-// Unit tests for pages/discovery/page1/diag_residuals.js — per-fish
+// Unit tests for pages/discovery/local_pca_dosage/diag_residuals.js — per-fish
 // residual-Z diagnostic + "residual" sample-color mode. Drives the
-// page1 getSampleColor switch's residual branch + the karyotype/tier
+// local_pca_dosage getSampleColor switch's residual branch + the karyotype/tier
 // page's suspicion column.
 
 import {
@@ -13,7 +13,7 @@ import {
   diagSampleColor,
   diagClearCache,
   diagComputeCandidateSuspicion,
-} from '../atlases/inversion/pages/discovery/page1/diag_residuals.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/diag_residuals.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {
@@ -238,11 +238,11 @@ group('diagComputeCandidateSuspicion — precomp window with z=5 outlier');
 }
 
 // =====================================================================
-group('getSampleColor wiring (page1/_state.js)');
+group('getSampleColor wiring (local_pca_dosage/_state.js)');
 {
   // Verify the _state.js module imports diagSampleColor and uses it
   // for mode === 'residual'. Smoke test: the export is present.
-  const mod = await import('../atlases/inversion/pages/discovery/page1/_state.js');
+  const mod = await import('../atlases/inversion/pages/discovery/local_pca_dosage/_state.js');
   check('getSampleColor exported',           typeof mod.getSampleColor === 'function');
 }
 

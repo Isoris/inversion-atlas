@@ -144,9 +144,9 @@ group('resolveSampleScopeColor — dispatch');
 }
 
 // =====================================================================
-group('page-isolation: page1 wrapper still exposes the legacy names');
+group('page-isolation: local_pca_dosage wrapper still exposes the legacy names');
 {
-  const mod = await import('../atlases/inversion/pages/discovery/page1/_state.js');
+  const mod = await import('../atlases/inversion/pages/discovery/local_pca_dosage/_state.js');
   check('_resolveSampleScopeColor exported',
         typeof mod._resolveSampleScopeColor === 'function');
   check('_lineageColor exported',

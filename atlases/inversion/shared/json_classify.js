@@ -81,7 +81,7 @@ export const JSON_KIND_INFO = Object.freeze({
 // =====================================================================
 
 /**
- * Chromosome JSONs: the main per-chrom data file consumed by page1.
+ * Chromosome JSONs: the main per-chrom data file consumed by local_pca_dosage.
  * MUST have a positive integer n_windows AND a non-empty windows[]
  * array. Auxiliaries (relatedness, etc.) lack one or both — without
  * this guard the dropdown would show entries like "catfish_226_

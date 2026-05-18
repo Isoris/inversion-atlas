@@ -5,53 +5,59 @@
   "atlas_description": "Population-genomic inversion detection, karyotyping, and follow-up for the 226-sample pure C. gariepinus hatchery cohort.",
   "pages": [
     {
-      "id": "page1",
+      "id": "local_pca_dosage",
       "slug": "local_pca_dosage",
       "label": "local PCA |z|",
       "stage": "discovery",
-      "fragment": "atlases/inversion/pages/discovery/page1.html",
-      "module": "atlases/inversion/pages/discovery/page1.js",
-      "tooltip": "Local PCA on dosage. Sim_mat heatmap, robust |Z|, per-sample lines, K-means PCA, L3 contingency. THE big page."
+      "fragment": "atlases/inversion/pages/discovery/local_pca_dosage.html",
+      "module": "atlases/inversion/pages/discovery/local_pca_dosage.js",
+      "tooltip": "Local PCA on dosage. Sim_mat heatmap, robust |Z|, per-sample lines, K-means PCA, L3 contingency. THE big page.",
+      "_was_id": "page1"
     },
     {
-      "id": "page12",
+      "id": "local_pca_theta_pi",
       "slug": "local_pca_theta_pi",
       "label": "local PCA \u03b8\u03c0",
       "stage": "discovery",
-      "fragment": "atlases/inversion/pages/discovery/page12.html",
-      "module": "atlases/inversion/pages/discovery/page12.js"
+      "fragment": "atlases/inversion/pages/discovery/local_pca_theta_pi.html",
+      "module": "atlases/inversion/pages/discovery/local_pca_theta_pi.js",
+      "_was_id": "page12"
     },
     {
-      "id": "page15",
+      "id": "local_pca_ghsl",
       "slug": "local_pca_ghsl",
       "label": "local PCA GHSL",
       "stage": "discovery",
-      "fragment": "atlases/inversion/pages/discovery/page15.html",
-      "module": "atlases/inversion/pages/discovery/page15.js"
+      "fragment": "atlases/inversion/pages/discovery/local_pca_ghsl.html",
+      "module": "atlases/inversion/pages/discovery/local_pca_ghsl.js",
+      "_was_id": "page15"
     },
     {
-      "id": "page2",
+      "id": "candidate_focus",
       "slug": "candidate_focus",
       "label": "candidate focus",
       "stage": "discovery_2",
-      "fragment": "atlases/inversion/pages/discovery/page2.html",
-      "module": "atlases/inversion/pages/discovery/page2.js"
+      "fragment": "atlases/inversion/pages/discovery/candidate_focus.html",
+      "module": "atlases/inversion/pages/discovery/candidate_focus.js",
+      "_was_id": "page2"
     },
     {
-      "id": "page8",
+      "id": "window_summary_table",
       "slug": "window_summary_table",
       "label": "per-window summary table",
       "stage": "catalogue",
-      "fragment": "atlases/inversion/pages/discovery/page8.html",
-      "module": "atlases/inversion/pages/discovery/page8.js"
+      "fragment": "atlases/inversion/pages/discovery/window_summary_table.html",
+      "module": "atlases/inversion/pages/discovery/window_summary_table.js",
+      "_was_id": "page8"
     },
     {
-      "id": "page19",
+      "id": "negative_regions",
       "slug": "negative_regions",
       "label": "negative regions catalogue",
       "stage": "catalogue",
-      "fragment": "atlases/inversion/pages/discovery/page19.html",
-      "module": "atlases/inversion/pages/discovery/page19.js"
+      "fragment": "atlases/inversion/pages/discovery/negative_regions.html",
+      "module": "atlases/inversion/pages/discovery/negative_regions.js",
+      "_was_id": "page19"
     },
     {
       "id": "haplotype_regimes",
@@ -401,7 +407,7 @@
     "atlases/inversion/css/inversion.css"
   ],
   "_stylesheets_chrome_doc": "atlas_chrome.css is a generic chrome stylesheet (tab pills + settings button + active-stage folding) shipped here as a CANDIDATE FOR PROMOTION to atlas-core. Pairs with shared/atlas_chrome.js. Other atlases can drop the same two files in. When atlas-core ships its own copy, remove this entry + delete the cartridge copy.",
-  "_stylesheets_doc": "Atlas-wide stylesheets, loaded by the shell at atlas-register time. Currently one big bundle (extracted verbatim from the legacy monolith). Future work: split into per-page stylesheets (atlases/inversion/css/pages/page1.css etc.) and reference them from each page entry's `stylesheet` field below \u2014 the router loads page-stylesheet on mount.",
+  "_stylesheets_doc": "Atlas-wide stylesheets, loaded by the shell at atlas-register time. Currently one big bundle (extracted verbatim from the legacy monolith). Future work: split into per-page stylesheets (atlases/inversion/css/pages/local_pca_dosage.css etc.) and reference them from each page entry's `stylesheet` field below \u2014 the router loads page-stylesheet on mount.",
   "scope_pickers": [
     {
       "slot": "activeChrom",
@@ -422,7 +428,7 @@
       "id": "discovery_2",
       "label": "discovery 2",
       "order": 2,
-      "_doc": "Round-2 discovery: workflow surfaces for per-candidate deep-dive and the v3.4 banding pipeline runner. Currently page2 (candidate focus) + haplotype_regimes (was page22 until 2026-05-16). The utility / inspector cartridges (tree panel, fingerprint track, similarity matrix, PCA scatter, dosage heatmap, nested detector, dosage cluster) moved to 'tooling' on 2026-05-16 \u2014 see AUDIT_local_pca_merge_vs_rename.md \u00a7Q3."
+      "_doc": "Round-2 discovery: workflow surfaces for per-candidate deep-dive and the v3.4 banding pipeline runner. Currently candidate_focus (candidate focus) + haplotype_regimes (was page22 until 2026-05-16). The utility / inspector cartridges (tree panel, fingerprint track, similarity matrix, PCA scatter, dosage heatmap, nested detector, dosage cluster) moved to 'tooling' on 2026-05-16 \u2014 see AUDIT_local_pca_merge_vs_rename.md \u00a7Q3."
     },
     {
       "id": "tooling",

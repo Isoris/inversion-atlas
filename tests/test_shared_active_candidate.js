@@ -2,7 +2,7 @@
 //
 // Unit tests for shared/active_candidate.js — the tiny localStorage
 // helpers that persist the user's active-candidate selection across
-// page1 ↔ page2 navigation and full page reloads.
+// local_pca_dosage ↔ candidate_focus navigation and full page reloads.
 
 import {
   ACTIVE_CANDIDATE_LS_KEY,
@@ -110,7 +110,7 @@ group('events.js re-exports as _persistActiveCandidate (backward compat)');
 {
   // The events.js module re-exports persistActiveCandidateId under the
   // underscore name so existing callers don't break.
-  const mod = await import('../atlases/inversion/pages/discovery/page1/events.js');
+  const mod = await import('../atlases/inversion/pages/discovery/local_pca_dosage/events.js');
   check('_persistActiveCandidate is exported',
         typeof mod._persistActiveCandidate === 'function');
   // Smoke-test that the alias actually points at the same impl

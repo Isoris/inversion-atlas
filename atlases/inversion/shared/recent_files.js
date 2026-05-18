@@ -51,7 +51,7 @@ function _hasLocalStorage() {
  * `detectLayers` is an optional callback (data) → number of layers
  * detected — used to populate n_layers when kind === 'chromosome'.
  * Optional because computing it requires the schema detector from
- * page1's _data.js, which we don't import here to keep this module
+ * local_pca_dosage's _data.js, which we don't import here to keep this module
  * page-isolated.
  *
  * @param {{name:string, size?:number}} file

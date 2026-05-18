@@ -47,13 +47,13 @@ Function bodies are extracted **verbatim** from the legacy file. No code was mod
 | `window.popgenDotplot` | (lib) | external | Vendor library — popgen dot plot panel renderer. Used by cross_species_breakpoints's `_renderCrossSpeciesDotplot` and multi_species_cockpit's multi-species dotplot rendering. Loaded as a `<script>` tag in the assembled HTML. |
 | `window.popgenFocalVsBg` | (lib) | external | Vendor library — focal-vs-background panel renderer. Used by cross_species_breakpoints's `_renderCrossSpeciesFocalVsBg`. Same loading mechanism. |
 
-The five scrubber draw helpers (`setCur`, `drawZ`, `drawSim`, `drawLinesPanel`, `drawWinSumStrip`) are only invoked from `_csBpJumpToWindow` to repaint the |Z| panel after a cross-species jump, and are wrapped in `typeof === 'function'` guards. **Page16 will degrade gracefully if these are absent.** They will be provided by batch 1's scrubber module (`page1.js` / `inversion_discovery/`). The merge chat wires them via either a shared scrubber bridge or unchanged `window.*` globals.
+The five scrubber draw helpers (`setCur`, `drawZ`, `drawSim`, `drawLinesPanel`, `drawWinSumStrip`) are only invoked from `_csBpJumpToWindow` to repaint the |Z| panel after a cross-species jump, and are wrapped in `typeof === 'function'` guards. **Page16 will degrade gracefully if these are absent.** They will be provided by batch 1's scrubber module (`local_pca_dosage.js` / `inversion_discovery/`). The merge chat wires them via either a shared scrubber bridge or unchanged `window.*` globals.
 
 ---
 
 ## Window-mounted exports (no TODO needed — defined and exported by these modules)
 
-These are functions defined in the extracted modules and explicitly mounted on `window.*` for cross-page consumers (notably the page1 scrubber's canvas hover wiring):
+These are functions defined in the extracted modules and explicitly mounted on `window.*` for cross-page consumers (notably the local_pca_dosage scrubber's canvas hover wiring):
 
 **From cross_species_breakpoints.js:**
 `window._csBpHitTestXFromList`, `window._csBpHitTest2D`, `window._csBpJumpToWindow`, `window._csBpHoverEnter`, `window._csBpHoverLeave`, `window._wireCsBpHoverOnCanvas`, `window._CS_BP_HOVER_TOL_PX`
@@ -85,7 +85,7 @@ The merge chat will decide whether to keep the window-global mount pattern or co
 **Read but not owned (cross-page):**
 - `state.repeatDensity` (boundaries page / boundary_refinement)
 - `state.candidateList` (catalogue / marker_panels)
-- `state.cur`, `state.data` (scrubber / page1)
+- `state.cur`, `state.data` (scrubber / local_pca_dosage)
 
 ---
 

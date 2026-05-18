@@ -482,7 +482,7 @@ export function renderBoundaryTracksHtml(state, opts) {
   overlays += _zoneDiv(bs.staging && bs.staging.boundary_left,  'L');
   overlays += _zoneDiv(bs.staging && bs.staging.boundary_right, 'R');
 
-  // Cursor marker (state.cur is the active window index from page1)
+  // Cursor marker (state.cur is the active window index from local_pca_dosage)
   if (state && Number.isInteger(state.cur) && windows.start_bp && windows.end_bp) {
     const wi = state.cur;
     if (wi >= 0 && wi < windows.start_bp.length) {

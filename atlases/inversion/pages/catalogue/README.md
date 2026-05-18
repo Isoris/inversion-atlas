@@ -26,7 +26,7 @@ Catalogue answers that. The user works through:
 | page | label | summary |
 |------|-------|---------|
 | `catalogue` | catalogue | sortable / filterable table of L2 envelopes (or L1-merged inversions); Turn-146 breeding-card export pipeline (HTML + JSON, tier-gated) |
-| `confirmed_carousel` | confirmed carousel | prev/next walk through `state.candidateList.filter(c => c.confirmed === true)`; reuses page2's renderer |
+| `confirmed_carousel` | confirmed carousel | prev/next walk through `state.candidateList.filter(c => c.confirmed === true)`; reuses candidate_focus's renderer |
 | `marker_panels` | marker panels | diagnostic PCR marker panel cards per candidate; activates when `marker_panel_summary` layer ships |
 | `annotation_cockpit` | annotation cockpit | per-sample-lines canvas with cursor-driven candidate selection (←/→ + Shift / Esc / 0..9 hotkeys); drives `state.tracked` |
 
@@ -49,13 +49,13 @@ Catalogue answers that. The user works through:
 
 ## Cross-page dependencies
 
-- **confirmed_carousel** reuses **page2**'s `renderCandidateMetadata` (each
-  carousel card is a full page2 detail card).
+- **confirmed_carousel** reuses **candidate_focus**'s `renderCandidateMetadata` (each
+  carousel card is a full candidate_focus detail card).
 - **stats_profile** calls **cross_species_breakpoints**'s `_csGetSyntenyBlocks` +
   `_csPermutationTest` (cross-page runtime dep; round 5 step 11
   promoted these from typeof-guarded calls to proper ES exports;
   stats_profile's import-promote is a follow-up task).
-- **annotation_cockpit** mutates `state.tracked` which drives **page1**'s
+- **annotation_cockpit** mutates `state.tracked` which drives **local_pca_dosage**'s
   linkage shading + linkage table.
 
 ## Fresh-implementation pages (legacy was HTML shell only)
@@ -70,9 +70,9 @@ implementations**, not verbatim ports:
   `catalogue/catalogue.js`.
 - **confirmed_carousel** — confirmed-carousel JS does NOT exist in legacy
   (confirmed by grep). Current in `confirmed_carousel/carousel.js`.
-- **page19** lives on disk in `pages/discovery/` but its manifest
+- **negative_regions** lives on disk in `pages/discovery/` but its manifest
   stage is `catalogue` — fresh implementation in
-  `pages/discovery/page19/negative_regions.js`.
+  `pages/discovery/negative_regions/negative_regions.js`.
 
 ## SPECs relevant to catalogue
 
@@ -103,7 +103,7 @@ has a contract.
   body. Reserved for a future synthesis overview (workflow summary,
   candidate counts per stage, layer-presence checklist). Module
   exists so the page registry has a non-throwing entry.
-- **page8 + page19** (negative regions + per-window summary) live
+- **window_summary_table + negative_regions** (negative regions + per-window summary) live
   in `pages/discovery/` but their manifest stage is `catalogue`.
   Don't move files; stage is authoritative.
 
@@ -112,6 +112,6 @@ has a contract.
 Of the 9 pages logically in catalogue stage:
 - 5 live in `pages/catalogue/` (catalogue, confirmed_carousel, marker_panels, annotation_cockpit, overview where the stage is classification but historically grouped here)
 - 3 live in `pages/catalogue/` but have stage=`classification` (stats_profile, marker_readiness, overview)
-- 2 live in `pages/discovery/` but have stage=`catalogue` (page8, page19)
+- 2 live in `pages/discovery/` but have stage=`catalogue` (window_summary_table, negative_regions)
 
 The stage is authoritative for the shell's tab grouping. The dir is historical.

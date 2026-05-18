@@ -1,4 +1,4 @@
-# HANDOFF — page12 local-PCA-θπ MIGRATED; 10 of 22 pages done
+# HANDOFF — local_pca_theta_pi local-PCA-θπ MIGRATED; 10 of 22 pages done
 
 **Date:** 2026-05-07 (chat ~36, round 5 step 10)
 **Reads:** This file FIRST, then the audit log top entry, then
@@ -12,7 +12,7 @@
 ## 30-second orientation
 
 **Page12 (local-PCA-θπ chromosome-wide diversity scanner) is migrated.**
-The θπ sister of page1: same six-panel layout, but reads
+The θπ sister of local_pca_dosage: same six-panel layout, but reads
 `theta_pi_*` layers from `state.data` instead of dosage. Empty-state
 placeholder visible until the R pipeline ships at least one
 `theta_pi_per_window` / `theta_pi_local_pca` / `theta_pi_envelopes`
@@ -24,7 +24,7 @@ reveals the relevant panels (`#thCusumHeroPanel`, `#thSimPanel`,
 The chat-33 stub already had ~1008 LOC of body extracted from legacy
 (lines 53045-54168), with all 8 helpers exported as state-as-first-arg
 top-level functions. **All 13 TODO_MISSING markers were closure-scoped
-false positives** (same finding as page1 round 2): every name
+false positives** (same finding as local_pca_dosage round 2): every name
 (`showHide`, `xToPx`, `kColor`, `q`, `colorFor`, `palette`, `has`,
 `xAt`, `yAt`, `toX`, `toY`, `fillFor`, `yToPx`) has a local
 `const`/`let` declaration inside its calling function. The chat-33
@@ -34,8 +34,8 @@ bodies were already correct).
 
 ```
 atlases/inversion/pages/discovery/
-├── page12.js              1171 LOC ← refactored (was 1008)
-└── page12/
+├── local_pca_theta_pi.js              1171 LOC ← refactored (was 1008)
+└── local_pca_theta_pi/
     └── _state.js            18 LOC ← _pageState + setter
 ```
 
@@ -50,24 +50,24 @@ atlases/inversion/pages/discovery/
 
 ### Step 0 — registry + manifest fix
 
-- `pages.registry.json` page12: added `_label` ("local PCA θπ") +
+- `pages.registry.json` local_pca_theta_pi: added `_label` ("local PCA θπ") +
   long `_doc` documenting the six-panel layout, the four θπ-driving
   layer types, panel visibility wiring, the orthogonal-validation
   rationale (regions hit by BOTH dosage + θπ scrubbers are ~certainly
   real; θπ-only regions are sweeps / balancing selection invisible to
   genotype-based scrubbers), and the SCHEMA §22 reference.
-- `manifest.json` page12: label "page 12" → **"local PCA θπ"**.
+- `manifest.json` local_pca_theta_pi: label "page 12" → **"local PCA θπ"**.
   Stage stays "discovery" (correct).
 
-### Step 1 — page12.js refactored in-place (1008 → 1171 LOC, all additions appended at end)
+### Step 1 — local_pca_theta_pi.js refactored in-place (1008 → 1171 LOC, all additions appended at end)
 
-- Added `import { _pageState, _setActiveState } from './page12/_state.js';`.
+- Added `import { _pageState, _setActiveState } from './local_pca_theta_pi/_state.js';`.
 - **Did NOT modify** any of the 8 verbatim helpers (`_refreshThetaPiLayerStatus`
   through `_drawThPcaPanel`). Their bodies are unchanged from chat-33.
 - **TODO_MISSING block**: replaced with a "RESOLVED" comment block
   documenting that all 13 markers are closure-scoped false positives
   with line-number references to the local declarations. Same lesson
-  as page1 round 2.
+  as local_pca_dosage round 2.
 - Added 8 state-aware wrapper exports (one per verbatim helper):
   `refreshThetaPiLayerStatus(state)`, `refreshThetaPiPanelVisibility(state)`,
   `drawThCusumHero(state)`, `drawThLinesPanel(state)`,
@@ -82,7 +82,7 @@ atlases/inversion/pages/discovery/
   a console.warn fallback so one panel's render error doesn't block
   the others (matches the "graceful degradation" pattern from stats_profile/18).
 - Added `mount(root, atlasState, registry)`, `unmount(root)`, and
-  `_buildLegacyState(atlasState)`. `_buildLegacyState` uses page1's
+  `_buildLegacyState(atlasState)`. `_buildLegacyState` uses local_pca_dosage's
   pattern as reference: cross-atlas slots (`candidate`, `candidateList`,
   `cur`) overlay onto `inv`; `layersPresent` is normalized to a `Set`
   (it must support `.has(name)` calls — the helpers depend on this);
@@ -94,7 +94,7 @@ stats_profile/18: legacy callers reference `_refreshThetaPiLayerStatus()`
 etc. directly. The underscore-prefixed exports stay; the new
 non-prefixed wrappers are purely additive.
 
-### Step 2 — page12/_state.js (NEW, 18 LOC)
+### Step 2 — local_pca_theta_pi/_state.js (NEW, 18 LOC)
 
 Same shape as the other pages.
 
@@ -102,7 +102,7 @@ Same shape as the other pages.
 
 - `tests/test_discovery_page12.js`: replaced (was a stale chat-33
   test that imported from the wrong path
-  `../inversion_discovery/page12.js`). New version: 32 assertions
+  `../inversion_discovery/local_pca_theta_pi.js`). New version: 32 assertions
   covering exports (8 verbatim + 8 wrappers + 3 lifecycle), `_state.js`
   live-binding, no-document tolerance for the 3 helpers that check
   `typeof document === 'undefined'`, null-data tolerance for
@@ -111,7 +111,7 @@ Same shape as the other pages.
   callable when `_pageState` is null. **32/32**.
 - `tests/smoke_discovery_page12_round5.mjs`: NEW (~290 LOC). Full
   mount/render/unmount lifecycle with FakeContext canvas shim plus
-  `document.querySelectorAll('[data-th-layer]')` polyfill (page12's
+  `document.querySelectorAll('[data-th-layer]')` polyfill (local_pca_theta_pi's
   `_refreshThetaPiLayerStatus` queries layer-status indicators by
   data-attribute). Empty-layers mount yields `#thetaPiEmpty` visible,
   all panels hidden, indicators marked "not loaded". **Populated mount
@@ -130,12 +130,12 @@ Same shape as the other pages.
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1/page2/catalogue/confirmed_carousel/marker_panels/stats_profile/marker_readiness/annotation_cockpit/overview modules** — completely unchanged.
+- **local_pca_dosage/candidate_focus/catalogue/confirmed_carousel/marker_panels/stats_profile/marker_readiness/annotation_cockpit/overview modules** — completely unchanged.
 - **`shared/page1_data_helpers.js` / `shared/per_l2_cluster.js` /
   `shared/het_rate.js` / `shared/hungarian.js` / `shared/contingency.js`
   / `shared/kmeans.js` / `shared/color_helpers.js`** — unchanged.
   Page12's existing imports of these are correct.
-- **The 8 verbatim ~1008-LOC helper bodies inside page12.js** —
+- **The 8 verbatim ~1008-LOC helper bodies inside local_pca_theta_pi.js** —
   zero changes. Only the file header and the appended lifecycle
   block are new.
 - **The TODO_MISSING_SLOT markers** (`state._simGeom`, `state._thSimGeom`)
@@ -155,12 +155,12 @@ Same shape as the other pages.
 
 | Page | Folder (logical stage) | Status | LOC | Tests |
 |---|---|---|---|---|
-| page1 | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
-| page2 | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
+| local_pca_dosage | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
+| candidate_focus | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
 | catalogue | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
 | confirmed_carousel | catalogue | ✅ step 7 (single file, stub-preserving) | ~166 | 14+22 |
 | marker_panels | catalogue | ✅ step 9 (factory + new lifecycle) | ~344 | 25+26 |
-| page12 | discovery | ✅ step 10 (verbatim + state-aware wrappers + lifecycle) | ~1189 | 32+29 |
+| local_pca_theta_pi | discovery | ✅ step 10 (verbatim + state-aware wrappers + lifecycle) | ~1189 | 32+29 |
 | stats_profile | synthesis | ✅ step 5 (single file + state bridge) | ~1009 | 34+20 |
 | marker_readiness | synthesis | ✅ step 4 (single file) | ~984 | 46+20 |
 | annotation_cockpit | catalogue | ✅ step 6 (single file) | ~792 | 41+20 |
@@ -171,8 +171,8 @@ Same shape as the other pages.
 **Pages remaining (12 of 22):** karyotype_tier, 5, 6, 7, 8, 11, 15, 16, 16b,
 19, sv_evidence.
 
-**Discovery group status:** 3 of 4 migrated (page1, page2, page12).
-Only **page8, page15, page19** remain in discovery — all are tiny
+**Discovery group status:** 3 of 4 migrated (local_pca_dosage, candidate_focus, local_pca_theta_pi).
+Only **window_summary_table, local_pca_ghsl, negative_regions** remain in discovery — all are tiny
 stubs (<50 LOC each).
 
 ---
@@ -188,11 +188,11 @@ delegate. This is a third migration shape alongside:
   rewired to read `_pageState`)
 - **factory + new lifecycle** (marker_panels/overview — factory verbatim,
   add direct exports alongside)
-- **verbatim helpers + state-aware wrappers** (page12 — 8 helpers each
+- **verbatim helpers + state-aware wrappers** (local_pca_theta_pi — 8 helpers each
   get a wrapper)
 
 **TODO_MISSING false-positive resolution.** Page12 had 13 TODO_MISSING
-markers, all closure-scoped false positives (same as page1 round 2).
+markers, all closure-scoped false positives (same as local_pca_dosage round 2).
 Always run the scope check before extracting/stubbing: a name flagged
 in the header that has a local `const`/`let` declaration in every call
 site is a false positive — delete the marker, leave the body alone.
@@ -220,7 +220,7 @@ do the same.
 
 | Page | Folder | LOC | Notes |
 |---|---|---|---|
-| **page8, 15, 19** | discovery | <50 each | tiny stubs; would close out the discovery group entirely (page8 + page15 + page19 in 1-3 quick rounds) |
+| **window_summary_table, 15, 19** | discovery | <50 each | tiny stubs; would close out the discovery group entirely (window_summary_table + local_pca_ghsl + negative_regions in 1-3 quick rounds) |
 | **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest` (stats_profile), AND likely `computeTrackedLinkageProjection` (annotation_cockpit)** |
 | **help** | comparative | 34 | tiny help-page stub |
 | **karyotype_tier, 6, 7, 11** | review | 122-301 | review-stage pages |
@@ -228,7 +228,7 @@ do the same.
 
 Logical next priorities:
 
-- **Discovery group completion** — page8, 15, 19 are all sub-50 LOC
+- **Discovery group completion** — window_summary_table, 15, 19 are all sub-50 LOC
   stubs. Closing them out (in 1-3 rounds depending on Quentin's
   one-page-at-a-time tempo) would mean the entire discovery group is
   migrated.

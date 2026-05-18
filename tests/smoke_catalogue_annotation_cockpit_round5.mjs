@@ -31,7 +31,7 @@ function check(label, cond, extra) {
 function group(name) { console.log('\n--- ' + name + ' ---'); }
 
 // -----------------------------------------------------------------------------
-// Minimal DOM polyfill — same shape as page1/2/3/17/18 smoke harnesses.
+// Minimal DOM polyfill — same shape as local_pca_dosage/2/3/17/18 smoke harnesses.
 // Adds canvas-context shim because annotation_cockpit's draw path uses canvas extensively.
 // -----------------------------------------------------------------------------
 

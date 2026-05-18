@@ -188,7 +188,7 @@ unwritten and surface a TODO in the page header.
 |------------|-----------------|
 | `localStorage.setItem('myAtlas.foo', ...)` from a page | Add slot to `slots.registry.json` with `persist: true`; assign to `atlasState.<atlas_id>.foo`. AtlasState handles localStorage round-trip. |
 | `window.MY_SHARED_CACHE = {...}` | Add a `layer_entry` with `tier: "warm"`; `registry.resolve()` is the cache. |
-| `import { state as page1State } from '../page1/_state.js'` (from page2) | Page1 should publish what page2 needs via a shared slot or a writable layer. Page2 reads through atlasState/registry. |
+| `import { state as page1State } from '../local_pca_dosage/_state.js'` (from candidate_focus) | Page1 should publish what candidate_focus needs via a shared slot or a writable layer. Page2 reads through atlasState/registry. |
 | Direct `fetch('http://localhost:8000/api/...')` in a page | Add an `operation_entry`; call `registry.resolve()`. |
 | New `window.addEventListener('myAtlasEvent', ...)` for cross-page signal | Use `atlasState.subscribe('<event_name>', cb)` / `atlasState.emit(...)`. |
 

@@ -116,7 +116,7 @@ Same shape as the other pages.
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1/page2/catalogue/confirmed_carousel/stats_profile/marker_readiness/annotation_cockpit/overview modules** — completely unchanged.
+- **local_pca_dosage/candidate_focus/catalogue/confirmed_carousel/stats_profile/marker_readiness/annotation_cockpit/overview modules** — completely unchanged.
 - **`shared/page1_data_helpers.js`** — unchanged.
 - **The verbatim legacy render body** (137 LOC inside `wirePage10`) —
   zero changes. Only the factory header (`_setActiveState(state)` injection)
@@ -132,8 +132,8 @@ Same shape as the other pages.
 
 | Page | Folder (logical stage) | Status | LOC | Tests |
 |---|---|---|---|---|
-| page1 | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
-| page2 | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
+| local_pca_dosage | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
+| candidate_focus | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
 | catalogue | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
 | confirmed_carousel | catalogue | ✅ step 7 (single file, stub-preserving) | ~166 | 14+22 |
 | marker_panels | catalogue | ✅ step 9 (factory + new lifecycle) | ~344 | 25+26 |
@@ -149,7 +149,7 @@ Same shape as the other pages.
 
 🎉 **CATALOGUE GROUP COMPLETE.** All catalogue + synthesis pages
 migrated. The remaining work is split across:
-- **Discovery** (4 pages remaining): page8, 12, 15, 19
+- **Discovery** (4 pages remaining): window_summary_table, 12, 15, 19
 - **Comparative** (3 pages remaining): help, 16, 16b
 - **Review** (5 pages remaining): karyotype_tier, 6, 7, 11, sv_evidence
 
@@ -186,17 +186,17 @@ discovery, comparative, and review. Reasonable next candidates:
 
 | Page | Folder | LOC | Notes |
 |---|---|---|---|
-| **page12** | discovery | 1008 | 18 TODOs — substantial; closes the next-largest discovery page |
+| **local_pca_theta_pi** | discovery | 1008 | 18 TODOs — substantial; closes the next-largest discovery page |
 | **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest` (stats_profile), AND likely `computeTrackedLinkageProjection` (annotation_cockpit)** |
-| **page8, 15, 19** | discovery | <50 each | tiny stubs; quick router-wiring rounds |
+| **window_summary_table, 15, 19** | discovery | <50 each | tiny stubs; quick router-wiring rounds |
 | **help** | comparative | 34 | tiny help-page stub |
 | **karyotype_tier, 6, 7, 11** | review | 122-301 | review-stage pages |
 | **sv_evidence** | review | 148 | SV evidence review |
 
 Logical next priorities:
 
-- **Discovery group completion** — page12 is the substantial discovery
-  page; page8, 15, 19 are tiny. Tackling page12 first leaves the
+- **Discovery group completion** — local_pca_theta_pi is the substantial discovery
+  page; window_summary_table, 15, 19 are tiny. Tackling local_pca_theta_pi first leaves the
   stubs as a single quick batch.
 - **Comparative cockpit** — cross_species_breakpoints/multi_species_cockpit is the most ambitious
   remaining; resolves the most runtime guards across stats_profile + annotation_cockpit.

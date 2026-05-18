@@ -163,7 +163,7 @@ export function refreshPopstatsPage() {
  * Public entry — state-aware wrapper around showPopstatsPage.
  *
  * If `state` is passed, sets _pageState as a side effect before delegating
- * (mirrors ancestry_per_window/confirmed_carousel/page15/help wrapper pattern). The chat-33
+ * (mirrors ancestry_per_window/confirmed_carousel/local_pca_ghsl/help wrapper pattern). The chat-33
  * showPopstatsPage signature already takes state as an explicit arg, so
  * the wrapper just threads _pageState into it.
  */

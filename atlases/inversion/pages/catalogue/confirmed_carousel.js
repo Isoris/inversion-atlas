@@ -25,15 +25,15 @@
 //   "Carousel walk-through of all candidates marked confirmed on page 2."
 //   - state.candidateList.filter(c => c.confirmed === true)
 //   - prev/next buttons cycle through the confirmed set
-//   - reuses the page2 candidate-focus rendering for the current candidate
+//   - reuses the candidate_focus candidate-focus rendering for the current candidate
 //
 // External dependencies (when wired up):
 //   TODO_MISSING(_renderConfirmedCarousel)
 //     — full carousel renderer (does not exist yet in legacy)
 //   TODO_MISSING(_wireConfirmedCarouselNav)
 //     — keydown ←/→ + button click handlers (does not exist yet)
-//   TODO_MISSING(renderCandidateFocus)  — owned by Batch 1 (page2)
-//     — the confirmed_carousel carousel reuses page2's candidate-focus renderer for
+//   TODO_MISSING(renderCandidateFocus)  — owned by Batch 1 (candidate_focus)
+//     — the confirmed_carousel carousel reuses candidate_focus's candidate-focus renderer for
 //       the currently-displayed confirmed candidate
 //   global `state`                — reads state.candidateList,
 //                                   state.confirmedCarouselIndex (new)

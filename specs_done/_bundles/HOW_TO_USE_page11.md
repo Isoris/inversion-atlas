@@ -171,7 +171,7 @@ Hotkey discipline:
 
 ## How to run
 
-1. **Pick a candidate** (cross-page slot — same as page2 / karyotype_tier):
+1. **Pick a candidate** (cross-page slot — same as candidate_focus / karyotype_tier):
    the candidate dropdown `#bndCandSelect` is populated by
    `populateCandidateSelect(state)` from `state.candidateList`.
    Both the dropdown and the prev/next nav bar above the toolbar
@@ -198,7 +198,7 @@ Hotkey discipline:
    - `#bndFocalVsBg` — focal-vs-background statistical widget
 
 5. **Refine manually** if needed:
-   - Move page1's cursor (state.cur) to a different window
+   - Move local_pca_dosage's cursor (state.cur) to a different window
    - Hit `E` to set the left edge there; `F` for the right
 
 6. **Save** (`B` or the "save" button) — persists the boundary
@@ -255,10 +255,10 @@ Hotkey discipline:
 ## Common gotchas
 
 1. **"`E` / `F` does nothing."** The override-at-cursor hotkeys
-   require `state.cur` to be a finite number. If page1 hasn't been
+   require `state.cur` to be a finite number. If local_pca_dosage hasn't been
    mounted on the same chromosome (or the cursor hasn't been set
    yet), `state.cur` is null/undefined and the hotkey is a no-op.
-   Move the cursor on page1 first.
+   Move the cursor on local_pca_dosage first.
 
 2. **"Auto-propose returned nothing."** The scan range is
    determined by `boundaryScanRange(cand, SCAN_RADIUS_BP, chromLen,

@@ -7,7 +7,7 @@
 //
 // 17 helpers extracted byte-verbatim from legacy/Inversion_atlas.html
 // (call closure starting from _wireCatalogueBreedingExportBtns at
-// legacy line 23668). Bodies that read bare `state` get the page1
+// legacy line 23668). Bodies that read bare `state` get the local_pca_dosage
 // round-4 shim pattern: `const state = _pageState;` injected as the
 // first statement.
 //

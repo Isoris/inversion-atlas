@@ -5,15 +5,15 @@
 ## Purpose
 
 Carousel walk-through of all candidates marked **confirmed** on
-page2. `state.candidateList.filter(c => c.confirmed === true)`.
+candidate_focus. `state.candidateList.filter(c => c.confirmed === true)`.
 Prev/next buttons cycle through the confirmed set; each card reuses
-page2's candidate-detail renderer.
+candidate_focus's candidate-detail renderer.
 
 ## Capabilities
 
 - Render a nav bar with prev / next buttons and a position counter.
 - Render the active confirmed candidate as a full detail card
-  (delegates to page2's `renderCandidateMetadata`).
+  (delegates to candidate_focus's `renderCandidateMetadata`).
 - Show an empty-state when no candidates are confirmed.
 
 ## Required data
@@ -29,7 +29,7 @@ page2's candidate-detail renderer.
 ## Outputs
 
 Preview-only — no committable outputs. Commit gestures (confirm /
-unconfirm) happen on page2.
+unconfirm) happen on candidate_focus.
 
 ## Sub-modules in `confirmed_carousel/`
 

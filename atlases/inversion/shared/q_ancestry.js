@@ -1,7 +1,7 @@
 // shared/q_ancestry.js
 //
 // Q-association ancestry coloring. Drives the q_ancestry sample-color
-// mode in page1/_state.js getSampleColor + the Q-proportion legend
+// mode in local_pca_dosage/_state.js getSampleColor + the Q-proportion legend
 // swap. Per-fish Q-vectors come from the NGSadmix K=2..20 precomp
 // sweep; this module owns selection (which K is active), lookup,
 // color resolution (hard / blend), and legend bars.
@@ -22,7 +22,7 @@
 // qaRegisterK() becomes a registry.write('q_ancestry', {K}, payload)
 // call and the in-memory _all_K cache becomes a thin read-through.
 //
-// Page-isolation: this is shared/, not page1/. Any page that wants
+// Page-isolation: this is shared/, not local_pca_dosage/. Any page that wants
 // to color by ancestry imports from here.
 
 // =====================================================================

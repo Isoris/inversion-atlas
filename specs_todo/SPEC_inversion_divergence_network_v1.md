@@ -37,7 +37,7 @@ The diagram only makes sense in the context of a single candidate's
 karyotype calls. It belongs alongside the PCA scatter and the heatmap,
 not as a separate top-level page. Implementation:
 
-- One new panel that mounts under the page1 PCA scatter when a
+- One new panel that mounts under the local_pca_dosage PCA scatter when a
   candidate is active (`state.candidate` non-null and has K + locked_labels)
 - Empty-state placeholder when the candidate is missing or has K=1
 - Rebuilds whenever `state.candidate`, `state.cur`, or the candidate's
@@ -57,7 +57,7 @@ computeDivergenceNetwork(state, candidate, karyotypeBySample, opts?)
 
 | Arg | Shape | Source |
 |---|---|---|
-| `state` | the page1 state object | `state.data.windows[]`, `state.data.n_samples` |
+| `state` | the local_pca_dosage state object | `state.data.windows[]`, `state.data.n_samples` |
 | `candidate` | a candidate-registry entry | `{id, chrom, K, start_w, end_w, locked_labels?}` |
 | `karyotypeBySample` | per-sample label dict OR Array | `{0: 'STD', 1: 'HET', 2: 'INV', ...}` or `['STD', 'HET', ...]` |
 | `opts.source` | `'pc1'` or `'dosage'` | which per-sample value drives the math (default `'pc1'`) |
@@ -232,7 +232,7 @@ The compute step returns pure stats. The render-hints step adds:
   the user's locked_haplotype_labels, or a future inheritance-group
   layer.
 
-The pure data layer (this spec) lands first. The page1 panel wiring
+The pure data layer (this spec) lands first. The local_pca_dosage panel wiring
 (canvas/svg + hover + click-to-track) is a follow-up.
 
 ## 8. v1 vs future

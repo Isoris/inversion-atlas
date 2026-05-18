@@ -1,6 +1,6 @@
 // tests/test_page1_l2_sweep.js
 //
-// Unit tests for pages/discovery/page1/l2_sweep.js — the auto-promote
+// Unit tests for pages/discovery/local_pca_dosage/l2_sweep.js — the auto-promote
 // pipeline that turns interesting L2 envelopes into candidates when
 // state.l2SweepEnabled is true.
 
@@ -15,7 +15,7 @@ import {
   addL2SweepDismissed,
   invalidateL2SweepCache,
   autoPromoteFromSweep,
-} from '../atlases/inversion/pages/discovery/page1/l2_sweep.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/l2_sweep.js';
 import {
   ClusterCache,
   contextFromState,

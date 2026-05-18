@@ -71,7 +71,7 @@
   },
 
   "known_issues": [
-    "Owns 6 JSON layers — heaviest layer load of any page after page1.",
+    "Owns 6 JSON layers — heaviest layer load of any page after local_pca_dosage.",
     "Cross-page read from cross_species_breakpoints (state.crossSpecies) — fragile coupling; if cross_species_breakpoints hasn't been mounted on the same chromosome, behaviour is empty-state."
   ],
   "confidence": "high"

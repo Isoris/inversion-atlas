@@ -51,7 +51,7 @@ When atlas-core ships its own copy:
   <!-- one page button per page in the active atlas's manifest.pages.
        Page buttons have data-stage matching one of the declared
        stages. -->
-  <button data-page="page1" data-stage="discovery"
+  <button data-page="local_pca_dosage" data-stage="discovery"
           class="active">1 local PCA |z|</button>
 </nav>
 ```
@@ -94,7 +94,7 @@ the atlas provides a hue.
 
 ## 3. Precomp loader — STILL A STUB, atlas-core needs to wire it
 
-`pages/discovery/page1/sidebar.js:404` currently warns and exits:
+`pages/discovery/local_pca_dosage/sidebar.js:404` currently warns and exits:
 
 ```js
 console.warn('[sidebar TODO] #fileInput → loadMultipleJSONs not ported '
@@ -111,11 +111,11 @@ console.warn('[sidebar TODO] #fileInput → loadMultipleJSONs not ported '
      `legacy/Inversion_atlas.html` — schema v1 vs v2),
    - merges into `atlasState.inversion.data` keyed by chrom or
      layer name.
-2. After load completes, call **`page1.applyData(legacyState, data)`**
-   (exported from `pages/discovery/page1.js:91`) so the page
+2. After load completes, call **`local_pca_dosage.applyData(legacyState, data)`**
+   (exported from `pages/discovery/local_pca_dosage.js:91`) so the page
    re-renders.
 3. Update `#schemaBadge` (the v1/v2 indicator) — `pages/discovery/
-   page1.js:281-287` already has the rendering code; atlas-core just
+   local_pca_dosage.js:281-287` already has the rendering code; atlas-core just
    needs to trigger that path with the right `state.schemaVersion`.
 
 ### What's missing on the cartridge side (lower priority)
@@ -156,7 +156,7 @@ the shell so the button comes after the pills.
 
 - Port `#jsScriptsBadge` updater from legacy (see §3 above).
 - Once atlas-core ships its loader: de-stub
-  `pages/discovery/page1/sidebar.js` (`#fileInput`, `#chromSelect`,
+  `pages/discovery/local_pca_dosage/sidebar.js` (`#fileInput`, `#chromSelect`,
   `#clearJsonCacheBtn` handlers).
 - Once atlas-core ships its chrome: delete cartridge copies of
   `atlas_chrome.{js,css}` and remove the manifest stylesheet entry.

@@ -1,4 +1,4 @@
-# HANDOFF — page1 SPLIT done (10 sub-modules); next is page2 migration
+# HANDOFF — local_pca_dosage SPLIT done (10 sub-modules); next is candidate_focus migration
 
 **Date:** 2026-05-06 (chat ~35, round 4)
 **Reads:** This file FIRST, then `HANDOFF_2026-05-06_chat34_page2_plan.md`
@@ -11,18 +11,18 @@
 
 ## 30-second orientation
 
-**page1 is split.** The 6684-LOC monolith from chat 34 (eighth pass) is
+**local_pca_dosage is split.** The 6684-LOC monolith from chat 34 (eighth pass) is
 now a slim entry-point module plus 9 cohesive sub-modules under
-`atlases/inversion/pages/discovery/page1/`. **Every public export is
-preserved** (the manifest's `module: "page1.js"` contract is unchanged).
+`atlases/inversion/pages/discovery/local_pca_dosage/`. **Every public export is
+preserved** (the manifest's `module: "local_pca_dosage.js"` contract is unchanged).
 **Every named definition from the pre-split file is still present** —
 verified by a 90-name symbol-level diff (0 added, 0 removed).
 
 ```
 atlases/inversion/pages/discovery/
-├── page1.js                       431 LOC ← entry point, mount/unmount/applyData
-├── page1.js.bak                  6684 LOC ← pre-split reference (delete after round 5)
-└── page1/
+├── local_pca_dosage.js                       431 LOC ← entry point, mount/unmount/applyData
+├── local_pca_dosage.js.bak                  6684 LOC ← pre-split reference (delete after round 5)
+└── local_pca_dosage/
     ├── _state.js                  185 LOC ← _pageState (export let), color helpers
     ├── _data.js                   643 LOC ← schema, indexing, accessors, view ctrl
     ├── sim_panel.js               451 LOC ← drawSim, drawSimMini
@@ -40,21 +40,21 @@ chain via setCur(state, 25), per-fn direct calls, unmount cleanup, and a
 `_pageState` live-binding micro-test across module boundaries.
 
 **`tests/test_discovery_page1.js` updated**: stale path fixed
-(`../inversion_discovery/page1.js` → `../atlases/inversion/pages/discovery/page1.js`)
+(`../inversion_discovery/local_pca_dosage.js` → `../atlases/inversion/pages/discovery/local_pca_dosage.js`)
 and extended with sub-module export-coverage checks. **61/61 assertions
 pass** when run against an assembled workspace.
 
-**Next round (round 5): page2 migration.** Plan in
-`HANDOFF_2026-05-06_chat34_page2_plan.md`. Recipe is the same as page1's
+**Next round (round 5): candidate_focus migration.** Plan in
+`HANDOFF_2026-05-06_chat34_page2_plan.md`. Recipe is the same as local_pca_dosage's
 eighth pass + this round's split, with a **new cross-cutting question
-to answer first**: helpers shared between page1 and page2 should move
+to answer first**: helpers shared between local_pca_dosage and candidate_focus should move
 to `shared/`. See "Round-5 prep" below.
 
 ---
 
 ## What this round shipped
 
-### 9 new sub-modules under `pages/discovery/page1/`
+### 9 new sub-modules under `pages/discovery/local_pca_dosage/`
 
 | File | LOC | Concerns |
 |---|---|---|
@@ -71,7 +71,7 @@ to `shared/`. See "Round-5 prep" below.
 Largest file (z_panel.js) is 1375 LOC — fits Quentin's "easier to work
 with" criterion (down from 6684).
 
-### Slim main `page1.js` (431 LOC)
+### Slim main `local_pca_dosage.js` (431 LOC)
 
 Holds:
 1. **All cross-shell external imports** (`escapeHtml` from page1_utils,
@@ -79,8 +79,8 @@ Holds:
 2. **Sub-module imports** for the helpers `applyData` calls into
    (8 from `_data`, 2 from `candidates`, 1 from `_state`, plus the public
    set used by `mount`).
-3. **Public re-exports** (`export {drawSim, ...} from './page1/sim_panel.js'`
-   etc.) so the manifest's `module: "page1.js"` import contract is
+3. **Public re-exports** (`export {drawSim, ...} from './local_pca_dosage/sim_panel.js'`
+   etc.) so the manifest's `module: "local_pca_dosage.js"` import contract is
    preserved with zero manifest edits.
 4. **`applyData` body** — kept in main because it orchestrates calls
    across every sub-module. Putting it in `_data.js` would mean `_data`
@@ -111,12 +111,12 @@ top-of-body injection.
 
 This works **because only one page is mounted at a time** (the
 atlas-router's unmount-old → mount-new pattern). Cross-page contamination
-is impossible. For round 5 (page2), helpers shared between pages will
+is impossible. For round 5 (candidate_focus), helpers shared between pages will
 need a different strategy — see "Round-5 prep" below.
 
 ### Body extraction discipline
 
-Bodies are extracted **byte-verbatim** from `page1.js.bak`:
+Bodies are extracted **byte-verbatim** from `local_pca_dosage.js.bak`:
 - Every comment, every blank line, every legacy-line annotation preserved.
 - The only programmatic mutation is `export ` prefix injection: each
   name imported by another sub-module gets `export` prepended once
@@ -128,24 +128,24 @@ The split was done by `/home/claude/work/split_page1.py` — a one-shot
 extraction tool. Brace-matches function bodies, computes cross-module
 deps via tight regex, computes the `must_export` set as the union of
 "imported by another module" and "in PUBLIC_EXPORTS for re-export by
-main", writes the 10 files. ~930 LOC. Saved in case page2/3/4 want to
+main", writes the 10 files. ~930 LOC. Saved in case candidate_focus/3/4 want to
 crib from it.
 
 ---
 
 ## What this round did NOT touch
 
-- **HTML fragment** (`page1.html`) — unchanged.
+- **HTML fragment** (`local_pca_dosage.html`) — unchanged.
 - **CSS** (`inversion.css`) — unchanged.
 - **Manifest** (`pages.registry.json` & friends) — unchanged. The split
-  preserves the `module: "page1.js"` contract exactly.
+  preserves the `module: "local_pca_dosage.js"` contract exactly.
 - **atlas-core engine** — unchanged (9/9 parse-clean; engine tests not
   re-run this round, but no atlas-core file was modified).
 - **Server, schemas, master_config** — unchanged. JS-only.
 - **Cross-page `shared/` hoisting** — explicitly deferred to round 5
-  per the page2 plan. The pure-on-state helpers in `_data.js` are
+  per the candidate_focus plan. The pure-on-state helpers in `_data.js` are
   the prime candidates.
-- **Sibling pages** (page2, page8, page12, page15, page19) — only
+- **Sibling pages** (candidate_focus, window_summary_table, local_pca_theta_pi, local_pca_ghsl, negative_regions) — only
   parse-checked, not modified.
 
 ---
@@ -154,8 +154,8 @@ crib from it.
 
 ```
 node --check on all 10 modules:                               PASS (10/10)
-Symbol-level diff vs page1.js.bak:                            PASS (90 names, 0 added, 0 removed)
-Module load (dynamic import of page1.js, all 28 exports):     PASS (28/28)
+Symbol-level diff vs local_pca_dosage.js.bak:                            PASS (90 names, 0 added, 0 removed)
+Module load (dynamic import of local_pca_dosage.js, all 28 exports):     PASS (28/28)
 Smoke test (mount → applyData → setCur → unmount):            PASS (33/33)
 tests/test_discovery_page1.js (path fixed + sub-module checks): PASS (61/61)
 ```
@@ -182,9 +182,9 @@ The 33-assertion smoke test verifies, against synthetic data
 
 ---
 
-## Round-5 prep (read before starting page2)
+## Round-5 prep (read before starting candidate_focus)
 
-The page2 plan (`HANDOFF_2026-05-06_chat34_page2_plan.md`) flags **Step 5
+The candidate_focus plan (`HANDOFF_2026-05-06_chat34_page2_plan.md`) flags **Step 5
 — Cross-page imports** as a key decision. After round 4, the answer is
 much clearer:
 
@@ -195,17 +195,17 @@ first arg. Drop the `_pageState` shim only on the hoisted helpers.**
 Quentin's chat-35 framing: *"I feel like using a shared/ if its for a
 function why not."*
 
-**Why not just keep them in `page1/_data.js` and have page2 import them?**
-Because every helper in `page1/_data.js` reads `_pageState` from
-`page1/_state.js`. If page2's `lines_panel` (or wherever) imports
-`getPC` from `page1/_data.js`, then page2's mount sets page1's
-`_pageState` — but page1 isn't mounted, so the chain works by accident
+**Why not just keep them in `local_pca_dosage/_data.js` and have candidate_focus import them?**
+Because every helper in `local_pca_dosage/_data.js` reads `_pageState` from
+`local_pca_dosage/_state.js`. If candidate_focus's `lines_panel` (or wherever) imports
+`getPC` from `local_pca_dosage/_data.js`, then candidate_focus's mount sets local_pca_dosage's
+`_pageState` — but local_pca_dosage isn't mounted, so the chain works by accident
 (only because the atlas-router unmounts old pages first). It's safer
 to make hoisted helpers state-explicit.
 
 **Helpers that are good candidates for `shared/` hoisting:**
 
-From `page1/_data.js`:
+From `local_pca_dosage/_data.js`:
 - `getPC(state, winIdx)`, `getPCByAxis(state, winIdx, axis)`,
   `getPCRender(state, winIdx, axisX, axisY)`, `availablePCs(state)`
 - `getL2Cluster(state, l2idx)`, `getL2ClusterAt(state, l2idx, K)`
@@ -226,7 +226,7 @@ These are **already state-aware first-arg helpers** — they don't read
 shim was added). So hoisting them is just a **file move + import path
 update** — no body edits.
 
-From `page1/_state.js`:
+From `local_pca_dosage/_state.js`:
 - `FAMILY_PALETTE_BASE`, `FAMILY_COLOR_*` constants — these are pure
   data, can move to `shared/state_constants.js` or similar.
 - The color helpers (`trackedColor`, `_vColor`, `_lineageColor`, etc.)
@@ -234,15 +234,15 @@ From `page1/_state.js`:
   refactored to take `state` (or `(state, si)`) as first arg. Defer.
 
 **Recommended round-5 ordering:**
-1. Resolve the page2 registry-entry mismatch (Step 0 in page2 plan).
-2. Move the pure-on-state helpers from `page1/_data.js` to
-   `shared/page1_data_helpers.js` (or similar). Update `page1/_data.js`
-   to re-export them so existing page1 panel modules don't break. Verify
+1. Resolve the candidate_focus registry-entry mismatch (Step 0 in candidate_focus plan).
+2. Move the pure-on-state helpers from `local_pca_dosage/_data.js` to
+   `shared/page1_data_helpers.js` (or similar). Update `local_pca_dosage/_data.js`
+   to re-export them so existing local_pca_dosage panel modules don't break. Verify
    smoke test still 33/33.
-3. THEN start the page2 migration following the same recipe used for
-   page1's eighth pass + this round's split.
+3. THEN start the candidate_focus migration following the same recipe used for
+   local_pca_dosage's eighth pass + this round's split.
 
-The page2 plan suggests this exact sequence and the recipe is now mature.
+The candidate_focus plan suggests this exact sequence and the recipe is now mature.
 
 ---
 

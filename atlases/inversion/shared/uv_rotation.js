@@ -7,7 +7,7 @@
 // v = orthogonal residual.
 //
 // Used by both the L2 rotation cache and the slab UV rotation path on
-// page1. The legacy code keeps the cache slot keyed by L2 idx or
+// local_pca_dosage. The legacy code keeps the cache slot keyed by L2 idx or
 // (s, e) slab — those callers go in legacy for now. This module
 // extracts the pure compute portion (Phase 2 of UV rotation).
 //

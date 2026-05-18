@@ -5,7 +5,7 @@
 // page). **THE FINAL MIGRATION** (review group: 4 of 5 → 5 of 5;
 // MIGRATION COMPLETE 21/21). Pattern 2 (single-file with _state.js)
 // applied; closest peers are karyotype_tier (step 21, the direct template),
-// page12 (step 10), stats_profile (step 5).
+// local_pca_theta_pi (step 10), stats_profile (step 5).
 //
 // boundary_refinement has 4 chat-33 functions, all preserved verbatim. Unlike
 // karyotype_tier (which got manual AST shims into 2 of 4 helpers), boundary_refinement

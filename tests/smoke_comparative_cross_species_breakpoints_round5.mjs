@@ -41,7 +41,7 @@ function check(label, cond, extra) {
 function group(name) { console.log('\n--- ' + name + ' ---'); }
 
 // -----------------------------------------------------------------------------
-// Minimal DOM polyfill — same shape as page1/2/3/9/10/12/17/18/21 smoke
+// Minimal DOM polyfill — same shape as local_pca_dosage/2/3/9/10/12/17/18/21 smoke
 // harnesses. Adds canvas-context shim because cross_species_breakpoints's render path uses
 // canvas (#csIdeogramCanvas + flank chart canvases). Adds insertAdjacentHTML
 // because the ideogram building uses it.

@@ -106,20 +106,20 @@ Same playbook as stats_profile/18 (rounds 5 step 4-5):
 **TODO_MISSING resolution:**
 
 - **`_esc`** (×61 unguarded uses) — RESOLVED via import from
-  `shared/page1_data_helpers.js` (added round 5 step 2 for page2).
+  `shared/page1_data_helpers.js` (added round 5 step 2 for candidate_focus).
   All 61 uses now resolve to the shared helper.
 - **`_getRepeatDensity`** (×3 sites at lines 494/826/1080) —
   KEPT as runtime guard (`typeof _getRepeatDensity === 'function' ?
   _getRepeatDensity(chrom) : null`). Lives at legacy line 14477
-  (page2/repeat_density territory). Graceful degradation when not
+  (candidate_focus/repeat_density territory). Graceful degradation when not
   loaded.
 - **`setCur`, `drawZ`, `drawSim`, `drawLinesPanel`, `drawWinSumStrip`** —
   KEPT as runtime guards. Each has a single typeof-guarded call site
   triggering a cross-panel re-render after a cs-bp click jumps the
   scrubber. Page1 NOW exports all four (`drawSim`, `drawZ`,
   `drawLinesPanel`, `setCur`), but promoting these to imports would
-  couple cross_species_breakpoints to page1's module load order. Runtime guards preserve
-  graceful degradation when page1 isn't mounted. (`drawWinSumStrip` is
+  couple cross_species_breakpoints to local_pca_dosage's module load order. Runtime guards preserve
+  graceful degradation when local_pca_dosage isn't mounted. (`drawWinSumStrip` is
   not defined in legacy at all — optional hook.)
 - **`window.popgenDotplot`, `window.popgenFocalVsBg`** — KEPT as
   runtime guards. External vendor libs.
@@ -189,8 +189,8 @@ the strategic value (stats_profile guard-resolution).
 - **Page renumbering** — deferred per Quentin's directive.
 - **Toolkit-registry vs Atlas-state cache decisions** — deferred.
 - **`computeTrackedLinkageProjection`** — confirmed during audit:
-  this function lives at legacy line 46751, inside page2-territory
-  chunks (not cross_species_breakpoints/multi_species_cockpit). Will land when page2's missing
+  this function lives at legacy line 46751, inside candidate_focus-territory
+  chunks (not cross_species_breakpoints/multi_species_cockpit). Will land when candidate_focus's missing
   helpers eventually surface. Not part of this round.
 
 ---
@@ -199,12 +199,12 @@ the strategic value (stats_profile guard-resolution).
 
 | Page | Folder (logical stage) | Status | LOC | Tests |
 |---|---|---|---|---|
-| page1 | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
-| page2 | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
+| local_pca_dosage | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
+| candidate_focus | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
 | catalogue | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
 | confirmed_carousel | catalogue | ✅ step 7 (single file, stub-preserving) | ~166 | 14+22 |
 | marker_panels | catalogue | ✅ step 9 (factory + new lifecycle) | ~344 | 25+26 |
-| page12 | discovery | ✅ step 10 (verbatim + state-aware wrappers + lifecycle) | ~1189 | 32+29 |
+| local_pca_theta_pi | discovery | ✅ step 10 (verbatim + state-aware wrappers + lifecycle) | ~1189 | 32+29 |
 | **cross_species_breakpoints** | **comparative** | **✅ step 11 (AST shim injection + explicit exports + lifecycle)** | **~2776** | **40+23** |
 | stats_profile | synthesis | ✅ step 5 (single file + state bridge) | ~1009 | 34+20 |
 | marker_readiness | synthesis | ✅ step 4 (single file) | ~984 | 46+20 |
@@ -216,8 +216,8 @@ the strategic value (stats_profile guard-resolution).
 **Pages remaining (11 of 22):** karyotype_tier, 5, 6, 7, 8, 11, 15, 16b, 19,
 sv_evidence.
 
-**Discovery group status:** 3 of 4 migrated (page1, page2, page12).
-Only **page8 (23 LOC stub), page15 (42 LOC stub), page19 (23 LOC stub)**
+**Discovery group status:** 3 of 4 migrated (local_pca_dosage, candidate_focus, local_pca_theta_pi).
+Only **window_summary_table (23 LOC stub), local_pca_ghsl (42 LOC stub), negative_regions (23 LOC stub)**
 remain in discovery — all sub-50-LOC stubs.
 
 **Comparative group status:** 1 of 3 migrated (cross_species_breakpoints). Remaining:
@@ -232,7 +232,7 @@ first migration that closes a cross-page runtime-guard. The pattern
 is repeatable: when page A's verbatim helpers are runtime-guarded
 in page B, migrating A makes the helpers explicit exports, and B
 can then promote its guards to imports. Future candidates of the
-same shape will surface as more pages migrate (e.g., page2's
+same shape will surface as more pages migrate (e.g., candidate_focus's
 `computeTrackedLinkageProjection` will eventually unblock something).
 
 **AST shim injection scaling.** The patcher used here (50 functions,
@@ -244,7 +244,7 @@ rather than substring matches because the docstring now mentions the
 shim text.
 
 **The "preserved underscore-prefix" pattern is mature.** Every
-verbatim-body migration round (stats_profile, marker_readiness, annotation_cockpit, page12,
+verbatim-body migration round (stats_profile, marker_readiness, annotation_cockpit, local_pca_theta_pi,
 cross_species_breakpoints) keeps the chat-33 underscore-prefixed bodies AS exports for
 backward compat with legacy direct callers, and adds non-prefixed
 state-aware wrappers (`renderXxx(state)`) for the new lifecycle. Cost:
@@ -268,7 +268,7 @@ the same proof pattern.
 | Page | Folder | LOC | Notes |
 |---|---|---|---|
 | **stats_profile guard promotion** | synthesis (post-migration cleanup) | ~5 LOC delta | promote stats_profile's runtime guards for `_csGetSyntenyBlocks` + `_csPermutationTest` to imports — payoff round for step 11 |
-| **page8, 15, 19** | discovery | <50 each | tiny stubs; would close out discovery group entirely (3 quick rounds) |
+| **window_summary_table, 15, 19** | discovery | <50 each | tiny stubs; would close out discovery group entirely (3 quick rounds) |
 | **multi_species_cockpit** | comparative | 2417 LOC | multi-species cockpit; no cross-page helper exposures, but second-largest unmigrated page |
 | **help** | comparative | 34 LOC | tiny help-page stub |
 | **karyotype_tier, 6, 7, 11** | review | 122-301 LOC | review-stage pages |
@@ -280,7 +280,7 @@ Logical next priorities:
   runtime guards to imports, removes the `typeof X === 'function'`
   pattern in stats_profile, and demonstrates the cross-page guard-resolution
   mechanic end-to-end.
-- **Discovery group completion** — page8, 15, 19 are all sub-50-LOC.
+- **Discovery group completion** — window_summary_table, 15, 19 are all sub-50-LOC.
   Closing them out would mean the entire discovery group is migrated.
 - **multi_species_cockpit** — most ambitious remaining pre-cleanup migration.
 - **Review pages** — 5 pages, manageable.

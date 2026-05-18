@@ -1,6 +1,6 @@
 // tests/test_page1_enrichment.js
 //
-// Unit tests for pages/discovery/page1/enrichment.js — the
+// Unit tests for pages/discovery/local_pca_dosage/enrichment.js — the
 // enrichment-layer merge that runs whenever the user drops a partial
 // JSON onto an already-loaded chromosome (or when IDB restore replays
 // cached enrichments at startup).
@@ -8,7 +8,7 @@
 import {
   ENRICHMENT_LAYER_NAMES,
   mergeEnrichmentLayers,
-} from '../atlases/inversion/pages/discovery/page1/enrichment.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/enrichment.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

@@ -5,7 +5,7 @@
 // inversion / haplotype system, with a hand-picked axis topology.
 //
 // Persisted in localStorage (single blob) and surfaced cross-page in
-// the catalogue's "regimes" column + page1's candidate-focus tab.
+// the catalogue's "regimes" column + local_pca_dosage's candidate-focus tab.
 //
 // State shape:
 //   state.regimeRegistry = {
@@ -37,7 +37,7 @@
 // All entry points take state as their first arg. localStorage access
 // is headless-tolerant. Both candidate-track helpers accept an
 // optional onCandidateListChanged callback so callers can wire
-// page1's persistCandidateList() without this module importing it.
+// local_pca_dosage's persistCandidateList() without this module importing it.
 
 // =====================================================================
 // Constants
@@ -356,7 +356,7 @@ export function formatCandTrackRef(candId, trackIdx) {
  * and scoped forms (a candidate can't be in the same regime twice on
  * the same track). Mirrors `cand.tracks[trackIdx].regime_id` when the
  * candidate is in state.candidateList. Calls opts.onCandidateListChanged
- * after the mirror write (page1 wires this to persistCandidateList).
+ * after the mirror write (local_pca_dosage wires this to persistCandidateList).
  *
  * Returns true on success, false if regime not found or candId invalid.
  */

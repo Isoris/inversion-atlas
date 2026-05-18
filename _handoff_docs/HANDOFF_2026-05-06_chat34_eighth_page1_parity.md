@@ -1,4 +1,4 @@
-# HANDOFF — page1 LEGACY PARITY COMPLETE (4 stubs left, all forever-stubs); next is the SPLIT into sub-modules
+# HANDOFF — local_pca_dosage LEGACY PARITY COMPLETE (4 stubs left, all forever-stubs); next is the SPLIT into sub-modules
 
 **Date:** 2026-05-06 (chat ~34, eighth pass)
 **Reads:** `AUDIT_LOG.md` top entry (chat ~34 eighth pass), then this
@@ -10,28 +10,28 @@ file, then `PAGE_MIGRATION_RECIPE.md` migration log tail.
 
 ## 30-second orientation
 
-**page1 is now at full legacy parity.** Every legacy helper that has
+**local_pca_dosage is now at full legacy parity.** Every legacy helper that has
 a real body in `legacy/Inversion_atlas.html` is now defined in
-`page1.js`. The only 4 stubs remaining (`_winNavBand`, `_wRowBand`,
+`local_pca_dosage.js`. The only 4 stubs remaining (`_winNavBand`, `_wRowBand`,
 `_drawWRow`, `_drawWinNavLane`) are referenced-but-never-defined in
 legacy itself — keeping them stubbed IS parity.
 
-**Stubs: 23 → 4.** **page1.js LOC: 5397 → 6684.**
+**Stubs: 23 → 4.** **local_pca_dosage.js LOC: 5397 → 6684.**
 
 The page now mounts end-to-end via index.html, populates state
 correctly, and the entry-point chain (drawSim → drawZ → drawTracks
 → drawLinesPanel → drawPCA → updateWinLabel) runs without errors
 when `setCur` triggers a re-render.
 
-**Next round (round 4): split page1.js into 10 sub-modules** under
-`pages/discovery/page1/`. The split was Quentin's explicit request
+**Next round (round 4): split local_pca_dosage.js into 10 sub-modules** under
+`pages/discovery/local_pca_dosage/`. The split was Quentin's explicit request
 after parity. Plan in this file under "Open for next round".
 
 ---
 
 ## What this pass shipped
 
-**page1.js (6684 LOC):**
+**local_pca_dosage.js (6684 LOC):**
 
 1. **`_pageState` module-level reference** (a `let _pageState = null;`
    declaration at the top of the legacy-bodies block) plus
@@ -75,14 +75,14 @@ after parity. Plan in this file under "Open for next round".
 
 ## What this pass did NOT touch
 
-- HTML (page1.html), CSS (inversion.css), manifest, registry,
+- HTML (local_pca_dosage.html), CSS (inversion.css), manifest, registry,
   master_config, schemas, atlas-core engine, server. JS-only.
 
 ---
 
 ## Verification
 
-- `node --check` clean: page1.js (6684 LOC), all other shared/*.js
+- `node --check` clean: local_pca_dosage.js (6684 LOC), all other shared/*.js
   and pages/**/*.js, all atlas-core/core/*.js (9/9).
 - 23/23 + 13/13 + 4/4 atlas-core engine test assertions still pass.
 - **Smoke test (assembled workspace + fake DOM, N=100 windows, S=50
@@ -100,31 +100,31 @@ after parity. Plan in this file under "Open for next round".
 
 ---
 
-## Open for next round (round 4): SPLIT page1.js into sub-modules
+## Open for next round (round 4): SPLIT local_pca_dosage.js into sub-modules
 
 Quentin's direction: "if possible split the huge js into smaller
 like per type of analysis or panel so it makes it so much easier to
 work with and faster."
 
-**Proposed 10-module split** under `atlases/inversion/pages/discovery/page1/`:
+**Proposed 10-module split** under `atlases/inversion/pages/discovery/local_pca_dosage/`:
 
 | File | Concerns | LOC est |
 |---|---|---|
-| `page1.js` (main) | Imports, mount/unmount, applyData, _buildLegacyState, _wireCanvasHandlers, exports | ~400 |
-| `page1/_state.js` | _pageState, _setActiveState, color helpers (trackedColor, _vColor, _lineageColor, familyColor, ancestryColor, manualGroupColor, getSampleColor, _resolveSampleScopeColor), constants (PALETTE, GROUP_COLORS, FAMILY_PALETTE_BASE, FAMILY_COLOR_*) | ~300 |
-| `page1/_data.js` | detectSchemaAndLayers, inferLayersFromV1, buildIndexes, computePC1Signs, populateSimScales, buildFamilyPalette, getPC, getPCByAxis, getPCRender, availablePCs, getLinesValuesAt, getLinesGrid, getLinesSignAt, allSampleIdx, getL2Cluster, getL2ClusterAt, loadViewControls, saveViewControls, reconcileViewControlsForData, listLayers, _isLinesColorModeAvailable, currentMbRange, getActiveSimScale | ~700 |
-| `page1/sim_panel.js` | drawSim + drawSimMini | ~430 |
-| `page1/z_panel.js` | drawZ + 9 strip renderers | ~1400 |
-| `page1/lines_panel.js` | drawLinesPanel, buildLinesPanel, buildLinesPanelCheckboxes, setLinesPanelCandidateBands, refreshLinesColorMode | ~1300 |
-| `page1/pca_panel.js` | drawPCA, drawAnchorStrip, renderTrackedList, renderManualGroupsList, recomputeAnchorConcord, _refreshScreeInset, autoPickRadial, cycleKAside, togglePlay | ~600 |
-| `page1/l3_panel.js` | renderL3Panel, renderL3PanelSlab, renderL3PanelScaleStability | ~870 |
-| `page1/candidates.js` | _assignCandidateLanes, _paintCandidateBands, _ensureCsOverlayIndex, drawCandidateBar, refreshCandidateUI, refreshBandPickBar, _winNavBand/_wRowBand/_drawWRow/_drawWinNavLane (forever-stubs) | ~470 |
-| `page1/events.js` | onSimClick, onZClick, onPCAClick, setCur, updateWinLabel, drawTracks, buildTrackPanels | ~330 |
+| `local_pca_dosage.js` (main) | Imports, mount/unmount, applyData, _buildLegacyState, _wireCanvasHandlers, exports | ~400 |
+| `local_pca_dosage/_state.js` | _pageState, _setActiveState, color helpers (trackedColor, _vColor, _lineageColor, familyColor, ancestryColor, manualGroupColor, getSampleColor, _resolveSampleScopeColor), constants (PALETTE, GROUP_COLORS, FAMILY_PALETTE_BASE, FAMILY_COLOR_*) | ~300 |
+| `local_pca_dosage/_data.js` | detectSchemaAndLayers, inferLayersFromV1, buildIndexes, computePC1Signs, populateSimScales, buildFamilyPalette, getPC, getPCByAxis, getPCRender, availablePCs, getLinesValuesAt, getLinesGrid, getLinesSignAt, allSampleIdx, getL2Cluster, getL2ClusterAt, loadViewControls, saveViewControls, reconcileViewControlsForData, listLayers, _isLinesColorModeAvailable, currentMbRange, getActiveSimScale | ~700 |
+| `local_pca_dosage/sim_panel.js` | drawSim + drawSimMini | ~430 |
+| `local_pca_dosage/z_panel.js` | drawZ + 9 strip renderers | ~1400 |
+| `local_pca_dosage/lines_panel.js` | drawLinesPanel, buildLinesPanel, buildLinesPanelCheckboxes, setLinesPanelCandidateBands, refreshLinesColorMode | ~1300 |
+| `local_pca_dosage/pca_panel.js` | drawPCA, drawAnchorStrip, renderTrackedList, renderManualGroupsList, recomputeAnchorConcord, _refreshScreeInset, autoPickRadial, cycleKAside, togglePlay | ~600 |
+| `local_pca_dosage/l3_panel.js` | renderL3Panel, renderL3PanelSlab, renderL3PanelScaleStability | ~870 |
+| `local_pca_dosage/candidates.js` | _assignCandidateLanes, _paintCandidateBands, _ensureCsOverlayIndex, drawCandidateBar, refreshCandidateUI, refreshBandPickBar, _winNavBand/_wRowBand/_drawWRow/_drawWinNavLane (forever-stubs) | ~470 |
+| `local_pca_dosage/events.js` | onSimClick, onZClick, onPCAClick, setCur, updateWinLabel, drawTracks, buildTrackPanels | ~330 |
 
 Largest file ≤ 1400 LOC. Each module is a cohesive concern.
 
 **Module-level `_pageState` shared via ES live-binding:**
-`page1/_state.js` exports both `_pageState` (a `let` binding — the
+`local_pca_dosage/_state.js` exports both `_pageState` (a `let` binding — the
 exported binding sees the latest written value) and `_setActiveState`.
 Every other panel module does `import { _pageState, _setActiveState }
 from './_state.js';`. The entry-point in each panel module sets
@@ -133,22 +133,22 @@ the local `state` alias) and see the latest value because of how
 ES modules' live bindings work.
 
 **Order of work (recommended):**
-1. Create `page1/_state.js` with `_pageState`, `_setActiveState`,
+1. Create `local_pca_dosage/_state.js` with `_pageState`, `_setActiveState`,
    color helpers, constants. Verify parse + smoke test still passes
-   when `page1.js` imports from it.
-2. Create `page1/_data.js`. Same verify.
+   when `local_pca_dosage.js` imports from it.
+2. Create `local_pca_dosage/_data.js`. Same verify.
 3. Move panels one at a time: sim, z, lines, pca, l3, candidates, events.
 4. After each move, run the smoke test; if it breaks, the module
    you just split has a missing import or a binding issue.
-5. After all 10 modules exist, `page1.js` is just imports + mount/
+5. After all 10 modules exist, `local_pca_dosage.js` is just imports + mount/
    unmount + applyData + _buildLegacyState + _wireCanvasHandlers.
 
 **Split discipline:**
 - Each panel module is a black box: imports `_pageState`, imports
   any shared helpers it needs, exports its public entry points
   (`drawSim`, `drawSimMini`, etc.).
-- The main page1.js re-exports the entry points so the manifest's
-  `module: "page1.js"` import contract stays unchanged.
+- The main local_pca_dosage.js re-exports the entry points so the manifest's
+  `module: "local_pca_dosage.js"` import contract stays unchanged.
 - No DOM access in `_state.js` or `_data.js` (these are pure /
   cache layers). DOM access is panel-module territory.
 - `_setActiveState` is called by the public entry-points, NOT by
@@ -162,7 +162,7 @@ ES modules' live bindings work.
 2. `AUDIT_LOG.md` top entry (chat ~34 eighth pass) — what just shipped.
 3. This file — for the split plan.
 4. `PAGE_MIGRATION_RECIPE.md` — recipe + migration log tail.
-5. `atlases/inversion/pages/discovery/page1.js` — the 6684-LOC
+5. `atlases/inversion/pages/discovery/local_pca_dosage.js` — the 6684-LOC
    monolith to split. Read by section (the file has section headers).
 
 ---
@@ -173,5 +173,5 @@ Quentin is French-native, fluent English, based in Bangkok. PhD on
 LANTA HPC. Manuscript v19→v20 targeting Nature Communications. Terse
 and direct. Wants signal not flattery. Pushes back precisely when
 outputs are wrong (this whole sequence of round-3-step-1/2/3/4
-exists because the sixth-pass shipped a half-done page1; subsequent
+exists because the sixth-pass shipped a half-done local_pca_dosage; subsequent
 passes closed the actual gap step by step).

@@ -35,9 +35,9 @@ seed for per-page READMEs.
 
 ## DISCOVERY 1 (3 pages — the local-PCA scanners)
 
-### page1 — local PCA |Z|  ✅
-- **HTML**: `pages/discovery/page1.html` · **JS**: `pages/discovery/page1.js`
-- **Subdir**: `pages/discovery/page1/` (28 modules — the largest page)
+### local_pca_dosage — local PCA |Z|  ✅
+- **HTML**: `pages/discovery/local_pca_dosage.html` · **JS**: `pages/discovery/local_pca_dosage.js`
+- **Subdir**: `pages/discovery/local_pca_dosage/` (28 modules — the largest page)
 - **Tooltip**: Local PCA on dosage. Sim_mat heatmap, robust |Z|, per-sample lines, K-means PCA, L3 contingency. THE big page.
 - **Requires**: `scrubber_main`, `repeat_density`, `band_trajectories`, `candidate_tracks`
 - **Slots**: `activeChrom` (+ optional `activeCandidate`)
@@ -68,21 +68,21 @@ seed for per-page READMEs.
   - `panel_resize.js` — drag bottom edges of sim / Z / lines / PCA / L3
   - `fish_inspect_popover.js` — click-near-trace fish detail card
 
-### page12 — local PCA θπ  🟡
-- **HTML/JS**: `pages/discovery/page12.{html,js}` · **Subdir**: `page12/` (`_state.js` only)
-- **What it does**: same six-panel layout as page1, but driven by θπ (per-window nucleotide diversity) instead of dosage. Empty-state until the R pipeline ships any of `theta_pi_per_window` / `theta_pi_local_pca` / `theta_pi_envelopes` / `cusum_theta`. Orthogonal validation axis vs page1.
+### local_pca_theta_pi — local PCA θπ  🟡
+- **HTML/JS**: `pages/discovery/local_pca_theta_pi.{html,js}` · **Subdir**: `local_pca_theta_pi/` (`_state.js` only)
+- **What it does**: same six-panel layout as local_pca_dosage, but driven by θπ (per-window nucleotide diversity) instead of dosage. Empty-state until the R pipeline ships any of `theta_pi_per_window` / `theta_pi_local_pca` / `theta_pi_envelopes` / `cusum_theta`. Orthogonal validation axis vs local_pca_dosage.
 
-### page15 — local PCA GHSL  🟡
-- **HTML/JS**: `pages/discovery/page15.{html,js}` · **Subdir**: `page15/` (`_state.js` only)
-- **What it does**: third evidence axis — GHSL haplotype-pair sequence divergence. Five `[data-gh-layer]` indicator chips toggle 🟢/⚪ off `state.layersPresent`. Full six-panel renderers TODO_MISSING (sibling of page1's drawZ/drawSim/etc.).
+### local_pca_ghsl — local PCA GHSL  🟡
+- **HTML/JS**: `pages/discovery/local_pca_ghsl.{html,js}` · **Subdir**: `local_pca_ghsl/` (`_state.js` only)
+- **What it does**: third evidence axis — GHSL haplotype-pair sequence divergence. Five `[data-gh-layer]` indicator chips toggle 🟢/⚪ off `state.layersPresent`. Full six-panel renderers TODO_MISSING (sibling of local_pca_dosage's drawZ/drawSim/etc.).
 
 ---
 
 ## DISCOVERY 2 (10 pages — supplementary scanners / inspectors)
 
-### page2 — candidate focus deep-dive  ✅
-- **HTML/JS**: `pages/discovery/page2.{html,js}` · **Subdir**: `page2/` (5 modules)
-- **What it does**: per-candidate multi-panel detail page composed of ~15 sub-panels: header, sigma profile, K=6 nesting, FIG_C07 ridgeline, FIG_C08 dosage heatmap, per-band composition, ancestry confound, regime row, age origin, notes. Reuses page1's cluster-cache for the L2 recompute.
+### candidate_focus — candidate focus deep-dive  ✅
+- **HTML/JS**: `pages/discovery/candidate_focus.{html,js}` · **Subdir**: `candidate_focus/` (5 modules)
+- **What it does**: per-candidate multi-panel detail page composed of ~15 sub-panels: header, sigma profile, K=6 nesting, FIG_C07 ridgeline, FIG_C08 dosage heatmap, per-band composition, ancestry confound, regime row, age origin, notes. Reuses local_pca_dosage's cluster-cache for the L2 recompute.
 - **Subdir**: `_state.js`, `_draw_panels.js` (7 canvas painters), `_html_builders.js` (16 HTML builders), `_list.js` (candidate-list management), `_wires.js` (event wires).
 
 ### page22 — haplotype regimes (Stage 4 bruteforce projection)  ✅
@@ -161,7 +161,7 @@ seed for per-page READMEs.
 
 ### confirmed_carousel — confirmed carousel  ✅
 - **HTML/JS**: `pages/catalogue/confirmed_carousel.{html,js}` · **Subdir**: `confirmed_carousel/` (2 modules)
-- **What it does**: prev/next carousel through `state.candidateList.filter(c => c.confirmed === true)`. Reuses page2's candidate-detail rendering for each card. The legacy `confirmedNav*` JS never existed — this is a fresh implementation.
+- **What it does**: prev/next carousel through `state.candidateList.filter(c => c.confirmed === true)`. Reuses candidate_focus's candidate-detail rendering for each card. The legacy `confirmedNav*` JS never existed — this is a fresh implementation.
 
 ### marker_panels — marker panels  ✅
 - **HTML/JS**: `pages/catalogue/marker_panels.{html,js}` · **Subdir**: `marker_panels/` (`_state.js` only)
@@ -181,12 +181,12 @@ seed for per-page READMEs.
 - **HTML/JS**: `pages/catalogue/annotation_cockpit.{html,js}` · **Subdir**: `annotation_cockpit/` (`_state.js` only)
 - **What it does**: per-sample-lines canvas with cursor-driven candidate selection. Every promoted candidate is a faint rectangle in mb-space; per-sample PC1 trajectories drawn beneath. ←/→ moves cursor (Shift jumps boundaries, Esc clears); digit keys 0–9 select a band of the candidate under the cursor → linkage shading + linkage table + haplotype-annotation panel.
 
-### page8 — per-window summary table  ✅
-- **HTML/JS**: `pages/discovery/page8.{html,js}` (stage = `catalogue` in manifest) · **Subdir**: `page8/` (2 modules)
+### window_summary_table — per-window summary table  ✅
+- **HTML/JS**: `pages/discovery/window_summary_table.{html,js}` (stage = `catalogue` in manifest) · **Subdir**: `window_summary_table/` (2 modules)
 - **What it does**: sortable read-out of |Z|, λ1/λ2, eigenvalue ratio, ANGSD biallelic-SNP counts per window for the active chrom. Per-window strip canvas coloured by the active sortable column (default |Z|) with L1/L2 zone bars. ANGSD bi-SNP discovery parameter info panel for full provenance.
 
-### page19 — negative regions catalogue  ✅
-- **HTML/JS**: `pages/discovery/page19.{html,js}` (stage = `catalogue` in manifest) · **Subdir**: `page19/` (2 modules)
+### negative_regions — negative regions catalogue  ✅
+- **HTML/JS**: `pages/discovery/negative_regions.{html,js}` (stage = `catalogue` in manifest) · **Subdir**: `negative_regions/` (2 modules)
 - **What it does**: region-level catalogue of "no detectable inversion" calls — complement of catalogue. Each region carries a `region_status` (e.g. `no_detectable_inversion_high_confidence`); static caution banner explicitly warns against binary positive/negative misreading. Drag-drop `negative_regions.json/.tsv`; summary cards per `region_status`; CSV export.
 
 ### overview — synthesis overview  🟡

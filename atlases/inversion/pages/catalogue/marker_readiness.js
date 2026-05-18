@@ -767,7 +767,7 @@ function _mpRenderMethods() {
     'routine breeding deployment. No marker on this panel constitutes a guarantee of genotype-' +
     'phenotype association without independent validation in the target population. ' +
     '<br><br>' +
-    'See also: <a href="Population_atlas.html#page8" style="color:#7ad3db; text-decoration:none;">' +
+    'See also: <a href="Population_atlas.html#window_summary_table" style="color:#7ad3db; text-decoration:none;">' +
     'Population Atlas \u2192 Breeding</a> for sample-level highlights of marker-validation control ' +
     'samples and other broodstock flagged for committee review.' +
     '</div>';

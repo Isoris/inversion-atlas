@@ -1,6 +1,6 @@
 // tests/test_page1_band_trace_state.js
 //
-// Unit tests for pages/discovery/page1/band_trace_state.js — the
+// Unit tests for pages/discovery/local_pca_dosage/band_trace_state.js — the
 // state-managed wrapper around shared/band_trace.js.
 
 import {
@@ -12,7 +12,7 @@ import {
   setBandTraceOn,
   loadBandTraceState,
   bandTraceFromFocalCandidate,
-} from '../atlases/inversion/pages/discovery/page1/band_trace_state.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/band_trace_state.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

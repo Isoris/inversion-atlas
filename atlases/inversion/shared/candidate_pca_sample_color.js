@@ -25,7 +25,7 @@ import {
 
 /**
  * Default 10-color categorical palette (matches the legacy
- * page1 K-cluster palette — kept inlined so the module has zero
+ * local_pca_dosage K-cluster palette — kept inlined so the module has zero
  * dependencies beyond candidate_pca_ordering.js).
  */
 export const DEFAULT_CLUSTER_PALETTE = Object.freeze([
@@ -94,7 +94,7 @@ export function clusterColor(label, palette) {
 
 /**
  * Read cluster labels for the active window with locked-labels
- * precedence — same precedence as page1's draw paths.
+ * precedence — same precedence as local_pca_dosage's draw paths.
  *
  * @param {Object} state
  * @returns {Array<number>|null}

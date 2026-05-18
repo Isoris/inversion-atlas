@@ -204,7 +204,7 @@ try {
 //                                                        with a cand-list pane)
 //                                                       NOTE: refreshCandidateListUI
 //                                                       IS exported by
-//                                                       pages/discovery/page2/_list.js
+//                                                       pages/discovery/candidate_focus/_list.js
 //                                                       in the migrated tree —
 //                                                       wiring as an import is
 //                                                       a post-migration cleanup

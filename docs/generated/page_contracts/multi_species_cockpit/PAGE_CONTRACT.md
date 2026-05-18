@@ -72,7 +72,7 @@ Commit policy: manual only.
 
 ## Status and known issues
 
-- Owns 6 JSON layers — heaviest layer load of any page after page1.
+- Owns 6 JSON layers — heaviest layer load of any page after local_pca_dosage.
 - Cross-page read of `state.crossSpecies` (cross_species_breakpoints's data) — fragile
   coupling.
 

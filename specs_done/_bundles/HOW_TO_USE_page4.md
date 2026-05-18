@@ -18,7 +18,7 @@ Per-candidate review — two sub-views toggleable via
    `final_classification.json` (per `SCHEMA.md` §19).
 
 This is the **first real review-stage page** — it's where you
-verify the karyotype assignment that page1's K-means produced.
+verify the karyotype assignment that local_pca_dosage's K-means produced.
 
 ## Where the pieces live
 
@@ -35,7 +35,7 @@ atlases/inversion/
 │       └── tier_axes.js                          ← 14-axis schema + color palette + grid renderer
 ├── registries/data/pages.registry.json         ← karyotype_tier _doc (notes 4 registry mismatches)
 └── shared/
-    ├── page1_data_helpers.js                   ← groupColor (shared with page1)
+    ├── page1_data_helpers.js                   ← groupColor (shared with local_pca_dosage)
     └── (no other karyotype_tier-private shared modules)
 ```
 
@@ -43,8 +43,8 @@ atlases/inversion/
 
 1. **Pick a candidate** — karyotype_tier reads `state.candidate` (cross-atlas
    slot). Routes that populate this slot:
-   - page1: click a candidate rectangle on the |Z| strip
-   - page2: prev/next in candidate-list
+   - local_pca_dosage: click a candidate rectangle on the |Z| strip
+   - candidate_focus: prev/next in candidate-list
    - catalogue: click a row's id in the catalogue table
    - annotation_cockpit: navigate the annotation cockpit cursor
 
@@ -162,11 +162,11 @@ allowed but the override flag is recorded.
 
 | destination | reason |
 |-------------|--------|
-| **page2** | edit notes, regime, age_origin (the "detail card" fields) |
+| **candidate_focus** | edit notes, regime, age_origin (the "detail card" fields) |
 | **boundary_refinement** | refine boundary zones; the Tier grid's `boundary_quality` axis reads boundary_refinement's output |
 | **sv_evidence** | drives Layer B (SV callers) — open to inspect |
 | **stats_profile** | stats profile across all candidates, cohort-wide |
-| **page1** | back to the chromosome scrubber to verify in context |
+| **local_pca_dosage** | back to the chromosome scrubber to verify in context |
 
 ## Critical: registry mismatch flagged
 
@@ -209,7 +209,7 @@ what the layer-status indicator says.
    The default sort uses the sample's "primary" band's Sigma; use
    the band filter to scope the sort to one track at a time.
 
-4. **"My Tier-grid edits don't persist."** Same as page2 —
+4. **"My Tier-grid edits don't persist."** Same as candidate_focus —
    persistence depends on the registry-write path. localStorage
    works out of the box; atlas-core resolver-backed writes need
    `SPEC_registry_v2`'s Registry.write half (currently pending in
@@ -226,7 +226,7 @@ what the layer-status indicator says.
 - **It does NOT compute the 14 axes** — the cluster-side R pipeline
   computes them. Page4 just renders + edits.
 - **It does NOT confirm candidates** — confirmation happens on
-  page2.
+  candidate_focus.
 - **It does NOT refine boundaries** — that's boundary_refinement.
 - **It does NOT call SV evidence** — that's sv_evidence.
 

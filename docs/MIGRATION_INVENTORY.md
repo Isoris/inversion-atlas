@@ -26,12 +26,12 @@ on each tab.
 
 | # | data-page | Tab label | Stage (legacy) | Lands in | Notes |
 |---|---|---|---|---|---|
-| 1 | `page1` | local PCA \|z\| | discovery | `inversion_discovery` | The main scrubber. Sim_mat heatmap, robust \|Z\|, per-sample lines, K-means PCA, L3 contingency. |
-| 2 | `page12` | local PCA θπ | discovery | `inversion_discovery` | Mirror of page1 but on θπ. Empty-state until R-side `STEP_R39/R40/R41` ship. |
-| 3 | `page15` | local PCA GHSL | discovery | `inversion_discovery` | Mirror of page1 but on GHSL. Empty-state until R-side `STEP_C04c/d` ship. |
-| 4 | `page2` | candidate focus | discovery | `inversion_discovery` | Deep-dive on one promoted candidate (sim_mini, karyogram, dosage heatmap, ancestry strip). |
-| 5 | `page8` | windows | refinement | `inversion_discovery` | Per-window summary table. **Note**: legacy stage is "refinement" but it's a discovery diagnostic — moving to discovery. |
-| 6 | `page19` | negative regions | discovery | `inversion_discovery` | Inversion-negative inventory (complement of the catalogue). |
+| 1 | `local_pca_dosage` | local PCA \|z\| | discovery | `inversion_discovery` | The main scrubber. Sim_mat heatmap, robust \|Z\|, per-sample lines, K-means PCA, L3 contingency. |
+| 2 | `local_pca_theta_pi` | local PCA θπ | discovery | `inversion_discovery` | Mirror of local_pca_dosage but on θπ. Empty-state until R-side `STEP_R39/R40/R41` ship. |
+| 3 | `local_pca_ghsl` | local PCA GHSL | discovery | `inversion_discovery` | Mirror of local_pca_dosage but on GHSL. Empty-state until R-side `STEP_C04c/d` ship. |
+| 4 | `candidate_focus` | candidate focus | discovery | `inversion_discovery` | Deep-dive on one promoted candidate (sim_mini, karyogram, dosage heatmap, ancestry strip). |
+| 5 | `window_summary_table` | windows | refinement | `inversion_discovery` | Per-window summary table. **Note**: legacy stage is "refinement" but it's a discovery diagnostic — moving to discovery. |
+| 6 | `negative_regions` | negative regions | discovery | `inversion_discovery` | Inversion-negative inventory (complement of the catalogue). |
 | 7 | `boundary_refinement` | boundaries | refinement | `inversion_review` | Refine each candidate's [start_bp, end_bp] interval. |
 | 8 | `sv_evidence` | SV evidence (5b) | refinement | `inversion_review` | SV calls clustered around boundaries; karyotype-group genotype counts. |
 | 9 | `karyotype_tier` | karyotype / tier | refinement | `inversion_review` | Two views: per-candidate sample-level regime + 14-axis tier classification. |
@@ -51,7 +51,7 @@ on each tab.
 
 ### Decisions / disagreements with legacy stage labels
 
-- **`page8` (windows)**: legacy stage `refinement`; moving to `inversion_discovery`. Justification: it's a per-window diagnostic table the user opens DURING scrubbing to investigate a window's robust |Z| and eigenvalue ratios. It's not a refinement step.
+- **`window_summary_table` (windows)**: legacy stage `refinement`; moving to `inversion_discovery`. Justification: it's a per-window diagnostic table the user opens DURING scrubbing to investigate a window's robust |Z| and eigenvalue ratios. It's not a refinement step.
 - **`catalogue` (catalogue)**: legacy stage `discovery`; moving to `inversion_catalogue`. Justification: it's the manuscript-grade output table; users build it AFTER discovery, not during.
 - **`popstats` (popstats)** and **`ancestry_per_window` (ancestry)**: legacy stage `classification`; moving to `inversion_review`. Justification: they're per-candidate evidence views the user consults while reviewing whether to confirm. Could also live in `inversion_catalogue` for cross-candidate stats — flagging for re-decision once we touch them.
 
@@ -268,7 +268,7 @@ end-to-end before moving on. **One step per turn** is realistic.
 |---|---|---|---|
 | **0** | done | foundation (shared/state_io.js, build/, data/ skeleton, smoke tests) | done |
 | **1** | next | extract `shared/` primitives (contingency, hungarian, kmeans, pca, het_rate, color_ramps) — JS only, no UI yet. Each module exports + has unit tests. | medium (need to identify what's used by ≥2 callers) |
-| **2** | +1 | `inversion_discovery.html` + `inversion_discovery/` — page1 + page12 + page15 + page2 + page8 + page19. Behavioural parity with legacy. | high (the scrubber is the bulk of the legacy code) |
+| **2** | +1 | `inversion_discovery.html` + `inversion_discovery/` — local_pca_dosage + local_pca_theta_pi + local_pca_ghsl + candidate_focus + window_summary_table + negative_regions. Behavioural parity with legacy. | high (the scrubber is the bulk of the legacy code) |
 | **3** | +2 | `inversion_review.html` + `inversion_review/` — boundary_refinement + sv_evidence + karyotype_tier + ancestry_per_window + popstats + the existing band-trace UI + G-panel auto tab. Migration only, no new SPEC BLOCK 2 features yet. | high (cross-page state plumbing kicks in) |
 | **4** | +3 | `inversion_catalogue.html` + `inversion_catalogue/` — catalogue + confirmed_carousel + annotation_cockpit + stats_profile + marker_readiness + marker_panels + overview. | medium |
 | **5** | +4 | `inversion_comparative.html` + `inversion_comparative/` — cross_species_breakpoints + multi_species_cockpit + help. | low |

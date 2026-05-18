@@ -4,7 +4,7 @@
 **Reads:** This file FIRST, then the audit log top entry, then
 `PAGE_MIGRATION_RECIPE.md` round-5-step-3 section. The
 round-5-step-2 handoff (`HANDOFF_2026-05-07_chat36_round5_step2_done.md`)
-is the prior round; only consult if you need page2 context.
+is the prior round; only consult if you need candidate_focus context.
 **Project:** MS_Inversions_North_african_catfish — 226-sample pure
 *C. gariepinus* hatchery cohort, LANTA HPC.
 
@@ -73,10 +73,10 @@ doesn't exist.**
 ### Step 2 — catalogue split into 2 sub-modules + new main
 
 - `catalogue/_state.js` (18 LOC) — same `_pageState`/`_setActiveState`
-  pattern as page1/page2, catalogue's own.
+  pattern as local_pca_dosage/candidate_focus, catalogue's own.
 - `catalogue/_breeding_export.js` (1106 LOC) — 17 helpers + 1 constant.
   Bodies extracted byte-verbatim with the same patcher used for
-  page1/page2:
+  local_pca_dosage/candidate_focus:
   - Legacy `(typeof window !== 'undefined' && window.state) ?
     window.state : state` rewritten to `_pageState`.
   - `const state = _pageState;` shim injected in bodies that read
@@ -90,7 +90,7 @@ doesn't exist.**
     — the only catalogue-toolbar action with a working legacy
     implementation.
   - `mount(root, atlasState, registry)`: builds a legacy-shape state
-    via `_buildLegacyState` (mirrors page1/page2), calls render +
+    via `_buildLegacyState` (mirrors local_pca_dosage/candidate_focus), calls render +
     init.
   - `unmount(root)`: clears `_pageState`.
 
@@ -119,7 +119,7 @@ doesn't exist.**
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1 / page2 sub-modules** — completely unchanged this round.
+- **local_pca_dosage / candidate_focus sub-modules** — completely unchanged this round.
 - **`shared/page1_data_helpers.js`** — unchanged (catalogue's breeding-export
   closure is fully self-contained).
 - **The catalogue table renderer + 11 unimplemented toolbar handlers**

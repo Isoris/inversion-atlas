@@ -8,7 +8,7 @@
 //           markers: [ { marker, dosage_centered, polarity_flipped, ... } ],
 //           ... }
 //
-//   2. Legacy chunk shape (the candidate dosage-heatmap in page2):
+//   2. Legacy chunk shape (the candidate dosage-heatmap in candidate_focus):
 //         { samples, markers, dosage }
 //      with row-major `dosage[marker_idx][sample_idx]`, plus the
 //      caller-provided selection of marker indices + per-sample

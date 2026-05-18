@@ -1,4 +1,4 @@
-# HANDOFF — page1 migration round 3 done; round 4 next (state-bound color helpers)
+# HANDOFF — local_pca_dosage migration round 3 done; round 4 next (state-bound color helpers)
 
 **Date:** 2026-05-06 (chat ~34, sixth pass)
 **Reads:** `AUDIT_LOG.md` top entry (chat ~34 sixth pass), then this file,
@@ -13,9 +13,9 @@ then `PAGE_MIGRATION_RECIPE.md` migration log tail, then proceed.
 Page1 migration round 3 landed. The "easy tier" of round-2 stubs is
 done: 5 stubs (3 pure color helpers + 2 pure-state-read accessors)
 replaced with real legacy bodies. 1 new shared module created
-(`shared/color_helpers.js`). page12 now imports from it too.
+(`shared/color_helpers.js`). local_pca_theta_pi now imports from it too.
 
-Stubs in page1.js: 34 → 29 (5 resolved: 3 imported, 2 promoted to
+Stubs in local_pca_dosage.js: 34 → 29 (5 resolved: 3 imported, 2 promoted to
 real bodies). 0 TODO_MISSING markers. 0 registry
 changes. 0 master_config changes. 0 schema changes. No engine code
 touched. All `node --check` clean; 23/23 registry write tests still
@@ -39,7 +39,7 @@ arg) but they touch state slots that may need registering in
     31281-31294, 31299-31307.
 
 **Modified:**
-- `atlases/inversion/pages/discovery/page1.js`
+- `atlases/inversion/pages/discovery/local_pca_dosage.js`
   - New import for the 3 color helpers from `shared/color_helpers.js`
   - Removed round-2 stubs: simColor, simColorPDF, zColorPDF
   - `getActiveSimScale(state)` body extracted from legacy 31311-31329
@@ -47,7 +47,7 @@ arg) but they touch state slots that may need registering in
   - 8 call sites updated to pass `state` (2 × getActiveSimScale,
     6 × currentMbRange)
   - Round-2 accounting comment refreshed
-- `atlases/inversion/pages/discovery/page12.js`
+- `atlases/inversion/pages/discovery/local_pca_theta_pi.js`
   - New import: `import { simColor } from '../../shared/color_helpers.js'`
   - The `(typeof simColor === 'function')` guard at line 613 now
     resolves against the imported binding. Guard kept intact.
@@ -65,15 +65,15 @@ arg) but they touch state slots that may need registering in
 - atlas-core engine — no JS edits, no test edits. 9/9 parse-clean,
   23/23 assertions still passing.
 - popstats_server.py — unchanged.
-- 29 still-stubbed helpers in page1.js — see "Open for round 4" below.
-- 29 TODO_MISSING_SLOT markers in page1.js — round 4 will register
+- 29 still-stubbed helpers in local_pca_dosage.js — see "Open for round 4" below.
+- 29 TODO_MISSING_SLOT markers in local_pca_dosage.js — round 4 will register
   the slots actually needed by the round-4 extractions.
 
 ---
 
 ## Round 4 plan: state-bound color helpers (next)
 
-**Working file:** `atlases/inversion/pages/discovery/page1.js`
+**Working file:** `atlases/inversion/pages/discovery/local_pca_dosage.js`
 (4672 LOC; 29 stubs remaining; 0 TODO_MISSING; 29 TODO_MISSING_SLOT.)
 
 **Round-4 targets (4 stubs):**
@@ -88,17 +88,17 @@ arg) but they touch state slots that may need registering in
 **Method (same as round 3):**
 
 1. Find each function in `legacy/Inversion_atlas.html`.
-2. Extract the body verbatim into the page1.js stub.
+2. Extract the body verbatim into the local_pca_dosage.js stub.
 3. If the body references `state.X` directly (legacy global), refactor
    to take `state` as first arg.
 4. For each `state.X` referenced, check `shared/state.js` SLOT_REGISTRY:
    - If registered → done, just keep the reference.
-   - If not registered AND it's in the page1.js TODO_MISSING_SLOT list
+   - If not registered AND it's in the local_pca_dosage.js TODO_MISSING_SLOT list
      → register it in SLOT_REGISTRY with appropriate default + scope
      before extracting the body.
 5. Update call sites if the signature changes (round 3 added `state`
    to two functions; round 4 may add `state` to all four).
-6. `node --check page1.js`.
+6. `node --check local_pca_dosage.js`.
 
 **Likely SLOT_REGISTRY work:**
 The TODO_MISSING_SLOT names that look most likely to be touched:
@@ -117,7 +117,7 @@ TODO_MISSING_SLOT list.
 
 ---
 
-## After round 4: what's left in page1.js
+## After round 4: what's left in local_pca_dosage.js
 
 After the 4 state-bound color helpers, the remaining stubs split into
 three tiers, in the recommended order to tackle them:

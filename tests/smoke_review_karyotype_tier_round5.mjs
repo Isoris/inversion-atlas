@@ -4,7 +4,7 @@
 // unmount lifecycle smoke test for karyotype_tier (karyotype/tier candidate-
 // level review page). **First real review-stage migration**
 // (review group: 3 of 5 → 4 of 5). Pattern 2 (single-file with
-// _state.js) applied; closest peers are page12 (step 10) and stats_profile
+// _state.js) applied; closest peers are local_pca_theta_pi (step 10) and stats_profile
 // (step 5) in pattern shape.
 //
 // karyotype_tier has 4 chat-33 functions + 1 page-private const (karyoState),

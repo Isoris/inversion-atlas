@@ -147,9 +147,9 @@ empty/malformed inputs.
 
 ### Step 2 strategy reframing — discovered after auditing
 
-**Original plan**: extract page1 in one or two turns.
+**Original plan**: extract local_pca_dosage in one or two turns.
 
-**What the audit showed**: page1 reaches **680 of 1064 top-level
+**What the audit showed**: local_pca_dosage reaches **680 of 1064 top-level
 functions** in the legacy atlas. Page1 isn't a clean island — opening
 a candidate in the scrubber triggers boundary code, classification,
 band-trace, lineage compute, etc. A page-by-page extraction would

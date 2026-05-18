@@ -5,7 +5,7 @@
 // envelopes, cuts samples into "lineages" via agglomerative average-
 // linkage clustering at a fixed (1 - concordance) distance threshold.
 //
-// The lineage strip drawn on page1 reads
+// The lineage strip drawn on local_pca_dosage reads
 // `state.lineageResult.lineage_id_per_sample[si]` to color each fish
 // trajectory. This module produces that result without any state-globals.
 
@@ -88,7 +88,7 @@ export function lineageColor(lineageId) {
 // =====================================================================
 
 /**
- * Draw the lineage strip on page1's PC1 panel. Renders one colored
+ * Draw the lineage strip on local_pca_dosage's PC1 panel. Renders one colored
  * bar per L2 envelope (by the dominant lineage among samples in the
  * L2's largest band) over a faint backdrop. L2s flagged as
  * "chain-break" by the Hungarian projection get a diagonal-hatch

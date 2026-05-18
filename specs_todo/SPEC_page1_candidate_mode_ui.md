@@ -9,8 +9,8 @@
 
 ## Architectural note (new mode, not new page)
 
-This spec extends page1 with a candidate mode. **Recommend
-implementing as a new mode inside page1**, not a new page, for these
+This spec extends local_pca_dosage with a candidate mode. **Recommend
+implementing as a new mode inside local_pca_dosage**, not a new page, for these
 reasons:
 
 - **Page1 is the scrubber.** Its core invariant is "cursor walks
@@ -20,19 +20,19 @@ reasons:
 - **Page2 is the candidate card.** It's a static deep-dive (metadata,
   sub-bands, dosage heatmap, sigma chart, bands, ancestry…). It does
   not walk a cursor through windows and has its own `_pageState`
-  separate from page1's. Adding a multi-PCA + heatmap traversal mode
-  there would mean duplicating page1's sample-color logic, tracked-list
+  separate from local_pca_dosage's. Adding a multi-PCA + heatmap traversal mode
+  there would mean duplicating local_pca_dosage's sample-color logic, tracked-list
   side panel, hover linkage, manual groups, panel resize, hotkeys,
   events handlers, and lines panel — all of which live under
-  `pages/discovery/page1/`.
+  `pages/discovery/local_pca_dosage/`.
 - **Activation is a state flag, not a route.** `state.candidateMode
   .active = true` flips behaviour without changing which page is
   mounted. The atlas-router stays simple.
 
-**Proposed file layout under `pages/discovery/page1/`:**
+**Proposed file layout under `pages/discovery/local_pca_dosage/`:**
 
 ```
-pages/discovery/page1/
+pages/discovery/local_pca_dosage/
 ├── candidate_mode/                ← NEW sub-folder for this work
 │   ├── _state.js                  ← state.candidateMode slot + setters
 │   ├── controls.js                ← top-level shared controls bar
@@ -68,7 +68,7 @@ loads pre-computed JSONs from the producer (HANDOFF 1) and offers
 unified PCA + heatmap controls with shared rendering state.
 
 **Status**: not started. Existing Page 1 UI is in
-`pages/discovery/page1/` (see `pca_panel.js` already provided).
+`pages/discovery/local_pca_dosage/` (see `pca_panel.js` already provided).
 HANDOFF_1 produces the JSON inputs.
 
 **Audience**: a fresh chat where Claude implements the UI.
@@ -109,7 +109,7 @@ In `mgl_adapter/specs/SPEC_0_master.md`, Sections 7-11 lay out:
 - Shared rendering state (Section 10)
 - UI control layout (Section 11)
 
-The atlas already has `pages/discovery/page1/pca_panel.js` with
+The atlas already has `pages/discovery/local_pca_dosage/pca_panel.js` with
 `drawPCA(state)`, sample-color logic, and tracked-list/manual-groups
 sidebars. It uses:
 - `state.data` — single object holding window data
@@ -394,10 +394,10 @@ The producer (HANDOFF 1) generates JSONs from synthetic data via
 
 ## Pointers
 
-- `pages/discovery/page1/pca_panel.js` already provided (in conversation
+- `pages/discovery/local_pca_dosage/pca_panel.js` already provided (in conversation
   attachments). Read first to understand existing patterns.
-- `pages/discovery/page1/_data.js` likely contains `getPC()` etc. — read
+- `pages/discovery/local_pca_dosage/_data.js` likely contains `getPC()` etc. — read
   this to understand the existing data loading pattern.
-- `pages/discovery/page1/_state.js` for state structure.
+- `pages/discovery/local_pca_dosage/_state.js` for state structure.
 - HANDOFF 1 produces the JSONs you'll consume. Read its CLI section to
   know what fields will be in each JSON.

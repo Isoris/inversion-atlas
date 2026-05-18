@@ -34,10 +34,10 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 
 | stage | page_id | label | status | confidence | contract |
 |-------|---------|-------|--------|-----------:|----------|
-| discovery | page1 | local PCA \|Z\| | active | high | [page.manifest.json](page_contracts/page1/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page1/PAGE_CONTRACT.md) |
-| discovery | page12 | local PCA θπ | active (empty-state until layers) | high | [page.manifest.json](page_contracts/page12/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page12/PAGE_CONTRACT.md) |
-| discovery | page15 | local PCA GHSL | stub (renderers TODO) | high | [page.manifest.json](page_contracts/page15/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page15/PAGE_CONTRACT.md) |
-| discovery_2 | page2 | candidate focus | active | high | [page.manifest.json](page_contracts/page2/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page2/PAGE_CONTRACT.md) |
+| discovery | local_pca_dosage | local PCA \|Z\| | active | high | [page.manifest.json](page_contracts/local_pca_dosage/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/local_pca_dosage/PAGE_CONTRACT.md) |
+| discovery | local_pca_theta_pi | local PCA θπ | active (empty-state until layers) | high | [page.manifest.json](page_contracts/local_pca_theta_pi/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/local_pca_theta_pi/PAGE_CONTRACT.md) |
+| discovery | local_pca_ghsl | local PCA GHSL | stub (renderers TODO) | high | [page.manifest.json](page_contracts/local_pca_ghsl/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/local_pca_ghsl/PAGE_CONTRACT.md) |
+| discovery_2 | candidate_focus | candidate focus | active | high | [page.manifest.json](page_contracts/candidate_focus/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/candidate_focus/PAGE_CONTRACT.md) |
 | discovery_2 | haplotype_regimes | haplotype regimes | active (Phase 1) | high | [page.manifest.json](page_contracts/haplotype_regimes/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/haplotype_regimes/PAGE_CONTRACT.md) |
 | discovery_2 | tree_panel | tree panel | active (Phase 1) | high | [page.manifest.json](page_contracts/tree_panel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/tree_panel/PAGE_CONTRACT.md) |
 | discovery_2 | fingerprint_track | fingerprint track | active (Phase 1) | high | [page.manifest.json](page_contracts/fingerprint_track/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/fingerprint_track/PAGE_CONTRACT.md) |
@@ -46,8 +46,8 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | discovery_2 | dosage_heatmap | dosage heatmap | active (Phase 1) | high | [page.manifest.json](page_contracts/dosage_heatmap/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/dosage_heatmap/PAGE_CONTRACT.md) |
 | discovery_2 | nested_inversion_detector | nested detector | active (Phase 1) | high | [page.manifest.json](page_contracts/nested_inversion_detector/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/nested_inversion_detector/PAGE_CONTRACT.md) |
 | discovery_2 | dosage_cluster_adaptive_k | dosage cluster | active (Phase 1) | high | [page.manifest.json](page_contracts/dosage_cluster_adaptive_k/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/dosage_cluster_adaptive_k/PAGE_CONTRACT.md) |
-| catalogue | page8 | per-window summary table | active (fresh) | high | [page.manifest.json](page_contracts/page8/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page8/PAGE_CONTRACT.md) |
-| catalogue | page19 | negative regions catalogue | active (fresh) | high | [page.manifest.json](page_contracts/page19/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page19/PAGE_CONTRACT.md) |
+| catalogue | window_summary_table | per-window summary table | active (fresh) | high | [page.manifest.json](page_contracts/window_summary_table/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/window_summary_table/PAGE_CONTRACT.md) |
+| catalogue | negative_regions | negative regions catalogue | active (fresh) | high | [page.manifest.json](page_contracts/negative_regions/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/negative_regions/PAGE_CONTRACT.md) |
 | catalogue | catalogue | catalogue | active | high | [page.manifest.json](page_contracts/catalogue/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/catalogue/PAGE_CONTRACT.md) |
 | catalogue | confirmed_carousel | confirmed carousel | active (fresh) | high | [page.manifest.json](page_contracts/confirmed_carousel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/confirmed_carousel/PAGE_CONTRACT.md) |
 | catalogue | marker_panels | marker panels | active | high | [page.manifest.json](page_contracts/marker_panels/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/marker_panels/PAGE_CONTRACT.md) |
@@ -99,7 +99,7 @@ Closed entries:
 
 ### Directory / stage discrepancies
 
-- **page8**, **page19** live under `pages/discovery/` but
+- **window_summary_table**, **negative_regions** live under `pages/discovery/` but
   `manifest.json` says `stage: "catalogue"`.
 - **stats_profile**, **marker_readiness**, **overview** live under
   `pages/catalogue/` but `manifest.json` says `stage:
@@ -131,11 +131,11 @@ with boundary_refinement's. Deferred to a future renumbering round.
 
 (From `_handoff_docs/SPECS_AUDIT.md`)
 
-- `SPEC_g_panel_unified_groups.md` (page1)
-- `SPEC_lines_panel_candidate_bands.md` (page1)
-- `SPEC_l2_sweep_inheritance.md` (page1)
-- `SPEC_l3_het_dosage_coloring.md` (page1)
-- `SPEC_lasso_inheritance_backgrounds.md` (page1)
+- `SPEC_g_panel_unified_groups.md` (local_pca_dosage)
+- `SPEC_lines_panel_candidate_bands.md` (local_pca_dosage)
+- `SPEC_l2_sweep_inheritance.md` (local_pca_dosage)
+- `SPEC_l3_het_dosage_coloring.md` (local_pca_dosage)
+- `SPEC_lasso_inheritance_backgrounds.md` (local_pca_dosage)
 - `SPEC_sv_evidence_page.md` (sv_evidence + producer)
 - `SPEC_DEFERRED.md` (general)
 - `SPEC_distant_band_concordance_fish_trajectory.md` (band-track parent)
@@ -160,10 +160,10 @@ All 3 fall back to empty-state when their external module is absent.
 
 ### Fresh implementations (legacy shipped HTML shell only)
 
-- **page8** — per-window summary table (legacy had `#winSumNoChrom`
+- **window_summary_table** — per-window summary table (legacy had `#winSumNoChrom`
   empty state only)
 - **confirmed_carousel** — confirmed carousel (no JS in legacy; built from spec)
-- **page19** — negative regions catalogue (legacy referenced
+- **negative_regions** — negative regions catalogue (legacy referenced
   `_nrRender` in HTML comment, never implemented)
 - **catalogue** — catalogue rendering pipeline (legacy referenced
   `renderCatalogue` via typeof guards, never defined)
@@ -184,9 +184,9 @@ help, not a manual.
   — promoted to ES exports round 5 step 11; still imported via
   typeof guards)
 - **multi_species_cockpit** → cross_species_breakpoints (`state.crossSpecies` — fragile coupling)
-- **page12** + **page15** → page1 (`page1.applyData()` dispatches
+- **local_pca_theta_pi** + **local_pca_ghsl** → local_pca_dosage (`local_pca_dosage.applyData()` dispatches
   panel renderers when θπ / GHSL layers are present)
-- **confirmed_carousel** → page2 (reuses `renderCandidateMetadata`)
+- **confirmed_carousel** → candidate_focus (reuses `renderCandidateMetadata`)
 - **polarize_msa_stacked** → dosage_heatmap (reuses
   painter)
 
@@ -198,11 +198,11 @@ help, not a manual.
 - **Low confidence**: 0
 - **Active / shipped**: 32
 - **Stubs / empty / Phase 1 with deferred work**: 5
-  (page12, page15, overview, fish_ancestry_scroller; page22
+  (local_pca_theta_pi, local_pca_ghsl, overview, fish_ancestry_scroller; page22
   Phase 1 only)
 - **Thin loaders**: 3 (popstats, ancestry_per_window, sv_evidence)
 - **Fresh implementations (legacy was HTML shell)**: 4 (catalogue,
-  page8, confirmed_carousel, page19)
+  window_summary_table, confirmed_carousel, negative_regions)
 
 ## Next steps (for reviewer)
 

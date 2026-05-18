@@ -20,10 +20,10 @@
 //   _gatherActiveCandidatesForInheritance — legacy line 41196; gathers the
 //                                           active candidate list for the
 //                                           current chrom. Likely promoted
-//                                           to shared/ when page2 lands.
+//                                           to shared/ when candidate_focus lands.
 //   _wireCandidateHaplotypeAnnotations    — wires the band-annotation UI
 //                                           under the canvas. Probably owned
-//                                           by Batch 1 (page2 candidate focus).
+//                                           by Batch 1 (candidate_focus candidate focus).
 //   candidateHaplotypeAnnotationsHtml     — HTML builder for the haplotype-
 //                                           annotation panel (sibling of above).
 //   computeTrackedLinkageProjection       — legacy line ~46912; computes

@@ -40,7 +40,7 @@ import { contextFromState, ClusterCache } from '../../shared/per_l2_cluster.js';
 
 // Sample-color resolution is now in shared/sample_color.js. The regimes
 // panels pass their own state to resolveSampleScopeColor, so this
-// module no longer needs to set page1's _pageState as a side effect.
+// module no longer needs to set local_pca_dosage's _pageState as a side effect.
 // Page-isolation per specs_todo/SPEC_registry_write_and_page_isolation.md.
 
 // Pipeline core (audited v3.4)
@@ -132,7 +132,7 @@ function _wireCtxCallbacks(state, atlasState) {
   const data = state.data;
 
   // Build window→L2 index. (Mirrors what _data.js buildIndexes does for
-  // page1; we replicate here so this page works without page1 having mounted.)
+  // local_pca_dosage; we replicate here so this page works without local_pca_dosage having mounted.)
   const N = data.n_windows;
   const windowToL2 = new Int32Array(N).fill(-1);
   if (Array.isArray(data.l2_envelopes)) {

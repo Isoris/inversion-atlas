@@ -2,7 +2,7 @@
 //
 // Covers the pure-helper additions to shared/page1_utils.js. The
 // canvas/DOM-bound helpers (fitCanvas, escapeHtml, themeColor) are
-// covered indirectly by the page1 smoke tests and are skipped here.
+// covered indirectly by the local_pca_dosage smoke tests and are skipped here.
 
 import {
   assignCandidateLanes,

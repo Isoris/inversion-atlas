@@ -1,23 +1,23 @@
 # SPEC — L3 Het / Dosage Coloring
 
 **Status**: SHIPPED (Slice 1) — was SPEC ONLY (referenced from
-`pages/discovery/page1.html` without an on-disk doc) until 2026-05-15.
+`pages/discovery/local_pca_dosage.html` without an on-disk doc) until 2026-05-15.
 **Authored from shipped code** (recovery of a missing SPEC).
 **Originator turn**: turn 128d (per inline `// turn 128d Slice 1
 (SPEC_l3_het_dosage_coloring.md):` comments at the implementation
 sites).
 
 **Implemented in (Slice 1)**:
-- `atlases/inversion/pages/discovery/page1.html` lines 1407-1425 —
+- `atlases/inversion/pages/discovery/local_pca_dosage.html` lines 1407-1425 —
   `#l3HetToggle` checkbox + `#l3HetToggleLabel` wrapper
-- `atlases/inversion/pages/discovery/page1/l3_panel.js` — paint
+- `atlases/inversion/pages/discovery/local_pca_dosage/l3_panel.js` — paint
   logic for L3 mini-PCA dots when `state.l3HetColoring === true`
 - `atlases/inversion/shared/het_rate.js` — `hetRateColor(het_rate)`
   primitive (cold blue → neutral → warm red ramp)
-- `atlases/inversion/pages/discovery/page1/_state.js` — toggle
+- `atlases/inversion/pages/discovery/local_pca_dosage/_state.js` — toggle
   setter + localStorage persistence
 
-**Page contract**: `docs/generated/page_contracts/page1/`
+**Page contract**: `docs/generated/page_contracts/local_pca_dosage/`
 (L3 panel listed under `panels[].id = 'l3_panel'`)
 
 **Companion specs**:
@@ -123,7 +123,7 @@ The het rate per sample comes from the `dosage_chunks` layer's
 allele-dosage matrix, NOT from a separate het-rate layer. This is
 deliberate:
 
-- `dosage_chunks` is already loaded for the active candidate (page2
+- `dosage_chunks` is already loaded for the active candidate (candidate_focus
   uses it for the dosage heatmap).
 - Computing het rate is `O(n_markers)` per sample — cheap.
 - Avoids needing yet another producer step / layer.
@@ -136,7 +136,7 @@ sample's dosage falls in the heterozygous range (typically
 ## §5. K-mode interaction
 
 The L3 panel supports three K-mode views (per the `K=3` / `K=6 ⚠`
-/ `K=3+6` buttons immediately above the het toggle in `page1.html`):
+/ `K=3+6` buttons immediately above the het toggle in `local_pca_dosage.html`):
 
 - **K=3** — coarse split into {REF, HET, INV}-like bands
 - **K=6 ⚠** — sub-resolves into nested haplotype clusters (warning
@@ -151,7 +151,7 @@ follows the active K-mode.
 
 The intended user workflow:
 
-1. User opens page1, loads precomp + `dosage_chunks` layer.
+1. User opens local_pca_dosage, loads precomp + `dosage_chunks` layer.
 2. User looks at the L3 panel with K=3 bands coloured by K-means.
 3. User clicks the `het` toggle.
 4. The fill colour redraws by per-sample het rate.
@@ -161,28 +161,28 @@ The intended user workflow:
    miscall:
    - "Looks like band g0 (homozygous) by K-means but het rate is high
      → maybe a HET that K-means clustered with g0 due to noise?"
-   - Sample worth flagging / inspecting on page2.
+   - Sample worth flagging / inspecting on candidate_focus.
 
 ## §7. References
 
-- **DOM control**: `pages/discovery/page1.html#l3HetToggle` +
+- **DOM control**: `pages/discovery/local_pca_dosage.html#l3HetToggle` +
   `#l3HetToggleLabel`
 - **State slot**: `state.l3HetColoring`
 - **Persistence key**: `pca_scrubber_v3.l3HetColoring`
 - **Color ramp**: `atlases/inversion/shared/het_rate.js#hetRateColor`
 - **Source layer**: `dosage_chunks` (per-window allele-dosage
   matrix; producer-side)
-- **L3 panel renderer**: `pages/discovery/page1/l3_panel.js`
+- **L3 panel renderer**: `pages/discovery/local_pca_dosage/l3_panel.js`
   (`renderL3Panel`, `renderL3PanelSlab`, `renderL3PanelScaleStability`)
 - **Companion controls in same toolbar block** (`l3-more-item`):
   het toggle, L2-sweep toggle (per
   `specs_done/SPEC_l2_sweep_inheritance.md`)
 - **K-mode buttons**: `data-l3k="k3" | "k6" | "both"` in
-  `page1.html` lines 1399-1406
+  `local_pca_dosage.html` lines 1399-1406
 
 ---
 
-**Authored**: 2026-05-15 from `pages/discovery/page1.html` lines
+**Authored**: 2026-05-15 from `pages/discovery/local_pca_dosage.html` lines
 1407-1425 + the inline turn-128d annotation on the toggle. One of
 the 8 SPECs identified as missing on disk in
 `_handoff_docs/SPECS_AUDIT.md`.

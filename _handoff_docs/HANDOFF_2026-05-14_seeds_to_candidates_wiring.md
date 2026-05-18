@@ -47,7 +47,7 @@ registry-aware adapter.
 
 ```
 scrubber_main.json
-  ↓ (page1 / page22 load)
+  ↓ (local_pca_dosage / page22 load)
 state.data.windows[].labels, .K, .band_quality, .pc1
   ↓ (page22 ctx)
 runBandingPipeline(ctx) — shared/band_tracking/banding_pipeline.js

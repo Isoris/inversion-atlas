@@ -1,6 +1,6 @@
 // tests/test_page1_idb_restore.js
 //
-// Integration tests for pages/discovery/page1/idb_restore.js — the
+// Integration tests for pages/discovery/local_pca_dosage/idb_restore.js — the
 // session-restore orchestrator that replays IndexedDB cache contents
 // at app startup. Uses the same in-memory IDB shim as test_page1_idb.js
 // plus a minimal document shim so refreshChromSelect's DOM path runs.
@@ -9,17 +9,17 @@ import {
   restoreFromIdb,
   replayEnrichmentsFromIdb,
   cachedChromNames,
-} from '../atlases/inversion/pages/discovery/page1/idb_restore.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/idb_restore.js';
 import {
   IDB_STORE_CHROM,
   IDB_STORE_ENRICH,
   IDB_STORE_META,
   idbPut,
   _resetIdbForTests,
-} from '../atlases/inversion/pages/discovery/page1/idb.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/idb.js';
 import {
   clearChromCache,
-} from '../atlases/inversion/pages/discovery/page1/chrom_cache.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/chrom_cache.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

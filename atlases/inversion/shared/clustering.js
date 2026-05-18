@@ -6,7 +6,7 @@
 // and return either a dendrogram or a compact group assignment.
 //
 // Pure functions — no state, no DOM. The lineage-specific orchestrator
-// is in pages/discovery/page1/lineage.js; the band-tracking pipeline's
+// is in pages/discovery/local_pca_dosage/lineage.js; the band-tracking pipeline's
 // downstream consumers use these primitives via that wrapper.
 
 // =====================================================================

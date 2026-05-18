@@ -8,7 +8,7 @@
 // _pageState live-binding pattern + atlas-router mount/unmount lifecycle.
 // Body kept as a single file (vs sub-module split) because all 30 helpers
 // are cohesive marker-panel-domain code (~966 LOC; threshold for splitting
-// is ~3000 LOC across multiple concerns, like page1 and page2).
+// is ~3000 LOC across multiple concerns, like local_pca_dosage and candidate_focus).
 
 import * as marker_readiness from '../atlases/inversion/pages/catalogue/marker_readiness.js';
 import * as state  from '../atlases/inversion/pages/catalogue/marker_readiness/_state.js';

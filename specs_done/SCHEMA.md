@@ -110,7 +110,7 @@ empty-state when prerequisites aren't met.
 
 ## §6. The candidate JSON shape
 
-Per `pages/discovery/page1/candidates.js` + the field references
+Per `pages/discovery/local_pca_dosage/candidates.js` + the field references
 across the codebase:
 
 ```
@@ -234,9 +234,9 @@ loaded):
 ## §11. Dosage / heterozygosity (`dosage_chunks` layer)
 
 **Source**: cluster-side (per-window dosage matrix). **Consumers**:
-`page2` FIG_C08 dosage heatmap, `dosage_heatmap`,
-`dosage_cluster_adaptive_k`, `page1` L3 het-coloring (per
-`specs_done/SPEC_l3_het_dosage_coloring.md`), `page1`
+`candidate_focus` FIG_C08 dosage heatmap, `dosage_heatmap`,
+`dosage_cluster_adaptive_k`, `local_pca_dosage` L3 het-coloring (per
+`specs_done/SPEC_l3_het_dosage_coloring.md`), `local_pca_dosage`
 `linesColorMode='dosage'` and `'het'`.
 
 Shape (per chrom or per candidate):
@@ -311,7 +311,7 @@ classifier rules (§3.4 of that SPEC). Highlights:
 Reserved for: lineage (§15 — see
 `specs_done/SPEC_distant_band_concordance_fish_trajectory.md`),
 band-trace (§16 — same SPEC), inheritance-group clustering (§17 —
-`shared/inheritance_groups.js`), candidate-list (§18 — page2 +
+`shared/inheritance_groups.js`), candidate-list (§18 — candidate_focus +
 candidate_io.js).
 
 These are computed in the browser, not loaded as files. They cache
@@ -379,14 +379,14 @@ state shows the axis schema only — no values — until
 ## §20-§21. Reserved
 
 For arrangement_calls + boundary annotations (referenced in boundary_refinement
-`boundary_zone` per SPEC_l2_sweep + page1 candidate.boundary_zone).
+`boundary_zone` per SPEC_l2_sweep + local_pca_dosage candidate.boundary_zone).
 Both currently `pending` placeholder schemas; will be expanded when
 the boundary refinement output schema stabilizes.
 
 ## §22. Structural scaffold (θπ / GHSL panels)
 
-**Cited by**: `pages/discovery/page12.html:13`,
-`pages.registry.json -> pages.page12._doc`.
+**Cited by**: `pages/discovery/local_pca_theta_pi.html:13`,
+`pages.registry.json -> pages.local_pca_theta_pi._doc`.
 
 The structural scaffold is the empty-state architecture for
 **evidence-axis pages** that ship UI without data:
@@ -399,9 +399,9 @@ The structural scaffold is the empty-state architecture for
   `state.layersPresent`
 
 Pages following this scaffold:
-- **page12** — θπ scanner (chips for `theta_pi_per_window`,
+- **local_pca_theta_pi** — θπ scanner (chips for `theta_pi_per_window`,
   `theta_pi_local_pca`, `theta_pi_envelopes`, `cusum_theta`)
-- **page15** — GHSL scanner (chips for `ghsl_panel`,
+- **local_pca_ghsl** — GHSL scanner (chips for `ghsl_panel`,
   `ghsl_kstripes`, `ghsl_karyotype_runs`, `ghsl_d17_envelopes`,
   `cusum_ghsl`)
 
@@ -465,7 +465,7 @@ For: regime annotation v3.4 (the Stage 5.5 layer per
 ## §29. Reserved
 
 For: cohort_diversity, cohort_sample_froh, ancestry_confound (the
-ancestry-confound calculations consumed by page2's ancestry
+ancestry-confound calculations consumed by candidate_focus's ancestry
 confound panel).
 
 ## §30. Reserved
@@ -547,7 +547,7 @@ this doc solves.
 ---
 
 **Authored**: 2026-05-15 to resolve the SCHEMA / SCHEMA_V2.md
-references from `pages.registry.json` karyotype_tier _doc + page12 _doc +
+references from `pages.registry.json` karyotype_tier _doc + local_pca_theta_pi _doc +
 marker_panels module header + `shared/regimes_registry.js:49` +
 `shared/scale_stability.js:3, 33, 298`. Also pulls in the 14-axis
 schema from `pages/review/karyotype_tier/tier_axes.js#TIER_AXES`.

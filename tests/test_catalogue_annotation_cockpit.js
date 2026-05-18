@@ -13,7 +13,7 @@
 // _gatherActiveCandidatesForInheritance, _wireCandidateHaplotypeAnnotations,
 // candidateHaplotypeAnnotationsHtml, computeTrackedLinkageProjection are
 // kept as runtime `typeof X === 'function'` guards — they will land
-// naturally with page2/cross_species_breakpoints migration).
+// naturally with candidate_focus/cross_species_breakpoints migration).
 
 import * as annotation_cockpit from '../atlases/inversion/pages/catalogue/annotation_cockpit.js';
 import * as state  from '../atlases/inversion/pages/catalogue/annotation_cockpit/_state.js';

@@ -1,12 +1,12 @@
 // tests/test_page1_band_diagnostics.js
 //
-// Unit tests for pages/discovery/page1/band_diagnostics.js — the
+// Unit tests for pages/discovery/local_pca_dosage/band_diagnostics.js — the
 // per-band confounder/support computation that drives the L3 panel's
 // diagnostic chips and table.
 
 import {
   computeBandDiagnostics,
-} from '../atlases/inversion/pages/discovery/page1/band_diagnostics.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/band_diagnostics.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

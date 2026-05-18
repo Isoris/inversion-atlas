@@ -130,7 +130,7 @@ The producer classifies each SV into one of:
 
 1. **Pick a candidate** — the page reads `state.candidate.id` and
    calls `AtlasSVEvidence.loadCandidate(cid)`. Routes that populate
-   `state.candidate`: page1 click, page2 prev/next, catalogue row click,
+   `state.candidate`: local_pca_dosage click, candidate_focus prev/next, catalogue row click,
    etc.
 
 2. **Open the SV evidence tab.**

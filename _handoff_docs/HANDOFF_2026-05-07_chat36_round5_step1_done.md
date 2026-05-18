@@ -1,4 +1,4 @@
-# HANDOFF — page1 data helpers HOISTED to shared/; next is page2 body migration
+# HANDOFF — local_pca_dosage data helpers HOISTED to shared/; next is candidate_focus body migration
 
 **Date:** 2026-05-07 (chat ~36, round 5 step 1)
 **Reads:** This file FIRST, then `HANDOFF_2026-05-06_chat34_page2_plan.md`
@@ -11,9 +11,9 @@ top entry, then `PAGE_MIGRATION_RECIPE.md` tail.
 
 ## 30-second orientation
 
-**The page1 data helpers are now in shared/.** This is the round-5
+**The local_pca_dosage data helpers are now in shared/.** This is the round-5
 prep step that the chat-35 round-4-done handoff flagged as required
-before the page2 body migration. It's a file-move-only change — zero
+before the candidate_focus body migration. It's a file-move-only change — zero
 body edits — verified by an unchanged 33/33 smoke test.
 
 ```
@@ -22,9 +22,9 @@ atlases/inversion/
 │   └── page1_data_helpers.js     665 LOC ← NEW. 21 functions/constants,
 │                                            byte-verbatim bodies from _data.js.
 ├── pages/discovery/
-│   ├── page1.js                  431 LOC ← unchanged.
-│   ├── page1.js.bak             6684 LOC ← unchanged (delete after round 5).
-│   └── page1/
+│   ├── local_pca_dosage.js                  431 LOC ← unchanged.
+│   ├── local_pca_dosage.js.bak             6684 LOC ← unchanged (delete after round 5).
+│   └── local_pca_dosage/
 │       ├── _data.js               38 LOC ← shrunk from 643. Now a re-export shim.
 │       ├── _state.js             185 LOC ← FAMILY_PALETTE_BASE export dropped.
 │       └── ... (8 other modules) unchanged.
@@ -39,7 +39,7 @@ shared module (live re-export — same function identity, not a copy).
 - `tests/test_discovery_page1.js`: **103/103** (was 61/61; +42 new
   assertions covering shared/shim consistency).
 - `tests/test_discovery_page2.js`: **3/3** (stale path fixed —
-  `../inversion_discovery/page2.js` → `../atlases/inversion/pages/discovery/page2.js`).
+  `../inversion_discovery/candidate_focus.js` → `../atlases/inversion/pages/discovery/candidate_focus.js`).
 - `tests/smoke_discovery_page1_round4.mjs`: **33/33 unchanged**.
   This is the strongest check — it exercises mount/applyData/setCur(25)/
   full-draw-chain/unmount end-to-end through `atlas_api.bootstrap`.
@@ -86,7 +86,7 @@ also hoisted into this file — it lived in `_state.js` only because
 the round-3 split was done before the shared/ hoist plan crystallized.
 Now it's where `buildFamilyPalette` lives.
 
-### `pages/discovery/page1/_data.js` reduced to 38-LOC re-export shim
+### `pages/discovery/local_pca_dosage/_data.js` reduced to 38-LOC re-export shim
 
 ```js
 export {
@@ -104,7 +104,7 @@ transparent. **Delete the shim only when every panel module's import
 has been rewritten to point at `shared/page1_data_helpers.js` directly**
 — defer that mass-rename to a later cleanup round (it's churn-only).
 
-### `pages/discovery/page1/_state.js` (185 LOC, unchanged size)
+### `pages/discovery/local_pca_dosage/_state.js` (185 LOC, unchanged size)
 
 `FAMILY_PALETTE_BASE` declaration removed (moved to shared); the three
 small-cohort fallbacks (`FAMILY_COLOR_SMALL`, `_SINGLETON`, `_UNMATCHED`)
@@ -124,11 +124,11 @@ Comment block grew while constant block shrunk — same total LOC.
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **The other 9 page1 sub-modules** — only their `_data.js` import
+- **The other 9 local_pca_dosage sub-modules** — only their `_data.js` import
   target changed under them, transparently. Same source bytes.
 - **Page2 body migration** — that is round 5 step 2.
-- **Page2 registry-entry mismatch** (page2 plan "Step 0"): `pages.registry.json`
-  still lists page2 as cohort-overview but the code is candidate-detail.
+- **Page2 registry-entry mismatch** (candidate_focus plan "Step 0"): `pages.registry.json`
+  still lists candidate_focus as cohort-overview but the code is candidate-detail.
   Defer to round 5 step 2 — the chat doing that migration has the most
   context.
 - **Color helpers in `_state.js`** (`trackedColor`, `_vColor`, `_lineageColor`,
@@ -136,21 +136,21 @@ Comment block grew while constant block shrunk — same total LOC.
   (refactor to take `state` as first arg) — defer until a page actually
   needs them shared.
 - **HTML, CSS, server, schemas, master_config** — JS-only round.
-- **Sibling pages** (page8, page12, page15, page19, page2-stub, catalogue,
+- **Sibling pages** (window_summary_table, local_pca_theta_pi, local_pca_ghsl, negative_regions, candidate_focus-stub, catalogue,
   4, 5, 6, 7, 9, 10, 11, 16, 16b, 17, 18, 21, _overview) — only
   parse-checked.
 
 ---
 
-## What to do NEXT (round 5 step 2: page2 body migration)
+## What to do NEXT (round 5 step 2: candidate_focus body migration)
 
-The page2 plan (`HANDOFF_2026-05-06_chat34_page2_plan.md`) is still
+The candidate_focus plan (`HANDOFF_2026-05-06_chat34_page2_plan.md`) is still
 the controlling document. **One thing has changed**: Step 5 ("Cross-page
-imports") is now resolved — page2's panel modules import the shared
+imports") is now resolved — candidate_focus's panel modules import the shared
 helpers directly:
 
 ```js
-// In page2's new sub-modules (or in page2.js if not splitting yet):
+// In candidate_focus's new sub-modules (or in candidate_focus.js if not splitting yet):
 import {
   getPC, getPCRender, getL2Cluster, getL2ClusterAt,
   availablePCs, currentMbRange, allSampleIdx,
@@ -163,39 +163,39 @@ import {
 } from '../../shared/page1_data_helpers.js';
 ```
 
-These helpers all take `state` as first arg — **page2 never imports
-or sets page1's `_pageState`**. Page2 has its own `_pageState` (in
-its own `_state.js` if you split, or local to `page2.js` if you don't),
-and that one is set only by page2's own entry-points.
+These helpers all take `state` as first arg — **candidate_focus never imports
+or sets local_pca_dosage's `_pageState`**. Page2 has its own `_pageState` (in
+its own `_state.js` if you split, or local to `candidate_focus.js` if you don't),
+and that one is set only by candidate_focus's own entry-points.
 
-Otherwise the page2 plan is unchanged: 41 helpers, 40 found in legacy
+Otherwise the candidate_focus plan is unchanged: 41 helpers, 40 found in legacy
 with real bodies (~2359 LOC), 1 forever-stub (`renderCatalogue` —
-likely page-4 territory). The recipe is the same as page1's eighth
+likely page-4 territory). The recipe is the same as local_pca_dosage's eighth
 pass + this round's split.
 
-**Step 0 from the page2 plan is still open** — the registry-entry
+**Step 0 from the candidate_focus plan is still open** — the registry-entry
 mismatch. Resolve it as the first move in round 5 step 2; getting it
 wrong cascades through every layer requirement check.
 
 **Recommended sequence for chat 37:**
-1. Read this file, then the page2 plan handoff, then the audit log
+1. Read this file, then the candidate_focus plan handoff, then the audit log
    top entry. Skim the recipe.
-2. Resolve the page2 registry-entry mismatch (page2 plan "Step 0").
-3. Audit page2.html fragment + CSS for `#candidate*` selectors
-   (page2 plan "Step 1"–"Step 2").
+2. Resolve the candidate_focus registry-entry mismatch (candidate_focus plan "Step 0").
+3. Audit candidate_focus.html fragment + CSS for `#candidate*` selectors
+   (candidate_focus plan "Step 1"–"Step 2").
 4. Extract the 40 helpers verbatim from `legacy/Inversion_atlas.html`
-   using the script pattern in the page2 plan "Step 3".
-5. Wire `_pageState` in page2.js (page2 plan "Step 4").
+   using the script pattern in the candidate_focus plan "Step 3".
+5. Wire `_pageState` in candidate_focus.js (candidate_focus plan "Step 4").
 6. Use `import { ... } from '../../shared/page1_data_helpers.js'`
-   for the cross-page helpers (page2 plan "Step 5", now resolved
+   for the cross-page helpers (candidate_focus plan "Step 5", now resolved
    per this handoff).
-7. Smoke-test (page2 plan "Step 6").
+7. Smoke-test (candidate_focus plan "Step 6").
 8. Update audit log + recipe + write a fresh handoff.
 
-If page2 turns out to be ≥3000 LOC after extraction, also split it
+If candidate_focus turns out to be ≥3000 LOC after extraction, also split it
 into sub-modules following the round-4 pattern. The legacy bodies are
 mostly HTML-builder strings, which should be much less coupled than
-page1's panels — the split is likely simpler, possibly into just 4–5
+local_pca_dosage's panels — the split is likely simpler, possibly into just 4–5
 sub-modules (`_state.js`, `_html_builders.js`, `_wires.js`,
 `_draw_panels.js`).
 

@@ -1,6 +1,6 @@
 // tests/test_page1_idb.js
 //
-// Unit tests for pages/discovery/page1/idb.js — IndexedDB persistence
+// Unit tests for pages/discovery/local_pca_dosage/idb.js — IndexedDB persistence
 // layer. Uses a minimal in-memory shim that implements the small slice
 // of the IDB Promise-wrapped API the module uses (open + put + get +
 // getAll + clear + transactional commit). No real IndexedDB needed.
@@ -19,7 +19,7 @@ import {
   idbPersistChrom,
   idbPersistEnrichment,
   _resetIdbForTests,
-} from '../atlases/inversion/pages/discovery/page1/idb.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/idb.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

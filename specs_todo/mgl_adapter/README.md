@@ -47,7 +47,7 @@ catfish-inversion-analysis). The atlas-side work is mostly:
 - consumer modules in `shared/` (JSON parsers, validators, derivers)
 - page cartridges in `pages/<group>/page_*` (renderers)
 - per-page state shape extending the existing `state.candidateMode`
-  slot already shipped in page1
+  slot already shipped in local_pca_dosage
 
 ---
 
@@ -57,7 +57,7 @@ catfish-inversion-analysis). The atlas-side work is mostly:
 |---|---|---|
 | Validate JSON shapes from SPEC_0 §8 (PCA), §9 (heatmap) | atlas-side, pure compute | Add `shared/mgl_pca_json.js` + `shared/mgl_heatmap_json.js` with `validate*Payload` + `extract*Layers` |
 | Pre-build shared rendering state (SPEC_0 §10) | atlas-side, pure state | Add `shared/mgl_render_state.js` with `centering / polarity / color_mode / sample_order` derivers |
-| Stub the candidate-mode state slot extension on page1 | cartridge wiring | Extend `pages/discovery/page1/_state.js` per HANDOFF_2 §"candidate-mode state machine" |
+| Stub the candidate-mode state slot extension on local_pca_dosage | cartridge wiring | Extend `pages/discovery/local_pca_dosage/_state.js` per HANDOFF_2 §"candidate-mode state machine" |
 | Build the tree-panel state slot + parsing helpers | atlas-side, pure compute | HANDOFF_5 atlas-side scaffolding |
 | Build the fingerprinter track state slot + helpers | atlas-side, pure compute | HANDOFF_6 atlas-side scaffolding |
 
@@ -93,12 +93,12 @@ ships.
    SPEC_0 §10. Powers the dual-panel coordination so PCA dots and
    heatmap rows move together when controls change.
 
-3. **Candidate-mode state extension on page1** — extend the existing
-   `pages/discovery/page1/_state.js` slot per HANDOFF_2 §"candidate-
+3. **Candidate-mode state extension on local_pca_dosage** — extend the existing
+   `pages/discovery/local_pca_dosage/_state.js` slot per HANDOFF_2 §"candidate-
    mode state machine". Sets the contract for when producer JSONs
    arrive.
 
-4. **Stubs for the 3 new panels** (`pages/discovery/page1/tree_panel.js`,
+4. **Stubs for the 3 new panels** (`pages/discovery/local_pca_dosage/tree_panel.js`,
    `fingerprint_track.js`, `similarity_panel.js`). Each empty-state
    tolerant: when its layer isn't loaded, show a "not computed"
    message.

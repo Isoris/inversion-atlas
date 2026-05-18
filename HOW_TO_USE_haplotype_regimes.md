@@ -2,7 +2,7 @@
 
 **Page**: `page22` · stage `discovery` · label "haplotype regimes"
 **Atlas**: `inversion` (the C. gariepinus 226-cohort atlas)
-**Wiring**: registered in `manifest.json` after page19; registry entry in `registries/data/pages.registry.json`
+**Wiring**: registered in `manifest.json` after negative_regions; registry entry in `registries/data/pages.registry.json`
 
 ## What this page does
 
@@ -112,7 +112,7 @@ buildCatalogue(result, { cohort_id, reference_id, ..., sample_ids, windowToBp })
 
 **Per-window labels via per-L2 clustering.** The pipeline expects `getLabels(w)` to return the K-means labels at window `w`. The atlas computes labels per L2-envelope (one set per L2, shared across all windows in that L2), so the bridge looks up `windowToL2[w]` and fetches `clusterL2(ctx, l2idx).labels`. A `ClusterCache` caches these. This is faithful to the atlas's existing semantics.
 
-**Sample colouring borrowed from page1.** `_resolveSampleScopeColor` lives in `page1/_state.js`; page22 imports it directly via `'../page1/_state.js'`. To make this work, page22's `mount()` calls `_setActiveState` on page1's state shim with its own legacy state. **TODO**: hoist `_resolveSampleScopeColor` to a shared module so the cross-page coupling goes away.
+**Sample colouring borrowed from local_pca_dosage.** `_resolveSampleScopeColor` lives in `local_pca_dosage/_state.js`; page22 imports it directly via `'../local_pca_dosage/_state.js'`. To make this work, page22's `mount()` calls `_setActiveState` on local_pca_dosage's state shim with its own legacy state. **TODO**: hoist `_resolveSampleScopeColor` to a shared module so the cross-page coupling goes away.
 
 **Catalogue export is browser-only for now.** The serializer's `writeCatalogueToDir` is for Node hosts (LANTA, post-processing). The browser path uses `_downloadJson` to trigger three downloads. To wire LANTA-side persistence, hook a POST endpoint into the popstats server and replace `_downloadJson` with `fetch`.
 

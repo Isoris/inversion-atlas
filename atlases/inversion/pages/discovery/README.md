@@ -29,9 +29,9 @@ Three orthogonal evidence axes drive the round-1 scanners:
 
 | axis | page | input | rationale |
 |------|------|-------|-----------|
-| genotype-based | **page1** | dosage | the workhorse — clearest signal when an inversion is present and frequent |
-| diversity-based | **page12** | θπ (per-sample nucleotide diversity) | catches sweeps + balancing selection invisible to genotype |
-| haplotype-based | **page15** | GHSL (haplotype-pair sequence divergence) | catches haplotype-specific divergence invisible to dosage-or-diversity |
+| genotype-based | **local_pca_dosage** | dosage | the workhorse — clearest signal when an inversion is present and frequent |
+| diversity-based | **local_pca_theta_pi** | θπ (per-sample nucleotide diversity) | catches sweeps + balancing selection invisible to genotype |
+| haplotype-based | **local_pca_ghsl** | GHSL (haplotype-pair sequence divergence) | catches haplotype-specific divergence invisible to dosage-or-diversity |
 
 Regions hit by all three are near-certainly real biology. Regions
 hit by only one are worth investigating with that axis's specific
@@ -47,15 +47,15 @@ HANDOFF_5 / 6 / 7 / 8 / 10 SPECs).
 
 | page | label | summary |
 |------|-------|---------|
-| `page1` | local PCA \|Z\| | **the big page** — six-panel scrubber (sim_mat, \|Z\|, lines, PCA, L3 contingency, sidebar). 60 fps target. Most-used page in the atlas. |
-| `page12` | local PCA θπ | sister to page1 driven by per-sample θπ; empty-state until R pipeline ships θπ layers |
-| `page15` | local PCA GHSL | third evidence axis (GHSL haplotype divergence); stub — only layer-status chips wired |
+| `local_pca_dosage` | local PCA \|Z\| | **the big page** — six-panel scrubber (sim_mat, \|Z\|, lines, PCA, L3 contingency, sidebar). 60 fps target. Most-used page in the atlas. |
+| `local_pca_theta_pi` | local PCA θπ | sister to local_pca_dosage driven by per-sample θπ; empty-state until R pipeline ships θπ layers |
+| `local_pca_ghsl` | local PCA GHSL | third evidence axis (GHSL haplotype divergence); stub — only layer-status chips wired |
 
 ### Stage `discovery_2` (round 2 — workflow surfaces only)
 
 | page | label | summary |
 |------|-------|---------|
-| `page2` | candidate focus | per-candidate deep-dive (~15 sub-panels); reads `state.candidate` |
+| `candidate_focus` | candidate focus | per-candidate deep-dive (~15 sub-panels); reads `state.candidate` |
 | `page22` | haplotype regimes | wires the v3.4 banding pipeline (Stage 1-4) into the atlas-core shell; has end-user docs at `specs_done/_bundles/HOW_TO_USE_haplotype_regimes.md` |
 
 ### Stage `tooling` — utility / inspector cartridges (re-staged 2026-05-16)
@@ -80,29 +80,29 @@ stage is now `tooling`. The shell groups them into a separate tab.
 
 | page | manifest stage | lives here because |
 |------|---------------|--------------------|
-| `page8` | `catalogue` | per-window summary table — discovery-side metrics (\|Z\|, λ, eigen, ANGSD bi-SNP) historically grouped near page1 |
-| `page19` | `catalogue` | negative regions catalogue — complement of catalogue's positive catalogue; historically grouped near the scanners |
+| `window_summary_table` | `catalogue` | per-window summary table — discovery-side metrics (\|Z\|, λ, eigen, ANGSD bi-SNP) historically grouped near local_pca_dosage |
+| `negative_regions` | `catalogue` | negative regions catalogue — complement of catalogue's positive catalogue; historically grouped near the scanners |
 
 ## Key shared modules consumed by discovery pages
 
 - **`shared/per_l2_cluster.js`** — `ClusterCache`, `contextFromState`,
   `clusterL2` — per-window K-means cache that bridges atlas-side
-  state to pipeline ctx (used by page1, page2, haplotype_regimes)
+  state to pipeline ctx (used by local_pca_dosage, candidate_focus, haplotype_regimes)
 - **`shared/band_tracking/`** (32 modules) — the v3.4 banding pipeline
   (Stage 1-4 + dosage overlay); page22 wires the orchestrator
 - **`shared/kmeans.js`** — `kmeans1D`, `kmeans2D`, `silhouette1D`,
-  `adaptiveK1D` — used by page1's clustering, dosage_cluster_adaptive_k
+  `adaptiveK1D` — used by local_pca_dosage's clustering, dosage_cluster_adaptive_k
 - **`shared/hungarian.js`** — `alignLabels`, `hungarianChainProjection`,
-  `concordanceMatrix` — used by page1's L3 contingency, lineage
+  `concordanceMatrix` — used by local_pca_dosage's L3 contingency, lineage
   compute (per `specs_done/SPEC_distant_band_concordance_fish_trajectory.md`)
 - **`shared/contingency.js`** — `buildContingency`, `computeARI`,
-  `computeNMI`, `cramersV` — used by page1, page12, page22
-- **`shared/het_rate.js`** — `hetRateColor` — used by page1's L3
+  `computeNMI`, `cramersV` — used by local_pca_dosage, local_pca_theta_pi, page22
+- **`shared/het_rate.js`** — `hetRateColor` — used by local_pca_dosage's L3
   het-coloring (per `specs_done/SPEC_l3_het_dosage_coloring.md`)
 - **`shared/page1_data_helpers.js`** — `groupColor`, schema
-  detection, indexing — used by page1, page2, karyotype_tier (cross-stage)
+  detection, indexing — used by local_pca_dosage, candidate_focus, karyotype_tier (cross-stage)
 - **`shared/inheritance_groups.js`** — `inheritanceGroupClustering`,
-  `IGC_MIN_BANDS_FOR_CLUSTERING` — used by page1's lineage compute
+  `IGC_MIN_BANDS_FOR_CLUSTERING` — used by local_pca_dosage's lineage compute
   + L2-sweep (per `specs_done/SPEC_l2_sweep_inheritance.md`)
 - **`shared/mgl_*.js`** family — the HANDOFF_5/6/7/8/10 producers
   (`mgl_nj_tree`, `mgl_fingerprinter`, `mgl_window_similarity`,
@@ -111,11 +111,11 @@ stage is now `tooling`. The shell groups them into a separate tab.
 
 ## Cross-page dependencies
 
-- **page12 + page15** receive panel-render dispatches from
-  page1's `applyData()` when θπ / GHSL layers are present in the
-  loaded chromosome JSON. This means page12's θπ panels paint
-  alongside page1 on shared data.
-- **page2** reuses page1's cluster-cache for the L2 recompute on
+- **local_pca_theta_pi + local_pca_ghsl** receive panel-render dispatches from
+  local_pca_dosage's `applyData()` when θπ / GHSL layers are present in the
+  loaded chromosome JSON. This means local_pca_theta_pi's θπ panels paint
+  alongside local_pca_dosage on shared data.
+- **candidate_focus** reuses local_pca_dosage's cluster-cache for the L2 recompute on
   the active candidate.
 
 ## SPECs relevant to discovery
@@ -123,17 +123,17 @@ stage is now `tooling`. The shell groups them into a separate tab.
 In `specs_done/`:
 - `SPEC_band_track_extraction_and_l3_single_band_rows.md` (parent
   band-track spec)
-- `SPEC_l2_sweep_inheritance.md` (page1's auto-promote pipeline)
-- `SPEC_g_panel_unified_groups.md` (page1's G-panel popup)
-- `SPEC_lines_panel_candidate_bands.md` (page1's lines vertical
+- `SPEC_l2_sweep_inheritance.md` (local_pca_dosage's auto-promote pipeline)
+- `SPEC_g_panel_unified_groups.md` (local_pca_dosage's G-panel popup)
+- `SPEC_lines_panel_candidate_bands.md` (local_pca_dosage's lines vertical
   highlights)
-- `SPEC_lasso_inheritance_backgrounds.md` (page1's linkage modal)
-- `SPEC_l3_het_dosage_coloring.md` (page1's L3 het-coloring)
-- `SPEC_distant_band_concordance_fish_trajectory.md` (page1's
+- `SPEC_lasso_inheritance_backgrounds.md` (local_pca_dosage's linkage modal)
+- `SPEC_l3_het_dosage_coloring.md` (local_pca_dosage's L3 het-coloring)
+- `SPEC_distant_band_concordance_fish_trajectory.md` (local_pca_dosage's
   lineage + band-trace duo)
 
 In `specs_todo/`:
-- `SPEC_page1_candidate_mode_ui.md` (page1 detailed mode — HANDOFF 2)
+- `SPEC_page1_candidate_mode_ui.md` (local_pca_dosage detailed mode — HANDOFF 2)
 - `mgl_adapter/` (the HANDOFF_5/6/7/8/10 + SPEC_0 family that drives
   all 7 discovery_2 cartridges)
 - The Stage 5.5/5.6/5.7 specs of the v3.4 pipeline:
@@ -148,12 +148,12 @@ has a `page.manifest.json` (machine-readable capabilities) and a
 
 ## Notes for new contributors
 
-- **Read page1 first.** The other pages mostly follow its patterns
+- **Read local_pca_dosage first.** The other pages mostly follow its patterns
   (state.cur cursor, _pageState live binding, _setActiveState in
   mount, panel sub-modules under page<X>/).
 - **page22 has a user guide** — `specs_done/_bundles/HOW_TO_USE_haplotype_regimes.md`.
   It's the only end-user-facing docs in the repo. Use it as the
   template for future user guides.
-- **The dir ≠ stage discrepancies (page8, page19) are intentional**
+- **The dir ≠ stage discrepancies (window_summary_table, negative_regions) are intentional**
   — don't move the files. The stage is authoritative for shell
   routing; the dir reflects historical grouping.

@@ -143,14 +143,14 @@ function buildTabBar() {
   }
   // Page buttons
   for (const [page, stage] of [
-    ['page1', 'discovery'], ['page2', 'discovery'],
+    ['local_pca_dosage', 'discovery'], ['candidate_focus', 'discovery'],
     ['karyotype_tier', 'classification'], ['popstats', 'classification'],
     ['help', 'help'], ['page_help2', 'help'],
   ]) {
     const btn = new FakeNode('button');
     btn.setAttribute('data-page', page);
     btn.setAttribute('data-stage', stage);
-    if (page === 'page1') btn.setAttribute('class', 'active');
+    if (page === 'local_pca_dosage') btn.setAttribute('class', 'active');
     tabBar.appendChild(btn);
   }
   return tabBar;
@@ -338,7 +338,7 @@ const boot = bootstrapAtlasChrome({
 check('returns { teardown, chrome }',
       typeof boot.teardown === 'function'
    && boot.chrome && boot.chrome.pills && boot.chrome.settings);
-// Auto-synced pill to the active page (page1 in fixture → discovery).
+// Auto-synced pill to the active page (local_pca_dosage in fixture → discovery).
 check('pills synced to active page on bootstrap',
       tabBar7.getAttribute('data-active-stage') === 'discovery');
 // Settings btn works.

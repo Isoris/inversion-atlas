@@ -2,7 +2,7 @@
 //
 // State module for the cross_species_breakpoints cross-species breakpoints page (chat 36
 // round 5 step 11, 2026-05-07). Mirrors confirmed_carousel/stats_profile/marker_readiness/annotation_cockpit/
-// overview/marker_panels/page12/_state.js.
+// overview/marker_panels/local_pca_theta_pi/_state.js.
 //
 // _pageState: module-level reference. Page16's mount + entry points
 // call _setActiveState(state) on entry so the helper bodies see the

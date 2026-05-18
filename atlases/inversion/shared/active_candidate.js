@@ -1,9 +1,9 @@
 // atlases/inversion/shared/active_candidate.js
 //
 // Cohort-wide persistence of the "active candidate" id (legacy line
-// 57399). The user can pick a candidate from page1's bar or page2's
+// 57399). The user can pick a candidate from local_pca_dosage's bar or candidate_focus's
 // list; we stash the selection in localStorage so it survives page
-// reloads and so navigating between page1↔page2 lands on the same
+// reloads and so navigating between local_pca_dosage↔candidate_focus lands on the same
 // candidate.
 //
 // Three tiny helpers; all are headless-tolerant (no-op when

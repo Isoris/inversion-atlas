@@ -130,9 +130,9 @@ export function initCataloguePage(state) {
 /**
  * Mount: called by atlas_router when the user navigates to catalogue.
  *
- * Reads activeChrom from atlasState. Like page2, catalogue doesn't itself
- * load the chromosome data layer — it reads what page1's mount already
- * pinned to atlasState.inversion.tracks[chrom]. If page1 hasn't mounted
+ * Reads activeChrom from atlasState. Like candidate_focus, catalogue doesn't itself
+ * load the chromosome data layer — it reads what local_pca_dosage's mount already
+ * pinned to atlasState.inversion.tracks[chrom]. If local_pca_dosage hasn't mounted
  * yet, the catalogue shows its empty state.
  */
 export async function mount(root, atlasState, registry) {
@@ -165,7 +165,7 @@ export async function unmount(root) {
 // ---------------------------------------------------------------------------
 
 function _buildLegacyState(atlasState) {
-  // Same shape page1/page2 use. The breeding-export pipeline reads
+  // Same shape local_pca_dosage/candidate_focus use. The breeding-export pipeline reads
   // state.candidateList, state.cohortDiversity, state.data, state.k.
   const inv = atlasState.inversion || {};
   const sh = atlasState.shared || {};
@@ -177,8 +177,8 @@ function _buildLegacyState(atlasState) {
   legacy.activeSampleSet        = sh.activeSampleSet || null;
   legacy.candidate_review_decisions = inv.candidate_review_decisions || {};
   legacy.locked_karyotype_groups    = inv.locked_karyotype_groups || {};
-  // Page3 reads state.data the same way page2 does — the chromosome
-  // precomp pinned by page1's mount.
+  // Page3 reads state.data the same way candidate_focus does — the chromosome
+  // precomp pinned by local_pca_dosage's mount.
   const chrom = sh.activeChrom;
   if (chrom && inv.tracks && inv.tracks[chrom]) {
     legacy.data = inv.tracks[chrom];

@@ -28,7 +28,7 @@ A page belongs here if it is an **inspector** — opened ad-hoc to
 characterise a candidate or debug a layer — rather than a
 **workflow step** users walk through in order.
 
-- ✅ `discovery_2` (workflow): page2 candidate focus, page22 haplotype regimes
+- ✅ `discovery_2` (workflow): candidate_focus candidate focus, page22 haplotype regimes
 - ✅ `tooling` (inspector): the 7 above
 
 A future addition should ship here too: `page_pca_comparator` per

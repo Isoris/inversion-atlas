@@ -117,7 +117,7 @@ Same shape as stats_profile/_state.js and marker_readiness/_state.js.
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1/page2/catalogue/stats_profile/marker_readiness modules** — completely unchanged.
+- **local_pca_dosage/candidate_focus/catalogue/stats_profile/marker_readiness modules** — completely unchanged.
 - **`shared/page1_data_helpers.js`** — unchanged. Page21 doesn't call
   `_esc` (the one shared helper that stats_profile picked up).
 - **The 4 external runtime-guarded helpers**
@@ -125,7 +125,7 @@ Same shape as stats_profile/_state.js and marker_readiness/_state.js.
   `_wireCandidateHaplotypeAnnotations`,
   `candidateHaplotypeAnnotationsHtml`,
   `computeTrackedLinkageProjection`) — kept as `typeof X === 'function'`
-  guards in the body. They will land naturally when page2 (candidate
+  guards in the body. They will land naturally when candidate_focus (candidate
   focus) lands the first three, and when the linkage projection
   helper gets promoted to `shared/`.
 - **Pages 4, 6, 7, 8, 9, 10, 11, 12, 15, 16, 16b, 19,
@@ -139,8 +139,8 @@ Same shape as stats_profile/_state.js and marker_readiness/_state.js.
 
 | Page | Folder (logical stage) | Status | LOC | Tests |
 |---|---|---|---|---|
-| page1 | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
-| page2 | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
+| local_pca_dosage | discovery | ✅ rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
+| candidate_focus | discovery | ✅ step 2 | ~3140 across 5 sub-modules | 58+24 |
 | catalogue | catalogue | ✅ step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
 | stats_profile | catalogue (synthesis) | ✅ step 5 (single file + state bridge) | ~1009 across main + _state | 34+20 |
 | marker_readiness | catalogue (synthesis) | ✅ step 4 (single file) | ~984 across main + _state | 46+20 |
@@ -172,7 +172,7 @@ refactor is shorter.
 (`_gatherActiveCandidatesForInheritance` etc.) are kept as runtime
 guards because each call site already handles the missing case
 gracefully. Same approach as stats_profile with `_csGetSyntenyBlocks` /
-`_csPermutationTest`. They'll land naturally with page2 / cross_species_breakpoints /
+`_csPermutationTest`. They'll land naturally with candidate_focus / cross_species_breakpoints /
 multi_species_cockpit migration.
 
 ---
@@ -183,9 +183,9 @@ multi_species_cockpit migration.
 
 | Page | Folder | LOC | Notes |
 |---|---|---|---|
-| **page12** | discovery | 1008 | 18 TODOs — substantial work |
+| **local_pca_theta_pi** | discovery | 1008 | 18 TODOs — substantial work |
 | **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest`, AND likely `computeTrackedLinkageProjection`** |
-| **page8, 9, 15, 19, overview** | various | <105 each | tiny stubs; quick router-wiring rounds — could batch several in one round |
+| **window_summary_table, 9, 15, 19, overview** | various | <105 each | tiny stubs; quick router-wiring rounds — could batch several in one round |
 | **karyotype_tier, 6, 7, 11** | review | 122-301 | review-stage pages |
 | **sv_evidence** | review | 148 | SV evidence review |
 | **marker_panels** | catalogue | TBD | catalogue completion |
@@ -196,12 +196,12 @@ Logical next priorities depending on goal:
 - **Catalogue completion** — confirmed_carousel, marker_panels, overview would round
   out the catalogue group. overview is the smallest, marker_panels/9
   are medium.
-- **Resolve cross-page runtime guards** — page2 (candidate focus deep
+- **Resolve cross-page runtime guards** — candidate_focus (candidate focus deep
   dive) is already migrated, but the 3 helpers annotation_cockpit stubs
-  (`_gatherActiveCandidatesForInheritance` etc.) live somewhere page2
+  (`_gatherActiveCandidatesForInheritance` etc.) live somewhere candidate_focus
   hasn't surfaced yet — likely they need extraction from legacy line
   41196+ into `shared/`.
-- **Quick wins / coverage** — tiny stubs (page8/9/15/19/overview)
+- **Quick wins / coverage** — tiny stubs (window_summary_table/9/15/19/overview)
   can be batched in a single round.
 - **Comparative cockpit** — cross_species_breakpoints/multi_species_cockpit is the most ambitious
   remaining; landing it resolves the most runtime guards across
