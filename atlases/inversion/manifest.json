@@ -6,6 +6,7 @@
   "pages": [
     {
       "id": "page1",
+      "slug": "local_pca_dosage",
       "label": "local PCA |z|",
       "stage": "discovery",
       "fragment": "atlases/inversion/pages/discovery/page1.html",
@@ -14,6 +15,7 @@
     },
     {
       "id": "page12",
+      "slug": "local_pca_theta_pi",
       "label": "local PCA θπ",
       "stage": "discovery",
       "fragment": "atlases/inversion/pages/discovery/page12.html",
@@ -21,6 +23,7 @@
     },
     {
       "id": "page15",
+      "slug": "local_pca_ghsl",
       "label": "local PCA GHSL",
       "stage": "discovery",
       "fragment": "atlases/inversion/pages/discovery/page15.html",
@@ -28,6 +31,7 @@
     },
     {
       "id": "page2",
+      "slug": "candidate_focus",
       "label": "candidate focus",
       "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/discovery/page2.html",
@@ -35,6 +39,7 @@
     },
     {
       "id": "page8",
+      "slug": "window_summary_table",
       "label": "per-window summary table",
       "stage": "catalogue",
       "fragment": "atlases/inversion/pages/discovery/page8.html",
@@ -42,6 +47,7 @@
     },
     {
       "id": "page19",
+      "slug": "negative_regions",
       "label": "negative regions catalogue",
       "stage": "catalogue",
       "fragment": "atlases/inversion/pages/discovery/page19.html",
@@ -49,6 +55,7 @@
     },
     {
       "id": "page22",
+      "slug": "haplotype_regimes",
       "label": "haplotype regimes",
       "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/discovery/page22.html",
@@ -57,6 +64,7 @@
     },
     {
       "id": "page4",
+      "slug": "karyotype_tier",
       "label": "karyotype / tier",
       "stage": "classification",
       "fragment": "atlases/inversion/pages/review/page4.html",
@@ -64,6 +72,7 @@
     },
     {
       "id": "page6",
+      "slug": "popstats",
       "label": "popstats",
       "stage": "classification",
       "fragment": "atlases/inversion/pages/review/page6.html",
@@ -71,6 +80,7 @@
     },
     {
       "id": "page7",
+      "slug": "ancestry_per_window",
       "label": "ancestry",
       "stage": "classification",
       "fragment": "atlases/inversion/pages/review/page7.html",
@@ -78,6 +88,7 @@
     },
     {
       "id": "page11",
+      "slug": "boundary_refinement",
       "label": "boundaries",
       "stage": "classification",
       "fragment": "atlases/inversion/pages/review/page11.html",
@@ -85,6 +96,7 @@
     },
     {
       "id": "page_sv_evidence",
+      "slug": "sv_evidence",
       "label": "SV evidence",
       "stage": "classification",
       "fragment": "atlases/inversion/pages/review/page_sv_evidence.html",
@@ -92,6 +104,7 @@
     },
     {
       "id": "page_ancestry_scroller",
+      "slug": "fish_ancestry_scroller",
       "label": "ancestry scroller",
       "stage": "classification",
       "fragment": "atlases/inversion/pages/review/page_ancestry_scroller.html",
@@ -100,6 +113,7 @@
     },
     {
       "id": "page3",
+      "slug": "catalogue",
       "label": "catalogue",
       "stage": "catalogue",
       "fragment": "atlases/inversion/pages/catalogue/page3.html",
@@ -107,6 +121,7 @@
     },
     {
       "id": "page9",
+      "slug": "confirmed_carousel",
       "label": "confirmed carousel",
       "stage": "catalogue",
       "fragment": "atlases/inversion/pages/catalogue/page9.html",
@@ -114,6 +129,7 @@
     },
     {
       "id": "page10",
+      "slug": "marker_panels",
       "label": "marker panels",
       "stage": "catalogue",
       "fragment": "atlases/inversion/pages/catalogue/page10.html",
@@ -121,6 +137,7 @@
     },
     {
       "id": "page17",
+      "slug": "stats_profile",
       "label": "stats profile",
       "stage": "classification",
       "fragment": "atlases/inversion/pages/catalogue/page17.html",
@@ -128,6 +145,7 @@
     },
     {
       "id": "page18",
+      "slug": "marker_readiness",
       "label": "marker panel",
       "stage": "classification",
       "fragment": "atlases/inversion/pages/catalogue/page18.html",
@@ -135,6 +153,7 @@
     },
     {
       "id": "page21",
+      "slug": "annotation_cockpit",
       "label": "annotation cockpit",
       "stage": "catalogue",
       "fragment": "atlases/inversion/pages/catalogue/page21.html",
@@ -142,6 +161,7 @@
     },
     {
       "id": "page_overview",
+      "slug": "overview",
       "label": "overview",
       "stage": "classification",
       "fragment": "atlases/inversion/pages/catalogue/page_overview.html",
@@ -149,6 +169,7 @@
     },
     {
       "id": "page5",
+      "slug": "help",
       "label": "help",
       "stage": "help",
       "fragment": "atlases/inversion/pages/comparative/page5.html",
@@ -157,6 +178,7 @@
     },
     {
       "id": "page16",
+      "slug": "cross_species_breakpoints",
       "label": "cross-species breakpoints",
       "stage": "comparative",
       "fragment": "atlases/inversion/pages/comparative/page16.html",
@@ -164,6 +186,7 @@
     },
     {
       "id": "page16b",
+      "slug": "multi_species_cockpit",
       "label": "multi-species",
       "stage": "comparative",
       "fragment": "atlases/inversion/pages/comparative/page16b.html",
@@ -172,6 +195,7 @@
     },
     {
       "id": "page_tree_panel",
+      "slug": "tree_panel",
       "label": "tree panel",
       "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_tree_panel.html",
@@ -180,6 +204,7 @@
     },
     {
       "id": "page_fingerprint_track",
+      "slug": "fingerprint_track",
       "label": "fingerprint track",
       "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_fingerprint_track.html",
@@ -188,6 +213,7 @@
     },
     {
       "id": "page_similarity_panel",
+      "slug": "similarity_matrix",
       "label": "similarity matrix",
       "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_similarity_panel.html",
@@ -196,6 +222,7 @@
     },
     {
       "id": "page_pca_panel",
+      "slug": "pca_scatter_per_window",
       "label": "PCA scatter",
       "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_pca_panel.html",
@@ -204,6 +231,7 @@
     },
     {
       "id": "page_dosage_heatmap",
+      "slug": "dosage_heatmap",
       "label": "dosage heatmap",
       "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_dosage_heatmap.html",
@@ -212,6 +240,7 @@
     },
     {
       "id": "page_nested_detector",
+      "slug": "nested_inversion_detector",
       "label": "nested detector",
       "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_nested_detector.html",
@@ -220,6 +249,7 @@
     },
     {
       "id": "page_dosage_cluster",
+      "slug": "dosage_cluster_adaptive_k",
       "label": "dosage cluster",
       "stage": "tooling",
       "fragment": "atlases/inversion/pages/discovery/page_dosage_cluster.html",
@@ -228,6 +258,7 @@
     },
     {
       "id": "page_evolution_polarize_msa",
+      "slug": "polarize_msa_stacked",
       "label": "polarize · MSA",
       "stage": "evolution",
       "fragment": "atlases/inversion/pages/evolution/page_evolution_polarize_msa.html",
@@ -236,6 +267,7 @@
     },
     {
       "id": "page_evolution_haplotype_network",
+      "slug": "haplotype_network",
       "label": "haplotype network",
       "stage": "evolution",
       "fragment": "atlases/inversion/pages/evolution/page_evolution_haplotype_network.html",
@@ -244,6 +276,7 @@
     },
     {
       "id": "page_evolution_polarize_synteny",
+      "slug": "polarize_synteny_vote",
       "label": "polarize · synteny",
       "stage": "evolution",
       "fragment": "atlases/inversion/pages/evolution/page_evolution_polarize_synteny.html",
@@ -252,6 +285,7 @@
     },
     {
       "id": "page_evolution_age",
+      "slug": "age_divergence",
       "label": "age + divergence",
       "stage": "evolution",
       "fragment": "atlases/inversion/pages/evolution/page_evolution_age.html",
@@ -260,6 +294,7 @@
     },
     {
       "id": "page_evolution_mosaicism",
+      "slug": "mosaicism_leakage",
       "label": "mosaicism / leakage",
       "stage": "evolution",
       "fragment": "atlases/inversion/pages/evolution/page_evolution_mosaicism.html",
@@ -268,6 +303,7 @@
     },
     {
       "id": "page_evolution_internal_history",
+      "slug": "inv_internal_substructure",
       "label": "internal history",
       "stage": "evolution",
       "fragment": "atlases/inversion/pages/evolution/page_evolution_internal_history.html",
@@ -276,6 +312,7 @@
     },
     {
       "id": "page_evolution_layer_cleaning",
+      "slug": "layer_cleaning",
       "label": "layer cleaning",
       "stage": "evolution",
       "fragment": "atlases/inversion/pages/evolution/page_evolution_layer_cleaning.html",
@@ -284,6 +321,7 @@
     },
     {
       "id": "page_evolution_event_tree",
+      "slug": "event_tree_relative_ordering",
       "label": "event tree",
       "stage": "evolution",
       "fragment": "atlases/inversion/pages/evolution/page_evolution_event_tree.html",
@@ -292,6 +330,7 @@
     },
     {
       "id": "page_evolution_archaeology_card",
+      "slug": "archaeology_synthesis_card",
       "label": "archaeology card",
       "stage": "evolution",
       "fragment": "atlases/inversion/pages/evolution/page_evolution_archaeology_card.html",
