@@ -14,13 +14,13 @@ authoritative routing key; directory location is historical.
 
 | page id | label | what it inspects |
 |---------|-------|------------------|
-| `page_tree_panel` | tree panel | NJ sample tree on dosage distances + ARI badge |
-| `page_fingerprint_track` | fingerprint track | per-window diversity-regime fingerprint + switch markers + scenario badge |
-| `page_similarity_panel` | similarity matrix | per-window sample × sample similarity heatmap with block detection + adjacent-window ARI transition strip |
-| `page_pca_panel` | PCA scatter | per-window PC1 × PC2 scatter with λ-magnitude scrubber |
-| `page_dosage_heatmap` | dosage heatmap | sample × marker dosage heatmap with K=3 group track, polarity stripe, and MINOR2/MINOR3 role-pair sidecar (per SPEC_0 §1) |
-| `page_nested_detector` | nested detector | 3 stratum tracks (HOM1 / HET / HOMO_2) + contiguous inner-interval overlays |
-| `page_dosage_cluster` | dosage cluster | adaptive-K sample clustering on per-window dosage profiles |
+| `tree_panel` | tree panel | NJ sample tree on dosage distances + ARI badge |
+| `fingerprint_track` | fingerprint track | per-window diversity-regime fingerprint + switch markers + scenario badge |
+| `similarity_matrix` | similarity matrix | per-window sample × sample similarity heatmap with block detection + adjacent-window ARI transition strip |
+| `pca_scatter_per_window` | PCA scatter | per-window PC1 × PC2 scatter with λ-magnitude scrubber |
+| `dosage_heatmap` | dosage heatmap | sample × marker dosage heatmap with K=3 group track, polarity stripe, and MINOR2/MINOR3 role-pair sidecar (per SPEC_0 §1) |
+| `nested_inversion_detector` | nested detector | 3 stratum tracks (HOM1 / HET / HOMO_2) + contiguous inner-interval overlays |
+| `dosage_cluster_adaptive_k` | dosage cluster | adaptive-K sample clustering on per-window dosage profiles |
 
 ## What qualifies as "tooling"
 

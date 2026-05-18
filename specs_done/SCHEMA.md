@@ -234,8 +234,8 @@ loaded):
 ## §11. Dosage / heterozygosity (`dosage_chunks` layer)
 
 **Source**: cluster-side (per-window dosage matrix). **Consumers**:
-`page2` FIG_C08 dosage heatmap, `page_dosage_heatmap`,
-`page_dosage_cluster`, `page1` L3 het-coloring (per
+`page2` FIG_C08 dosage heatmap, `dosage_heatmap`,
+`dosage_cluster_adaptive_k`, `page1` L3 het-coloring (per
 `specs_done/SPEC_l3_het_dosage_coloring.md`), `page1`
 `linesColorMode='dosage'` and `'het'`.
 

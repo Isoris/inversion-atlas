@@ -59,7 +59,7 @@ Preview-only — no committable outputs.
 
 - `shared/mgl_founder_consensus.js`
 - `shared/mgl_doubleton_sfs_clusters.js`
-- **page_dosage_heatmap painter** (reused as downstream renderer)
+- **dosage_heatmap painter** (reused as downstream renderer)
 
 ## Documents
 

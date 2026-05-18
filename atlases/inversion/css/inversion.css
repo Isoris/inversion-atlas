@@ -4387,22 +4387,22 @@ html[data-theme="academic"] #page16 .cs-synteny-sankey {
      body              →  main canvas-wrap + .right aside (250px col)
      footer            →  one-line caption
    Class prefixes used (one per panel):
-     .tree-panel-          page_tree_panel
-     .fingerprint-         page_fingerprint_track
-     .similarity-          page_similarity_panel
-     .pca-                 page_pca_panel
-     .dh2-                 page_dosage_heatmap
-     .nested-              page_nested_detector
-     .dc-                  page_dosage_cluster
+     .tree-panel-          tree_panel
+     .fingerprint-         fingerprint_track
+     .similarity-          similarity_matrix
+     .pca-                 pca_scatter_per_window
+     .dh2-                 dosage_heatmap
+     .nested-              nested_inversion_detector
+     .dc-                  dosage_cluster_adaptive_k
    ==================================================================== */
 
-.page#page_tree_panel.active,
-.page#page_fingerprint_track.active,
-.page#page_similarity_panel.active,
-.page#page_pca_panel.active,
-.page#page_dosage_heatmap.active,
-.page#page_nested_detector.active,
-.page#page_dosage_cluster.active {
+.page#tree_panel.active,
+.page#fingerprint_track.active,
+.page#similarity_matrix.active,
+.page#pca_scatter_per_window.active,
+.page#dosage_heatmap.active,
+.page#nested_inversion_detector.active,
+.page#dosage_cluster_adaptive_k.active {
   display: flex;
   flex-direction: column;
   height: 100%;

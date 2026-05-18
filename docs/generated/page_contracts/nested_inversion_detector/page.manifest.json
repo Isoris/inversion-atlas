@@ -1,0 +1,65 @@
+{
+  "page_id": "nested_inversion_detector",
+  "label": "nested detector",
+  "page_type": "core_page",
+  "stage": "discovery_2",
+  "owner_atlas": "inversion",
+  "status": "active (Phase 1)",
+  "current_path": {
+    "html": "atlases/inversion/pages/discovery/nested_inversion_detector.html",
+    "js_entry": "atlases/inversion/pages/discovery/nested_inversion_detector.js",
+    "js_subdir": "atlases/inversion/pages/discovery/nested_inversion_detector/"
+  },
+
+  "purpose": "Nested-inversion detector. 3 horizontal stratum tracks (HOM1 / HET / HOM2) with one coloured bar per per-stratum inner-band candidate (bar height = silhouette quality). Highlighted overlays for contiguous inner intervals. Verdict badge + strata-scanned indicator. Cartridge implementation of HANDOFF_7 / SPEC_0 §11.7.",
+
+  "required_layers": [],
+  "required_slots": ["activeCandidate (reads atlasState.inversion.nested_detector_state)"],
+  "input_contract": "atlasState.inversion.nested_detector_state = { detector_result: shared/mgl_nested_detector.detectNestedInversion output, candidate_label?, n_windows? }",
+
+  "panels": [
+    {"id": "strata_tracks", "purpose": "3 stratum tracks (HOM1 / HET / HOM2) — coloured bars per inner-band candidate"},
+    {"id": "inner_interval_overlays", "purpose": "highlighted overlays for contiguous inner intervals"},
+    {"id": "verdict_badge", "purpose": "verdict + strata-scanned indicator"},
+    {"id": "right_panel_detail", "purpose": "interval summary on hover"}
+  ],
+
+  "subdir_files": [
+    "_state.js — _pageState + setter",
+    "renderer.js — canvas painter (3 strata tracks + overlays + verdict)",
+    "selection.js — hover crosshair + click-to-toggle interval in selection"
+  ],
+
+  "primitives_used": [
+    "shared/mgl_nested_detector.js (detectNestedInversion)"
+  ],
+  "adapters_used": [],
+
+  "interactions": [
+    {"id": "hover_interval", "type": "hover", "purpose": "crosshair + right-panel interval summary"},
+    {"id": "click_interval", "type": "click", "purpose": "toggle interval in selection"}
+  ],
+  "hotkeys": [],
+
+  "computed_preview_outputs": [
+    "3-stratum inner-band candidates",
+    "contiguous inner intervals",
+    "verdict (NESTED / NOT_NESTED / INSUFFICIENT_DATA)",
+    "strata-scanned count"
+  ],
+  "committable_outputs": ["none"],
+  "commit_policy": "none_by_default",
+
+  "documents": {
+    "page_registry_doc": "unknown (not in pages.registry.json)",
+    "specs_done": [],
+    "specs_todo": [
+      "specs_todo/mgl_adapter/HANDOFF_7_nested_inversion.md",
+      "specs_todo/mgl_adapter/SPEC_0_master.md §11.7"
+    ],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [],
+  "confidence": "high"
+}

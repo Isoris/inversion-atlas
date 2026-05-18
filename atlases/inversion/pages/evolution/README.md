@@ -55,7 +55,7 @@ Each page is a thin atlas-side cartridge with the following shape:
 
 | page | primary primitive |
 |------|-------------------|
-| `polarize_msa` | `shared/mgl_founder_consensus.js` + `shared/mgl_doubleton_sfs_clusters.js` (feeds `page_dosage_heatmap` painter for the row-stack render) |
+| `polarize_msa` | `shared/mgl_founder_consensus.js` + `shared/mgl_doubleton_sfs_clusters.js` (feeds `dosage_heatmap` painter for the row-stack render) |
 | `haplotype_network` | `shared/mgl_haplotype_network.js` |
 | `polarize_synteny` | `shared/mgl_outgroup_synteny.js` |
 | `age` | `shared/mgl_inversion_divergence.js` (`computeDivergence`) |

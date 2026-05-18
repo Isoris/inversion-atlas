@@ -6,7 +6,7 @@
 // =====================================================================
 
 import { paintDosageHeatmap, findCellAtPixel }
-  from '../../discovery/page_dosage_heatmap/renderer.js';
+  from '../../discovery/dosage_heatmap/renderer.js';
 
 // Re-export the dosage-heatmap painter so the cartridge's import
 // graph stays explicit about the canonical-adapter reuse:

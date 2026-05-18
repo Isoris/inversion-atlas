@@ -39,13 +39,13 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | discovery | page15 | local PCA GHSL | stub (renderers TODO) | high | [page.manifest.json](page_contracts/page15/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page15/PAGE_CONTRACT.md) |
 | discovery_2 | page2 | candidate focus | active | high | [page.manifest.json](page_contracts/page2/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page2/PAGE_CONTRACT.md) |
 | discovery_2 | haplotype_regimes | haplotype regimes | active (Phase 1) | high | [page.manifest.json](page_contracts/haplotype_regimes/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/haplotype_regimes/PAGE_CONTRACT.md) |
-| discovery_2 | page_tree_panel | tree panel | active (Phase 1) | high | [page.manifest.json](page_contracts/page_tree_panel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_tree_panel/PAGE_CONTRACT.md) |
-| discovery_2 | page_fingerprint_track | fingerprint track | active (Phase 1) | high | [page.manifest.json](page_contracts/page_fingerprint_track/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_fingerprint_track/PAGE_CONTRACT.md) |
-| discovery_2 | page_similarity_panel | similarity matrix | active (Phase 1) | high | [page.manifest.json](page_contracts/page_similarity_panel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_similarity_panel/PAGE_CONTRACT.md) |
-| discovery_2 | page_pca_panel | PCA scatter | active (Phase 1) | high | [page.manifest.json](page_contracts/page_pca_panel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_pca_panel/PAGE_CONTRACT.md) |
-| discovery_2 | page_dosage_heatmap | dosage heatmap | active (Phase 1) | high | [page.manifest.json](page_contracts/page_dosage_heatmap/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_dosage_heatmap/PAGE_CONTRACT.md) |
-| discovery_2 | page_nested_detector | nested detector | active (Phase 1) | high | [page.manifest.json](page_contracts/page_nested_detector/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_nested_detector/PAGE_CONTRACT.md) |
-| discovery_2 | page_dosage_cluster | dosage cluster | active (Phase 1) | high | [page.manifest.json](page_contracts/page_dosage_cluster/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page_dosage_cluster/PAGE_CONTRACT.md) |
+| discovery_2 | tree_panel | tree panel | active (Phase 1) | high | [page.manifest.json](page_contracts/tree_panel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/tree_panel/PAGE_CONTRACT.md) |
+| discovery_2 | fingerprint_track | fingerprint track | active (Phase 1) | high | [page.manifest.json](page_contracts/fingerprint_track/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/fingerprint_track/PAGE_CONTRACT.md) |
+| discovery_2 | similarity_matrix | similarity matrix | active (Phase 1) | high | [page.manifest.json](page_contracts/similarity_matrix/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/similarity_matrix/PAGE_CONTRACT.md) |
+| discovery_2 | pca_scatter_per_window | PCA scatter | active (Phase 1) | high | [page.manifest.json](page_contracts/pca_scatter_per_window/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/pca_scatter_per_window/PAGE_CONTRACT.md) |
+| discovery_2 | dosage_heatmap | dosage heatmap | active (Phase 1) | high | [page.manifest.json](page_contracts/dosage_heatmap/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/dosage_heatmap/PAGE_CONTRACT.md) |
+| discovery_2 | nested_inversion_detector | nested detector | active (Phase 1) | high | [page.manifest.json](page_contracts/nested_inversion_detector/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/nested_inversion_detector/PAGE_CONTRACT.md) |
+| discovery_2 | dosage_cluster_adaptive_k | dosage cluster | active (Phase 1) | high | [page.manifest.json](page_contracts/dosage_cluster_adaptive_k/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/dosage_cluster_adaptive_k/PAGE_CONTRACT.md) |
 | catalogue | page8 | per-window summary table | active (fresh) | high | [page.manifest.json](page_contracts/page8/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page8/PAGE_CONTRACT.md) |
 | catalogue | page19 | negative regions catalogue | active (fresh) | high | [page.manifest.json](page_contracts/page19/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page19/PAGE_CONTRACT.md) |
 | catalogue | page3 | catalogue | active | high | [page.manifest.json](page_contracts/page3/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page3/PAGE_CONTRACT.md) |
@@ -88,9 +88,9 @@ Registry now covers all 38 manifest pages + 1 registry-only entry
 (`popstats_demo`) = 39 entries total.
 
 Closed entries:
-- page_tree_panel, page_fingerprint_track, page_similarity_panel,
-  page_pca_panel, page_dosage_heatmap, page_nested_detector,
-  page_dosage_cluster (7 cartridge pages — HANDOFF_5/6/7/8/10 + SPEC_0)
+- tree_panel, fingerprint_track, similarity_matrix,
+  pca_scatter_per_window, dosage_heatmap, nested_inversion_detector,
+  dosage_cluster_adaptive_k (7 cartridge pages — HANDOFF_5/6/7/8/10 + SPEC_0)
 - page_evolution_polarize_msa, page_evolution_haplotype_network,
   page_evolution_polarize_synteny, page_evolution_age,
   page_evolution_mosaicism, page_evolution_internal_history,
@@ -187,7 +187,7 @@ help, not a manual.
 - **page12** + **page15** → page1 (`page1.applyData()` dispatches
   panel renderers when θπ / GHSL layers are present)
 - **page9** → page2 (reuses `renderCandidateMetadata`)
-- **page_evolution_polarize_msa** → page_dosage_heatmap (reuses
+- **page_evolution_polarize_msa** → dosage_heatmap (reuses
   painter)
 
 ## Statistics

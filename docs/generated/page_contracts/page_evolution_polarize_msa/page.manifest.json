@@ -22,7 +22,7 @@
   "primitives_used": [
     "shared/mgl_founder_consensus.js",
     "shared/mgl_doubleton_sfs_clusters.js",
-    "page_dosage_heatmap painter (reused as downstream renderer)"
+    "dosage_heatmap painter (reused as downstream renderer)"
   ],
   "interactions": [{"id": "hover_cell", "type": "hover"}],
   "computed_preview_outputs": ["stacked-consensus MSA: outgroup row + INV founder-like + per-subgroup consensus rows + STD consensus row + tier-confidence stripe"],

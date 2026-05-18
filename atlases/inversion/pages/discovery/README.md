@@ -68,13 +68,13 @@ stage is now `tooling`. The shell groups them into a separate tab.
 
 | page | label | summary |
 |------|-------|---------|
-| `page_tree_panel` | tree panel | NJ sample tree on dosage distances + ARI badge (HANDOFF_5) |
-| `page_fingerprint_track` | fingerprint track | per-window diversity-regime fingerprint + switch markers + scenario badge (HANDOFF_6) |
-| `page_similarity_panel` | similarity matrix | per-window sample×sample heatmap + ARI transition strip (HANDOFF_10 / SPEC_0 §11.9) |
-| `page_pca_panel` | PCA scatter | per-window PC1×PC2 scatter with λ-magnitude scrubber (SPEC_0 §10) |
-| `page_dosage_heatmap` | dosage heatmap | sample × marker dosage heatmap with K=3 group track + polarity stripe + role-pair sidecar (SPEC_0 §11 / role-pair sidecar shipped 47ce1bc) |
-| `page_nested_detector` | nested detector | 3 stratum tracks (HOM1/HET/HOM2) + inner-interval overlays (HANDOFF_7 / SPEC_0 §11.7) |
-| `page_dosage_cluster` | dosage cluster | adaptive-K sample clustering on per-window dosage profiles (HANDOFF_8 / SPEC_0 §11.8) |
+| `tree_panel` | tree panel | NJ sample tree on dosage distances + ARI badge (HANDOFF_5) |
+| `fingerprint_track` | fingerprint track | per-window diversity-regime fingerprint + switch markers + scenario badge (HANDOFF_6) |
+| `similarity_matrix` | similarity matrix | per-window sample×sample heatmap + ARI transition strip (HANDOFF_10 / SPEC_0 §11.9) |
+| `pca_scatter_per_window` | PCA scatter | per-window PC1×PC2 scatter with λ-magnitude scrubber (SPEC_0 §10) |
+| `dosage_heatmap` | dosage heatmap | sample × marker dosage heatmap with K=3 group track + polarity stripe + role-pair sidecar (SPEC_0 §11 / role-pair sidecar shipped 47ce1bc) |
+| `nested_inversion_detector` | nested detector | 3 stratum tracks (HOM1/HET/HOM2) + inner-interval overlays (HANDOFF_7 / SPEC_0 §11.7) |
+| `dosage_cluster_adaptive_k` | dosage cluster | adaptive-K sample clustering on per-window dosage profiles (HANDOFF_8 / SPEC_0 §11.8) |
 
 ### Pages whose manifest stage ≠ this dir
 
@@ -91,7 +91,7 @@ stage is now `tooling`. The shell groups them into a separate tab.
 - **`shared/band_tracking/`** (32 modules) — the v3.4 banding pipeline
   (Stage 1-4 + dosage overlay); page22 wires the orchestrator
 - **`shared/kmeans.js`** — `kmeans1D`, `kmeans2D`, `silhouette1D`,
-  `adaptiveK1D` — used by page1's clustering, page_dosage_cluster
+  `adaptiveK1D` — used by page1's clustering, dosage_cluster_adaptive_k
 - **`shared/hungarian.js`** — `alignLabels`, `hungarianChainProjection`,
   `concordanceMatrix` — used by page1's L3 contingency, lineage
   compute (per `specs_done/SPEC_distant_band_concordance_fish_trajectory.md`)

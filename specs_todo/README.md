@@ -41,7 +41,7 @@ fully shipped: move to `specs_done/` with an `Implemented in:` block.
 | `SPEC_registry_v1.md` | n/a — superseded | use `specs_done/SPEC_registry_v2.md` | **SUPERSEDED** |
 | `SPEC_registry_write_and_page_isolation.md` | page-isolation discipline (zero cross-page imports as of commit 4e695f7) | Registry.write contract (defers to `specs_done/SPEC_registry_v2.md`) | **HALF SHIPPED** |
 | `SPEC_xpehh_per_window_track.md` | `shared/xpehh_per_window.js` (compute primitive ships) | popstats / ancestry page integration | **PARTIAL — page integration pending** |
-| `mgl_adapter/` | self-contained spec sub-tree (SPEC_0_master + 10 numbered HANDOFFs + 2 READMEs); per-page consumer pages all ship (HANDOFF_5 → page_tree_panel, HANDOFF_6 → page_fingerprint_track, etc. — see page contracts) | full cluster-side producer pipeline + atlas-core promotion | **PARTIAL — library complete, integration in flight** |
+| `mgl_adapter/` | self-contained spec sub-tree (SPEC_0_master + 10 numbered HANDOFFs + 2 READMEs); per-page consumer pages all ship (HANDOFF_5 → tree_panel, HANDOFF_6 → fingerprint_track, etc. — see page contracts) | full cluster-side producer pipeline + atlas-core promotion | **PARTIAL — library complete, integration in flight** |
 
 ### Net audit summary
 

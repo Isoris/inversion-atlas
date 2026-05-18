@@ -204,13 +204,13 @@ Examples:
 | `page16` | cross-species breakpoints | `cross_species_breakpoints` |
 | `page16b` | multi-species | `multi_species_cockpit` |
 | `page5` | help | `help` |
-| `page_tree_panel` | tree panel | `tree_panel` |
-| `page_fingerprint_track` | fingerprint track | `fingerprint_track` |
-| `page_similarity_panel` | similarity matrix | `similarity_matrix` |
-| `page_pca_panel` | PCA scatter | `pca_scatter_per_window` |
-| `page_dosage_heatmap` | dosage heatmap | `dosage_heatmap` |
-| `page_nested_detector` | nested detector | `nested_inversion_detector` |
-| `page_dosage_cluster` | dosage cluster | `dosage_cluster_adaptive_k` |
+| `tree_panel` | tree panel | `tree_panel` |
+| `fingerprint_track` | fingerprint track | `fingerprint_track` |
+| `similarity_matrix` | similarity matrix | `similarity_matrix` |
+| `pca_scatter_per_window` | PCA scatter | `pca_scatter_per_window` |
+| `dosage_heatmap` | dosage heatmap | `dosage_heatmap` |
+| `nested_inversion_detector` | nested detector | `nested_inversion_detector` |
+| `dosage_cluster_adaptive_k` | dosage cluster | `dosage_cluster_adaptive_k` |
 | `page_ancestry_scroller` | ancestry scroller | `fish_ancestry_scroller` |
 | `page_evolution_polarize_msa` | polarize · MSA | `polarize_msa_stacked` |
 | `page_evolution_haplotype_network` | haplotype network | `haplotype_network` |
@@ -263,13 +263,13 @@ The current `discovery_2` stage has **10 pages** (per
 
 - page2 — candidate focus (workflow / not a utility)
 - page22 — haplotype regimes (workflow / not a utility)
-- page_tree_panel — utility inspector
-- page_fingerprint_track — utility inspector
-- page_similarity_panel — utility inspector
-- page_pca_panel — utility inspector
-- page_dosage_heatmap — utility inspector
-- page_nested_detector — utility inspector
-- page_dosage_cluster — utility inspector
+- tree_panel — utility inspector
+- fingerprint_track — utility inspector
+- similarity_matrix — utility inspector
+- pca_scatter_per_window — utility inspector
+- dosage_heatmap — utility inspector
+- nested_inversion_detector — utility inspector
+- dosage_cluster_adaptive_k — utility inspector
 
 The 7 cartridges are **side-inspector tools** the user opens when
 they want to characterise a candidate, NOT primary discovery
@@ -298,13 +298,13 @@ Pages to re-stage from `discovery_2` → `tooling`:
 
 | page id | label | reason it's a utility |
 |---|---|---|
-| `page_tree_panel` | tree panel | inspector — NJ tree on demand |
-| `page_fingerprint_track` | fingerprint track | inspector — regime fingerprint on a focused candidate |
-| `page_similarity_panel` | similarity matrix | inspector — per-window sample×sample heatmap |
-| `page_pca_panel` | PCA scatter | inspector — per-window PC1×PC2 scatter |
-| `page_dosage_heatmap` | dosage heatmap | inspector — sample × marker heatmap (this is what the user explicitly mentioned) |
-| `page_nested_detector` | nested detector | inspector — 3-stratum nested inversion check |
-| `page_dosage_cluster` | dosage cluster | inspector — adaptive-K clustering inspection |
+| `tree_panel` | tree panel | inspector — NJ tree on demand |
+| `fingerprint_track` | fingerprint track | inspector — regime fingerprint on a focused candidate |
+| `similarity_matrix` | similarity matrix | inspector — per-window sample×sample heatmap |
+| `pca_scatter_per_window` | PCA scatter | inspector — per-window PC1×PC2 scatter |
+| `dosage_heatmap` | dosage heatmap | inspector — sample × marker heatmap (this is what the user explicitly mentioned) |
+| `nested_inversion_detector` | nested detector | inspector — 3-stratum nested inversion check |
+| `dosage_cluster_adaptive_k` | dosage cluster | inspector — adaptive-K clustering inspection |
 
 The remaining `discovery_2` pages stay where they are because they
 ARE workflow:

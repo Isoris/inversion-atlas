@@ -150,9 +150,9 @@ Two big "figure-quality" sub-panels:
 
 Both are canvas-rendered with the same painters used elsewhere in
 the atlas:
-- FIG_C07 → `page_fingerprint_track`-style strip
-- FIG_C08 → `page_dosage_heatmap` painter (per
-  `pages/discovery/page_dosage_heatmap/renderer.js`)
+- FIG_C07 → `fingerprint_track`-style strip
+- FIG_C08 → `dosage_heatmap` painter (per
+  `pages/discovery/dosage_heatmap/renderer.js`)
 
 ## Cross-page hand-offs
 

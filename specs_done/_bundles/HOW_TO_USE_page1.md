@@ -262,7 +262,7 @@ All of these read `state.candidate` from the cross-atlas slot.
 3. **"K=6 ⚠ shows 6 biological regimes!"** No it doesn't. K=6 is a
    diagnostic substructure layer. Real biology lives at K=3 unless
    you have explicit independent evidence for higher-K structure
-   (e.g. nested inversion detection on page_nested_detector).
+   (e.g. nested inversion detection on nested_inversion_detector).
 
 4. **Drag-drop doesn't work.** Check that you're dragging into the
    page1 main area, not the topbar. The topbar's drop handler is

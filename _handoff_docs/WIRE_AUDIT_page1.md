@@ -114,7 +114,7 @@ Group F — Cross-page features:
 
 | feature | what it should do | priority | notes |
 |---------|-------------------|----------|-------|
-| Connect dosage heatmap | add a "show dosage" button somewhere that opens `page_dosage_heatmap` for the active candidate | medium | user-requested 2026-05-15 "can you connect the dosage heatmap so that we can have it." The page exists at `pages/discovery/page_dosage_heatmap.{html,js}` — just needs an entry point from page1 / page2 |
+| Connect dosage heatmap | add a "show dosage" button somewhere that opens `dosage_heatmap` for the active candidate | medium | user-requested 2026-05-15 "can you connect the dosage heatmap so that we can have it." The page exists at `pages/discovery/dosage_heatmap.{html,js}` — just needs an entry point from page1 / page2 |
 | Silhouette display in L3 + tracked-samples | render the `cl.silhouette` value next to K-badge in L3 slab; add a row in tracked-samples panel | high | compute is now wired (637169f); display TBD |
 | **Hotkey scheme: G / U / Shift / CTRL** | refined 2026-05-15 (supersedes the earlier "CTRL cycles cluster-label notation" entry — kept as Group G below): G opens the G-panel popup (already per `specs_done/SPEC_g_panel_unified_groups.md`); U enters selection mode; Shift+drag within selection mode = lasso-select samples; CTRL opens the lateral bar to send the selected group to another atlas (cross-atlas group transfer) | **high** | This is the canonical hotkey design. Each key has a single function — no more cycling on CTRL. The cluster-label-notation feature (if still wanted) needs a different key (suggestion: tap-G inside the G-panel cycles the active notation mode, since G already opens that surface). |
 

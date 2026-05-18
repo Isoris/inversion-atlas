@@ -12,7 +12,7 @@ import {
   bindAllPanelsToCandidateMode,
 } from '../atlases/inversion/shared/mgl_panel_linkage.js';
 import { createTreePanelSelection } from
-  '../atlases/inversion/pages/discovery/page_tree_panel/selection.js';
+  '../atlases/inversion/pages/discovery/tree_panel/selection.js';
 import {
   createMglCandidateModeSlot,
 } from '../atlases/inversion/shared/mgl_candidate_mode.js';
@@ -21,11 +21,11 @@ import {
   updateMglRenderState,
 } from '../atlases/inversion/shared/mgl_render_state.js';
 import { createPcaPanelSelection } from
-  '../atlases/inversion/pages/discovery/page_pca_panel/selection.js';
+  '../atlases/inversion/pages/discovery/pca_scatter_per_window/selection.js';
 import { createSimilarityPanelSelection } from
-  '../atlases/inversion/pages/discovery/page_similarity_panel/selection.js';
+  '../atlases/inversion/pages/discovery/similarity_matrix/selection.js';
 import { createDosageHeatmapSelection } from
-  '../atlases/inversion/pages/discovery/page_dosage_heatmap/selection.js';
+  '../atlases/inversion/pages/discovery/dosage_heatmap/selection.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {
@@ -262,8 +262,8 @@ group('bindAllPanelsToCandidateMode');
   const tree = { selection: createTreePanelSelection() };
   const atlasState = {
     inversion: {
-      _page_pca_panel_state:        pca,
-      _page_similarity_panel_state: sim,
+      _page_pca_scatter_per_window_state:        pca,
+      _page_similarity_matrix_state: sim,
       _page_dosage_heatmap_state:   hm,
       _page_tree_panel_state:       tree,
     },

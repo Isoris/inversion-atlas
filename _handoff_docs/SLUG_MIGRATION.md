@@ -73,13 +73,13 @@ no tests fail.
 | `page16` | `cross_species_breakpoints` | Cgar × Cmac wfmash |
 | `page16b` | `multi_species_cockpit` | catfish phylogeny classifier |
 | `page5` | `help` | static help page |
-| `page_tree_panel` | `tree_panel` | NJ sample tree |
-| `page_fingerprint_track` | `fingerprint_track` | diversity-regime fingerprint |
-| `page_similarity_panel` | `similarity_matrix` | sample × sample heatmap |
-| `page_pca_panel` | `pca_scatter_per_window` | per-window PC1×PC2 |
-| `page_dosage_heatmap` | `dosage_heatmap` | sample × marker dosage heatmap |
-| `page_nested_detector` | `nested_inversion_detector` | 3-stratum detector |
-| `page_dosage_cluster` | `dosage_cluster_adaptive_k` | adaptive-K clustering |
+| `tree_panel` | `tree_panel` | NJ sample tree |
+| `fingerprint_track` | `fingerprint_track` | diversity-regime fingerprint |
+| `similarity_matrix` | `similarity_matrix` | sample × sample heatmap |
+| `pca_scatter_per_window` | `pca_scatter_per_window` | per-window PC1×PC2 |
+| `dosage_heatmap` | `dosage_heatmap` | sample × marker dosage heatmap |
+| `nested_inversion_detector` | `nested_inversion_detector` | 3-stratum detector |
+| `dosage_cluster_adaptive_k` | `dosage_cluster_adaptive_k` | adaptive-K clustering |
 | `page_evolution_polarize_msa` | `polarize_msa_stacked` | stacked-consensus MSA |
 | `page_evolution_haplotype_network` | `haplotype_network` | MSN of INV chromosomes |
 | `page_evolution_polarize_synteny` | `polarize_synteny_vote` | per-outgroup vote |

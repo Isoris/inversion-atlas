@@ -91,32 +91,32 @@ seed for per-page READMEs.
 - **Subdir**: `regimes_page.js` (4-panel layout + header), `regimes_panel.js` (lines-panel with regime y-axis), `regimes_pc1_panel.js` (PC1-lines variant).
 - **Connection point to the seeds→candidates wiring HANDOFF** — this page's pipeline produces the `stage3.loci[]` that `analysis/seeds_to_candidates/` (PR #18 spec) will promote into `state.candidateList`.
 
-### page_tree_panel — NJ sample tree  ✅
-- **JS**: `page_tree_panel.js` · **Subdir**: `page_tree_panel/{_state, renderer, selection}.js`
+### tree_panel — NJ sample tree  ✅
+- **JS**: `tree_panel.js` · **Subdir**: `tree_panel/{_state, renderer, selection}.js`
 - **What it does**: neighbour-joining tree built on dosage distances, cluster colouring + ARI-vs-clusters badge (HANDOFF_5).
 
-### page_fingerprint_track — diversity regimes per window  ✅
-- **JS**: `page_fingerprint_track.js` · **Subdir**: `page_fingerprint_track/{_state, renderer, selection, proportions}.js`
+### fingerprint_track — diversity regimes per window  ✅
+- **JS**: `fingerprint_track.js` · **Subdir**: `fingerprint_track/{_state, renderer, selection, proportions}.js`
 - **What it does**: per-window diversity-regime fingerprint with rank-equivalence regime IDs, switch markers, fragment-proportions treemap, architecture-scenario verdict (HANDOFF_6). Consumes `shared/mgl_fingerprinter.fingerprintCandidate`.
 
-### page_similarity_panel — per-window sample×sample heatmap  ✅
-- **JS**: `page_similarity_panel.js` · **Subdir**: `page_similarity_panel/{_state, renderer, selection}.js`
+### similarity_matrix — per-window sample×sample heatmap  ✅
+- **JS**: `similarity_matrix.js` · **Subdir**: `similarity_matrix/{_state, renderer, selection}.js`
 - **What it does**: per-window similarity heatmap + block detection + adjacent-window ARI transition strip (HANDOFF_10).
 
-### page_pca_panel — per-window PC1×PC2 scatter  ✅
-- **JS**: `page_pca_panel.js` · **Subdir**: `page_pca_panel/{_state, renderer, selection}.js`
+### pca_scatter_per_window — per-window PC1×PC2 scatter  ✅
+- **JS**: `pca_scatter_per_window.js` · **Subdir**: `pca_scatter_per_window/{_state, renderer, selection}.js`
 - **What it does**: per-window PCA scatter with cluster colouring + λ-magnitude scrubber (SPEC_0 §10 Phase 1).
 
-### page_dosage_heatmap — sample × marker dosage  ✅
-- **JS**: `page_dosage_heatmap.js` · **Subdir**: `page_dosage_heatmap/{_state, renderer, selection, adapters}.js`
+### dosage_heatmap — sample × marker dosage  ✅
+- **JS**: `dosage_heatmap.js` · **Subdir**: `dosage_heatmap/{_state, renderer, selection, adapters}.js`
 - **What it does**: sample × marker dosage heatmap with K=3 group track + polarity stripe. Two input shapes via `adapters.js`: new SPEC_0 `mgl_heatmap_json` or legacy candidate-chunk shape (SPEC_0 §11).
 
-### page_nested_detector — nested-inversion detector  ✅
-- **JS**: `page_nested_detector.js` · **Subdir**: `page_nested_detector/{_state, renderer, selection}.js`
+### nested_inversion_detector — nested-inversion detector  ✅
+- **JS**: `nested_inversion_detector.js` · **Subdir**: `nested_inversion_detector/{_state, renderer, selection}.js`
 - **What it does**: 3 stratum tracks (HOM1 / HET / HOM2) + contiguous inner-interval overlays (HANDOFF_7).
 
-### page_dosage_cluster — adaptive-K clustering  ✅
-- **JS**: `page_dosage_cluster.js` · **Subdir**: `page_dosage_cluster/{_state, renderer, selection}.js`
+### dosage_cluster_adaptive_k — adaptive-K clustering  ✅
+- **JS**: `dosage_cluster_adaptive_k.js` · **Subdir**: `dosage_cluster_adaptive_k/{_state, renderer, selection}.js`
 - **What it does**: adaptive-K sample clustering on per-window dosage profiles, per-K scoring table, cluster mean-curve display (HANDOFF_8).
 
 ---

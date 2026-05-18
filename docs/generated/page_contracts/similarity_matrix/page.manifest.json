@@ -1,0 +1,76 @@
+{
+  "page_id": "similarity_matrix",
+  "label": "similarity matrix",
+  "page_type": "core_page",
+  "stage": "discovery_2",
+  "owner_atlas": "inversion",
+  "status": "active (Phase 1)",
+  "current_path": {
+    "html": "atlases/inversion/pages/discovery/similarity_matrix.html",
+    "js_entry": "atlases/inversion/pages/discovery/similarity_matrix.js",
+    "js_subdir": "atlases/inversion/pages/discovery/similarity_matrix/"
+  },
+
+  "purpose": "Per-window sample × sample similarity heatmap with block detection + adjacent-window ARI transition strip. Cartridge implementation of HANDOFF_10 / SPEC_0 §11.9.",
+
+  "required_layers": [],
+  "required_slots": ["activeCandidate (reads atlasState.inversion.similarity_panel_state)"],
+  "input_contract": "atlasState.inversion.similarity_panel_state = { similarity_results, adjacent_aris, blocks_per_window, n_windows, n_samples, ... }",
+
+  "panels": [
+    {"id": "transition_strip", "purpose": "horizontal strip across windows + ARI gap row"},
+    {"id": "similarity_heatmap", "purpose": "n_samples × n_samples heatmap per window"},
+    {"id": "right_panel_detail", "purpose": "hover cell crosshair summary"}
+  ],
+  "deferred": [
+    "Sample labels on row / column axes for large n",
+    "Multi-metric switcher in-panel (pearson/l1/l2) — metric is fixed at load time upstream",
+    "Cross-panel linkage with tree / fingerprint / PCA"
+  ],
+
+  "subdir_files": [
+    "_state.js — _pageState + setter",
+    "renderer.js — canvas painter (transition strip + heatmap)",
+    "selection.js — hover crosshair + click-to-toggle sample selection set"
+  ],
+
+  "primitives_used": [
+    "shared/mgl_window_similarity.js (the producer that fills similarity_results)"
+  ],
+  "adapters_used": ["unknown — reads pre-computed result from atlasState"],
+
+  "interactions": [
+    {"id": "click_strip_cell", "type": "click", "purpose": "scrub a window — load that window's matrix"},
+    {"id": "click_matrix_cell", "type": "click", "purpose": "toggle sample in selection set"},
+    {"id": "hover_cell", "type": "hover", "purpose": "crosshair + right-panel detail"},
+    {"id": "block_overlay_toggle", "type": "view_control"},
+    {"id": "diagonal_toggle", "type": "view_control"},
+    {"id": "sample_order_selector", "type": "view_control", "values": ["natural", "by_block"]}
+  ],
+  "hotkeys": [],
+
+  "computed_preview_outputs": [
+    "per-window similarity matrix",
+    "block detection outlines",
+    "adjacent-window ARI transition strip"
+  ],
+  "committable_outputs": ["none"],
+  "commit_policy": "none_by_default",
+
+  "documents": {
+    "page_registry_doc": "unknown (not in pages.registry.json)",
+    "specs_done": [],
+    "specs_todo": [
+      "specs_todo/mgl_adapter/HANDOFF_10_atlas_similarity.md",
+      "specs_todo/pages_similarity_panel/_to_do/HANDOFF_10_atlas_similarity.md (duplicate)",
+      "specs_todo/mgl_adapter/SPEC_0_master.md §11.9"
+    ],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [
+    "Phase 1 only — sample labels deferred for large n; metric is fixed upstream."
+  ],
+
+  "confidence": "high"
+}
