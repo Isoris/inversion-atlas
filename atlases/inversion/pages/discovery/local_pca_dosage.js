@@ -512,6 +512,8 @@ function _buildLegacyState(atlasState) {
     kRange: [2, 5],
     silThreshold: 0.45,
     aggMethod: 'mean_pc1',
+    silScoreOn: 'pc1',
+
     mergeThr: 0.85,
     alpha: 0.05,
     minNGroup: 5,

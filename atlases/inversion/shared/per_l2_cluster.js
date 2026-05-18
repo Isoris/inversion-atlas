@@ -25,7 +25,7 @@
 // Caller manages caching (typically a Map keyed by l2idx + ctx.cacheKey).
 // =====================================================================
 
-import { kmeans1D, kmeans2D, adaptiveK1D } from './kmeans.js';
+import { kmeans1D, kmeans2D, adaptiveK1D, adaptiveK2D } from './kmeans.js';
 
 /**
  * Build a clustering context object from a state-like input. Helper
@@ -43,6 +43,10 @@ import { kmeans1D, kmeans2D, adaptiveK1D } from './kmeans.js';
  * @property {number} silThreshold
  * @property {number} minNGroup
  * @property {number} minNWin
+ * @property {string} silScoreOn     'pc1' (default) | 'same_as_fit'
+ *           which dimension to score silhouette on. Default 'pc1' keeps
+ *           K-selection calibrated on the cleaner 1-D signal even when
+ *           K-means itself is fit in 2-D.
  * @property {(winIdx:number) => {pc1:Array, pc2:Array, sign:number}} getPC
  *           callback returning per-window PC arrays + sign correction
  *           (caller wraps state.data.windows[w] + state.pc1Sign + state.flipPC1)
@@ -57,6 +61,7 @@ export function contextFromState(state) {
     silThreshold: state.silThreshold,
     minNGroup: state.minNGroup,
     minNWin: state.minNWin,
+    silScoreOn: state.silScoreOn || 'pc1',
     getPC: (winIdx) => {
       const w = state.data.windows[winIdx];
       const s = state.flipPC1 && state.pc1Sign ? state.pc1Sign[winIdx] : 1;
@@ -263,19 +268,49 @@ export function clusterL2(ctx, l2idx) {
   let silhouette = null;
   let fixedKLabels = null;
   let fixedKResult = null;
-  if (ctx.kMode === 'adaptive' && ctx.aggMethod !== 'mean_pc12') {
-    const ak = adaptiveK1D(agg.xs, ctx.kRange[0], ctx.kRange[1], ctx.silThreshold, ctx.minNGroup);
-    if (ak != null) {
-      result = { labels: ak.labels, centers: ak.centers, n_per_group: ak.n_per_group };
-      usedK = ak.k;
-      silhouette = ak.silhouette;
+  // Adaptive mode now works for both 1-D and 2-D fits. Default scoring
+  // is on PC1 (silScoreOn='pc1') because the inversion signal is
+  // primarily 1-D — even when fit is 2-D, the cleaner silhouette comes
+  // from PC1 alone. silScoreOn='same_as_fit' lets callers opt into
+  // 2-D silhouette when both dims carry signal.
+  const fit2D = ctx.aggMethod === 'mean_pc12';
+  const scoreOn2D = fit2D && ctx.silScoreOn === 'same_as_fit';
+  if (ctx.kMode === 'adaptive') {
+    if (scoreOn2D) {
+      const ak = adaptiveK2D(agg.xs, agg.ys, ctx.kRange[0], ctx.kRange[1],
+                             ctx.silThreshold, ctx.minNGroup);
+      if (ak != null) {
+        result = { labels: ak.labels, centers: ak.centers, n_per_group: ak.n_per_group };
+        usedK = ak.k;
+        silhouette = ak.silhouette;
+      } else {
+        result = kmeans2D(agg.xs, agg.ys, ctx.k);
+        usedK = ctx.k;
+      }
     } else {
-      result = kmeans1D(agg.xs, ctx.k);
-      usedK = ctx.k;
+      const ak = adaptiveK1D(agg.xs, ctx.kRange[0], ctx.kRange[1],
+                             ctx.silThreshold, ctx.minNGroup);
+      if (ak != null) {
+        usedK = ak.k;
+        silhouette = ak.silhouette;
+        // When fit is 2-D but we score on PC1, re-fit at the chosen K
+        // in 2-D so the partition reflects the requested fit dimension.
+        if (fit2D) {
+          const fit = kmeans2D(agg.xs, agg.ys, ak.k);
+          result = { labels: fit.labels, centers: fit.cx, n_per_group: fit.n_per_group };
+        } else {
+          result = { labels: ak.labels, centers: ak.centers, n_per_group: ak.n_per_group };
+        }
+      } else {
+        result = fit2D
+          ? kmeans2D(agg.xs, agg.ys, ctx.k)
+          : kmeans1D(agg.xs, ctx.k);
+        usedK = ctx.k;
+      }
     }
-    fixedKResult = kmeans1D(agg.xs, ctx.k);
+    fixedKResult = fit2D ? kmeans2D(agg.xs, agg.ys, ctx.k) : kmeans1D(agg.xs, ctx.k);
     fixedKLabels = fixedKResult.labels;
-  } else if (ctx.aggMethod === 'mean_pc12') {
+  } else if (fit2D) {
     result = kmeans2D(agg.xs, agg.ys, ctx.k);
     usedK = ctx.k;
     fixedKLabels = result.labels;

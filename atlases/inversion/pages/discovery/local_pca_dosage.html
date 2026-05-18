@@ -119,11 +119,18 @@
       </select>
     </div>
     <div class="ctl">
-      <label>Aggregation across L2 windows</label>
+      <label>Fit K-means on</label>
       <select id="aggMethod">
-        <option value="mean_pc1" selected>mean PC1</option>
-        <option value="median_pc1">median PC1</option>
-        <option value="mean_pc12">mean PC1 + PC2 (2-D K-means)</option>
+        <option value="mean_pc1" selected>mean PC1 (1-D)</option>
+        <option value="median_pc1">median PC1 (1-D)</option>
+        <option value="mean_pc12">mean PC1 + PC2 (2-D)</option>
+      </select>
+    </div>
+    <div class="ctl">
+      <label>Score K (silhouette) on</label>
+      <select id="silScoreOn">
+        <option value="pc1" selected>PC1 only (cleaner; works in 2-D fit too)</option>
+        <option value="same_as_fit">same as fit (2-D when 2-D fit)</option>
       </select>
     </div>
     <div class="ctl hrange">

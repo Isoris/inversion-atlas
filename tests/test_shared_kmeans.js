@@ -1,6 +1,6 @@
 // tests/test_shared_kmeans.js
 
-import { kmeans1D, kmeans2D, silhouette1D, adaptiveK1D } from '../atlases/inversion/shared/kmeans.js';
+import { kmeans1D, kmeans2D, silhouette1D, silhouette2D, adaptiveK1D, adaptiveK2D } from '../atlases/inversion/shared/kmeans.js';
 
 let pass = 0, fail = 0;
 function check(name, cond, detail = '') {
@@ -107,6 +107,50 @@ console.log('\n--- adaptiveK1D ---');
   const noisy = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   const r2 = adaptiveK1D(noisy, 2, 5, 0.99, 2);  // silThreshold so high nothing passes
   check('falls back to kMin',          r2 && r2.k === 2);
+}
+
+console.log('\n--- silhouette2D ---');
+{
+  // 3 well-separated 2-D clusters → silhouette near 1
+  const xs = [0,0.1,0.2,  5,5.1,5.2,  10,10.1,10.2];
+  const ys = [0,0.1,0.0,  5,5.0,5.1,  10,10.1,10.0];
+  const r = kmeans2D(xs, ys, 3);
+  const s = silhouette2D(xs, ys, r.labels, 3);
+  check('clean 3-clusters silhouette > 0.9', s > 0.9, `got ${s.toFixed(4)}`);
+
+  // Shuffled labels → degrades
+  const bad = new Int8Array([0,2,1, 1,0,2, 2,1,0]);
+  const sBad = silhouette2D(xs, ys, bad, 3);
+  check('shuffled labels silhouette < 0.5', sBad < 0.5, `got ${sBad.toFixed(4)}`);
+
+  // Edge cases
+  check('n<4 → NaN',
+        Number.isNaN(silhouette2D([0,1,2],[0,1,2], new Int8Array([0,0,0]), 1)));
+  check('k<2 → NaN',
+        Number.isNaN(silhouette2D([0,1,2,3],[0,1,2,3], new Int8Array([0,0,0,0]), 1)));
+  check('singleton cluster → NaN',
+        Number.isNaN(silhouette2D([0,1,2,3,100],[0,0,0,0,100],
+                                  new Int8Array([0,0,0,0,1]), 2)));
+}
+
+console.log('\n--- adaptiveK2D ---');
+{
+  // 3 separated 2-D clusters → adaptive picks K=3
+  const xs = [], ys = [];
+  for (let g = 0; g < 3; g++) {
+    for (let i = 0; i < 4; i++) {
+      xs.push(g * 10 + Math.random() * 0.5);
+      ys.push(g * 10 + Math.random() * 0.5);
+    }
+  }
+  const r = adaptiveK2D(xs, ys, 2, 5, 0.45, 3);
+  check('adaptiveK2D picks K=3 on clean data', r && r.k === 3, r && `got K=${r.k}`);
+  check('adaptiveK2D silhouette > 0.7',        r && r.silhouette > 0.7);
+  check('adaptiveK2D returns centers + centers_y', r && r.centers && r.centers_y);
+
+  // Insufficient data
+  check('too few points → null',
+        adaptiveK2D([1,2,3], [1,2,3], 2, 5, 0.45, 5) === null);
 }
 
 console.log('\n=================');

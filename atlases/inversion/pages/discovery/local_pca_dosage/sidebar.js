@@ -703,6 +703,19 @@ function _wireL3Clustering(state) {
     aggMethod.addEventListener('change', e => {
       state.aggMethod = e.target.value;
       state.l2GroupCache = null; state.cacheKey = null;
+      state.slabGroupCache = null;
+      drawPCA(state); renderZoneBlock(state); renderL3Panel(state);
+    });
+  }
+
+  // --- #silScoreOn change (2026-05-18: separates fit dim from score dim) ---
+  const silScoreOn = $('silScoreOn');
+  if (silScoreOn) {
+    if (state.silScoreOn) silScoreOn.value = state.silScoreOn;
+    silScoreOn.addEventListener('change', e => {
+      state.silScoreOn = e.target.value;
+      state.l2GroupCache = null; state.cacheKey = null;
+      state.slabGroupCache = null;
       drawPCA(state); renderZoneBlock(state); renderL3Panel(state);
     });
   }

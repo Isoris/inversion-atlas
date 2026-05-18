@@ -256,7 +256,7 @@ export function renderL3Panel(state) {
     body.innerHTML = '<div class="l3-col"><div class="dim" style="padding:12px;">scroll into an L2 envelope</div></div>';
     return;
   }
-  metaEl.innerHTML = `K=${state.k} · agg=${state.aggMethod} · merge τ=${state.mergeThr.toFixed(2)} · α=${state.alpha.toFixed(3)} · min n/grp=${state.minNGroup}`;
+  metaEl.innerHTML = `K=${state.k} · fit=${state.aggMethod} · score=${state.silScoreOn || 'pc1'} · merge τ=${state.mergeThr.toFixed(2)} · α=${state.alpha.toFixed(3)} · min n/grp=${state.minNGroup}`;
 
   // ---- DUAL LAYOUT: two pinned L2 envelopes + middle comparison column ----
   if (layoutKey === 'dual' && state.secondaryL2 != null) {

@@ -32,7 +32,7 @@
 //     access pattern.
 
 import { contextFromState } from '../../../shared/per_l2_cluster.js';
-import { kmeans1D, kmeans2D, silhouette1D } from '../../../shared/kmeans.js';
+import { kmeans1D, kmeans2D, silhouette1D, silhouette2D } from '../../../shared/kmeans.js';
 
 /**
  * Mean / median PC1 + mean PC2 across [s, e] windows for each sample.
@@ -122,23 +122,30 @@ export function clusterSlabAtK(state, s, e, K) {
   const ok = result.n_per_group.every(c => c >= minNGroup);
   const reason = ok ? null : 'LOW_GROUP_N';
 
-  // 2026-05-15 addition: compute silhouette so the L3 panel can
-  // surface a quality indicator for K=3 vs K=6 reclustering.
-  // silhouette1D(xs, labels, K) — only meaningful when K ≥ 2 and we
-  // have ≥ 4 non-missing points (matches l2_sweep's gating).
+  // 2026-05-18: compute silhouette honouring state.silScoreOn. Default
+  // is 'pc1' even in 2-D fits, because the inversion signal is
+  // primarily 1-D and PC1-only silhouette is the cleaner K-quality
+  // indicator. 'same_as_fit' scores on (PC1, PC2) when fit is 2-D.
   let silhouette = null;
   try {
     if (K >= 2 && result.labels && agg.xs && agg.xs.length >= 4) {
-      const xsKept = [], labsKept = [];
+      const fit2D = state.aggMethod === 'mean_pc12' && agg.ys;
+      const scoreOn2D = fit2D && state.silScoreOn === 'same_as_fit';
+      const xsKept = [], ysKept = [], labsKept = [];
       for (let i = 0; i < result.labels.length; i++) {
         const lab = result.labels[i];
-        if (lab >= 0 && lab < K && Number.isFinite(agg.xs[i])) {
+        const xOK = Number.isFinite(agg.xs[i]);
+        const yOK = !scoreOn2D || Number.isFinite(agg.ys[i]);
+        if (lab >= 0 && lab < K && xOK && yOK) {
           xsKept.push(agg.xs[i]);
+          if (scoreOn2D) ysKept.push(agg.ys[i]);
           labsKept.push(lab);
         }
       }
       if (xsKept.length >= 4) {
-        const sil = silhouette1D(xsKept, labsKept, K);
+        const sil = scoreOn2D
+          ? silhouette2D(xsKept, ysKept, labsKept, K)
+          : silhouette1D(xsKept, labsKept, K);
         if (Number.isFinite(sil)) silhouette = sil;
       }
     }
