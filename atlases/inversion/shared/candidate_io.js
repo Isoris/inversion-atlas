@@ -7,10 +7,10 @@
 //
 // Pure: no state reach-ins. The legacy reached for `_bndCloneRecord`
 // and `_recomputePerTrackAssignments` as module-scope fallbacks; the
-// cartridge port imports bndCloneRecord from page11/boundaries.js and
+// cartridge port imports bndCloneRecord from boundary_refinement/boundaries.js and
 // makes _recomputePerTrackAssignments injectable via opts.
 
-import { bndCloneRecord } from '../pages/review/page11/boundaries.js';
+import { bndCloneRecord } from '../pages/review/boundary_refinement/boundaries.js';
 
 /** Maximum tracks per candidate (legacy cap). */
 export const MAX_TRACKS = 2;

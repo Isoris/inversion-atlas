@@ -148,7 +148,7 @@ Same shape as stats_profile/_state.js and marker_readiness/_state.js.
 
 **Total assertions: 447/447 across 12 test runs.**
 
-**Pages remaining (16 of 22):** page4, 5, 6, 7, 8, 9, 10, 11, 12, 15,
+**Pages remaining (16 of 22):** karyotype_tier, 5, 6, 7, 8, 9, 10, 11, 12, 15,
 16, 16b, 19, overview, sv_evidence.
 
 ---
@@ -186,7 +186,7 @@ multi_species_cockpit migration.
 | **page12** | discovery | 1008 | 18 TODOs — substantial work |
 | **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest`, AND likely `computeTrackedLinkageProjection`** |
 | **page8, 9, 15, 19, overview** | various | <105 each | tiny stubs; quick router-wiring rounds — could batch several in one round |
-| **page4, 6, 7, 11** | review | 122-301 | review-stage pages |
+| **karyotype_tier, 6, 7, 11** | review | 122-301 | review-stage pages |
 | **sv_evidence** | review | 148 | SV evidence review |
 | **marker_panels** | catalogue | TBD | catalogue completion |
 | **help** | comparative | small (stub) | help-page stub |

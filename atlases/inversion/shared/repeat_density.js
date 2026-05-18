@@ -1,7 +1,7 @@
 // shared/repeat_density.js
 //
 // Repeat-density (TE) data layer + user prefs. Consumed by:
-//   - page11 (boundaries) — renders the per-chrom TE density panel
+//   - boundary_refinement (boundaries) — renders the per-chrom TE density panel
 //     beside the boundary auto-propose evidence
 //   - cross_species_breakpoints / multi_species_cockpit (comparative) — uses state.repeatDensity for
 //     flank charts at cross-species breakpoints

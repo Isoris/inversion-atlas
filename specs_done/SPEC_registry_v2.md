@@ -453,7 +453,7 @@ domain the atlas serves. Format:
 - **Cache tier(s):** hot / warm / cold
 - **Server endpoints:** (if any)
 - **Toolkit table:** (e.g. `evidence_registry/per_candidate/.../<block>`)
-- **Example consumers:** (page1, page11, ...)
+- **Example consumers:** (page1, boundary_refinement, ...)
 ```
 
 Entries: `samples`, `relatedness`, `ancestry`, `diversity`,

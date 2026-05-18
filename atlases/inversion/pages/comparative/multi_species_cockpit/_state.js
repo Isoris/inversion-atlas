@@ -4,7 +4,7 @@
 // page (chat 39 cont. round 5 step 20, 2026-05-07). Mirrors
 // cross_species_breakpoints/_state.js (the sibling comparative-stage page) and the
 // canonical _state.js shape (confirmed_carousel/stats_profile/marker_readiness/annotation_cockpit/
-// overview/marker_panels/page12/page7/page6/sv_evidence).
+// overview/marker_panels/page12/ancestry_per_window/popstats/sv_evidence).
 //
 // _pageState: module-level reference. Page16b's mount + entry points
 // call _setActiveState(state) on entry so the helper bodies see the

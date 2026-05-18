@@ -149,7 +149,7 @@ a `--norm` step).
 
 ### Atlas-side wiring
 
-#### Popstats page (page 8 → cartridge page6)
+#### Popstats page (page 8 → cartridge popstats)
 
 Add `xpehh` to the popstats track list. Renders as a stacked panel, same
 visual idiom as F_ST / dXY / Hobs:
@@ -163,7 +163,7 @@ visual idiom as F_ST / dXY / Hobs:
 Track order: F_ST → dXY → Hobs → **xpehh** → θπ. XP-EHH belongs near the
 selection-flavoured tracks, not next to coverage.
 
-#### Ancestry page (page 9 → cartridge page7)
+#### Ancestry page (page 9 → cartridge ancestry_per_window)
 
 XP-EHH is conceptually an ancestry-asymmetry signal. Adding it as a
 sub-panel here is appropriate. Lower priority than the popstats mount —

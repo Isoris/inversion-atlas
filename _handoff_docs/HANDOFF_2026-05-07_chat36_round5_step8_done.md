@@ -140,7 +140,7 @@ refactor.
 
 **Total assertions: 516/516 across 16 test runs.**
 
-**Pages remaining (14 of 22):** page4, 5, 6, 7, 8, 10, 11, 12, 15, 16,
+**Pages remaining (14 of 22):** karyotype_tier, 5, 6, 7, 8, 10, 11, 12, 15, 16,
 16b, 19, sv_evidence.
 
 **Catalogue + synthesis groups status:**
@@ -191,7 +191,7 @@ existing tests will keep passing.
 | **page12** | discovery | 1008 | 18 TODOs — substantial work |
 | **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest` (stats_profile), AND likely `computeTrackedLinkageProjection` (annotation_cockpit)** |
 | **page8, 15, 19, help** | various | <50 each | tiny stubs; quick router-wiring rounds |
-| **page4, 6, 7, 11** | review | 122-301 | review-stage pages |
+| **karyotype_tier, 6, 7, 11** | review | 122-301 | review-stage pages |
 | **sv_evidence** | review | 148 | SV evidence review |
 
 Logical next priorities:

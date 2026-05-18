@@ -8,14 +8,14 @@
 // from chat-33 "thin loader stub for window.AtlasSVEvidence" to the
 // _pageState live-binding pattern + atlas-router mount/unmount
 // lifecycle + state-aware public wrapper. **Direct twin of
-// page6 + page7** (the first two migrated review-stage pages,
+// popstats + ancestry_per_window** (the first two migrated review-stage pages,
 // shipped steps 17 + 18). Third (and final) review tier-1 thin-
 // loader-stub migration; review group: 2 of 5 → 3 of 5.
 //
 // sv_evidence is a thin loader stub for an external renderer
 // OBJECT (window.AtlasSVEvidence, with .init / .loadCandidate /
 // .destroy methods, defined in js/atlas_sv_evidence.js). NB:
-// structurally distinct from page6/page7, where the external
+// structurally distinct from popstats/ancestry_per_window, where the external
 // renderer is a single function (window.renderPopstatsPage /
 // window.renderAncestryPage). The chat-33 module exports
 // showSvEvidencePage(state) and hideSvEvidencePage(); both

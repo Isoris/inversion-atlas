@@ -12,7 +12,7 @@ rearrangements between **C. gariepinus** (Cgar) and
 
 Each breakpoint renders both species' coordinates, a syntenic-block
 linking line, and flanking repeat-element density on both species
-(drawing from page11's TEfull JSONs already loaded into
+(drawing from boundary_refinement's TEfull JSONs already loaded into
 `state.repeatDensity`).
 
 **Spalax-style TE enrichment at breakpoints is the manuscript hook.**

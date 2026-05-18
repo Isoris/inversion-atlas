@@ -3,14 +3,14 @@
 // Adapter: per-candidate classification row (from
 // shared/inversion_classification.buildInversionClassificationRow)
 // → tier-axes `axisValues` shape consumed by
-// pages/review/page4/tier_axes.renderTierAxesGrid.
+// pages/review/karyotype_tier/tier_axes.renderTierAxesGrid.
 //
-// Why this exists: page4's Tier subview was designed against the
+// Why this exists: karyotype_tier's Tier subview was designed against the
 // cluster-side R-pipeline output (`final_classification.json`). My
 // new per-axis primitives + consolidator produce the same data
 // content under different vocabularies. This adapter translates so
-// the existing renderer + grid layout in page4 keeps working
-// without rewriting; we now have ONE classification view (page4)
+// the existing renderer + grid layout in karyotype_tier keeps working
+// without rewriting; we now have ONE classification view (karyotype_tier)
 // fed by EITHER:
 //   - state.data.final_classification[<cid>]   (R-pipeline, planned)
 //   - the consolidator row, via this adapter   (atlas-side, today)
@@ -23,7 +23,7 @@
 //   structure_class       → internal_structure
 //
 // Eight net-new axes are forwarded as-is to TIER_AXES' new EXTENDED
-// group (see pages/review/page4/tier_axes.js — TIER_AXES_EXTENDED):
+// group (see pages/review/karyotype_tier/tier_axes.js — TIER_AXES_EXTENDED):
 //   copy_origin_verdict, position_class, arrangement_n,
 //   recombination_suppression, divergence, xpehh_signal,
 //   pangenome_class (also forwarded as `pangenome_class_raw`),

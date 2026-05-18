@@ -281,9 +281,9 @@ export function summarizeRegionStatuses(regions) {
 
 function _tsvCell(v) {
   if (v == null) return '';
-  // TSV: strip tab + newline (matches the catalogue / page4 export hygiene
+  // TSV: strip tab + newline (matches the catalogue / karyotype_tier export hygiene
   // convention). Tabs and newlines are illegal in TSV cells; the legacy
-  // catalogue / page4 / page8 exporters all use this strip-not-quote pattern.
+  // catalogue / karyotype_tier / page8 exporters all use this strip-not-quote pattern.
   return String(v).replace(/[\t\r\n]/g, ' ');
 }
 
@@ -294,7 +294,7 @@ function _tsvCell(v) {
  * are stripped (no quoting needed in TSV).
  *
  * Preferred over CSV across the inversion atlas — matches the
- * catalogue catalogue / page4 karyotype / page8 export convention.
+ * catalogue catalogue / karyotype_tier karyotype / page8 export convention.
  *
  * @param {Array<Object>} regions
  * @returns {string}

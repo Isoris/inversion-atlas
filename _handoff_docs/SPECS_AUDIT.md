@@ -182,7 +182,7 @@ These names appear in code or docs but have **no on-disk file** with that name:
 These are NOT missing — they exist as **sections inside other docs**:
 - `SPEC_0` → contents of `specs_todo/mgl_adapter/SPEC_0_master.md`
 - `SCHEMA §9 / §10 / §19 / §22` → refers to schema sections in some doc; the JSON-schema definitions are in `atlases/inversion/registries/schemas/*.schema.json` (26 schema files exist there) — the prose document doesn't appear to exist anywhere on disk
-- ~~`SCHEMA_V2.md` — pages.registry mentions "cross-refs SCHEMA_V2.md §19" but no file by that name exists; the 14-axis classification schema lives in `pages/review/page4/tier_axes.js`~~ **RESOLVED 2026-05-15** — `specs_done/SCHEMA.md` §19 carries the 14-axis prose schema (pulled from `tier_axes.js#TIER_AXES`).
+- ~~`SCHEMA_V2.md` — pages.registry mentions "cross-refs SCHEMA_V2.md §19" but no file by that name exists; the 14-axis classification schema lives in `pages/review/karyotype_tier/tier_axes.js`~~ **RESOLVED 2026-05-15** — `specs_done/SCHEMA.md` §19 carries the 14-axis prose schema (pulled from `tier_axes.js#TIER_AXES`).
 - legacy-line citations (e.g. "legacy lines 36977-37050") refer to `legacy/Inversion_atlas.html` — confirmed at `/home/user/inversion-atlas/legacy/` if that dir exists (haven't checked)
 
 ---

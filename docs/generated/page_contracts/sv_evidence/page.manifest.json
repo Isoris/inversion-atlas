@@ -11,7 +11,7 @@
     "js_subdir": "atlases/inversion/pages/review/sv_evidence/"
   },
   "legacy_source": "legacy/Inversion_atlas.html lines 9329-9331 (HTML shell) + line 54981 (script tag for js/atlas_sv_evidence.js)",
-  "external_renderer": "window.AtlasSVEvidence — an OBJECT with .init / .loadCandidate / .destroy (distinct from page6+page7 single-function renderers); defined in js/atlas_sv_evidence.js",
+  "external_renderer": "window.AtlasSVEvidence — an OBJECT with .init / .loadCandidate / .destroy (distinct from popstats+ancestry_per_window single-function renderers); defined in js/atlas_sv_evidence.js",
 
   "purpose": "Read-only candidate-level view of SV calls clustered around a candidate's boundaries, scored against the karyotype groups. Loads json/sv_genotype_counts/<cid>.json per candidate. Renders 3 stacked panels: SV table (caller/type/chrom/pos/len/support/gt-counts), UpSet plot of caller intersections, dosage heatmap.",
 
@@ -19,7 +19,7 @@
   "required_slots": ["activeCandidate"],
   "preloads": ["candidate_sv_counts"],
   "actually_consumed": "json/sv_genotype_counts/<cid>.json (loaded by AtlasSVEvidence.loadCandidate)",
-  "registry_alignment_note": "Unlike page6 and page7, this page's registry entries MATCH what the page actually does (no mismatch flag needed)",
+  "registry_alignment_note": "Unlike popstats and ancestry_per_window, this page's registry entries MATCH what the page actually does (no mismatch flag needed)",
 
   "panels": [
     {"id": "sv_evidence_root", "purpose": "single inner mount slot owned by AtlasSVEvidence"},

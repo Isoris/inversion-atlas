@@ -168,7 +168,7 @@ Required inputs (per the producer's README):
   `boundary_left_bp`, `boundary_right_bp`, optional
   `zone_definitions_bp`
 - `--karyotype` — TSV `sample_id <tab> label` where label ∈
-  `{HOMO_1, HET, HOMO_2}` (the annotation_cockpit / page4 lock format)
+  `{HOMO_1, HET, HOMO_2}` (the annotation_cockpit / karyotype_tier lock format)
 - `--out-root` — output root
 
 Optional:
@@ -226,16 +226,16 @@ AtlasSVEvidence module.
   producer pipeline. The atlas reads the JSON. If you want live
   SV aggregation, you'd need to add an endpoint to
   `popstats_server.py` (out of scope for v1).
-- **It does NOT refine boundaries** — that's `page11`. This page
-  shows what SV evidence EXISTS around the boundaries page11 has
+- **It does NOT refine boundaries** — that's `boundary_refinement`. This page
+  shows what SV evidence EXISTS around the boundaries boundary_refinement has
   already produced.
 - **It does NOT call breakpoints to base-pair resolution** — same
-  vocabulary contract as page11: `boundary_zone` is the verdict;
+  vocabulary contract as boundary_refinement: `boundary_zone` is the verdict;
   `exact_breakpoint` requires junction-level evidence (e.g.
   split-read consensus) the producer doesn't claim.
-- **It does NOT classify the candidate** — that's page4's Tier
+- **It does NOT classify the candidate** — that's karyotype_tier's Tier
   grid. Pattern labels here feed Layer B (SV callers) of the
-  14-axis existence-tier on page4.
+  14-axis existence-tier on karyotype_tier.
 
 ## Related specs
 

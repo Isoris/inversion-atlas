@@ -143,7 +143,7 @@ doesn't exist.**
 | **marker_panels** | catalogue | unknown | check chat-33 BATCH notes |
 | **stats_profile, 18, 21** | catalogue | unknown | check chat-33 BATCH notes |
 | **overview** | catalogue | low? | non-chromosome-scoped overview |
-| **page4** | discovery? | unknown | does page4 even have a stub? |
+| **karyotype_tier** | discovery? | unknown | does karyotype_tier even have a stub? |
 | **sv_evidence** | ? | unknown | uncategorized |
 
 Or: **separate task** — design and implement the 11 missing catalogue

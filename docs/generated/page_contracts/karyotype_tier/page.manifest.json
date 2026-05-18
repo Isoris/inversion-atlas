@@ -1,0 +1,94 @@
+{
+  "page_id": "karyotype_tier",
+  "label": "karyotype / tier",
+  "page_type": "core_page",
+  "stage": "classification",
+  "owner_atlas": "inversion",
+  "status": "active (per-candidate review)",
+  "current_path": {
+    "html": "atlases/inversion/pages/review/karyotype_tier.html",
+    "js_entry": "atlases/inversion/pages/review/karyotype_tier.js",
+    "js_subdir": "atlases/inversion/pages/review/karyotype_tier/"
+  },
+  "legacy_source": "legacy/Inversion_atlas.html lines 7573-7645 (HTML shell) + 62800-62836 (renderCandidateKaryotype) + 63091-63289 (_renderCandidateKaryotypeBody) + 63411-63492 (renderCandidateTier) + 62840-62861 (_refreshSubviewButtonStyles) + 62508-62526 (karyoState) + 63547 (_wireCandSubviewButtons)",
+
+  "purpose": "Karyotype/Tier candidate-level review page. Two sub-views toggleable via #candKaryoSubviewBar. (1) Karyotype — per-sample regime breakdown, each row a fish with its locked K=3 label (HOMO_1/HET/HOMO_2 in operational H-system, ordered by median PC1); two-track candidates get track-membership pills. (2) Tier — 14-axis classification view (empty-state until final_classification.json ships from cluster-side).",
+
+  "required_layers": [
+    "candidate_sv_counts (REGISTRY MISMATCH — appears misplaced; see known_issues)",
+    "candidate_boundaries (REGISTRY MISMATCH — appears misplaced)"
+  ],
+  "actually_consumed_layers": [
+    "state.data.final_classification (sub-field of state.data, NOT a top-level slot; keyed by candidate_id for the Tier view)",
+    "state.data.classification (cluster-emit §9 layer)",
+    "candidate's own completion/characterization blocks"
+  ],
+  "required_slots": ["activeCandidate"],
+  "preloads": ["candidate_sv_counts", "candidate_boundaries"],
+
+  "panels": [
+    {"id": "candListPane", "purpose": "left candidate list pane with import/export/registry/manuscript-bundle/clear actions"},
+    {"id": "candKaryoPane", "purpose": "right pane containing the karyotype + tier sub-views"},
+    {"id": "candKaryoSubviewBar", "purpose": "toggle between karyotype and tier sub-views (#candSubviewKaryoBtn + #candSubviewTierBtn + #candTierLayerStatus)"},
+    {"id": "candKaryoContent", "purpose": "karyotype sub-view body — per-sample regime rows"},
+    {"id": "candTierContent", "purpose": "tier sub-view body — 14-axis classification grid"}
+  ],
+
+  "subdir_files": [
+    "_state.js — _pageState + setter + karyoState (page-local UI state)",
+    "karyo_body.js — karyotype body renderer + toolbar wiring (legacy 63091-63289)",
+    "karyo_labels.js — K=3..K=6 label vocab (HOMO_1/HET/HOMO_2 etc.) persisted via localStorage",
+    "karyo_rows.js — per-sample row builder + sort/filter pure helpers (legacy 62703-62791)",
+    "tier_axes.js — 14-axis tier classification schema + color palette + grid renderer (legacy 63322-63548; PURE HTML BUILDER)"
+  ],
+
+  "primitives_used": [
+    "shared/page1_data_helpers.js (groupColor)"
+  ],
+  "adapters_used": [],
+
+  "interactions": [
+    {"id": "candSubviewKaryoBtn", "type": "view_control"},
+    {"id": "candSubviewTierBtn", "type": "view_control"},
+    {"id": "karyotype_row_sort", "type": "view_control"},
+    {"id": "karyotype_row_filter", "type": "view_control"},
+    {"id": "band_filter", "type": "view_control", "purpose": "two-track candidates: filter by active_band"},
+    {"id": "candidate_list_import_btn", "type": "action"},
+    {"id": "candidate_list_export_btn", "type": "action"},
+    {"id": "registry_btn", "type": "action"},
+    {"id": "manuscript_bundle_btn", "type": "action"},
+    {"id": "clear_btn", "type": "action"}
+  ],
+  "hotkeys": [],
+
+  "computed_preview_outputs": [
+    "per-sample karyotype rows with K=3 locked labels (HOMO_1 / HET / HOMO_2 ordered by median PC1)",
+    "two-track membership pills per active_band",
+    "14-axis tier classification grid (when final_classification.json present)"
+  ],
+  "committable_outputs": [
+    "candidate list import/export JSON",
+    "manuscript bundle export",
+    "karyotype label vocab choice (K=3..K=6) — localStorage"
+  ],
+  "commit_policy": "manual_only",
+
+  "documents": {
+    "page_registry_doc": "pages.registry.json -> pages.karyotype_tier._doc (long; flags 4 known registry mismatches)",
+    "specs_done": [],
+    "specs_todo": [],
+    "schema_doc_referenced_but_missing": "SCHEMA_V2.md §19 (14-axis classification) — referenced but no prose SCHEMA doc on disk",
+    "handoffs": [
+      "atlases/inversion/pages/review/BATCH_2_NOTES.md",
+      "_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step21_done.md (first review-stage migration; AST shim methodology)"
+    ],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [
+    "REGISTRY MISMATCH (flagged 2026-05-07 step 21): requires_layers candidate_sv_counts + candidate_boundaries are misplaced — karyotype_tier actually consumes state.data.final_classification + state.data.classification. May be SWAPPED with boundary_refinement's declared candidate_final_class + candidate_breeding_card. Round-21 did not change registry per architectural-discipline rule.",
+    "TODO_MISSING helpers: _renderCandidateKaryotypeBody, _renderTierAxesGrid (mount-time render wrapped in try/catch because populated path hits these).",
+    "SCHEMA_V2.md §19 cross-ref is to a prose schema doc that does not exist."
+  ],
+  "confidence": "high"
+}

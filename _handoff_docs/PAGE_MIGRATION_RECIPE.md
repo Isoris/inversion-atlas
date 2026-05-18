@@ -208,10 +208,10 @@ The order matters because some pages share extracted helpers.
    page1's helpers. When migrating page2, look at which page1 stubs
    it would also call — those are the candidates for hoisting to
    `shared/color_helpers.js` etc. (recipe Step 3 option (b)).
-3. **page11** (31 TODOs) — review.
+3. **boundary_refinement** (31 TODOs) — review.
 4. **catalogue** (26 TODOs) — catalogue.
 5. **page12** (18 TODOs) — discovery.
-6. **page4** (12 TODOs) — review.
+6. **karyotype_tier** (12 TODOs) — review.
 7. **cross_species_breakpoints** (11 TODOs) — comparative.
 8. The smaller pages (1–7 TODOs each) — quick wins.
 
@@ -913,7 +913,7 @@ WHAT WAS NOT TOUCHED:
 NEXT (round 5 step 4): Quentin's call. Candidates:
   - confirmed_carousel, marker_panels, stats_profile, marker_readiness, annotation_cockpit — also in pages/catalogue/.
   - overview — non-chromosome-scoped overview.
-  - page4 — does page4 even have a stub yet? (Check inventory.)
+  - karyotype_tier — does karyotype_tier even have a stub yet? (Check inventory.)
   - Or: implement the 11 missing catalogue handlers as new development
     distinct from migration (not in scope as "migration" but useful
     if Quentin wants the catalogue table to actually work).
@@ -1251,7 +1251,7 @@ NEXT (round 5 step 7+): Quentin's call.
   - Tiny stubs (page8/9/15/19/overview) — quick router-wiring,
     could batch several in one round.
   - Catalogue completion: confirmed_carousel, marker_panels, overview.
-  - Review pages: page4, 6, 7, 11, sv_evidence.
+  - Review pages: karyotype_tier, 6, 7, 11, sv_evidence.
 ```
 
 ---
@@ -1374,7 +1374,7 @@ NEXT (round 5 step 8+): Quentin's call.
   - cross_species_breakpoints/16b (comparative, 2400+ each) — would resolve cs*
     helpers + computeTrackedLinkageProjection.
   - Tiny stubs (page8/15/19/help) — quick router-wiring.
-  - Review pages (page4, 6, 7, 11, sv_evidence).
+  - Review pages (karyotype_tier, 6, 7, 11, sv_evidence).
 ```
 
 ---
@@ -1488,7 +1488,7 @@ NEXT (round 5 step 9+): Quentin's call.
   - cross_species_breakpoints/16b (comparative, 2400+ each) — would resolve cs*
     helpers + computeTrackedLinkageProjection.
   - Tiny stubs (page8/15/19/help) — quick router-wiring.
-  - Review pages (page4, 6, 7, 11, sv_evidence).
+  - Review pages (karyotype_tier, 6, 7, 11, sv_evidence).
 ```
 
 ---
@@ -1603,7 +1603,7 @@ NEXT (round 5 step 10+): Quentin's call.
   - cross_species_breakpoints/16b (comparative, 2400+ each) — would resolve cs*
     helpers + computeTrackedLinkageProjection.
   - Tiny stubs (page8/15/19/help) — quick router-wiring rounds.
-  - Review pages (page4, 6, 7, 11, sv_evidence) — review stage.
+  - Review pages (karyotype_tier, 6, 7, 11, sv_evidence) — review stage.
 ```
 
 ---
@@ -1731,7 +1731,7 @@ NEXT (round 5 step 11+): Quentin's call.
   - cross_species_breakpoints/multi_species_cockpit (comparative, 2400+ each) — would resolve cs*
     helpers + computeTrackedLinkageProjection.
   - help (comparative, 34 LOC) — tiny help-page stub.
-  - Review pages (page4, 6, 7, 11, sv_evidence).
+  - Review pages (karyotype_tier, 6, 7, 11, sv_evidence).
 ```
 
 ---
@@ -1875,5 +1875,5 @@ NEXT (round 5 step 12+): Quentin's call.
   - page8/15/19 (discovery, <50 LOC each) — close out discovery group.
   - multi_species_cockpit (comparative, 2417 LOC) — multi-species cockpit.
   - help (comparative, 34 LOC) — tiny help-page stub.
-  - Review pages (page4, 6, 7, 11, sv_evidence).
+  - Review pages (karyotype_tier, 6, 7, 11, sv_evidence).
 ```

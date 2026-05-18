@@ -1,6 +1,6 @@
-# How to use page4 — karyotype / tier
+# How to use karyotype_tier — karyotype / tier
 
-**Page**: `page4` · stage `classification` · label "karyotype / tier"
+**Page**: `karyotype_tier` · stage `classification` · label "karyotype / tier"
 **Atlas**: `inversion` (the C. gariepinus 226-cohort atlas)
 
 ## What this page does
@@ -25,30 +25,30 @@ verify the karyotype assignment that page1's K-means produced.
 ```
 atlases/inversion/
 ├── pages/review/
-│   ├── page4.html                              ← HTML shell
-│   ├── page4.js                                ← main entry + 4 chat-33 exports
-│   └── page4/
+│   ├── karyotype_tier.html                              ← HTML shell
+│   ├── karyotype_tier.js                                ← main entry + 4 chat-33 exports
+│   └── karyotype_tier/
 │       ├── _state.js                             ← _pageState + karyoState (page-local UI)
 │       ├── karyo_body.js                         ← karyotype body renderer + toolbar
 │       ├── karyo_labels.js                       ← K=3..K=6 label vocab (HOMO_1/HET/HOMO_2; legacy "band N")
 │       ├── karyo_rows.js                         ← per-sample row builder + sort/filter
 │       └── tier_axes.js                          ← 14-axis schema + color palette + grid renderer
-├── registries/data/pages.registry.json         ← page4 _doc (notes 4 registry mismatches)
+├── registries/data/pages.registry.json         ← karyotype_tier _doc (notes 4 registry mismatches)
 └── shared/
     ├── page1_data_helpers.js                   ← groupColor (shared with page1)
-    └── (no other page4-private shared modules)
+    └── (no other karyotype_tier-private shared modules)
 ```
 
 ## How to run
 
-1. **Pick a candidate** — page4 reads `state.candidate` (cross-atlas
+1. **Pick a candidate** — karyotype_tier reads `state.candidate` (cross-atlas
    slot). Routes that populate this slot:
    - page1: click a candidate rectangle on the |Z| strip
    - page2: prev/next in candidate-list
    - catalogue: click a row's id in the catalogue table
    - annotation_cockpit: navigate the annotation cockpit cursor
 
-2. **Open page4** — the tab is in the classification stage group.
+2. **Open karyotype_tier** — the tab is in the classification stage group.
 
 3. The page renders:
    - **Left**: candidate-list pane (`#candListPane`) with the
@@ -102,7 +102,7 @@ Persists to localStorage. Affects display only — the underlying
 ## The Tier subview
 
 The 14-axis classification grid, grouped into 6 sections (per
-`SCHEMA.md` §19 + `pages/review/page4/tier_axes.js#TIER_AXES`):
+`SCHEMA.md` §19 + `pages/review/karyotype_tier/tier_axes.js#TIER_AXES`):
 
 ### Existence (4 independent layers)
 
@@ -163,14 +163,14 @@ allowed but the override flag is recorded.
 | destination | reason |
 |-------------|--------|
 | **page2** | edit notes, regime, age_origin (the "detail card" fields) |
-| **page11** | refine boundary zones; the Tier grid's `boundary_quality` axis reads page11's output |
+| **boundary_refinement** | refine boundary zones; the Tier grid's `boundary_quality` axis reads boundary_refinement's output |
 | **sv_evidence** | drives Layer B (SV callers) — open to inspect |
 | **stats_profile** | stats profile across all candidates, cohort-wide |
 | **page1** | back to the chromosome scrubber to verify in context |
 
 ## Critical: registry mismatch flagged
 
-Per the page4 `_doc` in `pages.registry.json`: the registered
+Per the karyotype_tier `_doc` in `pages.registry.json`: the registered
 `requires_layers` for this page are
 **`candidate_sv_counts + candidate_boundaries`**, which look
 misplaced. The page actually consumes:
@@ -182,13 +182,13 @@ misplaced. The page actually consumes:
 - the candidate's own `completion` + `characterization` blocks
   (per §13)
 
-A **swap hypothesis** has been raised: page4's declared layers may
-have been swapped with page11's declared
+A **swap hypothesis** has been raised: karyotype_tier's declared layers may
+have been swapped with boundary_refinement's declared
 `candidate_final_class + candidate_breeding_card`. The registry is
 NOT changed here per the architectural-discipline rule (defer to a
 renumbering round).
 
-If you see a "missing layer" error on page4, it's likely from this
+If you see a "missing layer" error on karyotype_tier, it's likely from this
 mismatch — try loading the actually-needed layers
 (`final_classification.json`, `classification.json`) regardless of
 what the layer-status indicator says.
@@ -221,13 +221,13 @@ what the layer-status indicator says.
    follow-up extraction round lands them. mount() wraps render in
    try/catch so a cold mount works.
 
-## What page4 does NOT do
+## What karyotype_tier does NOT do
 
 - **It does NOT compute the 14 axes** — the cluster-side R pipeline
   computes them. Page4 just renders + edits.
 - **It does NOT confirm candidates** — confirmation happens on
   page2.
-- **It does NOT refine boundaries** — that's page11.
+- **It does NOT refine boundaries** — that's boundary_refinement.
 - **It does NOT call SV evidence** — that's sv_evidence.
 
 ## Related specs
@@ -236,7 +236,7 @@ In `specs_done/`:
 - `SCHEMA.md` (§9 cluster-emit `classification` + §13 evidence
   framework + §19 14-axis tier grid)
 - `SPEC_review_surfaces_auto_and_lineages.md` (auto-candidate
-  display rules — page4's left list pane sorts auto candidates to
+  display rules — karyotype_tier's left list pane sorts auto candidates to
   the bottom with dashed outline)
 - `SPEC_l2_sweep_inheritance.md` §6 (the `confirmed` discipline
   that determines what's visible)
@@ -250,7 +250,7 @@ In `specs_todo/`:
 
 ## Per-page contract
 
-`docs/generated/page_contracts/page4/PAGE_CONTRACT.md`
+`docs/generated/page_contracts/karyotype_tier/PAGE_CONTRACT.md`
 
 ## Cohort discipline
 

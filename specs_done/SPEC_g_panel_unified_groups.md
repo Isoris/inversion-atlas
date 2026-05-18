@@ -135,7 +135,7 @@ When `state.manualGroups.length === 0`:
 
 ## §6. Slice 2 (Karyotype tab) — outline
 
-Not yet implemented. The tab body will mirror `page4`'s karyotype
+Not yet implemented. The tab body will mirror `karyotype_tier`'s karyotype
 sub-view but scoped to the single focused candidate:
 
 - Per-sample row showing locked K=3 label (HOMO_1 / HET / HOMO_2)
@@ -143,7 +143,7 @@ sub-view but scoped to the single focused candidate:
 - Colour swatch matching the page1 `lines_panel` band paint
 - Click-to-select samples → adds to a new manual group?
   (UX decision pending)
-- Re-uses `page4/karyo_rows.js` pure helpers + `page4/karyo_labels.js`
+- Re-uses `karyotype_tier/karyo_rows.js` pure helpers + `karyotype_tier/karyo_labels.js`
   vocabulary.
 
 Empty state when no `state.candidate` focused:
@@ -176,7 +176,7 @@ Before Slice 1, the three group concepts were **scattered**:
 
 | concept | pre-Slice-1 surface |
 |---------|---------------------|
-| Karyotype | only on page4 (deep-dive review page) |
+| Karyotype | only on karyotype_tier (deep-dive review page) |
 | Inheritance | only as `lines_panel` pills + `l2_sweep` clustering result; no list view |
 | Manual | sidebar list + compact list (no popup) |
 
@@ -229,7 +229,7 @@ audit). No conflict with existing single-letter hotkeys (`n`, `p`,
 - **Hotkey wiring**: `pages/discovery/page1/hotkeys.js` (unverified
   in this audit; check during Slice 2/3 work)
 - **Karyotype primitives** (Slice 2 prep):
-  `pages/review/page4/karyo_rows.js`, `karyo_labels.js`
+  `pages/review/karyotype_tier/karyo_rows.js`, `karyo_labels.js`
 - **Inheritance primitives** (Slice 3 prep):
   `pages/discovery/page1/inheritance.js`,
   `shared/inheritance_groups.js`

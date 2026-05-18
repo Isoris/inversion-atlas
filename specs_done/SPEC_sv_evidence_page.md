@@ -231,7 +231,7 @@ Per-sample SV support across the candidate's flanking + body zones.
 
 `sv_evidence` is a **thin loader stub**. The renderer is
 `window.AtlasSVEvidence` — an **object** with `.init` /
-`.loadCandidate` / `.destroy` methods (distinct from page6/page7's
+`.loadCandidate` / `.destroy` methods (distinct from popstats/ancestry_per_window's
 single-function renderers). Defined externally in
 `js/atlas_sv_evidence.js` (NOT inlined in legacy
 `Inversion_atlas.html`).
@@ -312,7 +312,7 @@ precomputed JSONs.
 - **Producer README**: `atlases/inversion/engines/producers/sv_evidence/README.md`
 - **Server**: `atlases/inversion/server/SERVER_README.md` (the
   popstats live server; no SV endpoint today)
-- **Karyotype lock format**: annotation_cockpit / page4 produce the
+- **Karyotype lock format**: annotation_cockpit / karyotype_tier produce the
   `HOMO_1` / `HET` / `HOMO_2` locked labels consumed by `--karyotype`
 - **Three-cohort discipline**: see `atlases/inversion/manifest.json`
   + `_handoff_docs/SCAFFOLDING_NOTES.md`

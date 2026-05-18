@@ -12,7 +12,7 @@ candidate's boundaries, scored against the karyotype groups. Loads
 
 sv_evidence is a **thin loader stub**. The renderer is
 `window.AtlasSVEvidence` — an **object** with `.init` /
-`.loadCandidate` / `.destroy` methods (distinct from page6/page7's
+`.loadCandidate` / `.destroy` methods (distinct from popstats/ancestry_per_window's
 single-function renderers). Defined externally in
 `js/atlas_sv_evidence.js`.
 
@@ -35,7 +35,7 @@ Lifecycle:
 - **Layers**: `candidate_sv_counts`
 - **Slots**: `activeCandidate`
 
-Registry alignment ✅ — unlike page6 and page7, this page's
+Registry alignment ✅ — unlike popstats and ancestry_per_window, this page's
 registry entries match what the page actually does.
 
 ## Producer pipeline

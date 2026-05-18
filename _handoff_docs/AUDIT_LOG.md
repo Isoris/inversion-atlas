@@ -266,7 +266,7 @@ same proof pattern.
 - **multi_species_cockpit** (comparative, 2417 LOC) — multi-species cockpit. Most
   ambitious remaining pre-cleanup migration.
 - **help** (comparative, 34 LOC) — tiny help-page stub.
-- **Review pages** (page4, 6, 7, 11, sv_evidence) — review stage.
+- **Review pages** (karyotype_tier, 6, 7, 11, sv_evidence) — review stage.
 
 ---
 
@@ -491,7 +491,7 @@ canvas-driven pages (cross_species_breakpoints, multi_species_cockpit) should do
 - **cross_species_breakpoints/multi_species_cockpit** (comparative, 2400+ each) — would resolve cs*
   helpers + computeTrackedLinkageProjection.
 - **help** (comparative, 34 LOC) — tiny help-page stub.
-- **Review pages** (page4, 6, 7, 11, sv_evidence) — review stage.
+- **Review pages** (karyotype_tier, 6, 7, 11, sv_evidence) — review stage.
 
 ---
 
@@ -676,7 +676,7 @@ factory body is verbatim legacy and we deliberately don't touch it.
 - **cross_species_breakpoints/multi_species_cockpit** (comparative, 2400+ each) — would resolve cs*
   helpers + computeTrackedLinkageProjection.
 - **Tiny stubs** (page8, 15, 19, help) — quick router-wiring rounds.
-- **Review pages** (page4, 6, 7, 11, sv_evidence) — review stage.
+- **Review pages** (karyotype_tier, 6, 7, 11, sv_evidence) — review stage.
 
 ---
 
@@ -844,7 +844,7 @@ keep passing.
 - **cross_species_breakpoints/multi_species_cockpit** (comparative, 2400+ each) — would resolve
   cs* helpers + computeTrackedLinkageProjection.
 - **Tiny stubs** (page8/15/19/help) — quick router-wiring rounds.
-- **Review pages** (page4, 6, 7, 11, sv_evidence) — review stage.
+- **Review pages** (karyotype_tier, 6, 7, 11, sv_evidence) — review stage.
 
 ---
 
@@ -1000,7 +1000,7 @@ candidate-focus) becomes accessible.
 - **cross_species_breakpoints/multi_species_cockpit** (comparative, 2400+ each) — would resolve
   cs* helpers + computeTrackedLinkageProjection.
 - **Tiny stubs** (page8/15/19/help) — quick router-wiring rounds.
-- **Review pages** (page4, 6, 7, 11, sv_evidence) — review stage.
+- **Review pages** (karyotype_tier, 6, 7, 11, sv_evidence) — review stage.
 
 ---
 
@@ -1173,7 +1173,7 @@ need the AST-walking shim injection.
 - **Tiny stubs** (page8/9/15/19/overview) — quick router-wiring
   rounds; could batch several in one round.
 - **Catalogue completion** (confirmed_carousel, marker_panels, overview).
-- **Review pages** (page4, 6, 7, 11, sv_evidence) — review stage.
+- **Review pages** (karyotype_tier, 6, 7, 11, sv_evidence) — review stage.
 
 ---
 

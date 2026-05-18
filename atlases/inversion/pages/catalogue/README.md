@@ -78,7 +78,7 @@ implementations**, not verbatim ports:
 
 In `specs_done/`:
 - `SCHEMA.md` (§10 marker layer column contracts; §19 14-axis
-  classification carried over from page4)
+  classification carried over from karyotype_tier)
 - `SPEC_l2_sweep_inheritance.md` (the auto-promote pipeline that
   populates `candidateList` — catalogue sorts auto candidates to the
   bottom per `SPEC_review_surfaces_auto_and_lineages`)

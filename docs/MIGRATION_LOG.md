@@ -285,7 +285,7 @@ color the mini-PCA dots in v3.94+ "het coloring" mode).
 
 **Status**: not started
 
-**Scope**: page11 + sv_evidence + page4 + page7 + page6 + the
+**Scope**: boundary_refinement + sv_evidence + karyotype_tier + ancestry_per_window + popstats + the
 existing band-trace UI + G-panel auto tab. Behavioural parity only;
 new SPEC BLOCK 2 features (auto-promote / bulk actions / sample-
 concordance proposals) layer on AFTER migration is complete.

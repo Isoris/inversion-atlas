@@ -142,11 +142,11 @@ page modules):
 | 14 | page19 migration | discovery stub |
 | 15 | page15 migration | GHSL mirror |
 | 16 | help migration | comparative help |
-| 17 | page7 migration | review ancestry |
-| 18 | page6 migration | review popstats |
+| 17 | ancestry_per_window migration | review ancestry |
+| 18 | popstats migration | review popstats |
 | 19 | sv_evidence | review SV evidence |
 | 20 | multi_species_cockpit migration | comparative multi-species (2744 LOC) |
-| 21 | page4 migration | review karyotype/tier |
+| 21 | karyotype_tier migration | review karyotype/tier |
 | 22 | runner annotation | "MIGRATION COMPLETE 21/21" |
 | 23 | qopt loader pattern | first activate/extract two-schema example |
 | 24 | master config | YAML reader + `root:` / `path_under_root:` |

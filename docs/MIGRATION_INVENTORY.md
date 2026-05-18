@@ -32,11 +32,11 @@ on each tab.
 | 4 | `page2` | candidate focus | discovery | `inversion_discovery` | Deep-dive on one promoted candidate (sim_mini, karyogram, dosage heatmap, ancestry strip). |
 | 5 | `page8` | windows | refinement | `inversion_discovery` | Per-window summary table. **Note**: legacy stage is "refinement" but it's a discovery diagnostic — moving to discovery. |
 | 6 | `page19` | negative regions | discovery | `inversion_discovery` | Inversion-negative inventory (complement of the catalogue). |
-| 7 | `page11` | boundaries | refinement | `inversion_review` | Refine each candidate's [start_bp, end_bp] interval. |
+| 7 | `boundary_refinement` | boundaries | refinement | `inversion_review` | Refine each candidate's [start_bp, end_bp] interval. |
 | 8 | `sv_evidence` | SV evidence (5b) | refinement | `inversion_review` | SV calls clustered around boundaries; karyotype-group genotype counts. |
-| 9 | `page4` | karyotype / tier | refinement | `inversion_review` | Two views: per-candidate sample-level regime + 14-axis tier classification. |
-| 10 | `page7` | ancestry | classification | `inversion_review` | Per-window ancestry view (K-cluster + delta12 heatmap). |
-| 11 | `page6` | popstats | classification | `inversion_review` | Stack of pop-genetic tracks (Z, SNP density, BEAGLE, coverage, θπ, FST, Hobs/Hexp). |
+| 9 | `karyotype_tier` | karyotype / tier | refinement | `inversion_review` | Two views: per-candidate sample-level regime + 14-axis tier classification. |
+| 10 | `ancestry_per_window` | ancestry | classification | `inversion_review` | Per-window ancestry view (K-cluster + delta12 heatmap). |
+| 11 | `popstats` | popstats | classification | `inversion_review` | Stack of pop-genetic tracks (Z, SNP density, BEAGLE, coverage, θπ, FST, Hobs/Hexp). |
 | 12 | **NEW** | inversion review | refinement | `inversion_review` | **NEW** — the SPEC BLOCK 2 page (auto-promote, bulk actions, sample-concordance candidate proposals). Adds, doesn't replace existing pages. |
 | 13 | `catalogue` | catalogue | discovery | `inversion_catalogue` | Sortable/filterable catalogue of all L2 envelopes / L1-merged inversions. **Legacy stage is "discovery" but functionally it's synthesis** — moving to catalogue. |
 | 14 | `confirmed_carousel` | confirmed | synthesis | `inversion_catalogue` | Carousel walk-through of confirmed candidates. |
@@ -53,7 +53,7 @@ on each tab.
 
 - **`page8` (windows)**: legacy stage `refinement`; moving to `inversion_discovery`. Justification: it's a per-window diagnostic table the user opens DURING scrubbing to investigate a window's robust |Z| and eigenvalue ratios. It's not a refinement step.
 - **`catalogue` (catalogue)**: legacy stage `discovery`; moving to `inversion_catalogue`. Justification: it's the manuscript-grade output table; users build it AFTER discovery, not during.
-- **`page6` (popstats)** and **`page7` (ancestry)**: legacy stage `classification`; moving to `inversion_review`. Justification: they're per-candidate evidence views the user consults while reviewing whether to confirm. Could also live in `inversion_catalogue` for cross-candidate stats — flagging for re-decision once we touch them.
+- **`popstats` (popstats)** and **`ancestry_per_window` (ancestry)**: legacy stage `classification`; moving to `inversion_review`. Justification: they're per-candidate evidence views the user consults while reviewing whether to confirm. Could also live in `inversion_catalogue` for cross-candidate stats — flagging for re-decision once we touch them.
 
 If any of these decisions look wrong, flag now. They're cheap to swap pre-extraction.
 
@@ -269,7 +269,7 @@ end-to-end before moving on. **One step per turn** is realistic.
 | **0** | done | foundation (shared/state_io.js, build/, data/ skeleton, smoke tests) | done |
 | **1** | next | extract `shared/` primitives (contingency, hungarian, kmeans, pca, het_rate, color_ramps) — JS only, no UI yet. Each module exports + has unit tests. | medium (need to identify what's used by ≥2 callers) |
 | **2** | +1 | `inversion_discovery.html` + `inversion_discovery/` — page1 + page12 + page15 + page2 + page8 + page19. Behavioural parity with legacy. | high (the scrubber is the bulk of the legacy code) |
-| **3** | +2 | `inversion_review.html` + `inversion_review/` — page11 + sv_evidence + page4 + page7 + page6 + the existing band-trace UI + G-panel auto tab. Migration only, no new SPEC BLOCK 2 features yet. | high (cross-page state plumbing kicks in) |
+| **3** | +2 | `inversion_review.html` + `inversion_review/` — boundary_refinement + sv_evidence + karyotype_tier + ancestry_per_window + popstats + the existing band-trace UI + G-panel auto tab. Migration only, no new SPEC BLOCK 2 features yet. | high (cross-page state plumbing kicks in) |
 | **4** | +3 | `inversion_catalogue.html` + `inversion_catalogue/` — catalogue + confirmed_carousel + annotation_cockpit + stats_profile + marker_readiness + marker_panels + overview. | medium |
 | **5** | +4 | `inversion_comparative.html` + `inversion_comparative/` — cross_species_breakpoints + multi_species_cockpit + help. | low |
 | **6** | +5 | parity verification — load every JSON layer the legacy atlas loads, click every button, confirm same behaviour | low (testing) |
@@ -296,7 +296,7 @@ If you spot any of these missing from the lists above, flag it:
   → these need a `shared/state.js` module
 - All localStorage keys (`pca_scrubber_v3.*`, `inversion_atlas.*`)
   → preserved verbatim per sub-atlas
-- All keyboard shortcuts (E/F for boundaries on page11, ←/→ for cursor
+- All keyboard shortcuts (E/F for boundaries on boundary_refinement, ←/→ for cursor
   on annotation_cockpit, etc.) → migrated with their pages
 - All inline event handlers (`onclick="..."`) → must be migrated to
   `addEventListener` since modules don't expose top-level names to

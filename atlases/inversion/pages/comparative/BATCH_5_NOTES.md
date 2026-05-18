@@ -74,7 +74,7 @@ The merge chat will decide whether to keep the window-global mount pattern or co
 - `state._csOverlayIndex` — per-window breakpoint overlay index
 - `state._csDotplotPanel`, `state._csDotplotPanelFp` — popgenDotplot panel handles
 - `state._csHoverActive`, `state._csHoverRaf`, `state._csHeaderScrollWired`, `state._crossSpeciesKeysBound` — UI flags
-- `state._focalVsBg` — focal-vs-bg panel state (shared with page11)
+- `state._focalVsBg` — focal-vs-bg panel state (shared with boundary_refinement)
 
 **Owned by multi_species_cockpit.js (multi-species cockpit):**
 - `state.dotplotMashmap` (loader; consumed also by cross_species_breakpoints)
@@ -83,7 +83,7 @@ The merge chat will decide whether to keep the window-global mount pattern or co
 - `state._msClassifications`, `state.classifications` — classification persistence
 
 **Read but not owned (cross-page):**
-- `state.repeatDensity` (boundaries page / page11)
+- `state.repeatDensity` (boundaries page / boundary_refinement)
 - `state.candidateList` (catalogue / marker_panels)
 - `state.cur`, `state.data` (scrubber / page1)
 

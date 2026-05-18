@@ -176,7 +176,7 @@ Per `specs_done/SPEC_registry_v2.md`:
 ## §9. Cluster-emit `classification` layer
 
 **Source**: cluster-side R pipeline (final step). **Consumers**:
-`page4` Tier sub-view (`state.data.classification`).
+`karyotype_tier` Tier sub-view (`state.data.classification`).
 
 Shape:
 
@@ -270,7 +270,7 @@ C. gariepinus ≠ wild C. macrocephalus.
 
 The candidate object (per §6) carries optional **completion** +
 **characterization** blocks populated by the cluster-side pipeline
-or by the user via page4:
+or by the user via karyotype_tier:
 
 ```
 candidate.completion = {
@@ -321,10 +321,10 @@ candidateList}`.
 ## §19. 14-axis tier classification
 
 **Source**: cluster-side; ships as `final_classification.json` keyed
-by `candidate_id`. **Consumers**: `page4` Tier sub-view.
+by `candidate_id`. **Consumers**: `karyotype_tier` Tier sub-view.
 
 The 14 axes, grouped into 6 sections (per
-`pages/review/page4/tier_axes.js#TIER_AXES`):
+`pages/review/karyotype_tier/tier_axes.js#TIER_AXES`):
 
 ### Existence (4 axes — independent layers)
 
@@ -370,7 +370,7 @@ The 14 axes, grouped into 6 sections (per
 |------|---------|------------|
 | `confidence_tier` | overall tier from independence layers + group validation | T1 / T2 / T3 / T4 / unknown |
 
-The page4 Tier view renders these as a colour-coded grid. Empty
+The karyotype_tier Tier view renders these as a colour-coded grid. Empty
 state shows the axis schema only — no values — until
 `final_classification.json` ships from cluster-side.
 
@@ -378,7 +378,7 @@ state shows the axis schema only — no values — until
 
 ## §20-§21. Reserved
 
-For arrangement_calls + boundary annotations (referenced in page11
+For arrangement_calls + boundary annotations (referenced in boundary_refinement
 `boundary_zone` per SPEC_l2_sweep + page1 candidate.boundary_zone).
 Both currently `pending` placeholder schemas; will be expanded when
 the boundary refinement output schema stabilizes.
@@ -547,10 +547,10 @@ this doc solves.
 ---
 
 **Authored**: 2026-05-15 to resolve the SCHEMA / SCHEMA_V2.md
-references from `pages.registry.json` page4 _doc + page12 _doc +
+references from `pages.registry.json` karyotype_tier _doc + page12 _doc +
 marker_panels module header + `shared/regimes_registry.js:49` +
 `shared/scale_stability.js:3, 33, 298`. Also pulls in the 14-axis
-schema from `pages/review/page4/tier_axes.js#TIER_AXES`.
+schema from `pages/review/karyotype_tier/tier_axes.js#TIER_AXES`.
 
 **Future**: as more schemas move from `pending` to `validated`, this
 file accumulates the §N anchors that downstream code can reference.

@@ -39,7 +39,7 @@ That doesn't happen again.
 | `SPEC_l3_het_dosage_coloring.md` | L3 mini-PCA dot fill by per-sample het rate (cold blue → warm red); halo stays K-coloured | `pages/discovery/page1/l3_panel.js` + `shared/het_rate.js` + `page1.html#l3HetToggle` |
 | `SPEC_review_surfaces_auto_and_lineages.md` | Review surfaces for L2-sweep auto-promoted candidates (Slices 0-2 shipped: dashed CSS + filter pipelines + G-panel auto tab; Slice 3 lineages tab deferred) | `css/inversion.css` + legacy turn 130 + turn 165 (G-panel auto tab) |
 | `SPEC_distant_band_concordance_fish_trajectory.md` | Fish-paths dual of band-track (Slices 1-5 shipped: lineage compute, lines color mode, \|Z\| strip, band-trace UI, TSV; Slice 6 cross-strip chaining deferred) | `pages/discovery/page1/{lineage.js, band_trace_*.js}` + `shared/{band_trace.js, clustering.js}` |
-| `SCHEMA.md` | Prose schema reference — resolves all "SCHEMA §N" / "SCHEMA_V2.md §N" cross-refs from code; carries §9 cluster-emit, §10 marker columns, §13 evidence framework, §19 14-axis tier, §22 structural scaffold, §26 axis_topology vocab, §27 scale_stability verdicts; reserves §0-§30 for future | `registries/schemas/*.schema.json` (26 files) + `registries/data/*.registry.json` (5 files) + `pages/review/page4/tier_axes.js#TIER_AXES` |
+| `SCHEMA.md` | Prose schema reference — resolves all "SCHEMA §N" / "SCHEMA_V2.md §N" cross-refs from code; carries §9 cluster-emit, §10 marker columns, §13 evidence framework, §19 14-axis tier, §22 structural scaffold, §26 axis_topology vocab, §27 scale_stability verdicts; reserves §0-§30 for future | `registries/schemas/*.schema.json` (26 files) + `registries/data/*.registry.json` (5 files) + `pages/review/karyotype_tier/tier_axes.js#TIER_AXES` |
 
 ### Pending — `specs_todo/`
 

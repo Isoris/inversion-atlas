@@ -362,7 +362,7 @@ explicitly states:
 > render the result.
 
 The example flow the proposal gives for `renderMendelianPage` is
-precisely the flow `page_review/page11.js` etc. should follow. This
+precisely the flow `page_review/boundary_refinement.js` etc. should follow. This
 is what `mount(root, atlasState, registry)` is for.
 
 **Recommendation:** when `analysis/mendelian_inheritance.js` is

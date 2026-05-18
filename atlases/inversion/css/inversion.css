@@ -962,7 +962,7 @@ body[data-layout-mode="compact"] main#page1 #linesYsourceBar {
 #catalogue .cat-empty { padding: 40px; text-align: center; color: var(--ink-dim); }
 
 /* Page 4 — Karyotype view (saved candidates + per-sample table) */
-#page4 { height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); }
+#karyotype_tier { height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); }
 #page4Inner { display: grid; grid-template-columns: 280px 1fr; height: 100%; }
 #candListPane { background: var(--panel); border-right: 1px solid var(--rule);
                 padding: 16px 14px; overflow-y: auto; display: flex; flex-direction: column; }
@@ -1342,70 +1342,70 @@ html[data-theme="light"] .cli-subband[data-verdict="CROSS_CUTTING"] { color: #b9
                 margin-left: auto; }
 .dh-close-btn:hover { color: var(--bad); border-color: var(--bad); }
 /* v3.97: Boundary zone refinement page (page 11). */
-#page11 { padding: 0; overflow: auto; height: 100%; }
-#page11 .bnd-toolbar { display: flex; align-items: center; gap: 10px;
+#boundary_refinement { padding: 0; overflow: auto; height: 100%; }
+#boundary_refinement .bnd-toolbar { display: flex; align-items: center; gap: 10px;
                        flex-wrap: wrap; margin-bottom: 12px;
                        font-family: var(--mono); font-size: 11px; }
-#page11 .bnd-toolbar .bnd-lbl { color: var(--ink-dim); }
-#page11 .bnd-toolbar select { background: var(--panel-2);
+#boundary_refinement .bnd-toolbar .bnd-lbl { color: var(--ink-dim); }
+#boundary_refinement .bnd-toolbar select { background: var(--panel-2);
                               border: 1px solid var(--rule); color: var(--ink);
                               padding: 3px 8px; font-family: var(--mono);
                               font-size: 11px; border-radius: 2px; }
-#page11 .bnd-toolbar button { background: var(--panel-2);
+#boundary_refinement .bnd-toolbar button { background: var(--panel-2);
                               border: 1px solid var(--rule); color: var(--ink);
                               padding: 4px 10px; font-family: var(--mono);
                               font-size: 11px; cursor: pointer; border-radius: 2px; }
-#page11 .bnd-toolbar button:hover:not(:disabled) { background: var(--panel-3); }
-#page11 .bnd-toolbar button:disabled { opacity: 0.5; cursor: not-allowed; }
-#page11 .bnd-toolbar button.primary { background: var(--accent);
+#boundary_refinement .bnd-toolbar button:hover:not(:disabled) { background: var(--panel-3); }
+#boundary_refinement .bnd-toolbar button:disabled { opacity: 0.5; cursor: not-allowed; }
+#boundary_refinement .bnd-toolbar button.primary { background: var(--accent);
                                       color: #0e1116; border-color: var(--accent);
                                       font-weight: 700; }
-#page11 .bnd-toolbar button.primary:hover:not(:disabled) {
+#boundary_refinement .bnd-toolbar button.primary:hover:not(:disabled) {
                                       background: var(--accent); opacity: 0.85; }
-#page11 .bnd-toolbar button.dirty {
+#boundary_refinement .bnd-toolbar button.dirty {
                                       border-color: var(--accent);
                                       box-shadow: 0 0 0 1px var(--accent) inset; }
-#page11 .bnd-radius-group { display: inline-flex; gap: 1px; }
-#page11 .bnd-radius-btn { border-radius: 0 !important; }
-#page11 .bnd-radius-btn:first-child { border-radius: 2px 0 0 2px !important; }
-#page11 .bnd-radius-btn:last-child  { border-radius: 0 2px 2px 0 !important; }
-#page11 .bnd-radius-btn.active { background: var(--accent) !important;
+#boundary_refinement .bnd-radius-group { display: inline-flex; gap: 1px; }
+#boundary_refinement .bnd-radius-btn { border-radius: 0 !important; }
+#boundary_refinement .bnd-radius-btn:first-child { border-radius: 2px 0 0 2px !important; }
+#boundary_refinement .bnd-radius-btn:last-child  { border-radius: 0 2px 2px 0 !important; }
+#boundary_refinement .bnd-radius-btn.active { background: var(--accent) !important;
                                  color: #0e1116 !important; font-weight: 700;
                                  border-color: var(--accent) !important; }
-#page11 .bnd-status-wrap { display: inline-flex; gap: 6px; align-items: center;
+#boundary_refinement .bnd-status-wrap { display: inline-flex; gap: 6px; align-items: center;
                             margin-left: auto; }
-#page11 .bnd-info { font-family: var(--mono); font-size: 11px;
+#boundary_refinement .bnd-info { font-family: var(--mono); font-size: 11px;
                      color: var(--ink-dim); margin-bottom: 12px;
                      padding: 6px 10px; background: var(--panel-2);
                      border-left: 3px solid var(--accent);
                      border-radius: 0 3px 3px 0; }
-#page11 .bnd-info b { color: var(--ink); font-weight: 600; }
-#page11 .bnd-info .bnd-cls-strong    { color: #1B7837; font-weight: 600; }
-#page11 .bnd-info .bnd-cls-moderate  { color: #F4A582; }
-#page11 .bnd-info .bnd-cls-weak      { color: #FDDBC7; }
-#page11 .bnd-info .bnd-cls-ambiguous { color: var(--ink-dim); }
-#page11 .bnd-tracks { position: relative; background: #0a0c0f;
+#boundary_refinement .bnd-info b { color: var(--ink); font-weight: 600; }
+#boundary_refinement .bnd-info .bnd-cls-strong    { color: #1B7837; font-weight: 600; }
+#boundary_refinement .bnd-info .bnd-cls-moderate  { color: #F4A582; }
+#boundary_refinement .bnd-info .bnd-cls-weak      { color: #FDDBC7; }
+#boundary_refinement .bnd-info .bnd-cls-ambiguous { color: var(--ink-dim); }
+#boundary_refinement .bnd-tracks { position: relative; background: #0a0c0f;
                        border: 1px solid var(--rule); border-radius: 3px;
                        padding: 8px 12px 12px;
                        /* page 11 must use display:flex when active so
                           the column track-stack lays out correctly */
                      }
-#page11 .bnd-track { display: block; position: relative;
+#boundary_refinement .bnd-track { display: block; position: relative;
                        margin-top: 6px; padding: 1px 0; }
-#page11 .bnd-track-label { position: absolute; left: 4px; top: 0;
+#boundary_refinement .bnd-track-label { position: absolute; left: 4px; top: 0;
                             font-family: var(--mono); font-size: 9.5px;
                             color: var(--ink-dim); pointer-events: none;
                             z-index: 5; background: rgba(10,12,15,0.65);
                             padding: 0 3px; border-radius: 2px; }
-#page11 .bnd-track svg { display: block; }
+#boundary_refinement .bnd-track svg { display: block; }
 /* Boundary zones — vertical bands that overlay the entire track stack.
    Color comes from inline style (set by JS from SUPPORT_CLASS_COLORS). */
-#page11 .bnd-zone { position: absolute; top: 0; bottom: 0;
+#boundary_refinement .bnd-zone { position: absolute; top: 0; bottom: 0;
                       pointer-events: none;
                       border-left: 1px dashed rgba(255,255,255,0.55);
                       border-right: 1px dashed rgba(255,255,255,0.55);
                       z-index: 3; }
-#page11 .bnd-zone-label { position: absolute; top: 2px; left: 4px;
+#boundary_refinement .bnd-zone-label { position: absolute; top: 2px; left: 4px;
                            font-family: var(--mono); font-size: 9px;
                            padding: 1px 4px; border-radius: 2px;
                            background: var(--panel);
@@ -1415,30 +1415,30 @@ html[data-theme="light"] .cli-subband[data-verdict="CROSS_CUTTING"] { color: #b9
 /* Anchor lines — faint dashed verticals showing the candidate's
    committed [start_bp, end_bp] interval, as a reference for what the
    boundary zones refine FROM. */
-#page11 .bnd-anchor { position: absolute; top: 0; bottom: 0; width: 0;
+#boundary_refinement .bnd-anchor { position: absolute; top: 0; bottom: 0; width: 0;
                        border-left: 1px dotted rgba(255,255,255,0.30);
                        pointer-events: none; z-index: 2; }
-#page11 .bnd-cur { position: absolute; top: 0; bottom: 0; width: 0;
+#boundary_refinement .bnd-cur { position: absolute; top: 0; bottom: 0; width: 0;
                     border-left: 1px solid var(--accent);
                     opacity: 0.55; pointer-events: none; z-index: 4; }
-#page11 .bnd-summary { margin-top: 14px; font-family: var(--mono);
+#boundary_refinement .bnd-summary { margin-top: 14px; font-family: var(--mono);
                         font-size: 11px; }
-#page11 .bnd-summary table { width: 100%; border-collapse: collapse; }
-#page11 .bnd-summary th { text-align: left; padding: 5px 8px;
+#boundary_refinement .bnd-summary table { width: 100%; border-collapse: collapse; }
+#boundary_refinement .bnd-summary th { text-align: left; padding: 5px 8px;
                           color: var(--ink-dim); font-weight: 500;
                           border-bottom: 1px solid var(--rule);
                           font-size: 10px; text-transform: uppercase;
                           letter-spacing: 0.04em; }
-#page11 .bnd-summary td { padding: 5px 8px;
+#boundary_refinement .bnd-summary td { padding: 5px 8px;
                           border-bottom: 1px solid var(--rule); }
-#page11 .bnd-summary td.bnd-cls { font-weight: 600; }
-#page11 .bnd-summary .bnd-cls-strong    { color: #1B7837; }
-#page11 .bnd-summary .bnd-cls-moderate  { color: #F4A582; }
-#page11 .bnd-summary .bnd-cls-weak      { color: #FDDBC7; }
-#page11 .bnd-summary .bnd-cls-ambiguous { color: var(--ink-dim); }
-#page11 .bnd-empty { padding: 28px 0; text-align: center;
+#boundary_refinement .bnd-summary td.bnd-cls { font-weight: 600; }
+#boundary_refinement .bnd-summary .bnd-cls-strong    { color: #1B7837; }
+#boundary_refinement .bnd-summary .bnd-cls-moderate  { color: #F4A582; }
+#boundary_refinement .bnd-summary .bnd-cls-weak      { color: #FDDBC7; }
+#boundary_refinement .bnd-summary .bnd-cls-ambiguous { color: var(--ink-dim); }
+#boundary_refinement .bnd-empty { padding: 28px 0; text-align: center;
                       color: var(--ink-dim); font-family: var(--mono); }
-#page11 .bnd-empty-h { font-size: 14px; color: var(--ink); margin-bottom: 6px; }
+#boundary_refinement .bnd-empty-h { font-size: 14px; color: var(--ink); margin-bottom: 6px; }
 
 .cand-list-actions { padding-top: 10px; border-top: 1px solid var(--rule); }
 .cand-list-actions button { background: var(--panel-2);
@@ -1715,88 +1715,88 @@ html[data-theme="light"] .cli-subband[data-verdict="CROSS_CUTTING"] { color: #b9
             font-family: var(--mono); font-size: 11px; color: var(--ink); }
 
 /* Popstats stack (page 6) — Q04-style multi-track diagnostic */
-#page6 { padding: 16px 24px; overflow: auto; height: 100%;
+#popstats { padding: 16px 24px; overflow: auto; height: 100%;
          box-sizing: border-box; background: var(--bg); color: var(--ink); }
 /* Turn 6.5: when the gallery tray is open, page-6 lays out as a 2-col grid
    with the stack on the left and the 240-px tray on the right. When the
    tray is collapsed (data-collapsed="true") it's display:none and the
    stack reclaims full width. */
-#page6:has(> #psGalleryTray[data-collapsed="false"]) {
+#popstats:has(> #psGalleryTray[data-collapsed="false"]) {
   display: grid; grid-template-columns: 1fr 240px; column-gap: 12px;
   align-items: start;
 }
-#page6 > #psToolbar,
-#page6 > #psStack,
-#page6 > #psNoChrom { grid-column: 1; }
-#page6 > #psGalleryTray { grid-column: 2; }
-#page6 > #psGalleryTray[data-collapsed="true"] { display: none; }
-#page6 .ps-toolbar { display: flex; gap: 6px; align-items: center;
+#popstats > #psToolbar,
+#popstats > #psStack,
+#popstats > #psNoChrom { grid-column: 1; }
+#popstats > #psGalleryTray { grid-column: 2; }
+#popstats > #psGalleryTray[data-collapsed="true"] { display: none; }
+#popstats .ps-toolbar { display: flex; gap: 6px; align-items: center;
                      flex-wrap: wrap; margin-bottom: 14px; padding-bottom: 10px;
                      border-bottom: 1px solid var(--rule); }
-#page6 .ps-toolbar .label { font-family: var(--mono); font-size: 11px;
+#popstats .ps-toolbar .label { font-family: var(--mono); font-size: 11px;
                             color: var(--ink-dim); margin-right: 4px; }
-#page6 .ps-chip { background: var(--panel-2); border: 1px solid var(--rule);
+#popstats .ps-chip { background: var(--panel-2); border: 1px solid var(--rule);
                   color: var(--ink); padding: 4px 10px; border-radius: 12px;
                   font-family: var(--mono); font-size: 11px; cursor: pointer;
                   user-select: none; transition: all 0.15s; }
-#page6 .ps-chip:hover { background: var(--panel-3); }
-#page6 .ps-chip.active { background: var(--accent); color: #0e1116;
+#popstats .ps-chip:hover { background: var(--panel-3); }
+#popstats .ps-chip.active { background: var(--accent); color: #0e1116;
                          border-color: var(--accent); font-weight: 600; }
-#page6 .ps-chip.no-data { opacity: 0.45; font-style: italic; }
-#page6 .ps-chip.no-data::before { content: '○ '; }
-#page6 .ps-chip.active::before { content: '● '; }
-#page6 .ps-stack { display: flex; flex-direction: column; gap: 1px;
+#popstats .ps-chip.no-data { opacity: 0.45; font-style: italic; }
+#popstats .ps-chip.no-data::before { content: '○ '; }
+#popstats .ps-chip.active::before { content: '● '; }
+#popstats .ps-stack { display: flex; flex-direction: column; gap: 1px;
                    background: var(--rule); }
-#page6 .ps-track { background: var(--bg); position: relative;
+#popstats .ps-track { background: var(--bg); position: relative;
                    padding: 2px 0 4px; }
-#page6 .ps-track .ps-track-label { position: absolute; top: 4px; left: 14px;
+#popstats .ps-track .ps-track-label { position: absolute; top: 4px; left: 14px;
                                    font-family: var(--mono); font-size: 10px;
                                    font-weight: 600; color: var(--ink-dim);
                                    letter-spacing: 0.04em;
                                    text-transform: uppercase;
                                    pointer-events: none; }
-#page6 .ps-track .ps-empty-msg { padding: 12px 16px 12px 80px;
+#popstats .ps-track .ps-empty-msg { padding: 12px 16px 12px 80px;
                                  font-family: var(--mono); font-size: 11px;
                                  color: var(--ink-dim); font-style: italic; }
-#page6 .ps-track canvas { display: block; width: 100%; cursor: crosshair; }
-#page6 .ps-no-chrom { padding: 60px 20px; text-align: center;
+#popstats .ps-track canvas { display: block; width: 100%; cursor: crosshair; }
+#popstats .ps-no-chrom { padding: 60px 20px; text-align: center;
                       color: var(--ink-dim); font-style: italic; }
 
 /* Ancestry page (page 7) — admixture-along-chromosome */
-#page7 { padding: 16px 24px; overflow: auto; height: 100%;
+#ancestry_per_window { padding: 16px 24px; overflow: auto; height: 100%;
          box-sizing: border-box; background: var(--bg); color: var(--ink); }
-#page7 .anc-toolbar { display: flex; gap: 8px; align-items: center;
+#ancestry_per_window .anc-toolbar { display: flex; gap: 8px; align-items: center;
                       flex-wrap: wrap; margin-bottom: 14px; padding-bottom: 10px;
                       border-bottom: 1px solid var(--rule); }
-#page7 .anc-toolbar .label { font-family: var(--mono); font-size: 11px;
+#ancestry_per_window .anc-toolbar .label { font-family: var(--mono); font-size: 11px;
                              color: var(--ink-dim); margin-right: 4px; }
-#page7 .anc-meta { margin-left: auto; font-family: var(--mono); font-size: 11px;
+#ancestry_per_window .anc-meta { margin-left: auto; font-family: var(--mono); font-size: 11px;
                    color: var(--ink-dim); }
-#page7 .anc-chip { background: var(--panel-2); border: 1px solid var(--rule);
+#ancestry_per_window .anc-chip { background: var(--panel-2); border: 1px solid var(--rule);
                    color: var(--ink); padding: 4px 10px; border-radius: 12px;
                    font-family: var(--mono); font-size: 11px; cursor: pointer;
                    user-select: none; transition: all 0.15s; }
-#page7 .anc-chip:hover { background: var(--panel-3); }
-#page7 .anc-chip.active { background: var(--accent); color: #0e1116;
+#ancestry_per_window .anc-chip:hover { background: var(--panel-3); }
+#ancestry_per_window .anc-chip.active { background: var(--accent); color: #0e1116;
                           border-color: var(--accent); font-weight: 600; }
-#page7 .anc-chip.no-data { opacity: 0.45; font-style: italic; }
-#page7 .anc-stack { display: flex; flex-direction: column; gap: 1px;
+#ancestry_per_window .anc-chip.no-data { opacity: 0.45; font-style: italic; }
+#ancestry_per_window .anc-stack { display: flex; flex-direction: column; gap: 1px;
                     background: var(--rule); }
-#page7 .anc-section { background: var(--bg); position: relative;
+#ancestry_per_window .anc-section { background: var(--bg); position: relative;
                       padding: 4px 0 6px; }
-#page7 .anc-section .anc-section-label { position: absolute; top: 4px; left: 14px;
+#ancestry_per_window .anc-section .anc-section-label { position: absolute; top: 4px; left: 14px;
                                          font-family: var(--mono); font-size: 10px;
                                          font-weight: 600; color: var(--ink-dim);
                                          letter-spacing: 0.04em;
                                          text-transform: uppercase;
                                          pointer-events: none; }
-#page7 .anc-section canvas { display: block; width: 100%; cursor: crosshair; }
-#page7 .anc-section .anc-empty-msg { padding: 12px 16px 12px 80px;
+#ancestry_per_window .anc-section canvas { display: block; width: 100%; cursor: crosshair; }
+#ancestry_per_window .anc-section .anc-empty-msg { padding: 12px 16px 12px 80px;
                                      font-family: var(--mono); font-size: 11px;
                                      color: var(--ink-dim); font-style: italic; }
-#page7 .anc-no-chrom { padding: 60px 20px; text-align: center;
+#ancestry_per_window .anc-no-chrom { padding: 60px 20px; text-align: center;
                        color: var(--ink-dim); font-style: italic; }
-#page7 .anc-no-chrom code { background: var(--panel-2); padding: 2px 6px;
+#ancestry_per_window .anc-no-chrom code { background: var(--panel-2); padding: 2px 6px;
                             border-radius: 3px; font-family: var(--mono);
                             font-size: 11px; color: var(--ink); }
 /* Per-window summary (page 8) — compressed precomp inspector */
@@ -1874,18 +1874,18 @@ html[data-theme="light"] .cli-subband[data-verdict="CROSS_CUTTING"] { color: #b9
                                  font-size: 10px; color: var(--ink-dim); cursor: pointer; }
 #page8 #winSumTable td .gobtn:hover { background: var(--accent); color: #0e1116;
                                        border-color: var(--accent); }
-#page4 .provisional { background: var(--panel); border: 1px dashed var(--rule);
+#karyotype_tier .provisional { background: var(--panel); border: 1px dashed var(--rule);
                       border-radius: 4px; padding: 18px; margin-bottom: 16px; }
-#page4 .provisional h3 { font-size: 14px; margin: 0 0 8px;
+#karyotype_tier .provisional h3 { font-size: 14px; margin: 0 0 8px;
                          font-family: var(--serif); font-weight: 500; }
-#page4 .provisional .badge { display: inline-block; background: var(--accent);
+#karyotype_tier .provisional .badge { display: inline-block; background: var(--accent);
                              color: #0e1116; padding: 2px 8px; border-radius: 3px;
                              font-family: var(--mono); font-size: 9px;
                              text-transform: uppercase; letter-spacing: 0.1em;
                              margin-left: 8px; vertical-align: middle; }
-#page4 .provisional p { color: var(--ink-dim); font-size: 12px;
+#karyotype_tier .provisional p { color: var(--ink-dim); font-size: 12px;
                         line-height: 1.6; margin: 8px 0; }
-#page4 .provisional code { background: var(--panel-2); padding: 1px 5px;
+#karyotype_tier .provisional code { background: var(--panel-2); padding: 1px 5px;
                            border-radius: 2px; font-family: var(--mono);
                            font-size: 11px; color: var(--ink); }
 
@@ -2705,14 +2705,14 @@ body[data-layout-mode="free"] main#page1 #pcaAsideResize { display: none; }
 }
 .cand-regime-open { margin-left: 0; }
 /* v4 turn 18: repeat density panel on boundaries page */
-#page11 .bnd-repeat-density {
+#boundary_refinement .bnd-repeat-density {
   margin-top: 16px;
   padding: 12px;
   background: var(--panel-2);
   border: 1px solid var(--rule);
   border-radius: 4px;
 }
-#page11 .bnd-rd-empty {
+#boundary_refinement .bnd-rd-empty {
   color: var(--ink-dim);
   font-size: 11px;
   font-family: var(--mono);
@@ -2720,67 +2720,67 @@ body[data-layout-mode="free"] main#page1 #pcaAsideResize { display: none; }
   text-align: center;
   line-height: 1.5;
 }
-#page11 .bnd-rd-empty-h {
+#boundary_refinement .bnd-rd-empty-h {
   color: var(--ink);
   font-weight: 500;
   margin-bottom: 4px;
   font-size: 12px;
 }
-#page11 .bnd-rd-empty code {
+#boundary_refinement .bnd-rd-empty code {
   background: var(--panel-3); padding: 1px 4px; border-radius: 2px;
   font-size: 10.5px;
 }
-#page11 .bnd-rd-header {
+#boundary_refinement .bnd-rd-header {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   margin-bottom: 6px;
   font-family: var(--mono); font-size: 11px;
 }
-#page11 .bnd-rd-title {
+#boundary_refinement .bnd-rd-title {
   color: var(--ink); font-weight: 500;
   text-transform: uppercase; letter-spacing: 0.06em; font-size: 9.5px;
 }
-#page11 .bnd-rd-meta { color: var(--ink-dim); }
-#page11 .bnd-rd-meta code {
+#boundary_refinement .bnd-rd-meta { color: var(--ink-dim); }
+#boundary_refinement .bnd-rd-meta code {
   background: var(--panel-3); padding: 1px 4px; border-radius: 2px;
 }
 /* v4 turn 19+20: control row dropdowns, warn note, flash animation */
-#page11 .bnd-rd-ctrl {
+#boundary_refinement .bnd-rd-ctrl {
   display: inline-flex; align-items: center; gap: 4px;
 }
-#page11 .bnd-rd-ctrl-label {
+#boundary_refinement .bnd-rd-ctrl-label {
   color: var(--ink-dim);
   font-size: 9.5px;
   text-transform: uppercase; letter-spacing: 0.04em;
 }
-#page11 .bnd-rd-ctrl select {
+#boundary_refinement .bnd-rd-ctrl select {
   background: var(--panel-3); color: var(--ink);
   border: 1px solid var(--rule); border-radius: 2px;
   padding: 2px 4px; font-family: var(--mono); font-size: 10.5px;
   cursor: pointer;
   max-width: 220px;
 }
-#page11 .bnd-rd-ctrl select:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+#boundary_refinement .bnd-rd-ctrl select:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
 /* v4 turn 125: zoom-history nav buttons (◄ back / ► forward). Tight
    small chrome to fit alongside the select dropdowns; greyed when
    disabled. */
-#page11 .bnd-rd-ctrl-btn {
+#boundary_refinement .bnd-rd-ctrl-btn {
   background: var(--panel-3); color: var(--ink);
   border: 1px solid var(--rule); border-radius: 2px;
   padding: 2px 6px; font-family: var(--mono); font-size: 10px;
   line-height: 1.2; cursor: pointer; min-width: 18px;
 }
-#page11 .bnd-rd-ctrl-btn:hover:not(:disabled) {
+#boundary_refinement .bnd-rd-ctrl-btn:hover:not(:disabled) {
   border-color: var(--accent); color: var(--accent);
 }
-#page11 .bnd-rd-ctrl-btn:disabled {
+#boundary_refinement .bnd-rd-ctrl-btn:disabled {
   opacity: 0.35; cursor: default; color: var(--ink-dimmer);
 }
 /* v4 turn 23: LOESS band toggles. Pill-style buttons that adopt the
    band color via inline style. */
-#page11 .bnd-rd-loess-group {
+#boundary_refinement .bnd-rd-loess-group {
   display: inline-flex; align-items: center; gap: 4px;
 }
-#page11 .bnd-rd-loess-toggle {
+#boundary_refinement .bnd-rd-loess-toggle {
   border: 1px solid;
   border-radius: 10px;
   padding: 2px 8px;
@@ -2788,12 +2788,12 @@ body[data-layout-mode="free"] main#page1 #pcaAsideResize { display: none; }
   cursor: pointer;
   transition: opacity 0.12s ease, background 0.12s ease;
 }
-#page11 .bnd-rd-loess-toggle:hover { opacity: 1; }
-#page11 .bnd-rd-warn {
+#boundary_refinement .bnd-rd-loess-toggle:hover { opacity: 1; }
+#boundary_refinement .bnd-rd-warn {
   color: #d09030; font-size: 10.5px; font-style: italic;
 }
 /* v4 turn 24: dimmed internal candidate ID shown next to the display name. */
-#page11 .bnd-cand-iid {
+#boundary_refinement .bnd-cand-iid {
   color: var(--ink-dimmer);
   font-family: var(--mono);
   font-size: 10.5px;
@@ -2801,7 +2801,7 @@ body[data-layout-mode="free"] main#page1 #pcaAsideResize { display: none; }
   margin-left: 6px;
   cursor: help;
 }
-#page11 .bnd-rd-empty-loaded {
+#boundary_refinement .bnd-rd-empty-loaded {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px dashed var(--rule);
@@ -2809,14 +2809,14 @@ body[data-layout-mode="free"] main#page1 #pcaAsideResize { display: none; }
   color: var(--ink-dimmer);
 }
 /* Flash on chrom-change (Alt+arrow nav) */
-#page11 .bnd-repeat-density.bnd-rd-flash {
+#boundary_refinement .bnd-repeat-density.bnd-rd-flash {
   animation: bndRdFlash 600ms ease-out;
 }
 @keyframes bndRdFlash {
   0%   { box-shadow: 0 0 0 2px rgba(245, 165, 36, 0.7); }
   100% { box-shadow: 0 0 0 2px rgba(245, 165, 36, 0); }
 }
-#page11 .bnd-rd-svg {
+#boundary_refinement .bnd-rd-svg {
   background: #0a0c0f;
   border-radius: 3px;
   display: block;
@@ -2825,29 +2825,29 @@ body[data-layout-mode="free"] main#page1 #pcaAsideResize { display: none; }
 }
 /* v4 turn 25: class summary panel — sits above the repeat density panel
    when a candidate is selected. Compact table with per-class stats. */
-#page11 .bnd-class-summary {
+#boundary_refinement .bnd-class-summary {
   margin: 14px 0 6px;
   font-family: var(--mono); font-size: 11px;
   color: var(--ink);
 }
-#page11 .bnd-class-summary:empty { display: none; }
-#page11 .bnd-cs-header {
+#boundary_refinement .bnd-class-summary:empty { display: none; }
+#boundary_refinement .bnd-cs-header {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   margin-bottom: 4px;
 }
-#page11 .bnd-cs-title {
+#boundary_refinement .bnd-cs-title {
   color: var(--ink); font-weight: 500;
   text-transform: uppercase; letter-spacing: 0.06em; font-size: 9.5px;
 }
-#page11 .bnd-cs-meta {
+#boundary_refinement .bnd-cs-meta {
   color: var(--ink-dim); font-size: 10.5px;
 }
-#page11 .bnd-cs-table {
+#boundary_refinement .bnd-cs-table {
   border-collapse: collapse;
   width: 100%;
   font-size: 10.5px;
 }
-#page11 .bnd-cs-table thead th {
+#boundary_refinement .bnd-cs-table thead th {
   text-align: left;
   color: var(--ink-dimmer);
   font-weight: 400;
@@ -2857,58 +2857,58 @@ body[data-layout-mode="free"] main#page1 #pcaAsideResize { display: none; }
   padding: 4px 8px 3px;
   border-bottom: 1px solid var(--rule);
 }
-#page11 .bnd-cs-table tbody tr {
+#boundary_refinement .bnd-cs-table tbody tr {
   cursor: pointer;
   border-bottom: 1px dotted var(--rule);
   transition: background 0.08s ease;
 }
-#page11 .bnd-cs-table tbody tr:hover {
+#boundary_refinement .bnd-cs-table tbody tr:hover {
   background: rgba(245, 165, 36, 0.06);
 }
-#page11 .bnd-cs-table tbody tr.bnd-cs-active {
+#boundary_refinement .bnd-cs-table tbody tr.bnd-cs-active {
   background: rgba(245, 165, 36, 0.10);
   border-left: 2px solid var(--accent);
 }
-#page11 .bnd-cs-table td {
+#boundary_refinement .bnd-cs-table td {
   padding: 4px 8px;
   vertical-align: middle;
 }
-#page11 .bnd-cs-flag-col { width: 18px; text-align: center; }
-#page11 .bnd-cs-flag    { color: var(--accent); }
-#page11 .bnd-cs-noflag  { color: var(--ink-dimmer); }
+#boundary_refinement .bnd-cs-flag-col { width: 18px; text-align: center; }
+#boundary_refinement .bnd-cs-flag    { color: var(--accent); }
+#boundary_refinement .bnd-cs-noflag  { color: var(--ink-dimmer); }
 /* PATCH all_TE-priority Change 3: priority and aggregate row markers.
    Aggregate (all_TE) gets a filled diamond in the accent color, slightly
    larger; the row itself has a faint border-left to visually pin it.
    Other priority classes get an outline diamond, same color, no border. */
-#page11 .bnd-cs-aggregate {
+#boundary_refinement .bnd-cs-aggregate {
   color: var(--accent);
   font-size: 13px;
   line-height: 1;
 }
-#page11 .bnd-cs-priority {
+#boundary_refinement .bnd-cs-priority {
   color: var(--accent-2);
   font-size: 12px;
   line-height: 1;
   opacity: 0.9;
 }
-#page11 .bnd-cs-aggregate-row td {
+#boundary_refinement .bnd-cs-aggregate-row td {
   background: linear-gradient(to right,
     rgba(245, 165, 36, 0.08), rgba(245, 165, 36, 0.0) 60%);
 }
-#page11 .bnd-cs-aggregate-row td:first-child {
+#boundary_refinement .bnd-cs-aggregate-row td:first-child {
   border-left: 2px solid var(--accent);
 }
-#page11 .bnd-cs-priority-row:not(.bnd-cs-aggregate-row) td:first-child {
+#boundary_refinement .bnd-cs-priority-row:not(.bnd-cs-aggregate-row) td:first-child {
   border-left: 2px solid var(--accent-2);
 }
-#page11 .bnd-cs-name-col code { background: transparent; }
-#page11 .bnd-cs-num     { text-align: right; font-variant-numeric: tabular-nums; }
-#page11 .bnd-cs-num-delta { font-weight: 500; }
-#page11 .bnd-cs-delta-pos { color: #3cc08a; }
-#page11 .bnd-cs-delta-neg { color: var(--ink-dimmer); }
-#page11 .bnd-cs-delta-zero { color: var(--ink-dimmer); }
-#page11 .bnd-cs-bar-col { width: 100px; min-width: 100px; }
-#page11 .bnd-cs-bar {
+#boundary_refinement .bnd-cs-name-col code { background: transparent; }
+#boundary_refinement .bnd-cs-num     { text-align: right; font-variant-numeric: tabular-nums; }
+#boundary_refinement .bnd-cs-num-delta { font-weight: 500; }
+#boundary_refinement .bnd-cs-delta-pos { color: #3cc08a; }
+#boundary_refinement .bnd-cs-delta-neg { color: var(--ink-dimmer); }
+#boundary_refinement .bnd-cs-delta-zero { color: var(--ink-dimmer); }
+#boundary_refinement .bnd-cs-bar-col { width: 100px; min-width: 100px; }
+#boundary_refinement .bnd-cs-bar {
   display: inline-block;
   width: 90px;
   height: 6px;
@@ -2918,13 +2918,13 @@ body[data-layout-mode="free"] main#page1 #pcaAsideResize { display: none; }
   overflow: hidden;
   vertical-align: middle;
 }
-#page11 .bnd-cs-bar-fill {
+#boundary_refinement .bnd-cs-bar-fill {
   display: block;
   height: 100%;
   background: #7ad3db;   /* matches "tight" LOESS band color in repeat density panel */
   border-radius: 1px;
 }
-#page11 .bnd-cs-hidden-note {
+#boundary_refinement .bnd-cs-hidden-note {
   color: var(--ink-dimmer);
   font-size: 10px;
   font-style: italic;

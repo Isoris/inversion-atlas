@@ -27,7 +27,7 @@
 //
 // Round-5-step-19 status (chat 39, 2026-05-07): thin-loader-stub
 // migration — pattern 4 ("stub-preserving + one wired entry") applied as a
-// **direct twin of page7 + page6** (the first two migrated review-stage
+// **direct twin of ancestry_per_window + popstats** (the first two migrated review-stage
 // pages, shipped steps 17 + 18). Both chat-33 exports preserved verbatim:
 //   - showSvEvidencePage(state)  — main entry; tries window.AtlasSVEvidence,
 //                                  falls back to a missing-renderer empty-state
@@ -37,8 +37,8 @@
 //                                  re-mount with the same candidate is a no-op).
 //   - hideSvEvidencePage()       — teardown entry; calls mod.destroy() if
 //                                  available. NB: this is a teardown, not a
-//                                  refresh — semantically distinct from page6's
-//                                  refreshPopstatsPage and page7's
+//                                  refresh — semantically distinct from popstats's
+//                                  refreshPopstatsPage and ancestry_per_window's
 //                                  refreshAncestryPage.
 // New: _state.js sub-module + state-aware wrapper refreshPageSvEvidence +
 // mount/unmount lifecycle. mount() calls showSvEvidencePage(legacyState)
@@ -47,12 +47,12 @@
 // hideSvEvidencePage so the external module's destroy() runs.
 //
 // **Third (and final) review tier-1 thin-loader-stub migration.** After
-// this round, review tier-1 is closed (only page4, page11, multi_species_cockpit
+// this round, review tier-1 is closed (only karyotype_tier, boundary_refinement, multi_species_cockpit
 // remain across the whole project).
 //
 // Extraction notes (Batch 2)
 // --------------------------
-// Unlike the other review pages (page6, page7), sv_evidence is NOT
+// Unlike the other review pages (popstats, ancestry_per_window), sv_evidence is NOT
 // even *referenced* by a typeof-guard inside the legacy HTML — the whole
 // renderer lives in `js/atlas_sv_evidence.js`, loaded as an external
 // script and exposed as `window.AtlasSVEvidence`.
@@ -74,20 +74,20 @@
 // touches IndexedDB caching and the UpSet plot lib, which deserves its own
 // extraction pass.
 //
-// Registry alignment (NOT a mismatch — distinct from page6/page7)
+// Registry alignment (NOT a mismatch — distinct from popstats/ancestry_per_window)
 // ---------------------------------------------------------------
 // pages.registry.json declares sv_evidence has
 //   "requires_layers": ["candidate_sv_counts"]
 //   "requires_slots":  ["activeCandidate"]
 //   "preloads":        ["candidate_sv_counts"]
-// **This MATCHES what the page actually does.** Unlike page6 and page7
+// **This MATCHES what the page actually does.** Unlike popstats and ancestry_per_window
 // (both flagged with shape-of-mismatch entries in steps 17/18),
 // sv_evidence is genuinely a candidate-level view: the chat-33
 // renderer reads `state.candidate.id` and fetches
 // `json/sv_genotype_counts/<cid>.json` per-candidate. So the round-19
 // migration leaves the registry entry untouched (no `_doc` flag for
 // Quentin needed on this entry). Documented in the round-19 handoff for
-// completeness: only page6 + page7 have the chromosome-vs-candidate
+// completeness: only popstats + ancestry_per_window have the chromosome-vs-candidate
 // mismatch shape; sv_evidence does not.
 // =============================================================================
 
@@ -199,7 +199,7 @@ export function hideSvEvidencePage() {
  * Public entry — state-aware wrapper around showSvEvidencePage.
  *
  * If `state` is passed, sets _pageState as a side effect before delegating
- * (mirrors page7/page6/confirmed_carousel/page15/help wrapper pattern). The chat-33
+ * (mirrors ancestry_per_window/popstats/confirmed_carousel/page15/help wrapper pattern). The chat-33
  * showSvEvidencePage signature already takes state as an explicit arg, so
  * the wrapper just threads _pageState into it.
  */

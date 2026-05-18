@@ -45,8 +45,8 @@ The `data-stage` attribute on legacy tab buttons doesn't map cleanly 1-1 to sub-
 
 ```
 discovery       → page1, page12, page15, page2, page19, catalogue
-refinement      → page11, page4, page8
-classification  → annotation_cockpit, page6, page7
+refinement      → boundary_refinement, karyotype_tier, page8
+classification  → annotation_cockpit, popstats, ancestry_per_window
 synthesis       → confirmed_carousel, stats_profile, marker_readiness
 compare         → cross_species_breakpoints, multi_species_cockpit
 help            → help, marker_panels, overview, sv_evidence (mixed?)
@@ -56,7 +56,7 @@ vs. the original sub-atlas mapping I wrote:
 
 ```
 inversion_discovery   → page1, page12, page15, page2, page8, page19
-inversion_review      → page11, sv_evidence, page4, page7, page6
+inversion_review      → boundary_refinement, sv_evidence, karyotype_tier, ancestry_per_window, popstats
 inversion_catalogue   → catalogue, confirmed_carousel, annotation_cockpit, stats_profile, marker_readiness, marker_panels, overview
 inversion_comparative → cross_species_breakpoints, multi_species_cockpit, help
 ```
@@ -65,7 +65,7 @@ inversion_comparative → cross_species_breakpoints, multi_species_cockpit, help
 
 ```
 inversion_discovery.html  buttons: page1, page12, page15, page2, page8, page19
-inversion_review.html     buttons: page11, sv_evidence, page4, page7, page6
+inversion_review.html     buttons: boundary_refinement, sv_evidence, karyotype_tier, ancestry_per_window, popstats
 inversion_catalogue.html  buttons: catalogue, confirmed_carousel, annotation_cockpit, stats_profile, marker_readiness, marker_panels, overview, help  (+ help)
 inversion_comparative.html buttons: cross_species_breakpoints, multi_species_cockpit
 ```

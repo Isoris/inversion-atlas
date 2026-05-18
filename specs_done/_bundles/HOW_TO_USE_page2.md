@@ -108,10 +108,10 @@ The header carries a **Confirm** button. Click it to flip
 
 Unconfirm is symmetric.
 
-## The 14-axis classification grid (page4)
+## The 14-axis classification grid (karyotype_tier)
 
-Page2 does NOT show the 14-axis tier grid — that's page4's job.
-The header has a `→ page4 (karyotype/tier)` button to jump.
+Page2 does NOT show the 14-axis tier grid — that's karyotype_tier's job.
+The header has a `→ karyotype_tier (karyotype/tier)` button to jump.
 
 But page2's `characterization` block (read from
 `candidate.characterization` per SCHEMA §13) populates several of
@@ -122,7 +122,7 @@ those axes:
 - `burden_class` (enriched / neutral / depleted / unknown)
 - ...
 
-Edit them on page4; they persist back to the candidate.
+Edit them on karyotype_tier; they persist back to the candidate.
 
 ## Editable fields
 
@@ -131,7 +131,7 @@ Edit them on page4; they persist back to the candidate.
 | `candidate.notes` | textarea on the page; saves on blur |
 | `candidate.age_origin` | dropdown |
 | `candidate.regime` (when overriding the auto call) | dropdown |
-| `candidate.completion.*` / `.characterization.*` | edit on page4 |
+| `candidate.completion.*` / `.characterization.*` | edit on karyotype_tier |
 
 All edits mutate `state.candidateList` in-place and trigger
 re-render. Persistence depends on which registry you're wired to
@@ -159,8 +159,8 @@ the atlas:
 | destination | reason |
 |-------------|--------|
 | **page1** | inspect the candidate in context of the rest of the chromosome |
-| **page4** | karyotype rows + 14-axis tier grid |
-| **page11** | refine the boundary zones (E/F/B/R/A hotkeys; 9 scan radii) |
+| **karyotype_tier** | karyotype rows + 14-axis tier grid |
+| **boundary_refinement** | refine the boundary zones (E/F/B/R/A hotkeys; 9 scan radii) |
 | **sv_evidence** | SV calls clustered around the breakpoints |
 | **annotation_cockpit** | annotation cockpit shows this candidate's mb-strip |
 | **confirmed_carousel** | (if confirmed) prev/next walk through confirmed candidates |
@@ -191,7 +191,7 @@ the atlas:
 5. **"Per-band counts are wrong for two-track candidates."** A
    two-track candidate has separate K=3 bandings per track
    (`active_band` per track). Make sure you've focused the right
-   track via the `band filter` chip (page4 carries this UI).
+   track via the `band filter` chip (karyotype_tier carries this UI).
 
 ## What page2 does NOT do
 
@@ -200,7 +200,7 @@ the atlas:
   recompute beyond the L2 cache hit/miss.
 - **It does NOT auto-confirm candidates.** Confirmation is always
   a manual gesture (per `specs_done/SPEC_l2_sweep_inheritance §6`).
-- **It does NOT classify on the 14 axes** — that's `page4`'s Tier
+- **It does NOT classify on the 14 axes** — that's `karyotype_tier`'s Tier
   sub-view.
 - **It does NOT show cohort-wide stats** — that's `stats_profile` (stats
   profile).

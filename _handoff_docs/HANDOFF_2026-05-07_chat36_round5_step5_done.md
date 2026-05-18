@@ -127,7 +127,7 @@ Same shape as the other pages.
 
 **Total assertions: 386/386 across 10 test runs.**
 
-**Pages remaining (17 of 22):** page4, 5, 6, 7, 8, 9, 10, 11, 12, 15,
+**Pages remaining (17 of 22):** karyotype_tier, 5, 6, 7, 8, 9, 10, 11, 12, 15,
 16, 16b, 19, 21, overview, sv_evidence.
 
 ---
@@ -156,7 +156,7 @@ question Quentin deferred to end-of-migration.
 | **page12** | discovery | 1008 | 18 TODOs — substantial work |
 | **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks` and `_csPermutationTest`** |
 | **page8, 9, 15, 19, overview** | various | <105 each | tiny stubs; quick router-wiring rounds |
-| **page4, 6, 7, 11** | review | 122-301 | review-stage pages |
+| **karyotype_tier, 6, 7, 11** | review | 122-301 | review-stage pages |
 | **sv_evidence** | review | 148 | SV evidence review |
 
 The **stats_profile/18 pair is now properly wired** — synthesis-stage

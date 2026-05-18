@@ -168,7 +168,7 @@ Same shape as the other pages.
 
 **Total assertions: 628/628 across 20 test runs.**
 
-**Pages remaining (12 of 22):** page4, 5, 6, 7, 8, 11, 15, 16, 16b,
+**Pages remaining (12 of 22):** karyotype_tier, 5, 6, 7, 8, 11, 15, 16, 16b,
 19, sv_evidence.
 
 **Discovery group status:** 3 of 4 migrated (page1, page2, page12).
@@ -223,7 +223,7 @@ do the same.
 | **page8, 15, 19** | discovery | <50 each | tiny stubs; would close out the discovery group entirely (page8 + page15 + page19 in 1-3 quick rounds) |
 | **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest` (stats_profile), AND likely `computeTrackedLinkageProjection` (annotation_cockpit)** |
 | **help** | comparative | 34 | tiny help-page stub |
-| **page4, 6, 7, 11** | review | 122-301 | review-stage pages |
+| **karyotype_tier, 6, 7, 11** | review | 122-301 | review-stage pages |
 | **sv_evidence** | review | 148 | SV evidence review |
 
 Logical next priorities:

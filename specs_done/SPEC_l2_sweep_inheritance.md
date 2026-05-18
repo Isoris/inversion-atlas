@@ -183,7 +183,7 @@ Auto-promoted candidates land with `confirmed: false`. This means:
   visual cohort isn't polluted by unverified auto-suggestions.
 - They do **NOT** appear in confirmed_carousel's confirmed-carousel.
 - The user's gesture to confirm flips `confirmed: true` (typically
-  on page2 or page4).
+  on page2 or karyotype_tier).
 
 ## §7. Dismissed-set persistence (per chrom)
 

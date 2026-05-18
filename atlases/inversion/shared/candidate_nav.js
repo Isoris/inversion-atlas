@@ -2,7 +2,7 @@
 //
 // Cross-page candidate-navigation helpers (legacy lines 58552-58590 +
 // 59653-59745). The inline nav bar [‹ prev] [active] [next ›] [🌍] is
-// used by page4 / page6 / page7 / page11. Page2's candidate focus has
+// used by karyotype_tier / popstats / ancestry_per_window / boundary_refinement. Page2's candidate focus has
 // its own richer nav with confirm-toggle and isn't covered here.
 //
 // Public entries:

@@ -18,7 +18,7 @@
 // Legacy origin: lines 14573-14742 of legacy/Inversion_atlas.html.
 //
 // Consumers per the cartridge registry:
-//   - pages/review/page11.js (boundaries) — ncRNA panel beside the
+//   - pages/review/boundary_refinement.js (boundaries) — ncRNA panel beside the
 //     TE density + boundary auto-propose evidence
 //
 // All entry points take state as their first arg. localStorage access

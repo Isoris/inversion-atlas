@@ -100,7 +100,7 @@ stage is now `tooling`. The shell groups them into a separate tab.
 - **`shared/het_rate.js`** — `hetRateColor` — used by page1's L3
   het-coloring (per `specs_done/SPEC_l3_het_dosage_coloring.md`)
 - **`shared/page1_data_helpers.js`** — `groupColor`, schema
-  detection, indexing — used by page1, page2, page4 (cross-stage)
+  detection, indexing — used by page1, page2, karyotype_tier (cross-stage)
 - **`shared/inheritance_groups.js`** — `inheritanceGroupClustering`,
   `IGC_MIN_BANDS_FOR_CLUSTERING` — used by page1's lineage compute
   + L2-sweep (per `specs_done/SPEC_l2_sweep_inheritance.md`)

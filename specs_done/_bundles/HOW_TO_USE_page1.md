@@ -114,8 +114,8 @@ atlases/inversion/
    commit the candidate → it joins state.candidateList
    with source='manual', confirmed=true
         ↓
-   move to page2 to deep-dive, page4 to karyotype-review,
-   page11 to refine boundaries, etc.
+   move to page2 to deep-dive, karyotype_tier to karyotype-review,
+   boundary_refinement to refine boundaries, etc.
 ```
 
 ## Key hotkeys
@@ -129,8 +129,8 @@ atlases/inversion/
 | `f` / `b` | candidate-mode: flip resolution / nudge boundary |
 | `c` | candidate-mode toggle / commit |
 | `j` | jump-to prompt (enter bp or window index) |
-| `E` / `F` | (in page11 boundaries) override left / right boundary |
-| `B` / `R` / `A` | (in page11) save / reset / auto-propose |
+| `E` / `F` | (in boundary_refinement boundaries) override left / right boundary |
+| `B` / `R` / `A` | (in boundary_refinement) save / reset / auto-propose |
 
 See `page1/hotkeys.js` for the canonical list.
 
@@ -238,8 +238,8 @@ where you left off.
 When you commit a candidate or change `state.candidate`:
 
 - **page2** shows the per-candidate deep-dive (~15 sub-panels)
-- **page4** shows the karyotype rows + 14-axis tier grid
-- **page11** lets you refine the boundary zones
+- **karyotype_tier** shows the karyotype rows + 14-axis tier grid
+- **boundary_refinement** lets you refine the boundary zones
 - **sv_evidence** loads SV calls clustered around boundaries
 - **annotation_cockpit** annotation cockpit highlights this candidate on the
   chromosome strip
@@ -248,7 +248,7 @@ All of these read `state.candidate` from the cross-atlas slot.
 
 ## Common gotchas
 
-1. **Empty cluster cache.** If page2 / page4 / page11 feel slow on
+1. **Empty cluster cache.** If page2 / karyotype_tier / boundary_refinement feel slow on
    first open, it's because page1's cluster-cache hasn't been
    warmed for this chromosome yet. Just open page1 first; the
    cache fills as you scrub.
@@ -276,13 +276,13 @@ All of these read `state.candidate` from the cross-atlas slot.
 ## What page1 does NOT do
 
 - **It does NOT classify** — the 14-axis Tier classification grid
-  lives on `page4` and reads `state.data.final_classification`
+  lives on `karyotype_tier` and reads `state.data.final_classification`
   (cluster-side, R-pipeline output).
-- **It does NOT call breakpoints to base-pair resolution** — page11
+- **It does NOT call breakpoints to base-pair resolution** — boundary_refinement
   refines into **boundary zones** (the default verdict); exact
   breakpoints require junction-level evidence and aren't claimed
   here.
-- **It does NOT compute popstats live** — page6's track stack uses
+- **It does NOT compute popstats live** — popstats's track stack uses
   a live server (POST /api/popstats/*). Page1 only reads the
   precomp.
 - **It does NOT run the v3.4 banding pipeline** — that's page22's

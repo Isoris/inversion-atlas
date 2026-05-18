@@ -100,6 +100,6 @@ sub-modules see the active mount's state via ES module live-binding.
 - 🟡 **stub / empty-state / Phase 1** (renderers TODO or
   partial): ~10 pages
 - 🔵 **thin-loader** (external `window.*` renderer): 3 pages
-  (page6, page7, sv_evidence)
+  (popstats, ancestry_per_window, sv_evidence)
 - 🆕 **fresh implementations** (legacy shipped HTML shell only):
   4 pages (catalogue, page8, confirmed_carousel, page19)

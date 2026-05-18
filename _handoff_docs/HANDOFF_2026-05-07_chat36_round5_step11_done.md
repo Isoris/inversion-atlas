@@ -213,7 +213,7 @@ the strategic value (stats_profile guard-resolution).
 
 **Total assertions: 691/691 across 22 test runs.**
 
-**Pages remaining (11 of 22):** page4, 5, 6, 7, 8, 11, 15, 16b, 19,
+**Pages remaining (11 of 22):** karyotype_tier, 5, 6, 7, 8, 11, 15, 16b, 19,
 sv_evidence.
 
 **Discovery group status:** 3 of 4 migrated (page1, page2, page12).
@@ -271,7 +271,7 @@ the same proof pattern.
 | **page8, 15, 19** | discovery | <50 each | tiny stubs; would close out discovery group entirely (3 quick rounds) |
 | **multi_species_cockpit** | comparative | 2417 LOC | multi-species cockpit; no cross-page helper exposures, but second-largest unmigrated page |
 | **help** | comparative | 34 LOC | tiny help-page stub |
-| **page4, 6, 7, 11** | review | 122-301 LOC | review-stage pages |
+| **karyotype_tier, 6, 7, 11** | review | 122-301 LOC | review-stage pages |
 | **sv_evidence** | review | 148 LOC | SV evidence review |
 
 Logical next priorities:

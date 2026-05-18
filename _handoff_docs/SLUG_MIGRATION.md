@@ -17,7 +17,7 @@ caused real bugs:
   (it's the annotation cockpit)
 - help mislabelled "Multi-species comparison" (it's the help page;
   the actual multi-species cockpit is multi_species_cockpit)
-- The page4 / page6 / page7 / page11 swap-hypothesis registry
+- The karyotype_tier / popstats / ancestry_per_window / boundary_refinement swap-hypothesis registry
   mismatches partly come from numeric confusion
 
 Self-documenting slugs solve this:
@@ -55,10 +55,10 @@ no tests fail.
 | `page15` | `local_pca_ghsl` | third evidence axis (GHSL) |
 | `page2` | `candidate_focus` | per-candidate deep dive |
 | `page22` | `haplotype_regimes` | v3.4 banding pipeline runner |
-| `page4` | `karyotype_tier` | review-stage 2-tab page |
-| `page6` | `popstats` | popstats track stack |
-| `page7` | `ancestry_per_window` | per-window ancestry view |
-| `page11` | `boundary_refinement` | boundary zone refinement |
+| `karyotype_tier` | `karyotype_tier` | review-stage 2-tab page |
+| `popstats` | `popstats` | popstats track stack |
+| `ancestry_per_window` | `ancestry_per_window` | per-window ancestry view |
+| `boundary_refinement` | `boundary_refinement` | boundary zone refinement |
 | `sv_evidence` | `sv_evidence` | (drop the `page_` prefix) |
 | `fish_ancestry_scroller` | `fish_ancestry_scroller` | per-fish ancestry painting |
 | `catalogue` | `catalogue` | L2 envelopes table |

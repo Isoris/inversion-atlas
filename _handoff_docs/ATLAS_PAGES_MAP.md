@@ -123,28 +123,28 @@ seed for per-page READMEs.
 
 ## CLASSIFICATION (5 pages — per-candidate review / refinement / synthesis)
 
-### page4 — karyotype / tier  ✅
-- **HTML/JS**: `pages/review/page4.{html,js}` · **Subdir**: `page4/` (5 modules)
+### karyotype_tier — karyotype / tier  ✅
+- **HTML/JS**: `pages/review/karyotype_tier.{html,js}` · **Subdir**: `karyotype_tier/` (5 modules)
 - **What it does**: two-tab candidate-level review. **Karyotype tab**: per-sample regime breakdown, each row a fish with locked K=3 label (HOMO_1/HET/HOMO_2 ordered by median PC1) + active-band track pills for two-track candidates; sortable / filterable / band-filterable. **Tier tab**: 14-axis classification grid (empty-state until cluster-side ships `final_classification.json`).
 - **Subdir**: `_state.js`, `karyo_body.js` (body + toolbar), `karyo_labels.js` (K=3..K=6 label vocab), `karyo_rows.js` (sort/filter pure helpers), `tier_axes.js` (14-axis schema + palette + grid).
 - ⚠️ Registry mismatch flagged: `requires_layers` says `candidate_sv_counts + candidate_boundaries` — page actually consumes `final_classification` + `classification`.
 
-### page6 — popstats  🔵
-- **HTML/JS**: `pages/review/page6.{html,js}` · **Subdir**: `page6/` (`_state.js` only)
+### popstats — popstats  🔵
+- **HTML/JS**: `pages/review/popstats.{html,js}` · **Subdir**: `popstats/` (`_state.js` only)
 - **What it does**: chromosome-level popstats track stack — |Z|, SNP density, BEAGLE uncertainty, depth, θπ, F_ST, Hobs/Hexp, ancestry delta12. Thin loader stub for `window.renderPopstatsPage` (external `js/atlas_page6_wiring.js`); falls back to missing-renderer message if absent.
 - ⚠️ Registry mismatch flagged: declares `candidate_gene_cargo` + `activeCandidate` — page is chromosome-level.
 
-### page7 — ancestry  🔵
-- **HTML/JS**: `pages/review/page7.{html,js}` · **Subdir**: `page7/` (`_state.js` only)
+### ancestry_per_window — ancestry  🔵
+- **HTML/JS**: `pages/review/ancestry_per_window.{html,js}` · **Subdir**: `ancestry_per_window/` (`_state.js` only)
 - **What it does**: per-window ancestry view — three chip toggles (K-cluster label, Q-value heatmap, delta12). Loads `<chrom>_phase4_ancestry.json` via drag-drop; renders sample × window heatmaps. Thin loader stub for `window.renderAncestryPage`.
 - ⚠️ Registry mismatch flagged: declares `candidate_marker_primers` + `activeCandidate` — page is chromosome-level.
 
-### page11 — boundaries  ✅
-- **HTML/JS**: `pages/review/page11.{html,js}` · **Subdir**: `page11/` (3 modules)
+### boundary_refinement — boundaries  ✅
+- **HTML/JS**: `pages/review/boundary_refinement.{html,js}` · **Subdir**: `boundary_refinement/` (3 modules)
 - **What it does**: boundary-zone refinement for a promoted candidate. Auto-propose runs `BOUNDARY_TRACK_WEIGHTS`-weighted algorithm (`_bndAutoPropose`); manual override at scrubber cursor via E (left) / F (right) hotkeys; B saves, R resets. Nine scan-radius steps (1 kb → 5 Mb). TE-density panel, ncRNA-density panel, focal-vs-background widget.
 - **Vocab contract**: `boundary_zone` is the default verdict; `exact_breakpoint` reserved for junction-level evidence only.
 - **Subdir**: `_state.js`, `boundaries.js` (pure helpers — binary search, smoothing, MAD), `boundaries_ui.js` (toolbar + actions).
-- ⚠️ Registry mismatch flagged: declares `candidate_final_class + candidate_breeding_card` — possible swap with page4's declared `candidate_sv_counts + candidate_boundaries`.
+- ⚠️ Registry mismatch flagged: declares `candidate_final_class + candidate_breeding_card` — possible swap with karyotype_tier's declared `candidate_sv_counts + candidate_boundaries`.
 
 ### sv_evidence — SV calls × karyotype  🔵
 - **HTML/JS**: `pages/review/sv_evidence.{html,js}` · **Subdir**: `sv_evidence/` (`_state.js` only)
@@ -284,7 +284,7 @@ The following directory exists under `pages/` but is **not in the manifest** (so
 - **Tier breakdown** (rough):
   - ✅ shipped: ~18 pages
   - 🟡 stub / renderers TODO: ~14 pages (mostly evolution + classification stage-2 pages)
-  - 🔵 thin-loader: 3 pages (page6, page7, sv_evidence)
+  - 🔵 thin-loader: 3 pages (popstats, ancestry_per_window, sv_evidence)
 
 ---
 

@@ -55,10 +55,10 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | classification | stats_profile | stats profile | active | high | [page.manifest.json](page_contracts/stats_profile/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/stats_profile/PAGE_CONTRACT.md) |
 | classification | marker_readiness | marker readiness panel | active | high | [page.manifest.json](page_contracts/marker_readiness/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/marker_readiness/PAGE_CONTRACT.md) |
 | classification | overview | overview | empty stub | high | [page.manifest.json](page_contracts/overview/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/overview/PAGE_CONTRACT.md) |
-| classification | page4 | karyotype / tier | active | high | [page.manifest.json](page_contracts/page4/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page4/PAGE_CONTRACT.md) |
-| classification | page6 | popstats | active (thin loader) | high | [page.manifest.json](page_contracts/page6/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page6/PAGE_CONTRACT.md) |
-| classification | page7 | ancestry | active (thin loader) | high | [page.manifest.json](page_contracts/page7/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page7/PAGE_CONTRACT.md) |
-| classification | page11 | boundaries | active | high | [page.manifest.json](page_contracts/page11/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/page11/PAGE_CONTRACT.md) |
+| classification | karyotype_tier | karyotype / tier | active | high | [page.manifest.json](page_contracts/karyotype_tier/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/karyotype_tier/PAGE_CONTRACT.md) |
+| classification | popstats | popstats | active (thin loader) | high | [page.manifest.json](page_contracts/popstats/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/popstats/PAGE_CONTRACT.md) |
+| classification | ancestry_per_window | ancestry | active (thin loader) | high | [page.manifest.json](page_contracts/ancestry_per_window/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/ancestry_per_window/PAGE_CONTRACT.md) |
+| classification | boundary_refinement | boundaries | active | high | [page.manifest.json](page_contracts/boundary_refinement/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/boundary_refinement/PAGE_CONTRACT.md) |
 | classification | sv_evidence | SV evidence | active (thin loader) | high | [page.manifest.json](page_contracts/sv_evidence/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/sv_evidence/PAGE_CONTRACT.md) |
 | evolution | polarize_msa_stacked | polarize · MSA | active | high | [page.manifest.json](page_contracts/polarize_msa_stacked/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/polarize_msa_stacked/PAGE_CONTRACT.md) |
 | evolution | haplotype_network | haplotype network | active | high | [page.manifest.json](page_contracts/haplotype_network/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/haplotype_network/PAGE_CONTRACT.md) |
@@ -112,20 +112,20 @@ authoritative for the shell's tab grouping.
 
 ### Registry mismatches flagged in `pages.registry.json` `_doc`
 
-1. **page4** — declares `candidate_sv_counts + candidate_boundaries`
+1. **karyotype_tier** — declares `candidate_sv_counts + candidate_boundaries`
    but consumes `state.data.final_classification +
    state.data.classification`.
-2. **page6** — declares `candidate_gene_cargo + activeCandidate`
+2. **popstats** — declares `candidate_gene_cargo + activeCandidate`
    but is chromosome-level (should be `popstats_tracks +
    activeChrom`).
-3. **page7** — declares `candidate_marker_primers + activeCandidate`
+3. **ancestry_per_window** — declares `candidate_marker_primers + activeCandidate`
    but is chromosome-level (should be `ancestry_phase4 +
    activeChrom`).
-4. **page11** — declares `candidate_final_class +
+4. **boundary_refinement** — declares `candidate_final_class +
    candidate_breeding_card` but consumes boundaries.
 
-**Swap hypothesis**: page4's declared layers may have been swapped
-with page11's. Deferred to a future renumbering round.
+**Swap hypothesis**: karyotype_tier's declared layers may have been swapped
+with boundary_refinement's. Deferred to a future renumbering round.
 
 ### SPECs referenced from page sources but missing on disk
 
@@ -144,15 +144,15 @@ with page11's. Deferred to a future renumbering round.
 ### Schema prose referenced but missing
 
 - `SCHEMA.md` / `SCHEMA_V2.md` — referenced from
-  `pages.registry.json` (e.g. page4 _doc cites `SCHEMA_V2.md §19`)
+  `pages.registry.json` (e.g. karyotype_tier _doc cites `SCHEMA_V2.md §19`)
   and from marker_panels module header (`SCHEMA §10`) but no prose schema
   doc exists. The 26 JSON schemas in `registries/schemas/` cover
   layer formats but not the prose explanation.
 
 ### Thin-loader stubs (external renderers)
 
-- **page6** — `window.renderPopstatsPage` in `js/atlas_page6_wiring.js`
-- **page7** — `window.renderAncestryPage` in sibling external file
+- **popstats** — `window.renderPopstatsPage` in `js/atlas_page6_wiring.js`
+- **ancestry_per_window** — `window.renderAncestryPage` in sibling external file
 - **sv_evidence** — `window.AtlasSVEvidence` object in
   `js/atlas_sv_evidence.js`
 
@@ -200,7 +200,7 @@ help, not a manual.
 - **Stubs / empty / Phase 1 with deferred work**: 5
   (page12, page15, overview, fish_ancestry_scroller; page22
   Phase 1 only)
-- **Thin loaders**: 3 (page6, page7, sv_evidence)
+- **Thin loaders**: 3 (popstats, ancestry_per_window, sv_evidence)
 - **Fresh implementations (legacy was HTML shell)**: 4 (catalogue,
   page8, confirmed_carousel, page19)
 
@@ -212,7 +212,7 @@ help, not a manual.
 2. **Reclassify each page** by `page_type` (core_page /
    utility_overlay / debug_page / experimental_page / export_page).
    Today's contracts all default to `core_page`.
-3. **Resolve the 4 registry mismatches** (page4/6/7/11) — confirm
+3. **Resolve the 4 registry mismatches** (karyotype_tier/6/7/11) — confirm
    the swap hypothesis or correct the registry.
 4. **Decide manifest.json vs pages.registry.json canonicity** —
    currently `pages.registry.json` lags. The 7 cartridge pages

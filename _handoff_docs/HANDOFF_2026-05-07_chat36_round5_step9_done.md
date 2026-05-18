@@ -144,14 +144,14 @@ Same shape as the other pages.
 
 **Total assertions: 567/567 across 18 test runs.**
 
-**Pages remaining (13 of 22):** page4, 5, 6, 7, 8, 11, 12, 15, 16,
+**Pages remaining (13 of 22):** karyotype_tier, 5, 6, 7, 8, 11, 12, 15, 16,
 16b, 19, sv_evidence.
 
 🎉 **CATALOGUE GROUP COMPLETE.** All catalogue + synthesis pages
 migrated. The remaining work is split across:
 - **Discovery** (4 pages remaining): page8, 12, 15, 19
 - **Comparative** (3 pages remaining): help, 16, 16b
-- **Review** (5 pages remaining): page4, 6, 7, 11, sv_evidence
+- **Review** (5 pages remaining): karyotype_tier, 6, 7, 11, sv_evidence
 
 ---
 
@@ -190,7 +190,7 @@ discovery, comparative, and review. Reasonable next candidates:
 | **cross_species_breakpoints, multi_species_cockpit** | comparative | 2400+ each | multi-species cockpit; **would resolve `_csGetSyntenyBlocks`, `_csPermutationTest` (stats_profile), AND likely `computeTrackedLinkageProjection` (annotation_cockpit)** |
 | **page8, 15, 19** | discovery | <50 each | tiny stubs; quick router-wiring rounds |
 | **help** | comparative | 34 | tiny help-page stub |
-| **page4, 6, 7, 11** | review | 122-301 | review-stage pages |
+| **karyotype_tier, 6, 7, 11** | review | 122-301 | review-stage pages |
 | **sv_evidence** | review | 148 | SV evidence review |
 
 Logical next priorities:

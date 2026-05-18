@@ -239,7 +239,7 @@ export function restoreActiveCandidateId(opts) {
 /**
  * Canonical "fully remove" entry point (legacy lines 57445-57467
  * removeCandidateFully). Used by every UI surface that drops a
- * candidate (page2 ✕ clear, page4 karyotype red ✕, ...).
+ * candidate (page2 ✕ clear, karyotype_tier karyotype red ✕, ...).
  *
  * Behaviour:
  *   1. Drop the candidate from state.candidateList (no-op when absent)

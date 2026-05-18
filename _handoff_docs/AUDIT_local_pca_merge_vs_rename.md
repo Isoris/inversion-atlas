@@ -92,7 +92,7 @@ knowing the comparator isn't enough.
     its module header)
   - help was mislabelled "Multi-species comparison" (it's the help
     page; the actual multi-species cockpit is multi_species_cockpit)
-  - The page4/6/7/11 swap-hypothesis registry mismatches partly
+  - The karyotype_tier/6/7/11 swap-hypothesis registry mismatches partly
     come from the numeric confusion
 - Self-documenting URLs reduce mental overhead: `/inversion#local_pca_z`
   is unambiguous; `/inversion#page1` requires lookup
@@ -187,10 +187,10 @@ Examples:
 | `page15` | local PCA GHSL | `local_pca_ghsl` |
 | `page2` | candidate focus | `candidate_focus` |
 | `page22` | haplotype regimes | `haplotype_regimes` |
-| `page4` | karyotype / tier | `karyotype_tier` |
-| `page6` | popstats | `popstats` |
-| `page7` | ancestry | `ancestry_per_window` |
-| `page11` | boundaries | `boundary_refinement` |
+| `karyotype_tier` | karyotype / tier | `karyotype_tier` |
+| `popstats` | popstats | `popstats` |
+| `ancestry_per_window` | ancestry | `ancestry_per_window` |
+| `boundary_refinement` | boundaries | `boundary_refinement` |
 | `sv_evidence` | SV evidence | `sv_evidence` (drop the `page_` prefix) |
 | `catalogue` | catalogue | `catalogue` |
 | `confirmed_carousel` | confirmed carousel | `confirmed_carousel` |
@@ -352,7 +352,7 @@ ships) belongs in `tooling`:
   axes?" tool — exactly the utility-page pattern
 
 Similarly, when we add a "show dosage heatmap for this candidate"
-shortcut from page1 / page2 / page4 (per WIRE_AUDIT_page1.md
+shortcut from page1 / page2 / karyotype_tier (per WIRE_AUDIT_page1.md
 Group F), the destination is the Tooling stage's
 `dosage_heatmap` page.
 

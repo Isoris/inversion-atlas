@@ -3,13 +3,13 @@
 // Round 5 step 19 (chat 39, 2026-05-07): full mount / render /
 // unmount lifecycle smoke test for sv_evidence (SV evidence
 // candidate-level view — review stage). **Direct twin of
-// page6's + page7's smokes** (shipped steps 18 + 17); third (and
+// popstats's + ancestry_per_window's smokes** (shipped steps 18 + 17); third (and
 // final) migrated review tier-1 thin-loader-stub page (review
 // group: 2 of 5 → 3 of 5).
 //
 // sv_evidence is a thin loader stub for window.AtlasSVEvidence
 // (defined in the external js/atlas_sv_evidence.js bundle). Unlike
-// page6 + page7 (whose external renderer is a single function), the
+// popstats + ancestry_per_window (whose external renderer is a single function), the
 // sv_evidence external renderer is an OBJECT with three
 // methods: .init, .loadCandidate, .destroy. The chat-33
 // showSvEvidencePage(state) tries window.AtlasSVEvidence; if absent,
@@ -53,7 +53,7 @@ function check(label, cond, extra) {
 function group(name) { console.log('\n--- ' + name + ' ---'); }
 
 // -----------------------------------------------------------------------------
-// Minimal DOM polyfill — same shape as page6/page7 smoke; the only DOM
+// Minimal DOM polyfill — same shape as popstats/ancestry_per_window smoke; the only DOM
 // element sv_evidence touches is #sv_evidence_root (innerHTML +
 // __svInitFailed guard).
 // -----------------------------------------------------------------------------

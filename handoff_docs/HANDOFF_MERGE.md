@@ -36,7 +36,7 @@ What's left: **resolve TODO markers** and **assemble 4 working sub-atlas HTMLs**
 │   │   ├── page8.{js,html}, page12.{js,html}, page15.{js,html}, page19.{js,html}
 │   │   └── BATCH_1_NOTES.md             ← read this for batch-1 context
 │   ├── inversion_review/
-│   │   ├── page11.{js,html}, page4.{js,html}, page6.{js,html}, page7.{js,html},
+│   │   ├── boundary_refinement.{js,html}, karyotype_tier.{js,html}, popstats.{js,html}, ancestry_per_window.{js,html},
 │   │   ├── sv_evidence.{js,html}
 │   │   └── BATCH_2_NOTES.md
 │   ├── inversion_catalogue/

@@ -64,36 +64,40 @@
       "tooltip": "Long-range haplotype regimes (Stage 4 bruteforce projection). Run runBandingPipeline on the active chromosome and explore where each seed-band voter lands across target windows. Export the result as a regime catalogue JSON."
     },
     {
-      "id": "page4",
+      "id": "karyotype_tier",
       "slug": "karyotype_tier",
       "label": "karyotype / tier",
       "stage": "classification",
-      "fragment": "atlases/inversion/pages/review/page4.html",
-      "module": "atlases/inversion/pages/review/page4.js"
+      "fragment": "atlases/inversion/pages/review/karyotype_tier.html",
+      "module": "atlases/inversion/pages/review/karyotype_tier.js",
+      "_was_id": "page4"
     },
     {
-      "id": "page6",
+      "id": "popstats",
       "slug": "popstats",
       "label": "popstats",
       "stage": "classification",
-      "fragment": "atlases/inversion/pages/review/page6.html",
-      "module": "atlases/inversion/pages/review/page6.js"
+      "fragment": "atlases/inversion/pages/review/popstats.html",
+      "module": "atlases/inversion/pages/review/popstats.js",
+      "_was_id": "page6"
     },
     {
-      "id": "page7",
+      "id": "ancestry_per_window",
       "slug": "ancestry_per_window",
       "label": "ancestry",
       "stage": "classification",
-      "fragment": "atlases/inversion/pages/review/page7.html",
-      "module": "atlases/inversion/pages/review/page7.js"
+      "fragment": "atlases/inversion/pages/review/ancestry_per_window.html",
+      "module": "atlases/inversion/pages/review/ancestry_per_window.js",
+      "_was_id": "page7"
     },
     {
-      "id": "page11",
+      "id": "boundary_refinement",
       "slug": "boundary_refinement",
       "label": "boundaries",
       "stage": "classification",
-      "fragment": "atlases/inversion/pages/review/page11.html",
-      "module": "atlases/inversion/pages/review/page11.js"
+      "fragment": "atlases/inversion/pages/review/boundary_refinement.html",
+      "module": "atlases/inversion/pages/review/boundary_refinement.js",
+      "_was_id": "page11"
     },
     {
       "id": "sv_evidence",

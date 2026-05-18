@@ -39,7 +39,7 @@ below).
 
 A multi-panel deep-dive on a single promoted candidate inversion.
 The user promotes an interval to the candidate list (from page1 or
-page4), then opens it here.
+karyotype_tier), then opens it here.
 
 `renderCandidateMetadata(state)` builds the entire page from ~15
 sub-panel HTML builders:
