@@ -15,6 +15,7 @@
 // Bodies extracted verbatim from the pre-split local_pca_dosage.js (eighth pass).
 
 import { fitCanvas, formatTrackVal, themeColor, withAlpha } from '../../../shared/page1_utils.js';
+import { isPerSampleLineColorMode, perSampleValuesForMode, perSampleColorFor } from '../../../shared/per_sample_line_color.js';
 
 import { _resolveSampleScopeColor, _setActiveState, trackedColor } from './_state.js';
 import { _LINES_COLOR_MODES, _isLinesColorModeAvailable, availablePCs, currentMbRange, getLinesGrid, getLinesSignAt, getLinesValuesAt } from './_data.js';
@@ -352,16 +353,25 @@ export function drawLinesPanel(state) {
       // each fish gets its family / lineage color across all windows; alpha
       // bumped to 0.25 so saturated colors remain readable when 226 lines
       // overlap.
-      // 2026-05-18: 'lineage' added. The dropdown previously offered it
-      // but the lines stayed grey — only 'family' triggered the
-      // per-sample-coloring branch. Other window-varying modes (het /
-      // dosage / θπ / GHSL / F_ROH) still need per-sample-mean resolvers
-      // (separate port; per-window coloring would require breaking the
-      // line into colored segments which is a larger render change).
-      const usePerSampleColor = (lcMode === 'family' || lcMode === 'lineage');
+      // 2026-05-18: WIRE_AUDIT Group D — per-sample line coloring extended
+      // to the het / θπ / GHSL / F_ROH / confounder_alert modes via
+      // shared/per_sample_line_color.js. The resolver returns a Float64Array
+      // of per-sample summary values for the visible range; we pre-compute
+      // it once per frame and the inner loop just looks up the color.
+      // dosage mode is still pending (needs computeDosageMeanForRange port).
+      const usePerSampleColor = isPerSampleLineColorMode(lcMode);
       const baseAlpha = usePerSampleColor ? 0.25 : 0.10;
       const defaultStroke = `rgba(180,190,210,${baseAlpha.toFixed(3)})`;
       offCtx.strokeStyle = defaultStroke;
+      // Compute per-sample scalars once (null for family / lineage —
+      // those fall through to _resolveSampleScopeColor below).
+      const _firstW = (typeof getLinesGrid === 'function' && (typeof state.getCurrentMbRange === 'function' ||
+                       typeof currentMbRange === 'function'))
+        ? null  // window range comes from the visible mb range; resolver handles defaults
+        : null;
+      const psVals = (lcMode !== 'family' && lcMode !== 'lineage')
+        ? perSampleValuesForMode(state, lcMode, { startW: 0, endW: (state.data && state.data.n_windows - 1) | 0 })
+        : null;
       // v4 turn 126: track how many samples got a real per-sample color.
       // If we're in family mode but every sample falls back to the default
       // stroke (because family_id isn't loaded on samples), the visual
@@ -373,7 +383,15 @@ export function drawLinesPanel(state) {
         if (trackedSet.has(si)) continue;
         // Pick per-sample stroke color when in a per-sample-coloring mode.
         if (usePerSampleColor) {
-          const c = _resolveSampleScopeColor(si, lcMode);
+          // Two paths: family/lineage use the scope-color resolver (sample-
+          // static map). Het/θπ/GHSL/F_ROH/confounder_alert use the
+          // pre-computed per-sample value array + the per-mode color ramp.
+          let c = null;
+          if (lcMode === 'family' || lcMode === 'lineage') {
+            c = _resolveSampleScopeColor(si, lcMode);
+          } else if (psVals) {
+            c = perSampleColorFor(lcMode, psVals[si], psVals);
+          }
           if (c) {
             _perSampleColorHits++;
             // c may be 'rgb(r,g,b)' or '#rrggbb' — wrap with alpha.
