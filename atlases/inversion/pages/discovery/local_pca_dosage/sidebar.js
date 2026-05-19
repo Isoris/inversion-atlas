@@ -2262,6 +2262,65 @@ function _wireJump(state) {
     });
   });
 
+  // --- #l3CompareUnit button click (2026-05-18 wire gap fix) ---
+  // The L3 toolbar's L2/1w/5w/10w/Nw buttons had a sync hook from the
+  // sidebar's #stepModeBar (_syncStepModeToCompareUnit) but no click
+  // handler of their own — clicking L2/1w/5w/10w/Nw did nothing.
+  // User-reported chat 2026-05-18: "the L2 1w 5w 10w and Nw buttons
+  // don't work. when we click nothing happens."
+  document.querySelectorAll('#l3CompareUnit button[data-l3unit]').forEach(btn => {
+    if (btn.dataset.wired === '1') return;
+    btn.addEventListener('click', () => {
+      const want = btn.dataset.l3unit;
+      if (!want) return;
+      document.querySelectorAll('#l3CompareUnit button[data-l3unit]').forEach(b =>
+        b.classList.toggle('active', b.dataset.l3unit === want));
+      state.compareUnit = want;
+      try { localStorage.setItem('pca_scrubber_v3.compareunit', want); } catch (_) {}
+      // Reverse-sync to #stepModeBar so the sidebar shows the same
+      // resolution when stepModeSync is on.
+      if (state.stepModeSync) {
+        const mapToStep = { L2: 'l2', win1: 'win1', win5: 'win5', win10: 'win10', winN: 'winN' };
+        const newStep = mapToStep[want];
+        if (newStep && newStep !== state.stepMode) {
+          state.stepMode = newStep;
+          document.querySelectorAll('#stepModeBar button').forEach(b =>
+            b.classList.toggle('active', b.dataset.step === newStep));
+          try { localStorage.setItem('pca_scrubber_v3.stepmode', newStep); } catch (_) {}
+          const info = document.getElementById('stepModeInfo');
+          if (info) info.textContent = _stepModeLabel(state, newStep);
+          if (typeof _refreshStepSizeBtn === 'function') {
+            try { _refreshStepSizeBtn(); } catch (_) {}
+          }
+        }
+      }
+      try { renderL3Panel(state); } catch (e) {
+        console.warn('[l3CompareUnit] renderL3Panel:', e);
+      }
+    });
+    btn.dataset.wired = '1';
+  });
+  // The matching N-value input next to the Nw button.
+  const l3UnitN = $('l3CompareUnitN');
+  if (l3UnitN && l3UnitN.dataset.wired !== '1') {
+    l3UnitN.addEventListener('input', (e) => {
+      const v = parseInt(e.target.value, 10);
+      if (!Number.isFinite(v) || v < 1) return;
+      state.compareUnitN = v;
+      try { localStorage.setItem('pca_scrubber_v3.compareunitn', String(v)); } catch (_) {}
+      // Mirror to sidebar stepModeN when sync is on.
+      if (state.stepModeSync) {
+        state.stepModeN = v;
+        const sin = document.getElementById('stepModeNInput');
+        if (sin) sin.value = String(v);
+      }
+      if (state.compareUnit === 'winN') {
+        try { renderL3Panel(state); } catch (_) {}
+      }
+    });
+    l3UnitN.dataset.wired = '1';
+  }
+
   // --- #stepModeBar button click — legacy lines 66323-66341 ---
   document.querySelectorAll('#stepModeBar button').forEach(btn => {
     btn.addEventListener('click', () => {

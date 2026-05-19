@@ -1926,6 +1926,72 @@ function focalContentHtml(cl, env, l2idx, options) {
 }
 
 // =============================================================================
+// slabFocalContentHtml — 2026-05-18, ports the slab-flavoured focal content.
+// =============================================================================
+// User feedback: "in L3 contingency table at least manage that the GHSL and
+// Theta pi and het and ROH must be retrieved for each panel or resolution."
+//
+// Slab mode (renderL3PanelSlab) called slabFocalContentHtml without ever
+// defining it — same Type-B ReferenceError pattern as compareL2Pair_atK
+// before commit c7a7ba5. Focal pane content was silently blank.
+//
+// Now: reuses the L2-mode helpers (_invariantMetaInlineHtml +
+// _kSpecificMetaInlineHtml) so the layout matches. Builds a synthetic env
+// from the slab's bp range and feeds it to computeBandDiagnostics so the
+// GHSL / θπ / het / ROH chips render in slab mode too.
+function slabFocalContentHtml(cl, range, K) {
+  const state = _pageState;
+  if (!cl || !cl.labels) return '<div class="dim">no cluster</div>';
+  const d = state && state.data;
+  if (!d || !range || range.length !== 2) return '<div class="dim">no slab</div>';
+  const [s, e] = range;
+  let html = '';
+
+  // Slab header chip — slab range in windows + bp.
+  const wins = e - s + 1;
+  const w0 = d.windows && d.windows[s];
+  const wE = d.windows && d.windows[e];
+  const startBp = w0 && (w0.start_bp != null ? w0.start_bp : w0.center_bp);
+  const endBp   = wE && (wE.end_bp   != null ? wE.end_bp   : wE.center_bp);
+  const mbSpan = (Number.isFinite(startBp) && Number.isFinite(endBp))
+    ? ((endBp - startBp) / 1e6).toFixed(3) + ' Mb'
+    : '— Mb';
+  html += '<div class="ct-meta-inline" style="font-size: 9.5px; line-height: 1.2; ' +
+          'padding: 2px 10px; margin: 0; color: var(--ink-dim);">' +
+            '<span class="meta-chip">' +
+              `slab w ${s + 1}…${e + 1} <span style="color:var(--ink-dimmer);">(${wins}w · ${mbSpan})</span>` +
+            '</span>' +
+          '</div>';
+
+  // K-dependent chips (per-group counts + center PC1). Same helper as L2 mode.
+  html += _kSpecificMetaInlineHtml(cl, null);
+
+  // Power line.
+  html += `<div class="ct-row"><span class="lbl">power</span><span class="val">` +
+          `${cl.ok ? 'OK' : (cl.reason || 'WEAK')}</span></div>`;
+
+  // 2026-05-18 — Band diagnostics (GHSL / θπ / het / ROH / F_ROH) for the
+  // slab. Build a synthetic L2-shaped env so computeBandDiagnostics can
+  // filter panel columns by bp. The diagnostics functions are stateless
+  // re: env semantics — they just need start_bp/end_bp.
+  if (Number.isFinite(startBp) && Number.isFinite(endBp)) {
+    const synthEnv = { start_bp: startBp, end_bp: endBp };
+    try {
+      const _diag = computeBandDiagnostics(state, cl, synthEnv, null);
+      if (_diag) {
+        cl.__bandDiagnostics = _diag;
+        html += bandDiagsMiniChipsHtml(state, _diag, K, null);
+        html += bandDiagsPanelHtml(_diag, K);
+      }
+    } catch (err) {
+      console.warn('[slabFocalContentHtml] computeBandDiagnostics:', err);
+    }
+  }
+
+  return html;
+}
+
+// =============================================================================
 // ctHtml — legacy lines 50680-50893
 // =============================================================================
 // Builds the HTML for a neighbor pane's contingency table (focal vs neighbor).
