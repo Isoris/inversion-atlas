@@ -609,20 +609,22 @@
                      was considered but the per-segment refactor on the hot path
                      is large; the shade mode achieves the same diagnostic goal
                      without touching the line stroke path. -->
+        <!-- 2026-05-18 redesign: dropped the "off" button per user request.
+             strip and shade are mutually-exclusive toggles. Click an inactive
+             button → activate (other goes inactive). Click the active one →
+             deactivate (both off). state.linesSnpDensityMode ∈
+             {null, 'strip', 'shade'}. -->
         <span id="linesSnpDensityBar"
               style="display: flex; gap: 0; align-items: center; padding-left: 6px;
                      border-left: 1px solid var(--rule);"
-              title="SNP density visualization mode (zoom required to be useful). Off / strip / shade.">
+              title="SNP density visualization. Click strip OR shade to activate; click again to turn off. Inactive by default.">
           <span style="color: var(--ink-dim); margin-right: 4px; font-size: 10px;">SNP dens:</span>
-          <button data-snpdens-mode="off" class="active"
-                  style="font-size: 9.5px; padding: 2px 6px;"
-                  title="No SNP-density rendering on the per-sample lines panel.">off</button>
           <button data-snpdens-mode="strip"
                   style="font-size: 9.5px; padding: 2px 6px;"
-                  title="Thin gradient bar above PC1 panel: cool blue (low SNP density) → warm yellow (high). Useful for spotting density troughs that may explain band compression. Visible only when zoomed in.">strip</button>
+                  title="Thin gradient bar above PC1 panel: cool blue (low SNP density) → warm yellow (high). Useful for spotting density troughs that may explain band compression. Visible only when zoomed in. Click again to turn off.">strip</button>
           <button data-snpdens-mode="shade"
                   style="font-size: 9.5px; padding: 2px 6px;"
-                  title="Translucent vertical bars across the plot height for low-density windows. Highlights the columns where local PCA loses resolution — useful for interpreting diamond patterns where bands compress in low-density windows.">shade</button>
+                  title="Translucent vertical bars across the plot height for low-density windows. Highlights the columns where local PCA loses resolution — useful for interpreting diamond patterns where bands compress in low-density windows. Click again to turn off.">shade</button>
         </span>
         <!-- v4 turn 102: structural-haplotype transition-rate strip toggle.
              When ON, paints a thin red-graded strip just below the SNP-density

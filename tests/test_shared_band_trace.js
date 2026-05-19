@@ -15,6 +15,8 @@ import {
   bandTraceShannonEntropy,
   bandTraceForFishSet,
   bandTraceRegimeRuns,
+  bandTraceToTSV,
+  bandTraceRunsToTSV,
 } from '../atlases/inversion/shared/band_trace.js';
 
 let pass = 0, fail = 0;
@@ -241,6 +243,44 @@ group('bandTraceRegimeRuns — chain breaks force run split');
   check('chain break splits one all-co_seg trace into 2 runs', runs.length === 2);
   check('run 0 ends at L2 1 (chain 0)',  runs[0].end_l2_idx === 1);
   check('run 1 starts at L2 2 (chain 1)', runs[1].start_l2_idx === 2);
+}
+
+console.log('\n--- bandTraceToTSV + bandTraceRunsToTSV ---');
+{
+  const trace = {
+    K: 3,
+    n_fish_selected: 5,
+    per_l2: [
+      { l2_idx: 0, chain_idx: 0, chain_position: 0, n_valid: 4,
+        regime: 'co_seg', dominant_band: 0, dominant_fraction: 1.0, entropy: 0,
+        band_fractions: [1, 0, 0] },
+      { l2_idx: 1, chain_idx: 0, chain_position: 1, n_valid: 3,
+        regime: 'partial', dominant_band: 1, dominant_fraction: 0.667, entropy: 0.55,
+        band_fractions: [0.33, 0.67, 0] },
+    ],
+  };
+  const tsv = bandTraceToTSV(trace, { chrom: 'LG28', envelopes: null });
+  check('bandTraceToTSV returns string', typeof tsv === 'string');
+  check('TSV header has chrom+l2_idx',   tsv.includes('chrom\tl2_idx'));
+  check('TSV header has band_fraction_2 column',
+        tsv.includes('band_fraction_2'));
+  check('TSV row 1 starts with LG28\\t0', tsv.split('\n')[1].startsWith('LG28\t0'));
+  check('TSV row 1 includes co_seg regime', tsv.split('\n')[1].includes('co_seg'));
+  check('null trace → null',             bandTraceToTSV(null) === null);
+
+  const runs = [{
+    chain_idx: 0, start_l2_idx: 0, end_l2_idx: 4, n_L2: 5,
+    n_co_seg: 4, n_partial: 1, dominant_band: 0,
+    sum_dom: 4.5, sum_ent: 0.5,
+  }];
+  const runsTsv = bandTraceRunsToTSV(runs, { chrom: 'LG28' });
+  check('runs TSV has run_idx column',   runsTsv.includes('run_idx'));
+  check('runs TSV has mean_dominant_fraction', runsTsv.includes('mean_dominant_fraction'));
+  check('runs TSV row dominant_band = 0',
+        runsTsv.split('\n')[1].split('\t')[10] === '0');
+  check('runs TSV mean_dom = 4.5/5 = 0.9',
+        runsTsv.split('\n')[1].split('\t')[11] === '0.900000');
+  check('null runs → null',              bandTraceRunsToTSV(null) === null);
 }
 
 // =====================================================================

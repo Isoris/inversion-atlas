@@ -40,8 +40,23 @@
 //     because shortId is already in shared/page1_utils.js.
 
 import { shortId } from '../../../shared/page1_utils.js';
+import {
+  bandTraceForFishSet,
+  bandTraceRegimeRuns,
+  bandTraceToTSV,
+  bandTraceRunsToTSV,
+} from '../../../shared/band_trace.js';
+import {
+  lassoLinkageGetOrCompute,
+  lassoLinkageToTSV,
+} from '../../../shared/lasso_linkage.js';
 
 import { _setActiveState } from './_state.js';
+import {
+  bandTraceGetOrCompute,
+  bandTraceFromFocalCandidate,
+  setBandTraceOn,
+} from './band_trace_state.js';
 import { getL2Cluster, groupColor } from './_data.js';
 import { drawSim, drawSimMini } from './sim_panel.js';
 import { drawZ } from './z_panel.js';
@@ -265,6 +280,17 @@ function _wireNewShellControls(state) {
   }
 
   // ===========================================================================
+  // Lines-panel band-trace buttons (WIRE_AUDIT Group A — were never wired).
+  // ===========================================================================
+  _wireLinesBandTrace(state);
+
+  // ===========================================================================
+  // SNP-density buttons — redesigned 2026-05-18. "off" dropped per user
+  // request; strip / shade are mutually-exclusive toggles, default off.
+  // ===========================================================================
+  _wireSnpDensityButtons(state);
+
+  // ===========================================================================
   // Tracked-samples aside controls — kCycleBtnAside, [data-band-aside],
   // autoPickRadialAside, clearPicksAside, screeToggle mirrors. Legacy
   // sources cited inline.
@@ -334,6 +360,311 @@ function _initAttentionPulses() {
     el.addEventListener('focus',  onAny);
     el.addEventListener('change', onAny);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Lines-panel band-trace + linkage button wires. The HTML
+// (linesBandTraceToggle / linesBandTraceFromCandBtn /
+// linesBandTraceExportBtn / linesBandTraceExportRunsBtn /
+// linesBandTraceLinkageBtn) was carried over from legacy but no handlers
+// were ported. Idempotent via dataset.wired.
+// ---------------------------------------------------------------------------
+function _wireLinesBandTrace(state) {
+  if (typeof document === 'undefined') return;
+  const $ = (id) => document.getElementById(id);
+
+  // 1. linesBandTraceToggle — show/hide the band-trace strip.
+  const toggle = $('linesBandTraceToggle');
+  if (toggle && toggle.dataset.wired !== '1') {
+    toggle.checked = !!state.bandTraceOn;
+    toggle.addEventListener('change', (e) => {
+      setBandTraceOn(state, !!e.target.checked);
+      try { drawLinesPanel(state); } catch (_) {}
+    });
+    toggle.dataset.wired = '1';
+  }
+
+  // 2. linesBandTraceFromCandBtn — 🔍 trace: seed bandTraceFishSet from
+  // the focal candidate's largest band (or the pick-select choice).
+  const traceBtn = $('linesBandTraceFromCandBtn');
+  if (traceBtn && traceBtn.dataset.wired !== '1') {
+    traceBtn.addEventListener('click', () => {
+      const pick = $('linesBandTracePickSelect');
+      const opts = {};
+      if (pick && pick.value && pick.value !== 'largest') {
+        const v = parseInt(pick.value, 10);
+        if (Number.isFinite(v) && v >= 0) opts.bandIdx = v;
+      }
+      const result = bandTraceFromFocalCandidate(state, opts);
+      if (result) {
+        // Auto-turn-on the strip so the user immediately sees the trace.
+        if (!state.bandTraceOn) {
+          setBandTraceOn(state, true);
+          if (toggle) toggle.checked = true;
+        }
+        try { drawLinesPanel(state); } catch (_) {}
+      }
+    });
+    traceBtn.dataset.wired = '1';
+  }
+
+  // 3. linesBandTraceExportBtn — 📊 TSV: per-L2 export.
+  const tsvBtn = $('linesBandTraceExportBtn');
+  if (tsvBtn && tsvBtn.dataset.wired !== '1') {
+    tsvBtn.addEventListener('click', () => {
+      const fishSet = state.bandTraceFishSet;
+      if (!fishSet || !fishSet.length) return;
+      const d = state.data;
+      if (!d) return;
+      try {
+        const ctx = (typeof window !== 'undefined' && window._contextFromState)
+                    ? window._contextFromState(state) : null;
+        // We have bandTraceGetOrCompute on the page-local helper; use it.
+        const trace = bandTraceGetOrCompute(state);
+        if (!trace) return;
+        const tsv = bandTraceToTSV(trace, {
+          chrom: d.chrom,
+          envelopes: d.l2_envelopes,
+        });
+        if (!tsv) return;
+        _downloadTSV(tsv,
+          `band_trace_${d.chrom || 'unknown'}_n${trace.n_fish_selected | 0}_K${trace.K | 0}.tsv`);
+      } catch (err) { console.warn('[bandTrace TSV]', err); }
+    });
+    tsvBtn.dataset.wired = '1';
+  }
+
+  // 4. linesBandTraceExportRunsBtn — 📊 runs: per-run export.
+  const runsBtn = $('linesBandTraceExportRunsBtn');
+  if (runsBtn && runsBtn.dataset.wired !== '1') {
+    runsBtn.addEventListener('click', () => {
+      const fishSet = state.bandTraceFishSet;
+      if (!fishSet || !fishSet.length) return;
+      const d = state.data;
+      if (!d) return;
+      try {
+        const trace = bandTraceGetOrCompute(state);
+        if (!trace) return;
+        const runs = bandTraceRegimeRuns(trace);
+        const tsv = bandTraceRunsToTSV(runs, {
+          chrom: d.chrom,
+          envelopes: d.l2_envelopes,
+        });
+        if (!tsv) return;
+        _downloadTSV(tsv,
+          `band_trace_runs_${d.chrom || 'unknown'}_n${trace.n_fish_selected | 0}_K${trace.K | 0}.tsv`);
+      } catch (err) { console.warn('[bandTrace runs TSV]', err); }
+    });
+    runsBtn.dataset.wired = '1';
+  }
+
+  // 5. linesBandTraceLinkageBtn — 🔗 linkage: opens the per-candidate
+  // purity-table modal. Legacy ref: _openLassoLinkagePopover (40861-40913).
+  const linkBtn = $('linesBandTraceLinkageBtn');
+  if (linkBtn && linkBtn.dataset.wired !== '1') {
+    linkBtn.addEventListener('click', () => _openLassoLinkagePopover(state));
+    linkBtn.dataset.wired = '1';
+  }
+}
+
+// Download a TSV blob with the given filename. No-op in headless / blob-
+// blocked environments. Matches the legacy pattern (40296-40310).
+function _downloadTSV(tsv, filename) {
+  if (typeof document === 'undefined' || typeof Blob === 'undefined') return;
+  try {
+    const blob = new Blob([tsv], { type: 'text/tab-separated-values' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => { try { URL.revokeObjectURL(url); } catch (_) {} }, 200);
+  } catch (_) { /* defensive */ }
+}
+
+// ---------------------------------------------------------------------------
+// Lasso-linkage popover (port of legacy 40861-41008 + 41011-41020). Opens a
+// modal showing, for the active fish-set (state.bandTraceFishSet), which
+// confirmed candidates the set "links" to (purity per band). Click 🔗
+// linkage on the lines panel to open.
+// ---------------------------------------------------------------------------
+const _LASSO_LINKAGE_MODAL_ID = 'lassoLinkagePopover';
+
+function _openLassoLinkagePopover(state) {
+  if (typeof document === 'undefined') return null;
+  let modal = document.getElementById(_LASSO_LINKAGE_MODAL_ID);
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = _LASSO_LINKAGE_MODAL_ID;
+    modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;'
+                        + 'background:rgba(0,0,0,0.55);z-index:9999;display:none;'
+                        + 'align-items:center;justify-content:center;';
+    modal.innerHTML = ''
+      + '<div style="background:var(--panel-2);border:1px solid var(--rule);'
+      +              'border-radius:6px;padding:14px;max-width:780px;max-height:80vh;'
+      +              'display:flex;flex-direction:column;gap:8px;'
+      +              'font-family:var(--mono);overflow:hidden;">'
+      +   '<div style="display:flex;align-items:center;gap:10px;flex:0 0 auto;">'
+      +     '<span style="font-size:13px;color:var(--ink);"><b>Fish-set linkage</b></span>'
+      +     '<span id="llTitle" style="font-size:11px;color:var(--ink-dim);"></span>'
+      +     '<span style="margin-left:auto;display:flex;gap:6px;">'
+      +       '<button id="llExportBtn" style="font-family:var(--mono);font-size:11px;'
+      +                 'padding:3px 8px;background:var(--panel);border:1px solid var(--rule);'
+      +                 'color:var(--ink);border-radius:2px;cursor:pointer;"'
+      +                 ' title="Download the linkage table as TSV.">📊 TSV</button>'
+      +       '<button id="llClose" style="font-family:var(--mono);font-size:11px;'
+      +                 'padding:3px 8px;background:var(--panel);border:1px solid var(--rule);'
+      +                 'color:var(--ink);border-radius:2px;cursor:pointer;">close ×</button>'
+      +     '</span>'
+      +   '</div>'
+      +   '<div id="llStatus" style="font-size:11px;color:var(--ink-dim);line-height:1.4;'
+      +              'flex:0 0 auto;"></div>'
+      +   '<div id="llTableHost" style="overflow:auto;flex:1 1 auto;'
+      +              'font-family:var(--mono);font-size:11px;color:var(--ink);"></div>'
+      +   '<div style="font-size:10px;color:var(--ink-dim);max-width:760px;line-height:1.4;'
+      +              'flex:0 0 auto;">'
+      +     'For the current fish-set (state.bandTraceFishSet), each row shows a '
+      +     'confirmed candidate and which of its bands the fish-set predominantly '
+      +     'falls into. Strong links (purity ≥ 0.7 AND n_in_band ≥ 5) appear '
+      +     'first. Click 🔍 trace on the lines panel to populate or change the '
+      +     'fish-set. Observation-only — no candidate is labelled as "linked" or '
+      +     '"unlinked"; the table reports purity numbers and the reader interprets.'
+      +   '</div>'
+      + '</div>';
+    document.body.appendChild(modal);
+    const closeBtn = document.getElementById('llClose');
+    if (closeBtn) closeBtn.addEventListener('click', _closeLassoLinkagePopover);
+    const expBtn = document.getElementById('llExportBtn');
+    if (expBtn) expBtn.addEventListener('click', () => {
+      try {
+        const result = lassoLinkageGetOrCompute(state);
+        if (!result) return;
+        const tsv = lassoLinkageToTSV(result);
+        if (!tsv) return;
+        const chromTag = (state.data && state.data.chrom) || 'all';
+        _downloadTSV(tsv,
+          `lasso_linkage_${chromTag}_n${result.n_fish_selected | 0}.tsv`);
+      } catch (_) {}
+    });
+    modal.addEventListener('click', (ev) => {
+      if (ev.target === modal) _closeLassoLinkagePopover();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && modal.style.display !== 'none') {
+        _closeLassoLinkagePopover();
+      }
+    });
+  }
+  modal.style.display = 'flex';
+  _renderLassoLinkageTable(state);
+  return modal;
+}
+
+function _closeLassoLinkagePopover() {
+  if (typeof document === 'undefined') return;
+  const modal = document.getElementById(_LASSO_LINKAGE_MODAL_ID);
+  if (modal) modal.style.display = 'none';
+}
+
+function _renderLassoLinkageTable(state) {
+  if (typeof document === 'undefined') return;
+  const host = document.getElementById('llTableHost');
+  const status = document.getElementById('llStatus');
+  const title  = document.getElementById('llTitle');
+  if (!host) return;
+  const result = lassoLinkageGetOrCompute(state);
+  if (!result) {
+    host.innerHTML = '<div style="padding:18px;color:var(--ink-dim);'
+                   + 'font-style:italic;">No fish-set is active. Click 🔍 trace '
+                   + 'on the lines panel first.</div>';
+    if (status) status.textContent = '';
+    if (title)  title.textContent  = '';
+    return;
+  }
+  if (title) {
+    title.textContent = `n_fish=${result.n_fish_selected} · n_candidates=`
+                      + `${result.n_candidates_seen} · ${result.strong_links.length} `
+                      + `strong link(s) (purity≥${result.purity_threshold})`;
+  }
+  if (status) {
+    status.textContent = 'Sorted by best_purity descending. '
+                       + 'Strong-link rows are highlighted; weak rows are dimmed.';
+  }
+  const all = Object.values(result.per_candidate).slice();
+  all.sort((a, b) => {
+    if (a.is_strong_link !== b.is_strong_link) return a.is_strong_link ? -1 : 1;
+    if (b.best_purity !== a.best_purity) return b.best_purity - a.best_purity;
+    if (b.n_in_best_band !== a.n_in_best_band) return b.n_in_best_band - a.n_in_best_band;
+    return String(a.id).localeCompare(String(b.id));
+  });
+  const PAL = ['#3b6fb6', '#ffd866', '#d97a2c', '#7ad394', '#a76de2', '#e85a5a'];
+  const bandColor = (k) => (k >= 0) ? PAL[k % PAL.length] : '#444';
+  const esc = (s) => String(s).replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[ch]);
+  let html = '<table style="width:100%;border-collapse:collapse;">';
+  html += '<thead><tr style="border-bottom:1px solid var(--rule);color:var(--ink-dim);text-align:left;">';
+  for (const h of ['candidate', 'chrom', 'span (Mb)', 'best band', 'purity', 'n in band', 'strong?']) {
+    html += `<th style="padding:4px 8px;">${h}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+  for (const r of all) {
+    const span = (r.start_bp != null && r.end_bp != null)
+      ? `${(r.start_bp / 1e6).toFixed(2)}–${(r.end_bp / 1e6).toFixed(2)}`
+      : '';
+    const swatch = bandColor(r.best_band);
+    const rowStyle = r.is_strong_link
+      ? 'border-bottom:1px solid var(--rule);background:rgba(122,211,148,0.06);'
+      : 'border-bottom:1px solid var(--rule);color:var(--ink-dim);';
+    html += `<tr style="${rowStyle}">`
+         +  `<td style="padding:4px 8px;">${esc(r.id)}</td>`
+         +  `<td style="padding:4px 8px;">${esc(r.chrom || '')}</td>`
+         +  `<td style="padding:4px 8px;">${span}</td>`
+         +  `<td style="padding:4px 8px;">`
+         +    `<span style="display:inline-block;width:8px;height:8px;`
+         +    `background:${swatch};border-radius:1px;vertical-align:middle;`
+         +    `margin-right:4px;"></span>b${r.best_band | 0}</td>`
+         +  `<td style="padding:4px 8px;">${(r.best_purity * 100).toFixed(1)}%</td>`
+         +  `<td style="padding:4px 8px;">${r.n_in_best_band | 0} / ${r.n_lasso_seen | 0}</td>`
+         +  `<td style="padding:4px 8px;">${r.is_strong_link ? '✓' : '·'}</td>`
+         +  '</tr>';
+  }
+  html += '</tbody></table>';
+  host.innerHTML = html;
+}
+
+// ---------------------------------------------------------------------------
+// SNP-density buttons. 2026-05-18 redesign per user request: dropped the
+// "off" button; strip and shade are mutually-exclusive toggles. Click an
+// inactive button → activate, deactivating the other. Click the active
+// one → turn off (no button active).
+// state.linesSnpDensityMode ∈ {null, 'strip', 'shade'}.
+// ---------------------------------------------------------------------------
+function _wireSnpDensityButtons(state) {
+  if (typeof document === 'undefined') return;
+  const bar = document.getElementById('linesSnpDensityBar');
+  if (!bar || bar.dataset.wired === '1') return;
+
+  const sync = () => {
+    const mode = state.linesSnpDensityMode || null;
+    bar.querySelectorAll('[data-snpdens-mode]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.snpdensMode === mode);
+    });
+  };
+  sync();
+
+  bar.querySelectorAll('[data-snpdens-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const want = btn.dataset.snpdensMode;
+      // Toggle off when re-clicking the active mode.
+      state.linesSnpDensityMode = (state.linesSnpDensityMode === want) ? null : want;
+      sync();
+      try { drawLinesPanel(state); } catch (_) {}
+    });
+  });
+  bar.dataset.wired = '1';
 }
 
 // ---------------------------------------------------------------------------

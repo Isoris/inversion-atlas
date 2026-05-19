@@ -307,12 +307,103 @@ export function bandTraceRegimeRuns(trace, opts) {
 }
 
 // =====================================================================
+// TSV export (legacy 40228-40270 + 40444-40498)
+// =====================================================================
+
+/**
+ * Format a band-trace as TSV. One row per L2 entry in trace.per_l2.
+ * Verbatim port of legacy _bandTraceToTSV.
+ *
+ * @param {Object} trace               result of bandTraceForFishSet
+ * @param {{chrom?:string, envelopes?:Array}} [opts]
+ * @returns {string|null}              TSV text or null when trace is empty
+ */
+export function bandTraceToTSV(trace, opts) {
+  if (!trace || !Array.isArray(trace.per_l2)) return null;
+  opts = opts || {};
+  const chrom = opts.chrom || trace.chrom || '?';
+  const envs = Array.isArray(opts.envelopes) ? opts.envelopes : null;
+  const K = (trace.K | 0)
+            || ((trace.per_l2[0] && trace.per_l2[0].band_fractions
+                 && trace.per_l2[0].band_fractions.length) | 0)
+            || 0;
+  const n_fish = (trace.n_fish_selected | 0);
+  const fmt = (v) => (Number.isFinite(v) ? v.toFixed(6) : '');
+  const cols = ['chrom', 'l2_idx', 'chain_idx', 'chain_position',
+                'start_bp', 'end_bp', 'n_valid', 'n_fish_selected',
+                'regime', 'dominant_band', 'dominant_fraction', 'entropy'];
+  for (let k = 0; k < K; k++) cols.push('band_fraction_' + k);
+  const lines = [cols.join('\t')];
+  for (let i = 0; i < trace.per_l2.length; i++) {
+    const e = trace.per_l2[i];
+    if (!e) continue;
+    let start_bp = '', end_bp = '';
+    if (envs && envs[e.l2_idx] && envs[e.l2_idx].start_bp != null) {
+      start_bp = (envs[e.l2_idx].start_bp | 0);
+      end_bp   = (envs[e.l2_idx].end_bp   | 0);
+    }
+    const row = [chrom, (e.l2_idx | 0), (e.chain_idx | 0),
+                 (e.chain_position | 0), start_bp, end_bp,
+                 (e.n_valid | 0), n_fish, e.regime || '',
+                 (e.dominant_band == null ? -1 : (e.dominant_band | 0)),
+                 fmt(e.dominant_fraction), fmt(e.entropy)];
+    for (let k = 0; k < K; k++) {
+      row.push(fmt(e.band_fractions ? e.band_fractions[k] : NaN));
+    }
+    lines.push(row.join('\t'));
+  }
+  return lines.join('\n') + '\n';
+}
+
+/**
+ * Format the runs of a band-trace as TSV. One row per detected
+ * co-segregation run. Verbatim port of legacy _bandTraceRunsToTSV.
+ */
+export function bandTraceRunsToTSV(runs, opts) {
+  if (!Array.isArray(runs)) return null;
+  opts = opts || {};
+  const chrom = opts.chrom || '?';
+  const envs = Array.isArray(opts.envelopes) ? opts.envelopes : null;
+  const fmt = (v) => (Number.isFinite(v) ? v.toFixed(6) : '');
+  const cols = ['chrom', 'run_idx', 'chain_idx',
+                'start_l2_idx', 'end_l2_idx',
+                'start_bp', 'end_bp',
+                'n_L2', 'n_co_seg', 'n_partial',
+                'dominant_band', 'mean_dominant_fraction', 'mean_entropy'];
+  const lines = [cols.join('\t')];
+  for (let i = 0; i < runs.length; i++) {
+    const r = runs[i];
+    if (!r) continue;
+    let start_bp = '', end_bp = '';
+    if (envs && envs[r.start_l2_idx] && envs[r.start_l2_idx].start_bp != null) {
+      start_bp = (envs[r.start_l2_idx].start_bp | 0);
+    }
+    if (envs && envs[r.end_l2_idx] && envs[r.end_l2_idx].end_bp != null) {
+      end_bp = (envs[r.end_l2_idx].end_bp | 0);
+    }
+    const mean_dom = (r.n_L2 > 0) ? (r.sum_dom / r.n_L2) : NaN;
+    const mean_ent = (r.n_L2 > 0) ? (r.sum_ent / r.n_L2) : NaN;
+    lines.push([
+      chrom, i, (r.chain_idx | 0),
+      (r.start_l2_idx | 0), (r.end_l2_idx | 0),
+      start_bp, end_bp,
+      (r.n_L2 | 0), (r.n_co_seg | 0), (r.n_partial | 0),
+      (r.dominant_band == null ? -1 : (r.dominant_band | 0)),
+      fmt(mean_dom), fmt(mean_ent),
+    ].join('\t'));
+  }
+  return lines.join('\n') + '\n';
+}
+
+// =====================================================================
 // Console-debug exposures (preserves legacy `window._bandTraceForFishSet`)
 // =====================================================================
 if (typeof window !== 'undefined') {
   window._bandTraceForFishSet     = bandTraceForFishSet;
   window._bandTraceRegimeRuns     = bandTraceRegimeRuns;
   window._bandTraceShannonEntropy = bandTraceShannonEntropy;
+  window._bandTraceToTSV          = bandTraceToTSV;
+  window._bandTraceRunsToTSV      = bandTraceRunsToTSV;
   window._BTRACE_COSEG_ENTROPY_MAX  = BTRACE_COSEG_ENTROPY_MAX;
   window._BTRACE_FANNED_ENTROPY_MIN = BTRACE_FANNED_ENTROPY_MIN;
   window._BTRACE_MIN_VALID_FISH     = BTRACE_MIN_VALID_FISH;
