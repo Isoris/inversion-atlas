@@ -19,7 +19,7 @@ import { isPerSampleLineColorMode, perSampleValuesForMode, perSampleColorFor } f
 import { drawCusumPanel } from './cusum_panel.js';
 
 import { _resolveSampleScopeColor, _setActiveState, trackedColor } from './_state.js';
-import { _LINES_COLOR_MODES, _isLinesColorModeAvailable, availablePCs, currentMbRange, getLinesGrid, getLinesSignAt, getLinesValuesAt } from './_data.js';
+import { _LINES_COLOR_MODES, _isLinesColorModeAvailable, availablePCs, currentMbRange, getActiveModeView, getLinesGrid, getLinesSignAt, getLinesValuesAt } from './_data.js';
 import { _drawBandTraceStrip, _drawDiamondOverlay, _drawInheritanceLabelsStrip, _drawLineageStrip, _drawRegimeBreadthStrip, _drawSnpDensityShade, _drawSnpDensityStrip, _drawTrackedLinkageStrip, _drawTransitionRateStrip } from './z_panel.js';
 import { drawPCA } from './pca_panel.js';
 import { _ensureCsOverlayIndex, _paintCandidateBands } from './candidates.js';
@@ -53,9 +53,13 @@ export function drawLinesPanel(state) {
     }
   }
 
-  const d = state.data;
-  const nWin = d.n_windows;
-  const nS = d.n_samples;
+  // 2026-05-19 mode-switch — view-aware. For 'dosage' mode this is
+  // state.data; for 'theta_pi' / 'ghsl' it's the synthesized envelope
+  // with per-window pc1/pc2 attached. n_samples stays sourced from
+  // state.data (cohort-wide, same across all modes).
+  const d = getActiveModeView(state) || state.data;
+  const nWin = (d && d.windows && d.windows.length) || d.n_windows || 0;
+  const nS = (state.data && state.data.n_samples) || d.n_samples || 0;
   if (nWin < 2 || nS === 0) return;
 
   const trackedSet = new Set(state.tracked);

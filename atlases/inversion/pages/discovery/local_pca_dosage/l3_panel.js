@@ -36,6 +36,7 @@ import {
 import { _pageState, _setActiveState, getSampleColor, trackedColor } from './_state.js';
 import {
   _fmtP,
+  getActiveModeView,
   getL2Cluster,
   getL2ClusterAt,
   getPC,
@@ -208,7 +209,11 @@ export function renderL3Panel(state) {
     try { _wireL3PaneToolsDelegation(); } catch (_) {}
   }
 
-  const d = state.data;
+  // 2026-05-19 mode-switch — paint contingency panes from the active
+  // mode's view. L3 reads l2_envelopes + windows[].pc1/pc2 + labels;
+  // all of those are synthesized onto theta_pi_view / ghsl_view by
+  // getActiveModeView.
+  const d = getActiveModeView(state) || state.data;
   if (!d) return;
 
   // v4 turn 12a (Deliverable D): scale-stability mode short-circuits both
@@ -705,7 +710,7 @@ export function renderL3Panel(state) {
 // --- renderL3PanelSlab() — legacy lines 49209-49478 ---
 export function renderL3PanelSlab(state) {
   _setActiveState(state);
-  const d = state.data;
+  const d = getActiveModeView(state) || state.data;
   if (!d) return;
   const body = document.getElementById('l3Body');
   if (!body) return;
@@ -992,7 +997,7 @@ export function renderL3PanelSlab(state) {
 // --- renderL3PanelScaleStability() — legacy lines 12833-12912 ---
 export function renderL3PanelScaleStability(state) {
   _setActiveState(state);
-  const d = state.data;
+  const d = getActiveModeView(state) || state.data;
   const body = document.getElementById('l3Body');
   const metaEl = document.getElementById('l3Meta');
   if (!body) return;

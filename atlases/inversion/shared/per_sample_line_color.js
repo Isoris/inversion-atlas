@@ -78,12 +78,29 @@ export function perSampleValuesForMode(state, mode, range) {
   }
 
   if (mode === 'theta_pi') {
+    // 2026-05-19 — canonical field is theta_pi_per_window.values[si][w]
+    // (per-sample × per-window 2D array). Old paths (theta_pi_panel /
+    // per_sample_theta_pi with .div_roll) are pre-schema-2.18 drafts.
+    const tpw = d.theta_pi_per_window;
+    if (tpw && Array.isArray(tpw.values)) {
+      return _perSampleMeanFrom2D(tpw.values, nS, startW, endW);
+    }
+    // Legacy fallback: panel-style div_roll.
     const panel = d.theta_pi_panel || d.per_sample_theta_pi || null;
     if (!panel) return null;
     return _perSampleMeanByWindowPanel(panel, nS, startW, endW, d);
   }
 
   if (mode === 'ghsl') {
+    // 2026-05-19 — canonical field is ghsl_local_pca.pc_loadings_aligned
+    // shaped [npc][n_windows][n_samples]. We average PC1 (loadings[0])
+    // across the visible window range; the resulting per-sample scalar
+    // separates the karyotype arms of the GHSL PC1 axis.
+    const lp = d.ghsl_local_pca;
+    if (lp && Array.isArray(lp.pc_loadings_aligned) && Array.isArray(lp.pc_loadings_aligned[0])) {
+      return _perSamplePcMeanFromAligned(lp.pc_loadings_aligned[0], nS, startW, endW);
+    }
+    // Legacy fallback.
     const panel = d.ghsl_panel || null;
     if (!panel) return null;
     return _perSampleMeanByWindowPanel(panel, nS, startW, endW, d);
@@ -127,6 +144,56 @@ export function perSampleValuesForMode(state, mode, range) {
   }
 
   return null;
+}
+
+// Helper: per-sample mean across [startW, endW] inclusive when the
+// values are a flat sample-major 2D array: M[sample_idx][window_idx].
+// This is the shape theta_pi_per_window.values uses today.
+function _perSampleMeanFrom2D(M, nS, startW, endW) {
+  if (!Array.isArray(M) || M.length === 0) return null;
+  const lo = Math.max(0, startW | 0);
+  const hi = Math.min((M[0] && M[0].length ? M[0].length - 1 : -1), endW | 0);
+  if (hi < lo) return null;
+  const out = new Float64Array(nS);
+  for (let si = 0; si < nS; si++) {
+    const row = M[si];
+    if (!row) { out[si] = NaN; continue; }
+    let sum = 0, n = 0;
+    for (let w = lo; w <= hi; w++) {
+      const v = row[w];
+      if (Number.isFinite(v)) { sum += v; n++; }
+    }
+    out[si] = n > 0 ? (sum / n) : NaN;
+  }
+  return out;
+}
+
+// Helper: per-sample mean across [startW, endW] inclusive when the
+// values are a WINDOW-MAJOR slice of an aligned-loadings cube:
+// pcSlice[window_idx][sample_idx]. This is what ghsl_local_pca's
+// pc_loadings_aligned[0] (= PC1 across all windows × samples) gives us.
+function _perSamplePcMeanFromAligned(pcSlice, nS, startW, endW) {
+  if (!Array.isArray(pcSlice) || pcSlice.length === 0) return null;
+  const lo = Math.max(0, startW | 0);
+  const hi = Math.min(pcSlice.length - 1, endW | 0);
+  if (hi < lo) return null;
+  const out = new Float64Array(nS);
+  // Accumulate per sample by walking windows once, samples-inner.
+  const sums = new Float64Array(nS);
+  const counts = new Int32Array(nS);
+  for (let w = lo; w <= hi; w++) {
+    const row = pcSlice[w];
+    if (!Array.isArray(row)) continue;
+    const N = Math.min(nS, row.length);
+    for (let si = 0; si < N; si++) {
+      const v = row[si];
+      if (Number.isFinite(v)) { sums[si] += v; counts[si]++; }
+    }
+  }
+  for (let si = 0; si < nS; si++) {
+    out[si] = counts[si] > 0 ? (sums[si] / counts[si]) : NaN;
+  }
+  return out;
 }
 
 // Helper: per-sample mean across [startW, endW] inclusive when the

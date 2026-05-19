@@ -39,6 +39,7 @@ import {
   invalidateLineageCache,
   _bandTraceClearCache,
 } from './local_pca_dosage/_state.js';
+import { invalidateColorScales } from '../../shared/sample_color.js';
 import {
   loadActiveSamples,
   refreshActiveSamplesBadge,
@@ -51,7 +52,7 @@ import {
 } from './local_pca_dosage/l2_sweep.js';
 import { idbPersistChrom } from './local_pca_dosage/idb.js';
 import { replayEnrichmentsFromIdb } from './local_pca_dosage/idb_restore.js';
-import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayers, listLayers, loadViewControls, populateSimScales, reconcileViewControlsForData } from './local_pca_dosage/_data.js';
+import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayers, getActiveModeView, listLayers, loadViewControls, populateSimScales, rebuildIndexesFromView, reconcileViewControlsForData } from './local_pca_dosage/_data.js';
 import { drawSim, drawSimMini } from './local_pca_dosage/sim_panel.js';
 import { drawZ } from './local_pca_dosage/z_panel.js';
 import { attachLinesLasso, buildLinesPanel, buildLinesPanelCheckboxes, drawLinesPanel, refreshLinesColorMode, setLinesPanelCandidateBands } from './local_pca_dosage/lines_panel.js';
@@ -126,6 +127,10 @@ export function applyData(state, data) {
   // data swaps, drop the cached result so the next paint re-triggers
   // compute on the new chromosome's L2 inventory.
   invalidateLineageCache(state);
+  // 2026-05-19: drop the per-mode color-scale cache (min/max for
+  // theta_pi / ghsl / froh ramps). The cache keys on (mode, cur) so a
+  // chrom swap means every entry is stale.
+  invalidateColorScales(state);
   // turn 161: clear the band-trace cache (per-chromosome, per-fish-set)
   // and re-hydrate the on/off toggle + fish-set from localStorage. The
   // fish-set is cohort-wide so it survives chrom changes, but the
@@ -210,6 +215,25 @@ export function applyData(state, data) {
   state.tracked = [];
   state.ancestryPalette = {};
   state.l2GroupCache = null;
+  // 2026-05-19 mode-switch — preserve activeMode across applyData calls
+  // (user toggled to θπ on LG02, scrubbed to LG06, expects θπ to stay).
+  // Default to 'dosage' on first load. Restore from localStorage if the
+  // user picked a non-default mode in a previous session AND the data
+  // for that mode is available on the current chrom; otherwise fall back
+  // to dosage.
+  if (!state.activeMode) {
+    try {
+      const saved = localStorage.getItem(_ACTIVE_MODE_STORAGE_KEY);
+      if (saved === 'theta_pi' && data.theta_pi_view) state.activeMode = 'theta_pi';
+      else if (saved === 'ghsl' && data.ghsl_view)     state.activeMode = 'ghsl';
+      else                                              state.activeMode = 'dosage';
+    } catch (_) { state.activeMode = 'dosage'; }
+  } else {
+    // Subsequent chrom swaps: validate the previously-active mode still
+    // has data on the new chrom. Fall back to dosage if not.
+    if (state.activeMode === 'theta_pi' && !data.theta_pi_view) state.activeMode = 'dosage';
+    if (state.activeMode === 'ghsl'     && !data.ghsl_view)     state.activeMode = 'dosage';
+  }
   state.cacheKey = null;
   // v3.99 turn 7 perf: clear render caches whenever a new dataset loads
   _l3CacheInvalidate();
@@ -375,6 +399,9 @@ export async function mount(root, atlasState, registry) {
   document.body.dataset.layoutMode = restoredMode;
   legacyState.layoutMode = restoredMode;
   try { localStorage.setItem('pca_scrubber_v3.layoutmode', restoredMode); } catch (_) {}
+  // The body[data-active-mode] attribute is set AFTER applyData runs
+  // (further below), because applyData is what restores state.activeMode
+  // from localStorage — we'd be writing 'undefined' here.
 
   // Resolve the precomp data layer for the active chromosome.
   const chrom = atlasState.shared.activeChrom;
@@ -397,6 +424,78 @@ export async function mount(root, atlasState, registry) {
     return;
   }
 
+  // 2026-05-19 — merge θπ + GHSL streams into the data envelope so the
+  // PCA comparator's adapter (pca_comparator/renderer.js#_getLayerPoints)
+  // and the eventual axis-toggle in this page can read all three axes
+  // off a single state.data. Best-effort: each layer fetch returns null
+  // on AUTO_INDEX_EMPTY / 404 (its pipeline output isn't on disk yet);
+  // the comparator's adapter renders a "not loaded" stub in that case,
+  // it doesn't error.
+  //
+  // Field merge: theta_pi and ghsl JSONs carry their top-level fields
+  // (theta_pi_local_pca, ghsl_local_pca, …); we shallow-merge so those
+  // become reachable from data.* without touching the z-blocks fields.
+  // Rename theta_pi_cusum → cusum_theta to match the legacy schema's
+  // canonical field name (page12 / theta-pi renderer reads cusum_theta).
+  // 2026-05-19 — wrap with Promise.resolve(...) because registry.resolve()
+  // returns the cached value SYNCHRONOUSLY when hot-tier cache hits
+  // (which is the common case here — the prewarm scheduler fetches
+  // scrubber_thetapi + scrubber_ghsl on chrom_change, populating the
+  // cache before mount() runs). Calling .catch() on the bare return
+  // value crashes when it's a plain object instead of a Promise; that
+  // was the root cause of `TypeError: registry.resolve(...).catch is
+  // not a function` blocking the entire mount, including the dataModeBar
+  // availability check (which made GHSL look unavailable even when its
+  // JSON was loaded). Promise.resolve flattens Promises and wraps values.
+  const [tpData, ghslData] = await Promise.all([
+    Promise.resolve(registry.resolve('scrubber_thetapi', { chrom })).catch(() => null),
+    Promise.resolve(registry.resolve('scrubber_ghsl',    { chrom })).catch(() => null),
+  ]);
+  // 2026-05-19 SELECTIVE MERGE — earlier shallow `Object.assign(data, tpData)`
+  // clobbered shared top-level fields (data.tracks, data.n_windows,
+  // data.chrom, data.scale, etc.) with theta-pi's versions, breaking the
+  // dosage panels because the right-side track strip painted theta-pi
+  // tracks while the |z| panel + cursor were still on dosage coords.
+  //
+  // The right shape: only merge MODE-SPECIFIC top-level fields into the
+  // dosage envelope (everything prefixed with `theta_pi_` / `ghsl_`).
+  // Generic fields (tracks, windows, n_windows, chrom, sim_scales, etc.)
+  // are namespaced under data.theta_pi_view / data.ghsl_view so the
+  // future mode-switch can swap the whole panel inputs in one place.
+  if (tpData) {
+    for (const k of Object.keys(tpData)) {
+      // Skip metadata + shared generics that would clobber the dosage view.
+      if (k.startsWith('_')) continue;
+      if (k === 'tracks' || k === 'windows' || k === 'chrom' ||
+          k === 'n_samples' || k === 'scale' ||
+          k.startsWith('n_windows')) continue;
+      // Merge the mode-specific theta_pi_* blocks at top level so the
+      // existing detectSchemaAndLayers + per-mode color resolvers see them.
+      if (k.startsWith('theta_pi') || k === 'samples') {
+        if (data[k] === undefined) data[k] = tpData[k];
+      }
+    }
+    if (tpData.theta_pi_cusum && data.cusum_theta === undefined) {
+      data.cusum_theta = tpData.theta_pi_cusum;
+    }
+    // Namespaced full envelope for the eventual mode-switch — keeps the
+    // theta-pi tracks/windows/chrom/etc. addressable without polluting
+    // the top-level dosage shape.
+    data.theta_pi_view = tpData;
+  }
+  if (ghslData) {
+    for (const k of Object.keys(ghslData)) {
+      if (k.startsWith('_')) continue;
+      if (k === 'tracks' || k === 'windows' || k === 'chrom' ||
+          k === 'n_samples' || k === 'scale' ||
+          k.startsWith('n_windows')) continue;
+      if (k.startsWith('ghsl') || k === 'samples') {
+        if (data[k] === undefined) data[k] = ghslData[k];
+      }
+    }
+    data.ghsl_view = ghslData;
+  }
+
   // 2026-05-18 — preserve cursor + tracked-samples across tab switches.
   // The unmount path keeps the stash alive (see unmount comment); on
   // re-mount, if the saved stash points at the SAME chromosome the
@@ -416,6 +515,10 @@ export async function mount(root, atlasState, registry) {
   // Apply data through the legacy entry point. This populates state.data,
   // state.tracks, state.windows, etc. — everything the draw functions need.
   applyData(legacyState, data);
+  // Mode shade — body data-attribute mirrors state.activeMode so the
+  // CSS wash on the PCA + tracked-samples panels reflects the restored
+  // mode immediately on mount, not only after a user toggle.
+  try { document.body.dataset.activeMode = legacyState.activeMode || 'dosage'; } catch (_) {}
 
   // Re-apply the preserved cursor / tracked-samples now that applyData's
   // defaults have been written.
@@ -693,6 +796,137 @@ function _buildLegacyState(atlasState) {
  * data.windows for max end_bp; neither is necessary because the
  * chunk is templated rather than addressed by extent.
  */
+// ---------------------------------------------------------------------------
+// Active mode (dosage / θπ / GHSL) — cycle helper used by the toolbar
+// button and the 'M' hotkey. Each call advances to the next available
+// mode (skipping modes whose data isn't loaded) and repaints every
+// panel by reading getActiveModeView(state) at draw time.
+// ---------------------------------------------------------------------------
+const _MODE_ORDER = ['dosage', 'theta_pi', 'ghsl'];
+const _ACTIVE_MODE_STORAGE_KEY = 'local_pca_dosage_active_mode';
+
+export function setActiveMode(state, mode) {
+  if (!state || !state.data) return;
+  if (!_MODE_ORDER.includes(mode)) return;
+  // Don't switch into a mode whose data isn't loaded.
+  if (mode === 'theta_pi' && !state.data.theta_pi_view) return;
+  if (mode === 'ghsl'     && !state.data.ghsl_view)     return;
+  if (state.activeMode === mode) return;
+  // Capture the bp position at the OLD mode's cur BEFORE swapping, so
+  // we can remap to a matching window in the new mode's grid below.
+  const oldCenterMb = _curCenterMb(state);
+  state.activeMode = mode;
+  // Clear render caches so panels re-paint from the new mode's data.
+  try { _linesCacheInvalidate(state); } catch (_) {}
+  try { _l3CacheInvalidate(); } catch (_) {}
+  state.l2GroupCache = null;
+  state.cacheKey = null;
+  // Drop the per-mode color-scale cache and the lazy-synthesis flag
+  // on the views so the next paint rebuilds for the new mode.
+  try { invalidateColorScales(state); } catch (_) {}
+  // Re-map cur to the window in the new mode's grid whose center_mb
+  // is closest to the old position. Different modes have different
+  // n_windows; a naive cur-preservation would jump to a wrong bp.
+  // Fall back to 0 if remap fails.
+  state.cur = _remapCurByMb(state, oldCenterMb);
+  // Rebuild windowToL1 / windowToL2 indexes against the NEW mode's
+  // view. Without this, drawZ's xOfWin crashes on `d.windows[wi]` when
+  // wi is a window index from the old (dosage) grid pointing past the
+  // end of the new (theta-pi / ghsl) windows array; the |Z| panel
+  // either fails to paint or renders only a fragment of the span.
+  try {
+    const newView = getActiveModeView(state);
+    if (newView) rebuildIndexesFromView(state, newView);
+  } catch (e) { console.warn('rebuildIndexesFromView mode-swap:', e); }
+  // Rebuild the track-panel DOM — each mode has a different set of
+  // track names (dosage tracks vs theta_pi_* tracks vs ghsl_* tracks),
+  // so we tear down the existing panels and re-render from view.tracks.
+  try { buildTrackPanels(state); } catch (e) { console.warn('buildTrackPanels mode-swap:', e); }
+  // Repaint every panel from the new view.
+  try { drawSim(state); }          catch (e) { console.warn('drawSim mode-swap:', e); }
+  try { drawZ(state); }            catch (e) { console.warn('drawZ mode-swap:', e); }
+  try { drawLinesPanel(state); }   catch (e) { console.warn('drawLinesPanel mode-swap:', e); }
+  try { drawPCA(state); }          catch (e) { console.warn('drawPCA mode-swap:', e); }
+  try { drawTracks(state); }       catch (e) { console.warn('drawTracks mode-swap:', e); }
+  try { renderL3Panel(state); }    catch (e) { console.warn('renderL3Panel mode-swap:', e); }
+  try { updateWinLabel(state); }   catch (_) {}
+  // Refresh the toolbar UI (highlight the active segment).
+  try { _refreshModeToggleUI(state); } catch (_) {}
+  // CSS shade: tint the PCA scatter + tracked-samples sidebar so the
+  // user can tell at a glance which axis is active. inversion.css reads
+  // `body[data-active-mode="…"]` to apply the wash.
+  try { document.body.dataset.activeMode = mode; } catch (_) {}
+  // Persist active mode to localStorage so it survives reload.
+  try { localStorage.setItem(_ACTIVE_MODE_STORAGE_KEY, mode); } catch (_) {}
+}
+
+export function cycleActiveMode(state) {
+  if (!state || !state.data) return;
+  const cur = state.activeMode || 'dosage';
+  const i = _MODE_ORDER.indexOf(cur);
+  // Walk forward through the cycle, skipping modes whose data is missing.
+  for (let step = 1; step <= _MODE_ORDER.length; step++) {
+    const next = _MODE_ORDER[(i + step) % _MODE_ORDER.length];
+    if (next === 'theta_pi' && !state.data.theta_pi_view) continue;
+    if (next === 'ghsl'     && !state.data.ghsl_view)     continue;
+    setActiveMode(state, next);
+    return;
+  }
+}
+
+// Read the center_mb at state.cur for the *current* active mode.
+// Returns NaN if there's no resolvable view or window. Used to anchor
+// the cur remap when swapping modes (different n_windows per mode).
+function _curCenterMb(state) {
+  try {
+    const view = (state.activeMode === 'dosage' || !state.data.theta_pi_view && !state.data.ghsl_view)
+      ? state.data
+      : (state.activeMode === 'theta_pi' ? state.data.theta_pi_view : state.data.ghsl_view);
+    if (!view || !Array.isArray(view.windows)) return NaN;
+    const w = view.windows[state.cur | 0];
+    return (w && Number.isFinite(w.center_mb)) ? w.center_mb : NaN;
+  } catch (_) { return NaN; }
+}
+
+// Find the window in the NEW mode's grid whose center_mb is closest
+// to `targetMb`. Linear scan; n_windows is at most ~5k so it's cheap.
+function _remapCurByMb(state, targetMb) {
+  if (!Number.isFinite(targetMb)) return 0;
+  // Read the NEW mode's view directly (already switched to state.activeMode).
+  let view;
+  if (state.activeMode === 'theta_pi')      view = state.data.theta_pi_view;
+  else if (state.activeMode === 'ghsl')     view = state.data.ghsl_view;
+  else                                       view = state.data;
+  if (!view || !Array.isArray(view.windows) || view.windows.length === 0) return 0;
+  let bestI = 0, bestD = Infinity;
+  for (let i = 0; i < view.windows.length; i++) {
+    const m = view.windows[i] && view.windows[i].center_mb;
+    if (!Number.isFinite(m)) continue;
+    const d = Math.abs(m - targetMb);
+    if (d < bestD) { bestD = d; bestI = i; }
+  }
+  return bestI;
+}
+
+// Refresh the active-mode toolbar visual state. Idempotent; safe to
+// call before the toolbar exists (returns silently).
+function _refreshModeToggleUI(state) {
+  if (typeof document === 'undefined') return;
+  const bar = document.getElementById('dataModeBar');
+  if (!bar) return;
+  const mode = state.activeMode || 'dosage';
+  for (const btn of bar.querySelectorAll('button[data-mode]')) {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+    const m = btn.dataset.mode;
+    const available =
+      m === 'dosage' ||
+      (m === 'theta_pi' && !!(state.data && state.data.theta_pi_view)) ||
+      (m === 'ghsl'     && !!(state.data && state.data.ghsl_view));
+    btn.disabled = !available;
+    btn.style.opacity = available ? '' : '0.4';
+  }
+}
+
 function _installSyntheticDosageChunks(data) {
   if (!data || data.dosage_chunks) return;
   if (!data.chrom) return;

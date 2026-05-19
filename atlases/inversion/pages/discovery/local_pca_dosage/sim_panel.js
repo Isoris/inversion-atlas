@@ -15,7 +15,7 @@ import { simColor, simColorPDF, zColorPDF } from '../../../shared/color_helpers.
 import { fitCanvas, niceTicks, themeColor } from '../../../shared/page1_utils.js';
 
 import { _setActiveState } from './_state.js';
-import { getActiveSimScale } from './_data.js';
+import { getActiveSimScale, getActiveModeView } from './_data.js';
 import { _ensureCsOverlayIndex } from './candidates.js';
 
 // --- drawSim(state) — legacy lines 31331-31638 ---
@@ -25,7 +25,12 @@ export function drawSim(state) {
   const { ctx, w, h } = fitCanvas(canvas);
   ctx.clearRect(0, 0, w, h);
   if (!state.data) return;
-  const d = state.data;
+  // 2026-05-19 — read from the active mode's view, not state.data directly.
+  // For 'dosage' mode this is a passthrough; for 'theta_pi' / 'ghsl' it
+  // returns the synthesized envelope (pc1/pc2/sim_scales/envelopes/cusum
+  // attached to data.theta_pi_view / .ghsl_view by getActiveModeView).
+  const d = getActiveModeView(state);
+  if (!d) return;
 
   // ---- Compute centered square geometry ----
   // The heatmap must be a perfect square so the diagonal reads at 45°
@@ -338,7 +343,9 @@ export function drawSimMini(state) {
   const { ctx, w, h } = fit;
   ctx.clearRect(0, 0, w, h);
   if (!state.data) return;
-  const d = state.data;
+  // Mode-aware view (see drawSim).
+  const d = getActiveModeView(state);
+  if (!d) return;
 
   // Square heatmap centered in the available space. Smaller padding than
   // drawSim because the minimap is much smaller and we want to maximize

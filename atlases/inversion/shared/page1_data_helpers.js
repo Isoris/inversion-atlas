@@ -50,7 +50,14 @@ const FAMILY_PALETTE_BASE = [
 // Resolve which scale to render. Falls back to legacy `sim_thumb` when
 // no scales were embedded.
 export function getActiveSimScale(state) {
-  const d = state && state.data;
+  if (!state || !state.data) return null;
+  // 2026-05-19 mode-switch — route through the active mode's view so
+  // theta_pi / ghsl modes use their own sim_mat (synthesized via
+  // getActiveModeView). For 'dosage' mode the view IS state.data so
+  // behavior is unchanged.
+  const d = (state.activeMode && state.activeMode !== 'dosage')
+    ? getActiveModeView(state)
+    : state.data;
   if (!d) return null;
   // New multi-scale path
   if (d.sim_scales && Object.keys(d.sim_scales).length > 0) {
@@ -71,10 +78,17 @@ export function getActiveSimScale(state) {
 
 // --- currentMbRange(state) — legacy lines 31781-31834 ---
 export function currentMbRange(state) {
-  if (!state || !state.data || !Array.isArray(state.data.windows) || state.data.windows.length === 0) {
+  if (!state || !state.data) return { mbMin: 0, mbMax: 1 };
+  // 2026-05-19 mode-switch — read the active mode's windows array.
+  const d = (state.activeMode && state.activeMode !== 'dosage')
+    ? getActiveModeView(state)
+    : state.data;
+  if (!d || !Array.isArray(d.windows) || d.windows.length === 0) {
     return { mbMin: 0, mbMax: 1 };
   }
-  const wins = state.data.windows;
+  // All windows / envelope reads below route through `d` (the view) so
+  // the L1/L2 zoom branch operates on the active mode's window grid.
+  const wins = d.windows;
   const genomeMin = wins[0].center_mb;
   const genomeMax = wins[wins.length - 1].center_mb;
   const mode = state.viewMode || 'genome';
@@ -83,9 +97,9 @@ export function currentMbRange(state) {
   if (mode === 'l2') {
     const cur = state.cur;
     const l2i = (state.windowToL2 && cur != null) ? state.windowToL2[cur] : -1;
-    if (l2i != null && l2i >= 0 && Array.isArray(state.data.l2_envelopes)
-        && state.data.l2_envelopes[l2i]) {
-      const e = state.data.l2_envelopes[l2i];
+    if (l2i != null && l2i >= 0 && Array.isArray(d.l2_envelopes)
+        && d.l2_envelopes[l2i]) {
+      const e = d.l2_envelopes[l2i];
       const lo = wins[Math.max(0, e._s0)].center_mb;
       const hi = wins[Math.min(wins.length-1, e._e0)].center_mb;
       const pad = (hi - lo) * 0.05;
@@ -96,15 +110,15 @@ export function currentMbRange(state) {
   const cur = state.cur;
   const l1i = (state.windowToL1 && cur != null) ? state.windowToL1[cur] : -1;
   if (l1i == null || l1i < 0) {
-    if (Array.isArray(state.data.l1_envelopes) && state.data.l1_envelopes.length > 0) {
+    if (Array.isArray(d.l1_envelopes) && d.l1_envelopes.length > 0) {
       let best = 0, bestD = Infinity;
-      for (let i = 0; i < state.data.l1_envelopes.length; i++) {
-        const e = state.data.l1_envelopes[i];
+      for (let i = 0; i < d.l1_envelopes.length; i++) {
+        const e = d.l1_envelopes[i];
         const center = (e._s0 + e._e0) / 2;
         const dd = Math.abs(center - cur);
         if (dd < bestD) { bestD = dd; best = i; }
       }
-      const e = state.data.l1_envelopes[best];
+      const e = d.l1_envelopes[best];
       const lo = wins[Math.max(0, e._s0)].center_mb;
       const hi = wins[Math.min(wins.length-1, e._e0)].center_mb;
       const pad = (hi - lo) * 0.05;
@@ -112,7 +126,7 @@ export function currentMbRange(state) {
     }
     return { mbMin: genomeMin, mbMax: genomeMax };
   }
-  const e = state.data.l1_envelopes[l1i];
+  const e = d.l1_envelopes[l1i];
   const lo = wins[Math.max(0, e._s0)].center_mb;
   const hi = wins[Math.min(wins.length-1, e._e0)].center_mb;
   const pad = (hi - lo) * 0.05;
@@ -143,14 +157,21 @@ function inferLayersFromV1(data) {
 export const _LINES_COLOR_MODES = [
   { id: 'kmeans',           layer: null,                   label: 'kmeans' },
   { id: 'dosage',           layer: 'dosage_chunks',        label: 'dosage' },
-  { id: 'ghsl',             layer: 'ghsl_panel',           label: 'GHSL' },
+  { id: 'ghsl',             layer: 'ghsl_local_pca',       label: 'GHSL' },
   { id: 'het',              layer: 'dosage_chunks',        label: 'het' },
-  { id: 'theta_pi',         layer: 'per_sample_theta_pi',  label: 'θπ' },
+  { id: 'theta_pi',         layer: 'theta_pi_per_window',  label: 'θπ' },
   { id: 'froh',             layer: 'sample_froh',          label: 'F_ROH' },
   { id: 'family',           layer: null,                   label: 'family' },
   { id: 'confounder_alert', layer: 'sample_froh',          label: '⚠ confounder' },
   { id: 'lineage',          layer: null,                   label: 'lineage' },
 ];
+// 2026-05-19 — gate field names aligned with the actual pipeline output:
+//   ghsl_panel       → ghsl_local_pca       (new GHSL JSON top-level field)
+//   per_sample_theta_pi → theta_pi_per_window (canonical theta-pi field)
+// These names match what detectSchemaAndLayers adds to state.layersPresent.
+// Note: enabling a mode here unlocks the dropdown option; the actual
+// per-sample color computation for dosage/het/theta_pi/ghsl is in
+// lines_panel.js's per-mode branch and may need its own wiring.
 
 export function _isLinesColorModeAvailable(state, modeId) {
   const def = _LINES_COLOR_MODES.find(m => m.id === modeId);
@@ -311,6 +332,16 @@ export function detectSchemaAndLayers(data) {
                                             (Array.isArray(data.theta_pi_envelopes.l1) ||
                                              Array.isArray(data.theta_pi_envelopes.l2) ||
                                              Array.isArray(data.theta_pi_envelopes.candidate_intervals))],
+      // 2026-05-19 — GHSL local-PCA: same shape as theta_pi_local_pca
+      // (the producer mirrors the theta-pi schema). Merged onto state.data
+      // by local_pca_dosage.mount() from the scrubber_ghsl layer.
+      ['ghsl_local_pca',             () => !!data.ghsl_local_pca &&
+                                            !!data.ghsl_local_pca.pc_loadings_aligned &&
+                                            Array.isArray(data.ghsl_local_pca.pc_loadings_aligned)],
+      ['ghsl_envelopes',             () => !!data.ghsl_envelopes &&
+                                            (Array.isArray(data.ghsl_envelopes.l1) ||
+                                             Array.isArray(data.ghsl_envelopes.l2) ||
+                                             Array.isArray(data.ghsl_envelopes.candidate_intervals))],
     ];
     for (const [name, check] of _RECOVERY_CHECKS) {
       if (actual.has(name)) continue;
@@ -327,6 +358,256 @@ export function detectSchemaAndLayers(data) {
 // --- listLayers(state) — legacy lines 54175-54177 ---
 export function listLayers(state) {
   return state && state.layersPresent ? Array.from(state.layersPresent).sort() : [];
+}
+
+// --- getActiveModeView(state) — mode-switch adapter (2026-05-19) ---
+//
+// Returns a "data view" object that every local_pca_dosage panel reads
+// from instead of `state.data` directly. For the default 'dosage' mode
+// this is a passthrough (zero-cost). For 'theta_pi' and 'ghsl' modes
+// the adapter returns the namespaced sub-envelope (state.data.theta_pi_view
+// or .ghsl_view set by local_pca_dosage.mount during the selective merge)
+// with synthesized per-window pc1/pc2 + top-level z/sim_scales/envelopes
+// attached lazily so the same panel renderers paint mode-correct content
+// without per-panel mode switches.
+//
+// State surface:
+//   state.activeMode = 'dosage' | 'theta_pi' | 'ghsl'   (defaults to 'dosage')
+//
+// Idempotent — only the first call per (view, mode) synthesizes the
+// missing fields; subsequent calls return the same view object.
+export function getActiveModeView(state) {
+  if (!state || !state.data) return state && state.data;
+  const mode = state.activeMode || 'dosage';
+  const d = state.data;
+  if (mode === 'dosage') return d;
+  if (mode === 'theta_pi') {
+    const tv = d.theta_pi_view;
+    if (!tv) return d;   // theta-pi data not loaded — fall back to dosage view
+    if (!tv._mode_synthesized) {
+      _synthesizeThetaPiView(tv);
+      tv._mode_synthesized = true;
+    }
+    return tv;
+  }
+  if (mode === 'ghsl') {
+    const gv = d.ghsl_view;
+    if (!gv) return d;
+    if (!gv._mode_synthesized) {
+      _synthesizeGhslView(gv);
+      gv._mode_synthesized = true;
+    }
+    return gv;
+  }
+  return d;
+}
+
+// Per-mode whitelist for the right-side track strip. The atlas JSONs
+// for theta-pi and GHSL ship 6-7 per-window summary tracks (median,
+// z_mds, z_direct, lambda_ratio, mds1, mds2, …). Many of those
+// (z_mds / z_direct / lambda_ratio) are different presentations of the
+// SAME underlying signal that the canonical |Z| panel already shows.
+// Showing all 6 next to the |Z| panel is redundant and visually noisy.
+// The whitelist keeps the one or two tracks that add information
+// orthogonal to |Z|: per-window median (the unaggregated raw signal)
+// and one mds coordinate (geometry). Other tracks are dropped from the
+// view's `tracks` object so they don't render as strips.
+// 2026-05-19: Quentin asked for a single track per mode (not median + mds1).
+// Default = mds1 (the geometry / clustering axis), which is what the |Z| and
+// scatter panels are actually driven by in the alternate modes. The median is
+// still in `_all_tracks` for later opt-in.
+const _MODE_TRACK_KEEP = {
+  theta_pi: new Set(['theta_pi_mds1']),
+  ghsl:     new Set(['ghsl_mds1']),
+};
+
+function _filterTracksForMode(view, modeKey) {
+  if (!view || !view.tracks) return;
+  const keep = _MODE_TRACK_KEEP[modeKey];
+  if (!keep) return;
+  const filtered = {};
+  for (const k of Object.keys(view.tracks)) {
+    if (keep.has(k)) filtered[k] = view.tracks[k];
+  }
+  // Stash the unfiltered set under _all_tracks so future UI (a "show all
+  // tracks" toggle) can opt back in without re-fetching the JSON.
+  if (!view._all_tracks) view._all_tracks = view.tracks;
+  view.tracks = filtered;
+}
+
+// Attach the dosage-shaped top-level fields (per-window pc1/pc2,
+// l1_envelopes, l2_envelopes, sim_scales, cusum) onto the theta-pi
+// envelope so panels can read them without knowing about the mode.
+function _synthesizeThetaPiView(tv) {
+  const lp = tv.theta_pi_local_pca;
+  // The theta-pi atlas JSON does NOT have a top-level `windows[]` array
+  // (unlike the dosage z-blocks JSON). The window bp positions live at
+  // theta_pi_per_window.windows as `[{idx, start_bp, end_bp}, ...]`.
+  // Hoist them to `tv.windows` and synthesize center_mb so panels that
+  // read `view.windows[i].center_mb` (axis ranges, cursor, click-to-jump)
+  // keep working.
+  if (!Array.isArray(tv.windows)) {
+    const tpw = tv.theta_pi_per_window;
+    if (tpw && Array.isArray(tpw.windows)) {
+      tv.windows = tpw.windows.map(w => {
+        const center_mb = (Number.isFinite(w.start_bp) && Number.isFinite(w.end_bp))
+          ? ((w.start_bp + w.end_bp) / 2 / 1e6)
+          : NaN;
+        return { idx: w.idx, start_bp: w.start_bp, end_bp: w.end_bp, center_mb };
+      });
+    } else {
+      tv.windows = [];
+    }
+  }
+  // Per-window pc1/pc2 from pc_loadings_aligned [npc][n_windows][n_samples].
+  if (lp && Array.isArray(lp.pc_loadings_aligned) && Array.isArray(tv.windows)) {
+    const pcs = lp.pc_loadings_aligned;
+    const nw = Math.min(tv.windows.length, (pcs[0] && pcs[0].length) || 0);
+    for (let i = 0; i < nw; i++) {
+      const w = tv.windows[i] || (tv.windows[i] = {});
+      if (w.pc1 === undefined && pcs[0]) w.pc1 = pcs[0][i];
+      if (w.pc2 === undefined && pcs[1]) w.pc2 = pcs[1][i];
+      if (w.pc3 === undefined && pcs[2]) w.pc3 = pcs[2][i];
+      if (w.pc4 === undefined && pcs[3]) w.pc4 = pcs[3][i];
+      // theta-pi z is a chrom-wide per-window scalar (robust |Z|).
+      if (w.z === undefined && lp.z && lp.z[i] !== undefined) w.z = lp.z[i];
+    }
+  }
+  // n_samples (some panels read this directly off view, not state.data).
+  if (tv.n_samples == null && lp && Number.isFinite(lp.n_samples)) tv.n_samples = lp.n_samples;
+  if (tv.n_windows == null && Array.isArray(tv.windows)) tv.n_windows = tv.windows.length;
+  // L1 / L2 envelopes from theta_pi_envelopes.
+  if (tv.theta_pi_envelopes) {
+    if (!tv.l1_envelopes && Array.isArray(tv.theta_pi_envelopes.l1)) {
+      tv.l1_envelopes = tv.theta_pi_envelopes.l1;
+    }
+    if (!tv.l2_envelopes && Array.isArray(tv.theta_pi_envelopes.l2)) {
+      tv.l2_envelopes = tv.theta_pi_envelopes.l2;
+    }
+    if (!tv.candidate_proposals && Array.isArray(tv.theta_pi_envelopes.candidate_intervals)) {
+      tv.candidate_proposals = tv.theta_pi_envelopes.candidate_intervals;
+    }
+  }
+  // Cusum (already may exist as theta_pi_cusum; alias if local_pca_dosage's
+  // renderer reads `cusum_theta` — which it does in some places — we
+  // also expose as `cusum` since the canonical mode-agnostic name).
+  if (!tv.cusum_theta && tv.theta_pi_cusum) tv.cusum_theta = tv.theta_pi_cusum;
+  if (!tv.cusum && tv.theta_pi_cusum) tv.cusum = tv.theta_pi_cusum;
+  // sim_scales — wrap the single theta_pi_local_pca.sim_mat in the
+  // multi-scale shape `getActiveSimScale` expects.
+  if (lp && lp.sim_mat && !tv.sim_scales) {
+    tv.sim_scales = {
+      default: {
+        sim:   lp.sim_mat,
+        n:     lp.sim_mat_n || (Array.isArray(lp.sim_mat) ? lp.sim_mat.length : 0),
+        z:     lp.z,
+        q_lo:  0.05,
+        q_hi:  0.95,
+        // max_z_axis is a PER-WINDOW array in the actual JSON (not a
+        // scalar). Reduce to a single representative value so panels
+        // calling `scale.z_max.toFixed(...)` don't blow up.
+        z_max: _scalarizeMaxZ(lp.max_z_axis),
+      },
+    };
+    if (!tv.default_sim_scale) tv.default_sim_scale = 'default';
+  }
+  // Drop redundant z-variants from the track strip — the |Z| main panel
+  // already shows the canonical z, no need for 6 strips next to it.
+  _filterTracksForMode(tv, 'theta_pi');
+}
+
+// max_z_axis is either a scalar (older schema) or a per-window array
+// (current schema). The sim_panel renderer formats z_max with toFixed,
+// so we must hand it a number. Strategy: take the 95th percentile of
+// the array (or max if short), falling back to 2.5 when absent.
+function _scalarizeMaxZ(mz) {
+  if (Number.isFinite(mz)) return mz;
+  if (!Array.isArray(mz) || mz.length === 0) return 2.5;
+  const sorted = Array.from(mz).filter(Number.isFinite).sort((a, b) => a - b);
+  if (sorted.length === 0) return 2.5;
+  // 95th percentile so a few extreme outliers don't blow up the axis.
+  const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95));
+  return sorted[idx];
+}
+
+function _synthesizeGhslView(gv) {
+  const lp = gv.ghsl_local_pca;
+  // GHSL JSON has no top-level `windows[]` array AND no per_window block
+  // (unlike theta-pi). Synthesize windows from n_windows + chrom length
+  // by uniform spacing. This is approximate but works for axis
+  // positioning + click-to-jump. If a future GHSL schema adds explicit
+  // window bp positions, this block becomes a fallback path.
+  if (!Array.isArray(gv.windows)) {
+    const nw = (lp && Number.isFinite(lp.n_windows)) ? lp.n_windows
+             : (Number.isFinite(gv.n_windows) ? gv.n_windows : 0);
+    if (nw > 0) {
+      // Best-effort chrom length: pull from sim_mat_n or the loadings
+      // sub-array length. Cap at 100 Mb if unresolvable.
+      // Step = totalBp / nw; center_mb = (i+0.5) * step / 1e6.
+      // The downstream click-to-jump only needs monotonic center_mb;
+      // exact bp positions matter less.
+      const approxChromBp = 100_000_000;   // placeholder; refined when grid_map lands
+      const stepBp = approxChromBp / nw;
+      gv.windows = new Array(nw);
+      for (let i = 0; i < nw; i++) {
+        const start_bp = Math.round(i * stepBp);
+        const end_bp = Math.round((i + 1) * stepBp);
+        gv.windows[i] = { idx: i, start_bp, end_bp, center_mb: (start_bp + end_bp) / 2 / 1e6 };
+      }
+    } else {
+      gv.windows = [];
+    }
+  }
+  if (lp && Array.isArray(lp.pc_loadings_aligned) && Array.isArray(gv.windows)) {
+    const pcs = lp.pc_loadings_aligned;
+    const nw = Math.min(gv.windows.length, (pcs[0] && pcs[0].length) || 0);
+    for (let i = 0; i < nw; i++) {
+      const w = gv.windows[i] || (gv.windows[i] = {});
+      if (w.pc1 === undefined && pcs[0]) w.pc1 = pcs[0][i];
+      if (w.pc2 === undefined && pcs[1]) w.pc2 = pcs[1][i];
+      if (w.pc3 === undefined && pcs[2]) w.pc3 = pcs[2][i];
+      if (w.pc4 === undefined && pcs[3]) w.pc4 = pcs[3][i];
+      if (w.z === undefined && lp.z && lp.z[i] !== undefined) w.z = lp.z[i];
+    }
+  }
+  if (gv.n_samples == null && lp && Number.isFinite(lp.n_samples)) gv.n_samples = lp.n_samples;
+  if (gv.n_windows == null && Array.isArray(gv.windows)) gv.n_windows = gv.windows.length;
+  if (gv.ghsl_envelopes) {
+    if (!gv.l1_envelopes && Array.isArray(gv.ghsl_envelopes.l1)) {
+      gv.l1_envelopes = gv.ghsl_envelopes.l1;
+    }
+    if (!gv.l2_envelopes && Array.isArray(gv.ghsl_envelopes.l2)) {
+      gv.l2_envelopes = gv.ghsl_envelopes.l2;
+    }
+    if (!gv.candidate_proposals && Array.isArray(gv.ghsl_envelopes.candidate_intervals)) {
+      gv.candidate_proposals = gv.ghsl_envelopes.candidate_intervals;
+    }
+  }
+  if (!gv.cusum && gv.ghsl_cusum) gv.cusum = gv.ghsl_cusum;
+  if (lp && lp.sim_mat && !gv.sim_scales) {
+    gv.sim_scales = {
+      default: {
+        sim:   lp.sim_mat,
+        n:     lp.sim_mat_n || (Array.isArray(lp.sim_mat) ? lp.sim_mat.length : 0),
+        z:     lp.z,
+        q_lo:  0.05,
+        q_hi:  0.95,
+        z_max: _scalarizeMaxZ(lp.max_z_axis),
+      },
+    };
+    if (!gv.default_sim_scale) gv.default_sim_scale = 'default';
+  }
+  _filterTracksForMode(gv, 'ghsl');
+}
+
+// Convenience: invalidate the synthesis flag so the next call re-runs.
+// Useful if data is mutated underneath the view (rare; mostly called
+// implicitly when applyData rebuilds state.data from scratch).
+export function invalidateModeView(state) {
+  const d = state && state.data;
+  if (!d) return;
+  if (d.theta_pi_view) delete d.theta_pi_view._mode_synthesized;
+  if (d.ghsl_view)     delete d.ghsl_view._mode_synthesized;
 }
 
 // --- availablePCs(state) — legacy lines 9980-9991 ---
@@ -394,6 +675,39 @@ export function getPC(state, winIdx) {
 }
 
 // --- buildIndexes(state) — legacy lines 9881-9927 ---
+// 2026-05-19 — rebuild state.windowToL1 / windowToL2 against an arbitrary
+// view (not state.data). Used by setActiveMode when swapping modes:
+// theta-pi and GHSL have different window counts AND different L1/L2
+// envelope boundaries than dosage, so the indexes built at applyData
+// time (from state.data) are wrong-sized + wrong-content on mode swap.
+// Calling this with the active view rebuilds both arrays in place.
+export function rebuildIndexesFromView(state, view) {
+  if (!state || !view) return;
+  const N = (Array.isArray(view.windows) && view.windows.length) || view.n_windows || 0;
+  if (!Number.isFinite(N) || N <= 0) return;
+  state.windowToL1 = new Int32Array(N).fill(-1);
+  state.windowToL2 = new Int32Array(N).fill(-1);
+  const clamp = (i) => Math.max(0, Math.min(N - 1, i | 0));
+  if (Array.isArray(view.l1_envelopes)) {
+    view.l1_envelopes.forEach((e, i) => {
+      const rawS0 = (Number.isFinite(e.start_w) ? e.start_w : (e._s0 + 1)) - 1;
+      const rawE0 = (Number.isFinite(e.end_w)   ? e.end_w   : (e._e0 + 1)) - 1;
+      e._s0 = clamp(rawS0);
+      e._e0 = clamp(rawE0);
+      for (let w = e._s0; w <= e._e0; w++) state.windowToL1[w] = i;
+    });
+  }
+  if (Array.isArray(view.l2_envelopes)) {
+    view.l2_envelopes.forEach((e, i) => {
+      const rawS0 = (Number.isFinite(e.start_w) ? e.start_w : (e._s0 + 1)) - 1;
+      const rawE0 = (Number.isFinite(e.end_w)   ? e.end_w   : (e._e0 + 1)) - 1;
+      e._s0 = clamp(rawS0);
+      e._e0 = clamp(rawE0);
+      for (let w = e._s0; w <= e._e0; w++) state.windowToL2[w] = i;
+    });
+  }
+}
+
 export function buildIndexes(state) {
   const d = state && state.data;
   if (!d) return;
