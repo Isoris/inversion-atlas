@@ -286,7 +286,11 @@ export function renderL3Panel(state) {
         if (buckets.size > 0) {
           const palette = ['#4fa3ff', '#b8b8b8', '#f5a524', '#3cc08a', '#e0555c'];
           let chips = '<div style="font-size: 10px; color: var(--ink-dim); '
-                    + 'padding: 2px 10px 0; line-height: 1.5;">';
+                    + 'padding: 2px 10px 0; line-height: 1.5;" '
+                    + 'title="Each macrostripe (long-range haplotype regime) and '
+                    + 'its K-means microgroup composition at this window.">'
+                    + '<span style="color: var(--ink-dimmer); margin-right: 6px;">'
+                    + 'macrostripes:</span>';
           const macList = Array.from(buckets.keys()).sort((a, b) => a - b);
           for (const mac of macList) {
             const inner = buckets.get(mac);
@@ -296,7 +300,7 @@ export function renderL3Panel(state) {
                   +  `gap: 4px; margin-right: 10px;">`
                   +  `<span style="display: inline-block; width: 9px; height: 9px; `
                   +    `border-radius: 50%; background: ${macCol};"></span>`
-                  +  `<b style="color: var(--ink);">macro ${mac}</b> `
+                  +  `<b style="color: var(--ink);">macrostripe ${mac}</b> `
                   +  `<span style="color: var(--ink-dim);">n=${total}</span>`;
             // Microgroup composition — small swatches.
             const micros = Array.from(inner.entries())
