@@ -1114,9 +1114,16 @@ function _wireTrackedSettingsPopup(state) {
     state.tPanelOpen = false;
   };
 
-  const openBtn = $('tPanelOpenBtn');
-  if (openBtn && openBtn.dataset.wired !== '1') {
-    openBtn.addEventListener('click', () => {
+  // 2026-05-18: dual open buttons — the fixed-mode aside header
+  // hosts #tPanelOpenBtn; the compact-mode panel header hosts
+  // #tPanelOpenBtnCompact. Both open the same #tPanelOverlay popup.
+  for (const id of ['tPanelOpenBtn', 'tPanelOpenBtnCompact']) {
+    const openBtn = $(id);
+    if (!openBtn || openBtn.dataset.wired === '1') continue;
+    openBtn.addEventListener('click', (e) => {
+      // The compact-panel head also has a click handler (collapse arrow);
+      // stop propagation so opening the popup doesn't collapse the body.
+      if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
       state.tPanelOpen ? close() : open();
     });
     openBtn.dataset.wired = '1';

@@ -1224,11 +1224,24 @@
                   cursor: pointer; user-select: none;"
            title="Click to collapse / expand the tracked samples controls">
         <span>tracked samples</span>
-        <!-- v3.99 turn 4: collapse arrow. Toggles
-             #trackedSamplesPanelCompactBody display between block and none.
-             Default expanded; persisted in localStorage. -->
-        <span id="trackedSamplesPanelCompactArrow"
-              style="font-size: 9px; color: var(--ink-dim);">▼</span>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <!-- 2026-05-18 — settings popup toggle (parity with the fixed-mode
+               aside's tPanelOpenBtn). Opens the same #tPanelOverlay; secondary
+               controls (trails / sign-align PC1 / lasso / scree / trail-back
+               / N tracked) live there. Mirrors the existing T-panel hotkey. -->
+          <button id="tPanelOpenBtnCompact"
+                  title="Tracked-samples settings (t)"
+                  style="background: transparent; border: 1px solid var(--rule);
+                         color: var(--ink-dim); border-radius: 3px;
+                         padding: 0 5px; font-family: var(--mono); font-size: 9.5px;
+                         cursor: pointer; line-height: 14px;"
+                  onclick="event.stopPropagation();">▾</button>
+          <!-- v3.99 turn 4: collapse arrow. Toggles
+               #trackedSamplesPanelCompactBody display between block and none.
+               Default expanded; persisted in localStorage. -->
+          <span id="trackedSamplesPanelCompactArrow"
+                style="font-size: 9px; color: var(--ink-dim);">▼</span>
+        </div>
       </div>
       <!-- v3.78: tightened spacing for the narrow column in compact mode.
            Rows use 4px gap, 4px 8px padding; text 10.5px; band buttons wrap to
@@ -1239,39 +1252,32 @@
            `renderTrackedList` mirror state from the sidebar. -->
       <div id="trackedSamplesPanelCompactBody"
            style="padding: 4px 8px; display: flex; flex-direction: column; gap: 4px;">
-        <!-- v4 turn 128d: ported the fixed-mode settings layout to compact —
-             previously compact had only [trails][sign-align PC1] + a 4-band
-             grid with no K-cycle, no lasso, no scree. The new layout matches
-             the in-pcaPanel fixed-mode aside one-for-one:
-               Row A: trails | sign-align PC1 | lasso | scree
-               Lasso confirm/clear bar (hidden until lasso selection exists)
-               Row B: trail back slider
-               Row C: N tracked slider
-               Row D: K(N) cycle button + "all" + 6 K-colored band buttons
-               Row E: Auto-pick + Clear (dark)
-             Compact-suffix IDs delegate to the fixed-mode handlers via
-             _wireCompactCheckboxMirror (added below in the script section).
-             The K-band buttons use data-k-band so _syncTrackedCompactUI's
-             color-and-enable loop picks them up automatically. -->
-        <div style="display: flex; gap: 6px; align-items: center; font-size: 10.5px; flex-wrap: wrap;">
-          <label style="display: flex; align-items: center; gap: 2px; cursor: pointer;">
-            <input type="checkbox" id="trailOnCompact" style="margin: 0;" /> trails
-          </label>
-          <label style="display: flex; align-items: center; gap: 2px; cursor: pointer;">
-            <input type="checkbox" id="flipPC1Compact" style="margin: 0;" /> sign-align PC1
-          </label>
-          <label id="pcaLassoLabelCompact"
-                 style="display: flex; align-items: center; gap: 2px; cursor: pointer;
-                        padding-left: 4px; border-left: 1px solid var(--rule);"
-                 title="Lasso mode: drag a rectangle on the PCA scatter to select samples by their PC1/PC2 position. Tracked highlights are suppressed while ON.">
-            <input type="checkbox" id="pcaLassoToggleCompact" style="margin: 0;" /> lasso
-          </label>
-          <label id="screeToggleLabelCompact"
-                 style="display: flex; align-items: center; gap: 2px; cursor: pointer;
-                        padding-left: 4px; border-left: 1px solid var(--rule);"
-                 title="Scree inset: top-k local-PCA eigenvalues for the current window. Steep bar drop = clean inversion structure; flat bars = noisy/unstable window.">
-            <input type="checkbox" id="screeToggleCompact" style="margin: 0;" /> scree
-          </label>
+        <!-- 2026-05-18 — compact-mode body slimmed to MAIN controls only.
+             Secondary controls (trails / sign-align PC1 / lasso / scree /
+             trail-back / N tracked) moved to the shared #tPanelOverlay popup
+             that fixed mode also uses; toggle via the ▾ button in the
+             panel head above. Mirror groups in sidebar.js
+             (flipMirrors / trailMirrors / lassoMirrors / screeMirrors)
+             keep state in lockstep regardless of which surface the user
+             interacts with — popup or aside. Kept inline below:
+               · K(N) cycle + 6 K-colored band buttons (Row D)
+               · Auto-pick + Clear (Row E)
+               · Lasso confirm/clear bar (transient — hidden until needed)
+               · The tracked sample chip list below this body.
+             User feedback (chat 2026-05-18): "I like to see everything
+             instant if possible." → no inline duplication, no scroll. -->
+        <!-- Hidden remnants of the legacy *Compact checkbox IDs. Kept in
+             the DOM (display:none) so the mirror wires in sidebar.js have
+             a no-op target during the transition — removes any chance of
+             a ReferenceError from a stale mirror loop. Safe to delete in a
+             follow-up commit once the popup is verified in production. -->
+        <div style="display: none;">
+          <input type="checkbox" id="trailOnCompact" />
+          <input type="checkbox" id="flipPC1Compact" />
+          <input type="checkbox" id="pcaLassoToggleCompact" />
+          <input type="checkbox" id="screeToggleCompact" />
+          <input type="range" id="trailNCompactDeprecated"   min="0" max="80" value="15" />
+          <input type="range" id="trackedNCompactDeprecated" min="0" max="30" value="10" />
         </div>
         <!-- Lasso confirm/clear bar — hidden until selection exists. The
              fixed-mode lasso handler pcaLassoSetBadge() updates display
@@ -1297,18 +1303,9 @@
                          padding: 1px 8px; font-family: var(--mono); font-size: 10px;
                          cursor: pointer;">Clear</button>
         </div>
-        <div style="display: flex; gap: 4px; align-items: center; font-size: 10.5px;">
-          <span style="color: var(--ink-dim); flex: 0 0 56px;">trail back</span>
-          <input type="range" id="trailNCompact" min="0" max="80" value="15" step="1"
-                 style="flex: 1 1 auto; min-width: 0;" />
-          <span class="val" id="trailNValCompact" style="flex: 0 0 22px; text-align: right;">15</span>
-        </div>
-        <div style="display: flex; gap: 4px; align-items: center; font-size: 10.5px;">
-          <span style="color: var(--ink-dim); flex: 0 0 56px;">N tracked</span>
-          <input type="range" id="trackedNCompact" min="0" max="30" step="1" value="10"
-                 style="flex: 1 1 auto; min-width: 0;" />
-          <span class="val" id="trackedNValCompact" style="flex: 0 0 22px; text-align: right;">10</span>
-        </div>
+        <!-- 2026-05-18: trail-back + N-tracked sliders moved to #tPanelOverlay
+             popup. The compact body now jumps from the (hidden) input
+             remnants above straight to the K-cycle + band-pick row below. -->
         <!-- K(N) cycle button + 6 K-colored band buttons. data-k-band="0..5"
              matches the existing fixed-mode buttons so _syncTrackedCompactUI
              auto-colors and auto-enables them based on state.k. The "all"
