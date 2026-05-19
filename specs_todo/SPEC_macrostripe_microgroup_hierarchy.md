@@ -106,25 +106,58 @@ The L2-sweep auto-promote pipeline
 (`specs_done/SPEC_l2_sweep_inheritance.md`) already candidates these
 regions; macrostripe_id is the right unit for its acceptance gates.
 
-## Algorithm (Phase 1)
+## Algorithm — Steps A-F map to existing code
 
-1. **Per-window K-means** — already emits microgroups (k=3 default).
-2. **Macro-stripe assignment for the current candidate region**:
-   - Call `runLineageCompute(state)` to get
-     `state.lineageResult.lineage_id_per_sample` at L2 resolution.
-   - For the active candidate range, the lineage_id IS the
-     macrostripe_id.
-   - Cache as `state.macrostripeAssignment` (Map per-candidate).
-3. **Render** (default UI):
-   - PCA scatter colored by macrostripe_id (3 stable colors).
-   - Trail lines colored by macrostripe_id (so each lane is one
-     color across all windows; the user immediately sees the 3-stripe
-     pattern that's hidden by per-window K-means).
-   - Microgroup overlay opt-in: "advanced" toggle → show K-means
-     microgroup colors on top of macrostripe-colored backgrounds.
-4. **Export**: per-sample `(macrostripe_id, microgroup_id)` pair on
-   every candidate; macrostripe_id is the headline. The two-column
-   TSV is the export.
+User-corrected pipeline framing (chat 2026-05-18 follow-up):
+
+> **A.** Local partitioning — k-means over many windows.
+> **B.** Stability filtering — Cramér's V finds stable windows / hot regions.
+> **C.** Seed selection — take only high-stability regions as reliable seeds.
+> **D.** Long-range voting — ask where else the same fish groupings reappear.
+> **E.** Regime construction — merge co-voting regions into large haplotype regimes.
+> **F.** Macrostripe summary — compress the regime into broad interpretable stripes.
+
+This is **exactly the existing band-tracking pipeline** plus its
+upstream K-means / Cramér's V inputs. The mapping:
+
+| step | function | existing module | output |
+|------|----------|------------------|--------|
+| A | local partitioning | `shared/kmeans.js#kmeans1D/kmeans2D` + `shared/per_l2_cluster.js#clusterL2` | per-L2 labels |
+| B | stability (Cramér's V) | `shared/contingency.js#cramersV` + L3 pairwise compare + `pages/discovery/local_pca_dosage/l2_sweep.js` | per-pair concord; MERGE/SEPARATE verdicts |
+| C | seed selection | `shared/band_tracking/seed_discovery.js` — **Stage 1** | high-stability seed sample sets |
+| D | long-range voting | `shared/band_tracking/cross_seed_voting.js` — **Stage 2** + `shared/band_tracking/breadth_voting.js` — Stage 4 driver | voter→target vote records |
+| E | regime construction | `shared/band_tracking/locus_construction.js` — **Stage 3** | `stage3_loci[].sample_set` (chained regimes) |
+| F | macrostripe summary | `shared/band_tracking/projection.js#classifyProjection` — **Stage 4** | `consensus_partition` per fish |
+
+`consensus_partition` IS `macrostripe_id`. No new compute is required;
+Phase 1 is rename + default UI flip.
+
+## Phase 1 — what actually ships
+
+1. **Rename in atlas-facing surfaces**: `consensus_partition` →
+   `macrostripe_id` in L3 chip labels, badges, exports, and color
+   legends. The internal field name in `bandingResult.target_loci[i]
+   .consensus_partition` stays — only the user-facing label changes.
+2. **Default color mode flip**: when `state.bandingResult` is present
+   for the current chrom + the candidate region, `drawPCA` /
+   `drawLinesPanel` / `renderL3Panel` color by macrostripe_id by
+   default. When `bandingResult` is absent (banding pipeline not
+   run yet on this chrom), fall through to today's per-window
+   K-means microgroup coloring.
+3. **Toggle**: lines-panel "▾ more" group gains a "macro / micro"
+   button. ON (default) = macrostripe colors; OFF (advanced view) =
+   per-window K-means microgroups. State slot:
+   `viewControls.useMacrostripeColors`.
+4. **Microgroup as supporting annotation**: even with the default ON,
+   the K-means microgroup composition shows as a small tint halo
+   around each macrostripe-colored dot (3-4 px diameter ring at low
+   alpha). Cheap visual cue that the macrostripe is composed of
+   sub-haplotypes without dominating the display.
+
+No banding-pipeline re-write. No new shared modules. The math from
+Stage 1-4 (cross-seed voting, Hungarian chain projection, breadth
+voting) stays untouched. The SPEC's job is to flip the default
+unit-of-display.
 
 ## UI design
 
@@ -228,11 +261,16 @@ Writes:
 
 ## Phase 2 (1-2 commits later)
 
-- Standalone macrostripe compute that doesn't depend on lineage —
-  uses banding pipeline output directly.
 - TSV export of `(sample_id, macrostripe_id, microgroup_id)` per
-  candidate.
-- L2-sweep auto-promote pipeline accepts on **macrostripe** purity.
+  candidate. Columns: sample, macrostripe (from
+  `target_loci[*].consensus_partition`), microgroup (from per-window
+  K-means at `state.cur`), candidate_id, source = atlas. Filename
+  `macrostripe_export.<chrom>.<candidate_id>.tsv`.
+- L2-sweep auto-promote pipeline (`pages/discovery/local_pca_dosage/
+  l2_sweep.js`) accepts on **macrostripe** purity instead of
+  per-window K-means purity. Same gates, different label source.
+- L3 panel chip row: per-stripe `n` + microgroup composition, layout
+  as documented above.
 
 ## Phase 3 (research)
 
