@@ -320,6 +320,58 @@ function _wireNewShellControls(state) {
   // buttons until first click; persist dismissal in localStorage.
   // ===========================================================================
   _initAttentionPulses();
+
+  // ===========================================================================
+  // ResizeObserver on the page root — re-fit + redraw every canvas when
+  // the layout changes. User feedback 2026-05-18: "L3 panels still don't
+  // refresh the PCA on resize like it's blurred". Without an observer,
+  // canvases keep their old DPR-sized backing-store while CSS stretches
+  // the box — browser scales the bitmap, producing blur. rAF-throttled
+  // so a single drag triggers ONE redraw per frame, not one per
+  // size-change event.
+  // ===========================================================================
+  _installPageResizeObserver(state);
+}
+
+// ---------------------------------------------------------------------------
+// Page-level ResizeObserver. Every canvas on local_pca_dosage uses fitCanvas
+// (shared/page1_utils.js#148) which sets the backing-store to
+// `rect.width × DPR` based on the bounding rect AT PAINT TIME. If the
+// layout reflows (window resize, seam drag, layout-mode switch, sim
+// minimap toggle, scree-inset toggle, etc.) but no repaint fires, the
+// canvases stretch their old bitmaps into the new box → blurred.
+//
+// Fix: observe the page root; on size change, rAF-throttle a full
+// repaint chain. ResizeObserver coalesces multiple changes in the same
+// frame; the rAF guard further collapses bursts during active drags.
+//
+// Idempotent via page.dataset.resizeObserverWired so re-mounts don't
+// stack observers.
+// ---------------------------------------------------------------------------
+function _installPageResizeObserver(state) {
+  if (typeof document === 'undefined') return;
+  if (typeof ResizeObserver === 'undefined') return;
+  const page = document.getElementById('local_pca_dosage');
+  if (!page || page.dataset.resizeObserverWired === '1') return;
+  let rafId = null;
+  const repaint = () => {
+    rafId = null;
+    try { drawSim(state); }        catch (_) {}
+    try { drawSimMini(state); }    catch (_) {}
+    try { drawZ(state); }          catch (_) {}
+    try { drawPCA(state); }        catch (_) {}
+    try { drawAnchorStrip(state); }catch (_) {}
+    try { drawLinesPanel(state); } catch (_) {}
+    try { renderL3Panel(state); }  catch (_) {}
+  };
+  const ro = new ResizeObserver(() => {
+    if (rafId != null) return;
+    rafId = requestAnimationFrame(repaint);
+  });
+  ro.observe(page);
+  page.dataset.resizeObserverWired = '1';
+  // Stash so callers can disconnect on unmount (atlas-router lifecycle).
+  if (typeof window !== 'undefined') window._local_pca_dosage_resizeObserver = ro;
 }
 
 // ---------------------------------------------------------------------------
