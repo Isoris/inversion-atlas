@@ -171,6 +171,21 @@
   animation: attention-pulse-kf 0.8s ease-out 1;
 }
 
+/* 2026-05-18: selection-mode (U key) visual affordance per
+   specs_todo/SPEC_cross_atlas_group_transfer.md. When body
+   data-selection-mode="1", paint a subtle amber outline around the
+   PCA canvas so the user knows they're in selection mode + change the
+   cursor to "cell" (the standard "select region" cursor) on every
+   selectable plot. Outline matches the K-cycle button's accent. */
+body[data-selection-mode="1"] #pcaCanvas,
+body[data-selection-mode="1"] #linesCanvasContainer canvas {
+  cursor: cell;
+}
+body[data-selection-mode="1"] #pcaCanvasWrap {
+  outline: 2px solid rgba(245, 165, 36, 0.6);
+  outline-offset: -2px;
+}
+
 /* v4 turn 114d: cross-species breakpoint hover glow. When the user hovers
    near a cs-breakpoint line on any of the source panels (zCanvas,
    simCanvas, lines-subpanels, winSumStripCanvas, boundaries TE-density

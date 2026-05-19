@@ -462,6 +462,15 @@ export function drawPCA(state) {
       && groupLabels && _pcaScreenXY) {
     _drawClusterLabelOverlay(ctx, state, groupLabels, _pcaScreenXY, d.n_samples);
   }
+
+  // 2026-05-18: selection-group halo (Group G stage 1). Renders a thin
+  // amber ring around each sample in state.selectionGroup.ids so the
+  // user sees what they lassoed in selection mode. The selection
+  // persists until U is pressed again or another lasso replaces it.
+  if (state.selectionGroup && state.selectionGroup.ids
+      && state.selectionGroup.ids.length && _pcaScreenXY) {
+    _drawSelectionHalo(ctx, state.selectionGroup.ids, _pcaScreenXY);
+  }
   // turn 120: refresh the scree inset on every PCA draw. Cheap (pure SVG
   // string write to an absolutely-positioned div, no canvas, no layout).
   // The renderer handles the off/on toggle and the empty-state internally.
@@ -497,6 +506,26 @@ function _clusterLabelText(mode, k, K) {
     return `g${k}`;
   }
   return null;
+}
+
+// Selection-group halo (Group G stage 1). Amber ring around each
+// lassoed sample so the user sees the group at a glance. Mirrors the
+// K-cycle button's accent palette for visual continuity.
+function _drawSelectionHalo(ctx, ids, screenXY) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(245,165,36,0.85)';
+  ctx.fillStyle   = 'rgba(245,165,36,0.18)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < ids.length; i++) {
+    const si = ids[i];
+    const x = screenXY[si * 2], y = screenXY[si * 2 + 1];
+    if (!isFinite(x) || !isFinite(y)) continue;
+    ctx.beginPath();
+    ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function _drawClusterLabelOverlay(ctx, state, groupLabels, screenXY, nS) {
@@ -938,14 +967,18 @@ export function attachPcaLasso(state) {
   }
 
   canvas.addEventListener('pointerdown', (e) => {
-    // Two activation paths:
-    //   (1) Shift+left-click → manual-group lasso (existing v3.39 behavior).
-    //   (2) state.pcaLassoActive (from lasso checkbox in tracked-samples
+    // Three activation paths:
+    //   (1) state.selectionMode (U key) + Shift+drag → selection lasso.
+    //       Writes to state.selectionGroup (transient). v Group G stage 1.
+    //   (2) Shift+left-click (no selectionMode) → manual-group lasso
+    //       (existing v3.39 behavior).
+    //   (3) state.pcaLassoActive (lasso checkbox in tracked-samples
     //       aside) + plain left-click → tracked-samples lasso. v4 turn 4.
     if (e.button !== 0) return;
     const st = _pageState;
     if (!st || !st.data) return;
     const isShift = !!e.shiftKey;
+    const isSelection = isShift && !!st.selectionMode;
     const isTrackedLasso = !isShift && !!st.pcaLassoActive;
     if (!isShift && !isTrackedLasso) return;
     e.preventDefault();
@@ -955,7 +988,8 @@ export function attachPcaLasso(state) {
     startClientX = e.clientX;
     startClientY = e.clientY;
     dragging = true;
-    canvas.__pcaLassoMode = isTrackedLasso ? 'tracked' : 'manual';
+    canvas.__pcaLassoMode = isSelection ? 'selection'
+                          : (isTrackedLasso ? 'tracked' : 'manual');
     try { canvas.setPointerCapture(e.pointerId); } catch(_) {}
     updateOverlay(e.clientX, e.clientY);
   });
@@ -996,6 +1030,25 @@ export function attachPcaLasso(state) {
       try { drawLinesPanel(st); } catch (_) {}
       drawPCA(st);
       try { renderL3Panel(st); } catch (_) {}
+      return;
+    }
+    if (mode === 'selection') {
+      // Group G stage 1: selection-mode lasso. Stash on the transient
+      // state.selectionGroup slot (not manualGroups). The G-panel
+      // manual tab will surface a "save selection as group" button to
+      // promote this into a persistent manual group; until then it's
+      // just observation. See specs_todo/SPEC_cross_atlas_group_transfer.md.
+      const d = st.data || {};
+      st.selectionGroup = {
+        ids:           samples.slice(),
+        source_atlas:  'inversion',
+        source_page:   'local_pca_dosage',
+        source_window: (st.cur | 0),
+        source_chrom:  d.chrom || null,
+        ts:            Date.now(),
+      };
+      // Repaint so the selection halo (drawPCA post-pass) shows up.
+      drawPCA(st);
       return;
     }
     // mode === 'manual': existing v3.39 manual-group lasso.

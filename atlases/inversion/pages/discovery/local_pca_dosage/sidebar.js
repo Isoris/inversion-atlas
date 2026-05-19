@@ -314,6 +314,14 @@ function _wireNewShellControls(state) {
   _wireClusterLabelHotkey(state);
 
   // ===========================================================================
+  // U hotkey — toggle selection mode (Group G stage 1 from WIRE_AUDIT
+  // + specs_todo/SPEC_cross_atlas_group_transfer.md). Boolean
+  // state.selectionMode; Shift+drag on PCA scatter writes to
+  // state.selectionGroup when this is true.
+  // ===========================================================================
+  _wireSelectionModeHotkey(state);
+
+  // ===========================================================================
   // First-use attention pulses (v4 turn 80 — never wired in modular tree).
   // CSS classes `.attention-pulse` + `.attention-pulse-fade` already exist
   // in inversion.css (lines 143-172). Apply pulse to the key onboarding
@@ -409,6 +417,42 @@ function _wireClusterLabelHotkey(state) {
       state.pcaClusterLabelMode = next;
       try { localStorage.setItem(_CLUSTER_LABEL_LS_KEY, next == null ? '' : next); }
       catch (_) {}
+      try { drawPCA(state); } catch (_) {}
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// U hotkey — toggle selection mode. Sets state.selectionMode boolean and
+// stamps body[data-selection-mode] so CSS can change cursor / show hint.
+// On entry, clears any stale state.selectionGroup so the new drag starts
+// fresh. Hotkey is one-document-wide; gated to fire only when local_pca_dosage
+// is the active page and the focus is not in a text input.
+// ---------------------------------------------------------------------------
+function _wireSelectionModeHotkey(state) {
+  if (typeof document === 'undefined') return;
+  const sync = () => {
+    if (document.body && document.body.dataset) {
+      document.body.dataset.selectionMode = state.selectionMode ? '1' : '0';
+    }
+  };
+  sync();
+  if (document._selectionModeHotkeyWired) return;
+  document._selectionModeHotkeyWired = true;
+  document.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    const pageEl = document.getElementById('local_pca_dosage');
+    if (!pageEl || !pageEl.classList.contains('active')) return;
+    if ((e.key === 'u' || e.key === 'U')
+        && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      state.selectionMode = !state.selectionMode;
+      if (state.selectionMode) {
+        // Fresh drag — clear any stale selection from a prior session.
+        state.selectionGroup = null;
+      }
+      sync();
       try { drawPCA(state); } catch (_) {}
     }
   });

@@ -515,6 +515,8 @@ function _buildLegacyState(atlasState) {
     silScoreOn: 'pc1',
     tPanelOpen: false,
     pcaClusterLabelMode: null,    // 'none'|'g_index'|'h_system'|'h_pair' — cycle with N
+    selectionMode: false,         // U key toggles; Shift+drag in selection mode writes to selectionGroup
+    selectionGroup: null,         // { ids, source_atlas, source_page, source_window, ts } — see specs_todo/SPEC_cross_atlas_group_transfer.md
 
     mergeThr: 0.85,
     alpha: 0.05,
