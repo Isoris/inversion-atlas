@@ -289,7 +289,12 @@ export function applyData(state, data) {
     _headerMetaEl.innerHTML =
       `<b>${data.chrom}</b>${speciesPart} · <b>${data.n_windows}</b> W · <b>${data.n_samples}</b> samples`;
   }
-  // Schema badge
+  // Schema badge. Two surfaces:
+  //   1. badge text — count + version, shown inline in the topbar
+  //   2. badge modal — opened on click; reads window.__atlasSchemaLayers
+  //      ([shell_chrome.js _wireSchemaBadge]). The modal expects rows of
+  //      { name, present, description }. Without writing the global the
+  //      modal displays "No JSON loaded yet" even after a chrom loads.
   const schemaBadge = document.getElementById('schemaBadge');
   if (schemaBadge) {
     const layerNames = listLayers(state);
@@ -298,6 +303,19 @@ export function applyData(state, data) {
     schemaBadge.className = 'v' + state.schemaVersion;
     schemaBadge.style.display = 'inline-block';
   }
+  // Populate the modal-side schema layers list for shell_chrome.
+  // We mark present-set explicitly; future work could enrich with the
+  // absent-known-layer list pulled from the inversion layers registry
+  // so users can see which fields the schema declares but this chrom's
+  // pipeline didn't write. Per-layer description left blank for now —
+  // the human-readable strings live in layers.registry.json > _doc fields.
+  try {
+    window.__atlasSchemaLayers = listLayers(state).map(name => ({
+      name,
+      present: true,
+      description: '',
+    }));
+  } catch (_) { /* never fail applyData on a badge update */ }
   renderTrackedList(state);
   refreshCandidateUI(state);
   if (typeof refreshCandidateListUI === 'function') refreshCandidateListUI();
