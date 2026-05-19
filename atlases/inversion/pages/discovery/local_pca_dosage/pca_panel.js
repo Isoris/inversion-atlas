@@ -137,7 +137,16 @@ function _ensureAnchor() {
 // --- _renderScreeInsetHTML — legacy lines 56422-56493 ---
 // Pure SVG string renderer. Returns the inset's innerHTML or '' when the
 // inset shouldn't render. Reads state.cur and state.data.windows[].
-const _SCREE_BAR_COLORS = ['#4fa3ff', '#f5a524', '#3cc08a', '#e0555c', '#b07cf7', '#5dc4d6', '#888'];
+// 2026-05-19: scree palette extended past the original 7-color cap.
+// First 7 colors stay identical for back-compat (PC1..PC7 keep their
+// canonical hues); past that we cycle a teal/grey-violet ramp so the
+// extra bars are visually distinct without screaming for attention
+// (only PC1/PC2 carry actionable information; PC8+ are mostly noise
+// and shouldn't compete for the eye).
+const _SCREE_BAR_COLORS = [
+  '#4fa3ff', '#f5a524', '#3cc08a', '#e0555c', '#b07cf7', '#5dc4d6', '#a0a0a0',
+  '#7a90a8', '#6a7da0', '#5a6b96', '#4f5a82', '#444f6e', '#3a445e', '#33394e',
+];
 function _renderScreeInsetHTML() {
   const state = _pageState;
   if (!state || !state.screePlotEnabled) return '';
@@ -154,14 +163,23 @@ function _renderScreeInsetHTML() {
     isFallback = true;
   }
   if (!spectrum || spectrum.length < 2) return '';
-  spectrum = spectrum.slice(0, 7);
+  // 2026-05-19: dropped the slice(0, 7) cap. Quentin: "show all eigen
+  // values in the screeplot and not only the first 2". When the precomp
+  // carries the full spectrum (w.lam_top_k), render every bar. Layout
+  // below auto-adapts (smaller bar width for larger N). The fallback
+  // path (lam1/lam2 only) still shows just the 2 bars — there's nothing
+  // more to draw without regenerating the precomp at higher NPC.
   spectrum = spectrum.slice().sort((a, b) => b - a);
-  const svgW = 100, svgH = 38;
+  // Widen the SVG when we have many bars so each stays at least ~3px wide.
+  const svgH = 38;
+  const minBarPx = 3;
+  const desiredW = Math.max(100, spectrum.length * (minBarPx + 1) + 4);
+  const svgW = Math.min(220, desiredW);
   const padL = 2, padR = 2, padTop = 2, padBot = 2;
   const plotW = svgW - padL - padR;
   const plotH = svgH - padTop - padBot;
   const nBars = spectrum.length;
-  const barW = plotW / nBars - 1.5;
+  const barW = Math.max(1, plotW / nBars - 1.0);
   const lamMax = spectrum[0];
   const bars = [];
   for (let i = 0; i < nBars; i++) {
@@ -174,18 +192,18 @@ function _renderScreeInsetHTML() {
     bars.push(
       '<rect class="scree-inset-bar" x="' + barX.toFixed(1) + '" y="' + barY.toFixed(1) +
       '" width="' + barW.toFixed(1) + '" height="' + barH.toFixed(1) +
-      '" fill="' + color + '"></rect>'
+      '" fill="' + color + '"><title>PC' + (i + 1) + ' λ=' + lam.toPrecision(3) + '</title></rect>'
     );
   }
   const svg = '<svg class="scree-inset-svg" viewBox="0 0 ' + svgW + ' ' + svgH +
-              '" preserveAspectRatio="none">' + bars.join('') + '</svg>';
+              '" preserveAspectRatio="none" style="width:' + svgW + 'px;">' + bars.join('') + '</svg>';
   let ratioStr = '';
   if (spectrum.length >= 2 && spectrum[1] > 0) {
     const r = spectrum[0] / spectrum[1];
-    ratioStr = 'λ₁/λ₂ = ' + r.toFixed(1);
+    ratioStr = 'λ₁/λ₂ = ' + r.toFixed(1) + ' · k=' + spectrum.length;
   }
   const hint = isFallback
-    ? '<div class="scree-inset-fallback-hint">k≥3 needs precomp ≥2.16</div>'
+    ? '<div class="scree-inset-fallback-hint">only λ₁,λ₂ available — re-emit precomp ≥2.16 for full spectrum</div>'
     : '';
   return (
     '<div class="scree-inset-label">PC eigenvalues · w' + state.cur + '</div>' +
@@ -254,6 +272,14 @@ function _positionScreeInsetSmart(state, screenXY, nSamples, pad, plotW, plotH) 
   if (typeof document === 'undefined') return;
   const el = document.getElementById('screeInset');
   if (!el || el.style.display === 'none') return;
+  // 2026-05-20: respect a user-pinned corner (set by drag-to-reattach).
+  // The pin only clears on dblclick of the inset.
+  if (state && state._screeUserCorner) {
+    if (['tl','tr','bl','br'].includes(state._screeUserCorner)) {
+      el.dataset.corner = state._screeUserCorner;
+      return;
+    }
+  }
   if (!screenXY || !nSamples || plotW <= 0 || plotH <= 0) return;
   const cx = pad.l + plotW / 2;
   const cy = pad.t + plotH / 2;
@@ -306,6 +332,93 @@ export function _refreshScreeInset() {
     el.style.display = 'block';
     el.innerHTML = html;
   }
+  // 2026-05-20: wire drag-to-reattach once. The user can grab the
+  // inset and drop it on any of the 4 corners; on release we snap to
+  // the corner closest to the drop point. While dragging, smart-corner
+  // placement is suspended (state._screeUserCorner takes precedence
+  // until cleared).
+  _wireScreeInsetDrag(el);
+}
+
+function _wireScreeInsetDrag(el) {
+  if (!el || el.dataset.dragWired === '1') return;
+  el.dataset.dragWired = '1';
+  let dragging = false;
+  let startMouseX = 0, startMouseY = 0;
+  let startLeftPx = 0, startTopPx = 0;
+  let wrap = null;
+  const restorePosition = () => {
+    // Restore the corner-mode positioning (clears inline left/top so
+    // the data-corner CSS rules take over again).
+    el.style.left = ''; el.style.top = ''; el.style.right = ''; el.style.bottom = '';
+  };
+  const onMouseDown = (ev) => {
+    // Only left button + don't start dragging if scree is hidden.
+    if (ev.button !== 0) return;
+    if (el.style.display === 'none') return;
+    wrap = el.parentElement;
+    if (!wrap) return;
+    const wr = wrap.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    startMouseX = ev.clientX;
+    startMouseY = ev.clientY;
+    startLeftPx = r.left - wr.left;
+    startTopPx  = r.top  - wr.top;
+    dragging = true;
+    el.classList.add('scree-dragging');
+    ev.preventDefault();
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp, { once: true });
+  };
+  const onMouseMove = (ev) => {
+    if (!dragging || !wrap) return;
+    const dx = ev.clientX - startMouseX;
+    const dy = ev.clientY - startMouseY;
+    el.style.left = (startLeftPx + dx) + 'px';
+    el.style.top  = (startTopPx  + dy) + 'px';
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+  };
+  const onMouseUp = (ev) => {
+    document.removeEventListener('mousemove', onMouseMove);
+    if (!dragging || !wrap) { dragging = false; el.classList.remove('scree-dragging'); return; }
+    dragging = false;
+    el.classList.remove('scree-dragging');
+    // Snap to the closest corner of the wrap.
+    const wr = wrap.getBoundingClientRect();
+    const r  = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2 - wr.left;
+    const cy = r.top  + r.height / 2 - wr.top;
+    const wW = wr.width, wH = wr.height;
+    const corners = [
+      { id: 'tl', dx: cx,      dy: cy      },
+      { id: 'tr', dx: wW - cx, dy: cy      },
+      { id: 'bl', dx: cx,      dy: wH - cy },
+      { id: 'br', dx: wW - cx, dy: wH - cy },
+    ];
+    corners.sort((a, b) => (a.dx * a.dx + a.dy * a.dy) - (b.dx * b.dx + b.dy * b.dy));
+    const target = corners[0].id;
+    restorePosition();
+    el.dataset.corner = target;
+    // Pin the user's choice so _positionScreeInsetSmart doesn't fight it
+    // on subsequent drawPCA paints. Cleared by double-click.
+    if (_pageState) _pageState._screeUserCorner = target;
+    try { localStorage.setItem('inversion_atlas.screeCorner', target); } catch (_) {}
+  };
+  el.addEventListener('mousedown', onMouseDown);
+  // Double-click clears the user pin so smart-placement resumes.
+  el.addEventListener('dblclick', () => {
+    if (_pageState) delete _pageState._screeUserCorner;
+    try { localStorage.removeItem('inversion_atlas.screeCorner'); } catch (_) {}
+  });
+  // Restore persisted pin on first wire.
+  try {
+    const saved = localStorage.getItem('inversion_atlas.screeCorner');
+    if (saved && ['tl','tr','bl','br'].includes(saved)) {
+      el.dataset.corner = saved;
+      if (_pageState) _pageState._screeUserCorner = saved;
+    }
+  } catch (_) {}
 }
 
 // --- drawPCA(state) — legacy lines 35749-35949 ---
@@ -743,15 +856,43 @@ export function drawAnchorStrip(state) {
     return;
   }
 
-  // Draw one vertical strip per window
+  // 2026-05-20: Cramér's V strip rendered as proportional histogram —
+  // bar HEIGHT encodes V (0..1) so a low-V cell reads as squat, high-V
+  // reads as tall. Previously the strip filled the entire panel height
+  // with V mapped only to color, which (per Quentin) read as "too high
+  // in height — it should be a thin band". The base color still varies
+  // with V (via _vColor) but the dominant visual cue is now the bar
+  // height, like a proportional ribbon.
+  //
+  // Layout: thin baseline at the bottom (V=0 anchor) + per-window bar
+  // grown upward. We also draw a faint grid line at V=0.5 + V=1 so the
+  // reader can eyeball the absolute level.
   const stripH = h - 4;
   const stripY = 2;
+  // Faint grid lines at V=0.5 and V=1.
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  const y_v1   = stripY + stripH - Math.round(1.0 * stripH);
+  const y_v05  = stripY + stripH - Math.round(0.5 * stripH);
+  ctx.moveTo(padL, y_v1 + 0.5);      ctx.lineTo(padL + plotW, y_v1 + 0.5);
+  ctx.moveTo(padL, y_v05 + 0.5);     ctx.lineTo(padL + plotW, y_v05 + 0.5);
+  ctx.stroke();
   for (let wi = 0; wi < N; wi++) {
+    const v = +concord[wi];
+    if (!Number.isFinite(v)) continue;
     const x0 = padL + Math.floor((wi / N) * plotW);
     const x1 = padL + Math.floor(((wi + 1) / N) * plotW);
-    ctx.fillStyle = _vColor(concord[wi]);
-    ctx.fillRect(x0, stripY, Math.max(1, x1 - x0), stripH);
+    const bw = Math.max(1, x1 - x0);
+    const clamped = Math.max(0, Math.min(1, v));
+    const barH = Math.max(1, Math.round(clamped * stripH));
+    const barY = stripY + stripH - barH;
+    ctx.fillStyle = _vColor(v);
+    ctx.fillRect(x0, barY, bw, barH);
   }
+  // Bottom baseline (V=0) so even cells with V=NaN have a visible row.
+  ctx.fillStyle = 'rgba(255,255,255,0.10)';
+  ctx.fillRect(padL, stripY + stripH - 1, plotW, 1);
 
   // Y-axis label on the left
   ctx.fillStyle = themeColor('ink-dim');

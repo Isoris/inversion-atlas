@@ -1023,13 +1023,34 @@ export function drawZ(state) {
     : d.windows.map(w0 => Math.abs(w0.z || 0));
   const _mbR = currentMbRange(state);
   const mbMin = _mbR.mbMin, mbMax = _mbR.mbMax;
-  // Compute zMax / zMin from the visible window subset only.
-  let zMax = 0, zMin = 0;
+  // 2026-05-20: y-axis clamp. GHSL's z-values can hit 1000+ while
+  // dosage stays ~3-5; the raw-max scaling produced wildly different
+  // y-axes between modes (and pushed the label "|Z|3000" past the
+  // pad.l budget, distorting the plot area). Quentin: "the z panel is
+  // too wide all z panels for all modes must be the same dimensions
+  // so the layout is consistent." Fix: clamp zMax to the 95th
+  // percentile of the visible-range absolute-z distribution. Outliers
+  // still render (they just paint above the y axis edge), but the
+  // panel keeps consistent dimensions across modes.
+  const visibleZ = [];
   for (let i = 0; i < d.n_windows; i++) {
     const cm = mbs[i];
     if (cm < mbMin || cm > mbMax) continue;
-    if (zs[i] > zMax) zMax = zs[i];
-    if (zMode_val === 'signed' && zs[i] < zMin) zMin = zs[i];
+    const a = Math.abs(zs[i]);
+    if (Number.isFinite(a)) visibleZ.push(a);
+  }
+  let zMax = 0, zMin = 0;
+  if (visibleZ.length > 0) {
+    visibleZ.sort((a, b) => a - b);
+    const p95Idx = Math.floor(0.95 * (visibleZ.length - 1));
+    zMax = visibleZ[p95Idx];
+  }
+  if (zMode_val === 'signed') {
+    for (let i = 0; i < d.n_windows; i++) {
+      const cm = mbs[i];
+      if (cm < mbMin || cm > mbMax) continue;
+      if (zs[i] < zMin) zMin = zs[i];
+    }
   }
   zMax = Math.max(3, Math.ceil(zMax));
   if (zMode_val === 'signed') {

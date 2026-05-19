@@ -72,11 +72,47 @@ function _modeNoDataNotice(mode, state) {
 // --- drawLinesPanel(state) — legacy lines 34894-35744 ---
 export function drawLinesPanel(state) {
   _setActiveState(state);
-  if (!state.data) return;
+  // 2026-05-19 debug instrumentation: trace silent bail-outs so the
+  // "per-sample lines disappeared" report has actionable signal in the
+  // browser console. Each early return logs a one-line reason with the
+  // pieces of state needed to diagnose. Remove these warns once the
+  // underlying cause is identified.
+  const DBG = '[drawLinesPanel]';
+  if (!state.data) {
+    console.warn(DBG, 'bail: state.data is null/undefined');
+    return;
+  }
   const container = document.getElementById('linesCanvasContainer');
-  if (!container || typeof container.querySelectorAll !== 'function') return;
+  if (!container || typeof container.querySelectorAll !== 'function') {
+    console.warn(DBG, 'bail: #linesCanvasContainer missing in DOM');
+    return;
+  }
   const subs = container.querySelectorAll('.lines-subpanel');
-  if (!subs || subs.length === 0) return;
+  if (!subs || subs.length === 0) {
+    console.warn(DBG, 'bail: no .lines-subpanel children — buildLinesPanel did not run or ran with empty state.viewControls.linesYsources. Current value:',
+      state.viewControls && state.viewControls.linesYsources);
+    return;
+  }
+  // One-time visibility diagnostic: log if the lines panel is rendered
+  // with zero pixel area (display:none, height:0, or container hidden).
+  // We render the canvas + log a single warn rather than silently emitting
+  // pixels into a 0-height box. Run this check at most once per state to
+  // avoid log spam.
+  if (state.__linesVisibilityDbg !== 'logged') {
+    state.__linesVisibilityDbg = 'logged';
+    const panel = document.getElementById('linesPanel');
+    const pRect = panel ? panel.getBoundingClientRect() : null;
+    const cRect = container.getBoundingClientRect();
+    const pDisp = panel ? getComputedStyle(panel).display : '(no #linesPanel)';
+    if (!pRect || pRect.height < 4 || cRect.height < 4 || pDisp === 'none') {
+      console.warn(DBG, 'visibility: lines panel may be invisible.',
+        '#linesPanel display=', pDisp,
+        'h=', pRect ? Math.round(pRect.height) : '?',
+        '#linesCanvasContainer h=', Math.round(cRect.height),
+        'state.linesPanelH=', state.linesPanelH,
+        'layoutMode=', document.body && document.body.dataset.layoutMode);
+    }
+  }
 
   // 2026-05-18: keep candidate-dependent UI bits in sync with the focal
   // candidate. The rebuilds fire only when the candidate ID changes
@@ -101,9 +137,29 @@ export function drawLinesPanel(state) {
   const d = getActiveModeView(state) || state.data;
   const nWin = (d && d.windows && d.windows.length) || d.n_windows || 0;
   const nS = (state.data && state.data.n_samples) || d.n_samples || 0;
-  if (nWin < 2 || nS === 0) return;
+  if (nWin < 2 || nS === 0) {
+    console.warn(DBG, 'bail: nWin/nS insufficient. nWin=', nWin, 'nS=', nS,
+      'activeMode=', state.activeMode,
+      'd.windows?', Array.isArray(d && d.windows) ? `array(len=${d.windows.length})` : typeof (d && d.windows),
+      'd.n_windows=', d && d.n_windows,
+      'state.data.n_samples=', state.data && state.data.n_samples);
+    return;
+  }
 
   const trackedSet = new Set(state.tracked);
+  // Defensive: d.windows might be missing or wrong-shaped when activeMode
+  // is theta_pi/ghsl but the synthesized view didn't get a windows array
+  // (e.g. theta_pi_per_window absent in this JSON). Without this guard
+  // the .map() throws TypeError and the page-mount try/catch swallows it,
+  // leaving the lines panel blank with no console signal.
+  if (!Array.isArray(d.windows) || d.windows.length === 0) {
+    console.warn(DBG, 'bail: d.windows is not a usable array.',
+      'activeMode=', state.activeMode,
+      'd.windows=', d.windows,
+      'has theta_pi_view?', !!(state.data && state.data.theta_pi_view),
+      'has ghsl_view?',     !!(state.data && state.data.ghsl_view));
+    return;
+  }
   const mbs = d.windows.map(w0 => w0.center_mb);
   const _mbR = currentMbRange(state);
   const mbMin = _mbR.mbMin, mbMax = _mbR.mbMax;

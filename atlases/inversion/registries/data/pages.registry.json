@@ -122,17 +122,24 @@
     },
     "popstats": {
       "_label": "popstats",
-      "_doc": "Per-window popstats track stack for the active chromosome. Stack of population-genetic tracks aligned to the chromosome: |Z| / score, SNP density, BEAGLE imputation uncertainty, depth/coverage, theta_pi (per-window Tajima pi), F_ST (between karyotype groups), Hobs/Hexp (observed vs expected heterozygosity), ancestry delta12 (top-1 minus top-2 Q). Track inventory lives in the request layer (atlas_request_layer.js) which talks to a popstats live server (POST /api/popstats/*); page-6 wiring (atlas_page6_wiring.js) wraps that with track-def slot-combine UI and tooltips. Click chips in #psChips to toggle visibility. DOM contract: #psToolbar (sticky chip bar) + #psStack (vertical canvas-track stack) + #psNoChrom (empty state) + #psGalleryTray (collapsible track-discovery sidebar, turn 6.5). Page6 is a thin loader stub: the renderer window.renderPopstatsPage is defined externally in js/atlas_page6_wiring.js (dispatched at legacy lines 59626-59627 + 59729-59730); popstats.js's showPopstatsPage(state) tries window.renderPopstatsPage and falls back to a missing-renderer empty-state message if absent. Round-5-step-18 status: thin-loader-stub migration \u2014 pattern 4 ('stub-preserving + one wired entry') applied as a direct twin of ancestry_per_window (shipped step 17). Both chat-33 exports preserved verbatim (showPopstatsPage, refreshPopstatsPage); state-aware wrapper refreshPage6 + mount/unmount lifecycle added. Second migrated review-stage page (review group: 1 of 5 \u2192 2 of 5). NB: the requires_layers / requires_slots fields below (candidate_gene_cargo / activeCandidate) appear to mismatch what the page actually does \u2014 popstats is a chromosome-level popstats track stack per the legacy DOM contract, driven by per-window metrics keyed on activeChrom + group_set_id, not a candidate-gene-cargo view. The mismatch is preserved as-is in this round (round 18 is migration-only, not a registry-content change, per the architectural-discipline rule established step 17 for ancestry_per_window); Quentin to decide whether requires_layers should be e.g. `popstats_tracks` and requires_slots `activeChrom`. Source: legacy/Inversion_atlas.html lines 7647-7658 (HTML shell) + 59626-59627/59729-59730 (typeof-guard dispatch sites for the external renderer).",
+      "_doc_2026-05-20": "Native ES-module port. Renderer lives in atlases/inversion/pages/review/popstats/_render.js; popstats.js resolves scrubber_main for atlasState.shared.activeChrom and threads it into the renderer. Chips: ideogram / sim_mat / Z (always) → θπ / θπ by invgt / Fst / Hobs/Hexp / Δ12 / Δ12 multi-scale (popstats) → SNP density / BEAGLE uncert / coverage (QC). Auto-discovered tracks from data.tracks either adopt their matching static placeholder (e.g. data.tracks.theta_pi lights up the θπ chip) or are bucketed into popstats vs other by name pattern. Live FST/Hobs/Δ12 overlays are staged in _live.js (POST /api/popstats/groupwise + /hobs_groupwise) but inert until a groups slot lands in atlasState. requires_layers / requires_slots updated 2026-05-20 to match what the page actually consumes (was candidate_gene_cargo + activeCandidate — chromosome-level page with candidate-level wiring, flagged for ~2 weeks).",
+      "_doc": "Per-window popstats track stack for the active chromosome. Stack of population-genetic tracks aligned to the chromosome: |Z|, SNP density, BEAGLE imputation uncertainty, depth/coverage, theta_pi, F_ST (between karyotype groups), Hobs/Hexp, ancestry delta12 (top-1 minus top-2 Q). DOM: #psToolbar + #psStack + #psNoChrom. Click chips in #psChips to toggle visibility; persisted via localStorage scrubber_v3_popstats. Source: legacy/Inversion_atlas.html lines 7647-7658 (HTML shell) + 71575-71732 (renderPopstatsPage); ported native into ./popstats/_render.js on 2026-05-20.",
       "requires_layers": [
-        "candidate_gene_cargo"
+        "scrubber_main"
       ],
       "requires_slots": [
-        "activeCandidate"
+        "activeChrom"
       ],
       "preloads": [
-        "candidate_gene_cargo"
+        "scrubber_main"
       ],
-      "_was_id": "page6"
+      "_was_id": "page6",
+      "_old_entry_2026-05-20": {
+        "requires_layers": ["candidate_gene_cargo"],
+        "requires_slots":  ["activeCandidate"],
+        "preloads":        ["candidate_gene_cargo"],
+        "note": "Preserved for audit trail. popstats is a chromosome-level page; the candidate-* declarations were a registry-content mismatch flagged at round-5-step-18."
+      }
     },
     "ancestry_per_window": {
       "_label": "ancestry",

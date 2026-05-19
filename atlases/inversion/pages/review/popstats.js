@@ -33,6 +33,7 @@
 
 import { _pageState, _setActiveState } from './popstats/_state.js';
 import { renderPopstatsPage } from './popstats/_render.js';
+import { renderCandidateNav } from './popstats/_candidate_nav.js';
 
 export async function mount(root, atlasState, registry) {
   const chrom = atlasState.shared && atlasState.shared.activeChrom;
@@ -58,7 +59,30 @@ export async function mount(root, atlasState, registry) {
   _setActiveState(pageState);
   if (atlasState.inversion) atlasState.inversion._page6State = pageState;
 
+  _mountCandidateNav(root, atlasState, registry);
   renderPopstatsPage({ root, data, candidate, cur });
+}
+
+/**
+ * Insert the prev/next candidate nav bar at the very top of #popstats.
+ * onChange flips activeCandidate via the AtlasState convenience setter
+ * AND re-runs mount() so the breakpoint overlay, candidate label, and
+ * "candidate N / M" position counter all refresh in one pass.
+ */
+function _mountCandidateNav(root, atlasState, registry) {
+  const page = (root && root.querySelector) ? root.querySelector('#popstats') : null;
+  if (!page) return;
+  const old = page.querySelector('.cand-nav-inline');
+  if (old) old.remove();
+  const bar = renderCandidateNav({
+    atlasState,
+    idPrefix: 'ps',
+    onChange: () => {
+      mount(root, atlasState, registry).catch(err =>
+        console.warn('popstats: re-mount after candidate change threw —', err));
+    },
+  });
+  page.insertBefore(bar, page.firstChild);
 }
 
 export async function unmount(root) {

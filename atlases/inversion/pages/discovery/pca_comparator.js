@@ -26,6 +26,8 @@ import {
   paintPanel,
   findSampleAtPixel,
   paintLines,
+  paintTrajectory,
+  computeConcordance,
   windowAtLinesX,
 } from './pca_comparator/renderer.js';
 

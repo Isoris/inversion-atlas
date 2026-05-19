@@ -23,6 +23,7 @@ import {
 } from './_canvas.js';
 import { loadView, saveView, categoryOf, isVisible, toggle } from './_view.js';
 import { collectTracks } from './_tracks.js';
+import { attachTooltip } from './_tooltip.js';
 
 const CAT_LABELS = { qc: 'QC', popstats: 'popstats' };
 
@@ -161,7 +162,14 @@ function _drawAll(stack, tracks, view, data, bps, cur) {
       drawSimCollapse(ctx, toX, pad, plotW, plotH, wins, data.sim_mat);
     } else if (typeof t.getData === 'function') {
       const td = t.getData(data);
-      if (td) drawLine(ctx, toX, pad, plotW, plotH, td, t);
+      if (td) {
+        drawLine(ctx, toX, pad, plotW, plotH, td, t);
+        attachTooltip(cv, {
+          trackDef: t, data: td,
+          padL: pad.l, padR: pad.r,
+          mbMin, mbMax,
+        });
+      }
     }
 
     if (typeof cur === 'number' && wins[cur]) {

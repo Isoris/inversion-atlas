@@ -4,7 +4,14 @@
 // per-band statistics from the data layers that local_pca_dosage already carries
 // (GHSL panel, θπ panel, ROH intervals, sample-FROH) and surfaces:
 
-import { computeHetRateForRange } from '../../shared/dosage_chunks.js';
+// 2026-05-19: was '../../shared/...' which from this file's location
+// (atlases/inversion/pages/discovery/local_pca_dosage/) resolves to
+// atlases/inversion/pages/shared/ — that dir doesn't exist, so the
+// import 404'd at module load. Every sibling in this directory uses
+// '../../../shared/' (three '..') to climb out of local_pca_dosage/ →
+// discovery/ → pages/ before hitting atlases/inversion/shared/. This
+// file was the outlier; fixed.
+import { computeHetRateForRange } from '../../../shared/dosage_chunks.js';
 //
 //   - Per-band rows with mean/median for each available source
 //     (GHSL, het, theta_pi, ROH overlap %, FROH).

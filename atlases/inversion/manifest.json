@@ -18,10 +18,117 @@
       "id": "candidate_focus",
       "slug": "candidate_focus",
       "label": "candidate focus",
-      "stage": "discovery_2",
+      "stage": "discovery",
       "fragment": "atlases/inversion/pages/discovery/candidate_focus.html",
       "module": "atlases/inversion/pages/discovery/candidate_focus.js",
       "_was_id": "page2"
+    },
+    {
+      "id": "haplotype_regimes",
+      "slug": "haplotype_regimes",
+      "_was_id": "page22",
+      "label": "haplotype regimes",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/haplotype_regimes.html",
+      "module": "atlases/inversion/pages/discovery/haplotype_regimes.js",
+      "tooltip": "Long-range haplotype regimes (Stage 4 bruteforce projection). Run runBandingPipeline on the active chromosome and explore where each seed-band voter lands across target windows. Export the result as a regime catalogue JSON."
+    },
+    {
+      "id": "pca_comparator",
+      "slug": "pca_comparator",
+      "label": "PCA comparator (dosage · θπ · GHSL)",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/pca_comparator.html",
+      "module": "atlases/inversion/pages/discovery/pca_comparator.js",
+      "tooltip": "Cross-evidence PCA comparator — Phase 1 (side-by-side). 3 synchronized mini-PCA panels at the active window; hover a dot to track it across all 3 axes. K-band coloring inherits from the anchor's clustering (default: dosage). Read-only inspector."
+    },
+    {
+      "id": "boundary_refinement",
+      "slug": "boundary_refinement",
+      "label": "boundaries",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/review/boundary_refinement.html",
+      "module": "atlases/inversion/pages/review/boundary_refinement.js",
+      "_was_id": "page11"
+    },
+    {
+      "id": "sv_evidence",
+      "slug": "sv_evidence",
+      "label": "SV evidence",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/review/sv_evidence.html",
+      "module": "atlases/inversion/pages/review/sv_evidence.js",
+      "_was_id": "page_sv_evidence"
+    },
+    {
+      "id": "tree_panel",
+      "slug": "tree_panel",
+      "label": "tree panel",
+      "stage": "tooling",
+      "fragment": "atlases/inversion/pages/discovery/tree_panel.html",
+      "module": "atlases/inversion/pages/discovery/tree_panel.js",
+      "tooltip": "Inversion-core sample tree (NJ on dosage distances) with cluster colouring and ARI-vs-clusters badge (HANDOFF_5).",
+      "_was_id": "page_tree_panel"
+    },
+    {
+      "id": "fingerprint_track",
+      "slug": "fingerprint_track",
+      "label": "fingerprint track",
+      "stage": "tooling",
+      "fragment": "atlases/inversion/pages/discovery/fingerprint_track.html",
+      "module": "atlases/inversion/pages/discovery/fingerprint_track.js",
+      "tooltip": "Per-window diversity-regime fingerprint with rank-equivalence regime IDs, switch markers, fragment-proportions treemap, and architecture-scenario verdict (HANDOFF_6).",
+      "_was_id": "page_fingerprint_track"
+    },
+    {
+      "id": "similarity_matrix",
+      "slug": "similarity_matrix",
+      "label": "similarity matrix",
+      "stage": "tooling",
+      "fragment": "atlases/inversion/pages/discovery/similarity_matrix.html",
+      "module": "atlases/inversion/pages/discovery/similarity_matrix.js",
+      "tooltip": "Per-window sample×sample similarity heatmap with block detection + adjacent-window ARI transition strip (HANDOFF_10).",
+      "_was_id": "page_similarity_panel"
+    },
+    {
+      "id": "pca_scatter_per_window",
+      "slug": "pca_scatter_per_window",
+      "label": "PCA scatter",
+      "stage": "tooling",
+      "fragment": "atlases/inversion/pages/discovery/pca_scatter_per_window.html",
+      "module": "atlases/inversion/pages/discovery/pca_scatter_per_window.js",
+      "tooltip": "Per-window PC1×PC2 scatter with cluster colouring and λ-magnitude scrubber (SPEC_0 §10 Phase 1).",
+      "_was_id": "page_pca_panel"
+    },
+    {
+      "id": "dosage_heatmap",
+      "slug": "dosage_heatmap",
+      "label": "dosage heatmap",
+      "stage": "tooling",
+      "fragment": "atlases/inversion/pages/discovery/dosage_heatmap.html",
+      "module": "atlases/inversion/pages/discovery/dosage_heatmap.js",
+      "tooltip": "Sample × marker dosage heatmap with K=3 group track and polarity stripe. Accepts mgl_heatmap_json or legacy candidate-chunk shape via shared adapters (SPEC_0 §11).",
+      "_was_id": "page_dosage_heatmap"
+    },
+    {
+      "id": "nested_inversion_detector",
+      "slug": "nested_inversion_detector",
+      "label": "nested detector",
+      "stage": "tooling",
+      "fragment": "atlases/inversion/pages/discovery/nested_inversion_detector.html",
+      "module": "atlases/inversion/pages/discovery/nested_inversion_detector.js",
+      "tooltip": "Nested-inversion detector with 3 stratum tracks (HOM1 / HET / HOM2) and contiguous inner-interval overlays (HANDOFF_7).",
+      "_was_id": "page_nested_detector"
+    },
+    {
+      "id": "dosage_cluster_adaptive_k",
+      "slug": "dosage_cluster_adaptive_k",
+      "label": "dosage cluster",
+      "stage": "tooling",
+      "fragment": "atlases/inversion/pages/discovery/dosage_cluster_adaptive_k.html",
+      "module": "atlases/inversion/pages/discovery/dosage_cluster_adaptive_k.js",
+      "tooltip": "Adaptive-K sample clustering on per-window dosage profiles, with per-K scoring table and cluster mean-curve display (HANDOFF_8).",
+      "_was_id": "page_dosage_cluster"
     },
     {
       "id": "window_summary_table",
@@ -40,80 +147,6 @@
       "fragment": "atlases/inversion/pages/discovery/negative_regions.html",
       "module": "atlases/inversion/pages/discovery/negative_regions.js",
       "_was_id": "page19"
-    },
-    {
-      "id": "haplotype_regimes",
-      "slug": "haplotype_regimes",
-      "_was_id": "page22",
-      "label": "haplotype regimes",
-      "stage": "discovery_2",
-      "fragment": "atlases/inversion/pages/discovery/haplotype_regimes.html",
-      "module": "atlases/inversion/pages/discovery/haplotype_regimes.js",
-      "tooltip": "Long-range haplotype regimes (Stage 4 bruteforce projection). Run runBandingPipeline on the active chromosome and explore where each seed-band voter lands across target windows. Export the result as a regime catalogue JSON."
-    },
-    {
-      "id": "pca_comparator",
-      "slug": "pca_comparator",
-      "label": "PCA comparator (dosage \u00b7 \u03b8\u03c0 \u00b7 GHSL)",
-      "stage": "discovery_2",
-      "fragment": "atlases/inversion/pages/discovery/pca_comparator.html",
-      "module": "atlases/inversion/pages/discovery/pca_comparator.js",
-      "tooltip": "Cross-evidence PCA comparator \u2014 Phase 1 (side-by-side). 3 synchronized mini-PCA panels at the active window; hover a dot to track it across all 3 axes. K-band coloring inherits from the anchor's clustering (default: dosage). Read-only inspector."
-    },
-    {
-      "id": "karyotype_tier",
-      "slug": "karyotype_tier",
-      "label": "karyotype / tier",
-      "stage": "classification",
-      "fragment": "atlases/inversion/pages/review/karyotype_tier.html",
-      "module": "atlases/inversion/pages/review/karyotype_tier.js",
-      "_was_id": "page4"
-    },
-    {
-      "id": "popstats",
-      "slug": "popstats",
-      "label": "popstats",
-      "stage": "synthesis",
-      "fragment": "atlases/inversion/pages/review/popstats.html",
-      "module": "atlases/inversion/pages/review/popstats.js",
-      "_was_id": "page6"
-    },
-    {
-      "id": "ancestry_per_window",
-      "slug": "ancestry_per_window",
-      "label": "ancestry",
-      "stage": "evolution",
-      "fragment": "atlases/inversion/pages/review/ancestry_per_window.html",
-      "module": "atlases/inversion/pages/review/ancestry_per_window.js",
-      "_was_id": "page7"
-    },
-    {
-      "id": "boundary_refinement",
-      "slug": "boundary_refinement",
-      "label": "boundaries",
-      "stage": "discovery_2",
-      "fragment": "atlases/inversion/pages/review/boundary_refinement.html",
-      "module": "atlases/inversion/pages/review/boundary_refinement.js",
-      "_was_id": "page11"
-    },
-    {
-      "id": "sv_evidence",
-      "slug": "sv_evidence",
-      "label": "SV evidence",
-      "stage": "discovery_2",
-      "fragment": "atlases/inversion/pages/review/sv_evidence.html",
-      "module": "atlases/inversion/pages/review/sv_evidence.js",
-      "_was_id": "page_sv_evidence"
-    },
-    {
-      "id": "fish_ancestry_scroller",
-      "slug": "fish_ancestry_scroller",
-      "label": "ancestry scroller",
-      "stage": "evolution",
-      "fragment": "atlases/inversion/pages/review/fish_ancestry_scroller.html",
-      "module": "atlases/inversion/pages/review/fish_ancestry_scroller.js",
-      "tooltip": "Fish Ancestry Scroller \u2014 per-fish ancestry painting across one selected inversion candidate (one chromosome viewport). Three numbered layers (PC1 Band / Ancestry Bricks / Brick summary cohort) + 5-row brick-metrics heatmap + tab strip. Headline metric: mean |\u0394Q| (global vs local). Consumes shared/ancestry_alignment.js (F-based label-switching alignment) + shared/ancestry_bricks.js (per-fish bricks + flags). See specs_todo/SPEC_fish_ancestry_scroller.md for UI layout v2.",
-      "_was_id": "page_ancestry_scroller"
     },
     {
       "id": "catalogue",
@@ -143,13 +176,22 @@
       "_was_id": "page10"
     },
     {
-      "id": "stats_profile",
-      "slug": "stats_profile",
-      "label": "stats profile",
-      "stage": "synthesis",
-      "fragment": "atlases/inversion/pages/catalogue/stats_profile.html",
-      "module": "atlases/inversion/pages/catalogue/stats_profile.js",
-      "_was_id": "page17"
+      "id": "annotation_cockpit",
+      "slug": "annotation_cockpit",
+      "label": "annotation cockpit",
+      "stage": "catalogue",
+      "fragment": "atlases/inversion/pages/catalogue/annotation_cockpit.html",
+      "module": "atlases/inversion/pages/catalogue/annotation_cockpit.js",
+      "_was_id": "page21"
+    },
+    {
+      "id": "karyotype_tier",
+      "slug": "karyotype_tier",
+      "label": "karyotype / tier",
+      "stage": "classification",
+      "fragment": "atlases/inversion/pages/review/karyotype_tier.html",
+      "module": "atlases/inversion/pages/review/karyotype_tier.js",
+      "_was_id": "page4"
     },
     {
       "id": "marker_readiness",
@@ -161,32 +203,23 @@
       "_was_id": "page18"
     },
     {
-      "id": "annotation_cockpit",
-      "slug": "annotation_cockpit",
-      "label": "annotation cockpit",
-      "stage": "catalogue",
-      "fragment": "atlases/inversion/pages/catalogue/annotation_cockpit.html",
-      "module": "atlases/inversion/pages/catalogue/annotation_cockpit.js",
-      "_was_id": "page21"
+      "id": "ancestry_per_window",
+      "slug": "ancestry_per_window",
+      "label": "ancestry",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/review/ancestry_per_window.html",
+      "module": "atlases/inversion/pages/review/ancestry_per_window.js",
+      "_was_id": "page7"
     },
     {
-      "id": "overview",
-      "slug": "overview",
-      "label": "overview",
-      "stage": "synthesis",
-      "fragment": "atlases/inversion/pages/catalogue/overview.html",
-      "module": "atlases/inversion/pages/catalogue/overview.js",
-      "_was_id": "page_overview"
-    },
-    {
-      "id": "help",
-      "slug": "help",
-      "label": "help",
-      "stage": "help",
-      "fragment": "atlases/inversion/pages/comparative/help.html",
-      "module": "atlases/inversion/pages/comparative/help.js",
-      "tooltip": "Quick-reference / help page (static HTML, no JS render). NB: legacy 'help' is the help page, NOT multi-species \u2014 the multi-species cockpit is multi_species_cockpit.",
-      "_was_id": "page5"
+      "id": "fish_ancestry_scroller",
+      "slug": "fish_ancestry_scroller",
+      "label": "ancestry scroller",
+      "stage": "evolution",
+      "fragment": "atlases/inversion/pages/review/fish_ancestry_scroller.html",
+      "module": "atlases/inversion/pages/review/fish_ancestry_scroller.js",
+      "tooltip": "Fish Ancestry Scroller — per-fish ancestry painting across one selected inversion candidate (one chromosome viewport). Three numbered layers (PC1 Band / Ancestry Bricks / Brick summary cohort) + 5-row brick-metrics heatmap + tab strip. Headline metric: mean |ΔQ| (global vs local). Consumes shared/ancestry_alignment.js (F-based label-switching alignment) + shared/ancestry_bricks.js (per-fish bricks + flags). See specs_todo/SPEC_fish_ancestry_scroller.md for UI layout v2.",
+      "_was_id": "page_ancestry_scroller"
     },
     {
       "id": "cross_species_breakpoints",
@@ -208,79 +241,9 @@
       "_was_id": "page16b"
     },
     {
-      "id": "tree_panel",
-      "slug": "tree_panel",
-      "label": "tree panel",
-      "stage": "tooling",
-      "fragment": "atlases/inversion/pages/discovery/tree_panel.html",
-      "module": "atlases/inversion/pages/discovery/tree_panel.js",
-      "tooltip": "Inversion-core sample tree (NJ on dosage distances) with cluster colouring and ARI-vs-clusters badge (HANDOFF_5).",
-      "_was_id": "page_tree_panel"
-    },
-    {
-      "id": "fingerprint_track",
-      "slug": "fingerprint_track",
-      "label": "fingerprint track",
-      "stage": "tooling",
-      "fragment": "atlases/inversion/pages/discovery/fingerprint_track.html",
-      "module": "atlases/inversion/pages/discovery/fingerprint_track.js",
-      "tooltip": "Per-window diversity-regime fingerprint with rank-equivalence regime IDs, switch markers, fragment-proportions treemap, and architecture-scenario verdict (HANDOFF_6).",
-      "_was_id": "page_fingerprint_track"
-    },
-    {
-      "id": "similarity_matrix",
-      "slug": "similarity_matrix",
-      "label": "similarity matrix",
-      "stage": "tooling",
-      "fragment": "atlases/inversion/pages/discovery/similarity_matrix.html",
-      "module": "atlases/inversion/pages/discovery/similarity_matrix.js",
-      "tooltip": "Per-window sample\u00d7sample similarity heatmap with block detection + adjacent-window ARI transition strip (HANDOFF_10).",
-      "_was_id": "page_similarity_panel"
-    },
-    {
-      "id": "pca_scatter_per_window",
-      "slug": "pca_scatter_per_window",
-      "label": "PCA scatter",
-      "stage": "tooling",
-      "fragment": "atlases/inversion/pages/discovery/pca_scatter_per_window.html",
-      "module": "atlases/inversion/pages/discovery/pca_scatter_per_window.js",
-      "tooltip": "Per-window PC1\u00d7PC2 scatter with cluster colouring and \u03bb-magnitude scrubber (SPEC_0 \u00a710 Phase 1).",
-      "_was_id": "page_pca_panel"
-    },
-    {
-      "id": "dosage_heatmap",
-      "slug": "dosage_heatmap",
-      "label": "dosage heatmap",
-      "stage": "tooling",
-      "fragment": "atlases/inversion/pages/discovery/dosage_heatmap.html",
-      "module": "atlases/inversion/pages/discovery/dosage_heatmap.js",
-      "tooltip": "Sample \u00d7 marker dosage heatmap with K=3 group track and polarity stripe. Accepts mgl_heatmap_json or legacy candidate-chunk shape via shared adapters (SPEC_0 \u00a711).",
-      "_was_id": "page_dosage_heatmap"
-    },
-    {
-      "id": "nested_inversion_detector",
-      "slug": "nested_inversion_detector",
-      "label": "nested detector",
-      "stage": "tooling",
-      "fragment": "atlases/inversion/pages/discovery/nested_inversion_detector.html",
-      "module": "atlases/inversion/pages/discovery/nested_inversion_detector.js",
-      "tooltip": "Nested-inversion detector with 3 stratum tracks (HOM1 / HET / HOM2) and contiguous inner-interval overlays (HANDOFF_7).",
-      "_was_id": "page_nested_detector"
-    },
-    {
-      "id": "dosage_cluster_adaptive_k",
-      "slug": "dosage_cluster_adaptive_k",
-      "label": "dosage cluster",
-      "stage": "tooling",
-      "fragment": "atlases/inversion/pages/discovery/dosage_cluster_adaptive_k.html",
-      "module": "atlases/inversion/pages/discovery/dosage_cluster_adaptive_k.js",
-      "tooltip": "Adaptive-K sample clustering on per-window dosage profiles, with per-K scoring table and cluster mean-curve display (HANDOFF_8).",
-      "_was_id": "page_dosage_cluster"
-    },
-    {
       "id": "polarize_msa_stacked",
       "slug": "polarize_msa_stacked",
-      "label": "polarize \u00b7 MSA",
+      "label": "polarize · MSA",
       "stage": "evolution",
       "fragment": "atlases/inversion/pages/evolution/polarize_msa_stacked.html",
       "module": "atlases/inversion/pages/evolution/polarize_msa_stacked.js",
@@ -300,7 +263,7 @@
     {
       "id": "polarize_synteny_vote",
       "slug": "polarize_synteny_vote",
-      "label": "polarize \u00b7 synteny",
+      "label": "polarize · synteny",
       "stage": "evolution",
       "fragment": "atlases/inversion/pages/evolution/polarize_synteny_vote.html",
       "module": "atlases/inversion/pages/evolution/polarize_synteny_vote.js",
@@ -354,7 +317,7 @@
       "stage": "evolution",
       "fragment": "atlases/inversion/pages/evolution/event_tree_relative_ordering.html",
       "module": "atlases/inversion/pages/evolution/event_tree_relative_ordering.js",
-      "tooltip": "Relative-ordering inference across multiple inversions on the same chromosome \u2014 carrier-overlap nesting, internal diversity ranking, outgroup presence, age class chaining.",
+      "tooltip": "Relative-ordering inference across multiple inversions on the same chromosome — carrier-overlap nesting, internal diversity ranking, outgroup presence, age class chaining.",
       "_was_id": "page_evolution_event_tree"
     },
     {
@@ -364,8 +327,45 @@
       "stage": "evolution",
       "fragment": "atlases/inversion/pages/evolution/archaeology_synthesis_card.html",
       "module": "atlases/inversion/pages/evolution/archaeology_synthesis_card.js",
-      "tooltip": "Per-candidate synthesis card: pulls together polarity, age class, integrity, mosaicism, frequency, \u03c0/dXY/FST, private/fixed counts, and confidence into one screen \u2014 the Step-6 verdict.",
+      "tooltip": "Per-candidate synthesis card: pulls together polarity, age class, integrity, mosaicism, frequency, π/dXY/FST, private/fixed counts, and confidence into one screen — the Step-6 verdict.",
       "_was_id": "page_evolution_archaeology_card"
+    },
+    {
+      "id": "popstats",
+      "slug": "popstats",
+      "label": "popstats",
+      "stage": "synthesis",
+      "fragment": "atlases/inversion/pages/review/popstats.html",
+      "module": "atlases/inversion/pages/review/popstats.js",
+      "_was_id": "page6"
+    },
+    {
+      "id": "stats_profile",
+      "slug": "stats_profile",
+      "label": "stats profile",
+      "stage": "synthesis",
+      "fragment": "atlases/inversion/pages/catalogue/stats_profile.html",
+      "module": "atlases/inversion/pages/catalogue/stats_profile.js",
+      "_was_id": "page17"
+    },
+    {
+      "id": "overview",
+      "slug": "overview",
+      "label": "overview",
+      "stage": "synthesis",
+      "fragment": "atlases/inversion/pages/catalogue/overview.html",
+      "module": "atlases/inversion/pages/catalogue/overview.js",
+      "_was_id": "page_overview"
+    },
+    {
+      "id": "help",
+      "slug": "help",
+      "label": "help",
+      "stage": "help",
+      "fragment": "atlases/inversion/pages/comparative/help.html",
+      "module": "atlases/inversion/pages/comparative/help.js",
+      "tooltip": "Quick-reference / help page (static HTML, no JS render). NB: legacy 'help' is the help page, NOT multi-species — the multi-species cockpit is multi_species_cockpit.",
+      "_was_id": "page5"
     }
   ],
   "registries": {
@@ -384,7 +384,7 @@
     "band_tracking": "atlases/inversion/shared/band_tracking/index.js"
   },
   "server": {
-    "_doc": "Server moved to atlas-core/server/ (turn 'core-server-unify'). Every endpoint here (popstats / LD / dosage / file / compute) is generic plumbing \u2014 the inversion atlas reaches it the same way every other atlas will. See atlas-core/server/SERVER_README.md.",
+    "_doc": "Server moved to atlas-core/server/ (turn 'core-server-unify'). Every endpoint here (popstats / LD / dosage / file / compute) is generic plumbing — the inversion atlas reaches it the same way every other atlas will. See atlas-core/server/SERVER_README.md.",
     "entry": "server/atlas_server.py",
     "config_example": "server/atlas_server.config.example.yaml",
     "default_url": "http://localhost:8000",
@@ -398,7 +398,7 @@
     "atlases/inversion/css/inversion.css"
   ],
   "_stylesheets_chrome_doc": "atlas_chrome.css is a generic chrome stylesheet (tab pills + settings button + active-stage folding) shipped here as a CANDIDATE FOR PROMOTION to atlas-core. Pairs with shared/atlas_chrome.js. Other atlases can drop the same two files in. When atlas-core ships its own copy, remove this entry + delete the cartridge copy.",
-  "_stylesheets_doc": "Atlas-wide stylesheets, loaded by the shell at atlas-register time. Currently one big bundle (extracted verbatim from the legacy monolith). Future work: split into per-page stylesheets (atlases/inversion/css/pages/local_pca_dosage.css etc.) and reference them from each page entry's `stylesheet` field below \u2014 the router loads page-stylesheet on mount.",
+  "_stylesheets_doc": "Atlas-wide stylesheets, loaded by the shell at atlas-register time. Currently one big bundle (extracted verbatim from the legacy monolith). Future work: split into per-page stylesheets (atlases/inversion/css/pages/local_pca_dosage.css etc.) and reference them from each page entry's `stylesheet` field below — the router loads page-stylesheet on mount.",
   "scope_pickers": [
     {
       "slot": "activeChrom",
@@ -407,25 +407,19 @@
       "shared": true
     }
   ],
-  "_scope_pickers_doc": "Pickers rendered in the shell's #scopebar (sticky strip below the topbar). Each picker drives an AtlasState slot via setActiveChrom / setActiveCandidate / generic emit. `auto_options_from: <root_name>` makes the dropdown discover its options at runtime via GET /api/precomp_index?root=<root_name> \u2014 the server walks the pipeline output dir and returns whichever chromosomes have an atlas JSON on disk. No manual list to maintain; add a new chrom to the pipeline output and it shows up in the dropdown on next page load. (A static `options: [...]` array is still supported for pickers that aren't backed by a precomp root.)",
+  "_scope_pickers_doc": "Pickers rendered in the shell's #scopebar (sticky strip below the topbar). Each picker drives an AtlasState slot via setActiveChrom / setActiveCandidate / generic emit. `auto_options_from: <root_name>` makes the dropdown discover its options at runtime via GET /api/precomp_index?root=<root_name> — the server walks the pipeline output dir and returns whichever chromosomes have an atlas JSON on disk. No manual list to maintain; add a new chrom to the pipeline output and it shows up in the dropdown on next page load. (A static `options: [...]` array is still supported for pickers that aren't backed by a precomp root.)",
   "stages": [
     {
       "id": "discovery",
-      "label": "discovery 1",
+      "label": "discovery",
       "order": 1,
-      "_doc": "Round-1 discovery: the local-PCA detection pipeline (|z|, \u03b8\u03c0, GHSL). Other discovery panels \u2014 dosage heatmap, PCA scatter, similarity matrix, fingerprint track, haplotype regimes, tree panel, nested detector, dosage cluster \u2014 live in 'discovery_2'. Per-window summary table + negative regions catalogue moved to 'catalogue'."
-    },
-    {
-      "id": "discovery_2",
-      "label": "discovery 2",
-      "order": 2,
-      "_doc": "Round-2 discovery: workflow surfaces for per-candidate deep-dive and the v3.4 banding pipeline runner. Currently candidate_focus (candidate focus) + haplotype_regimes (was page22 until 2026-05-16). The utility / inspector cartridges (tree panel, fingerprint track, similarity matrix, PCA scatter, dosage heatmap, nested detector, dosage cluster) moved to 'tooling' on 2026-05-16 \u2014 see AUDIT_local_pca_merge_vs_rename.md \u00a7Q3."
+      "_doc": "End-to-end discovery: |z|-based local-PCA detection, per-candidate deep-dive, haplotype regimes, cross-evidence PCA comparator, and the final-step candidate validation (boundary refinement + SV evidence). Merged from 'discovery 1' + 'discovery 2' on 2026-05-20 — the two-stage split was a legacy artifact; a single discovery stage matches the actual workflow (find → focus → refine → validate). Pages: local_pca_dosage (find), candidate_focus (focus), haplotype_regimes (regimes), pca_comparator (cross-axis check), boundary_refinement (last-step: where exactly does it start/end), sv_evidence (last-step: do SV callers agree). Per-window summary table + negative regions catalogue live in 'catalogue'. Utility / inspector cartridges (tree panel, fingerprint track, similarity matrix, PCA scatter, dosage heatmap, nested detector, dosage cluster) live in 'tooling'."
     },
     {
       "id": "tooling",
       "label": "tooling",
       "order": 2.5,
-      "_doc": "Utility / inspector cartridges. Open these to characterise a candidate, debug a layer, or compare evidence axes. Distinct from discovery_2's workflow pages. Pages currently in this stage: tree_panel, fingerprint_track, similarity_matrix, pca_scatter_per_window, dosage_heatmap, nested_inversion_detector, dosage_cluster_adaptive_k (re-staged from discovery_2 on 2026-05-16 per AUDIT_local_pca_merge_vs_rename.md \u00a7Q3). Future additions: page_pca_comparator (per SPEC_local_pca_comparator.md). Atlas-core shell may render this stage as a vertical sidebar rather than horizontal pills \u2014 that's a shell-side change tracked separately."
+      "_doc": "Utility / inspector cartridges. Open these to characterise a candidate, debug a layer, or compare evidence axes. Distinct from discovery_2's workflow pages. Pages currently in this stage: tree_panel, fingerprint_track, similarity_matrix, pca_scatter_per_window, dosage_heatmap, nested_inversion_detector, dosage_cluster_adaptive_k (re-staged from discovery_2 on 2026-05-16 per AUDIT_local_pca_merge_vs_rename.md §Q3). Future additions: page_pca_comparator (per SPEC_local_pca_comparator.md). Atlas-core shell may render this stage as a vertical sidebar rather than horizontal pills — that's a shell-side change tracked separately."
     },
     {
       "id": "catalogue",
@@ -436,7 +430,7 @@
       "id": "classification",
       "label": "classification",
       "order": 4,
-      "_doc": "Per-candidate karyotype assignment + marker readiness. Shrunk to 2 pages on 2026-05-18 (see STAGE_AUDIT_2026-05-18.md): ancestry / boundary-refinement / SV-evidence / popstats / stats_profile / overview moved out to evolution / discovery_2 / synthesis. Only karyotype_tier + marker_readiness remain \u2014 the actual per-candidate \"what kind of inversion\" surfaces."
+      "_doc": "Per-candidate karyotype assignment + marker readiness. Shrunk to 2 pages on 2026-05-18 (see STAGE_AUDIT_2026-05-18.md): ancestry / boundary-refinement / SV-evidence / popstats / stats_profile / overview moved out to evolution / discovery_2 / synthesis. Only karyotype_tier + marker_readiness remain — the actual per-candidate \"what kind of inversion\" surfaces."
     },
     {
       "id": "evolution",
@@ -448,7 +442,7 @@
       "id": "synthesis",
       "label": "synthesis",
       "order": 6,
-      "_doc": "Cohort-level synthesis surfaces. Project overview, manuscript-ready statistical profile, per-window popstats track stack. Restored 2026-05-18 \u2014 these pages were originally synthesis-stage in legacy but got swept into classification by the slug-migration scripts. See STAGE_AUDIT_2026-05-18.md for the audit trail."
+      "_doc": "Cohort-level synthesis surfaces. Project overview, manuscript-ready statistical profile, per-window popstats track stack. Restored 2026-05-18 — these pages were originally synthesis-stage in legacy but got swept into classification by the slug-migration scripts. See STAGE_AUDIT_2026-05-18.md for the audit trail."
     },
     {
       "id": "help",

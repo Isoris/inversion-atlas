@@ -1734,6 +1734,36 @@ html[data-theme="light"] .cli-subband[data-verdict="CROSS_CUTTING"] { color: #b9
 /* Popstats stack (page 6) — Q04-style multi-track diagnostic */
 #popstats { padding: 16px 24px; overflow: auto; height: 100%;
          box-sizing: border-box; background: var(--bg); color: var(--ink); }
+/* Candidate-nav bar at the top of popstats (+ any other page that mounts it
+   via popstats/_candidate_nav.js — shape is reusable). */
+#popstats .cand-nav-inline {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 12px; margin-bottom: 12px;
+  background: var(--panel-2); border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-family: var(--mono); font-size: 11.5px;
+  color: var(--ink);
+}
+#popstats .cand-nav-inline .cnav-btn {
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: 3px;
+  padding: 4px 12px;
+  font-family: var(--mono); font-size: 11px;
+  cursor: pointer;
+}
+#popstats .cand-nav-inline .cnav-btn:hover:not(:disabled) { border-color: var(--accent); }
+#popstats .cand-nav-inline .cnav-btn:disabled { opacity: 0.4; cursor: default; }
+#popstats .cand-nav-inline .cnav-btn-dim { color: var(--ink-dim); }
+#popstats .cand-nav-inline .cnav-pos {
+  color: var(--ink-dim); min-width: 130px; text-align: center; white-space: nowrap;
+}
+#popstats .cand-nav-inline .cnav-sep    { color: var(--ink-dim); margin: 0 6px; }
+#popstats .cand-nav-inline .cnav-label  { color: var(--ink-dim); }
+#popstats .cand-nav-inline .cnav-id     { color: var(--accent); font-weight: 500; }
+#popstats .cand-nav-inline .cnav-id.cnav-empty {
+  color: var(--ink-dim); font-style: italic; font-weight: normal;
+}
+#popstats .cand-nav-inline .cnav-spacer { flex: 1; }
 /* Turn 6.5: when the gallery tray is open, page-6 lays out as a 2-col grid
    with the stack on the left and the 240-px tray on the right. When the
    tray is collapsed (data-collapsed="true") it's display:none and the
@@ -2184,16 +2214,29 @@ body.resizing-l3, body.resizing-l3 * { cursor: ns-resize !important; user-select
    The selectors below are scoped to #pcaPanel + #trackedSamplesPanel so
    the wash doesn't bleed into the |Z|, sim_mat, lines, or L3 panels —
    those already have strong colors of their own. */
+/* 2026-05-19: selectors fixed. Previous version targeted
+   `#trackedSamplesPanel` which doesn't exist in current markup
+   (real IDs: #pcaTrackedAside in fixed mode, #trackedSamplesPanelCompact
+   in compact mode, #trackedSamplesSidebarSection in the sidebar). The
+   wash only showed up incidentally because #pcaPanel contains
+   #pcaTrackedAside as a child in fixed mode. Now explicit on all three
+   surfaces so the tint is consistent across layouts.
+   GHSL alpha bumped from 0.06 → 0.10 so the blue is actually
+   perceptible (matches the theta_pi amber's effective visibility). */
 body[data-active-mode="theta_pi"] #pcaPanel,
-body[data-active-mode="theta_pi"] #trackedSamplesPanel {
+body[data-active-mode="theta_pi"] #pcaTrackedAside,
+body[data-active-mode="theta_pi"] #trackedSamplesPanelCompact,
+body[data-active-mode="theta_pi"] #trackedSamplesSidebarSection {
   background-image:
-    linear-gradient(rgba(240, 175, 60, 0.045), rgba(240, 175, 60, 0.045));
+    linear-gradient(rgba(240, 175, 60, 0.08), rgba(240, 175, 60, 0.08));
   border-color: rgba(240, 175, 60, 0.35) !important;
 }
 body[data-active-mode="ghsl"] #pcaPanel,
-body[data-active-mode="ghsl"] #trackedSamplesPanel {
+body[data-active-mode="ghsl"] #pcaTrackedAside,
+body[data-active-mode="ghsl"] #trackedSamplesPanelCompact,
+body[data-active-mode="ghsl"] #trackedSamplesSidebarSection {
   background-image:
-    linear-gradient(rgba(80, 140, 200, 0.06), rgba(80, 140, 200, 0.06));
+    linear-gradient(rgba(80, 140, 200, 0.10), rgba(80, 140, 200, 0.10));
   border-color: rgba(80, 140, 200, 0.4) !important;
 }
 /* turn 128: #jumpToWindowsBtn (📊 Windows (N)) is the arrow-step cycler.
@@ -2295,10 +2338,22 @@ body[data-active-mode="ghsl"] #trackedSamplesPanel {
   font-family: var(--mono, monospace);
   font-size: 9px;
   color: var(--ink, #d8dde6);
-  pointer-events: none;
+  /* 2026-05-20: drag-to-reattach. pointer-events enabled so mousedown
+     can start a drag; children are non-interactive so the drag works
+     from anywhere on the inset surface. */
+  pointer-events: auto;
+  cursor: grab;
   z-index: 4;
   line-height: 1.2;
   transition: top 180ms ease, left 180ms ease, right 180ms ease, bottom 180ms ease;
+  user-select: none;
+}
+.scree-inset > * { pointer-events: none; }
+.scree-inset.scree-dragging {
+  cursor: grabbing;
+  transition: none;
+  border-color: var(--accent, #f5a524);
+  background: rgba(0, 0, 0, 0.75);
 }
 .scree-inset[data-corner="tl"] { top: 8px;    left: 8px;   right: auto;  bottom: auto; }
 .scree-inset[data-corner="tr"] { top: 8px;    right: 8px;  left: auto;   bottom: auto; }
@@ -3658,6 +3713,47 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
 }
 #multi_species_cockpit .ms-detail-kv .ms-kv-label { color: var(--ink-dim); }
 #multi_species_cockpit .ms-detail-kv .ms-kv-val { color: var(--ink); }
+/* ===== Synthesis overview (overview) — layer-envelope inventory ===== */
+#overview { overflow-y: auto; }
+#overview .ov-content { padding: 16px; max-width: 980px; }
+#overview .ov-title {
+  font-family: var(--serif); font-weight: 500; font-size: 18px;
+  color: var(--ink); margin-bottom: 4px;
+}
+#overview .ov-subtitle {
+  font-family: var(--mono); font-size: 12px;
+  color: var(--ink-dim); margin-bottom: 16px;
+}
+#overview .ov-panel {
+  font-family: var(--mono); font-size: 13px;
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: var(--panel-2);
+  padding: 12px;
+  min-height: 60px;
+}
+#overview .ov-hint { color: var(--ink-dim); font-style: italic; }
+#overview .ov-error { color: var(--bad, #e0555c); }
+#overview .ov-summary { margin-bottom: 8px; color: var(--ink-dim); }
+#overview .ov-table { width: 100%; border-collapse: collapse; }
+#overview .ov-table th {
+  text-align: left; padding: 4px 8px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel-3);
+  color: var(--ink);
+}
+#overview .ov-table td {
+  padding: 4px 8px; border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+}
+#overview .ov-table .ov-right  { text-align: right; }
+#overview .ov-table .ov-dim    { color: var(--ink-dim); }
+#overview .ov-table code {
+  background: transparent; color: var(--accent);
+  font-size: 12px;
+}
+
 /* ===== Stats profile synthesis page (stats_profile, v4 turn 76) ===== */
 #stats_profile { overflow-y: auto; }
 #stats_profile .sp-header { margin-bottom: 18px; }
@@ -5211,11 +5307,77 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
   color: var(--ink-dimmer); font-style: italic;
 }
 
+/* 2026-05-20: CUSUM dual-pane split. Mirrors the L3 "Dual" layout —
+   when body[data-l3-layout="dual"] is active AND a secondary L2 is
+   pinned, the CUSUM panel splits 50/50 into focal (left) + secondary
+   (right) cusum tracks. Otherwise the left pane fills the panel and
+   the right pane collapses. */
+body[data-l3-layout="dual"] #cusumPanel #cusumPaneLeft {
+  flex: 1 1 50%;
+  border-right: 1px solid var(--rule);
+}
+body[data-l3-layout="dual"] #cusumPanel #cusumPaneRight {
+  flex: 1 1 50%;
+  min-width: 0;
+}
+body:not([data-l3-layout="dual"]) #cusumPanel #cusumPaneRight {
+  flex: 0 0 0;
+  min-width: 0;
+  border: 0;
+  display: none;
+}
+
+/* 2026-05-20: seeds inspector chips on haplotype_regimes. Horizontal
+   scrollable strip of clickable chips, one per Stage 1 seed / Stage 3
+   locus. The active (focal) seed is accent-filled; others are panel-2
+   with a thin rule border. Hover lifts brightness. Each chip carries
+   anchor mb, span (w), and a quality dot (color from band_quality). */
+.rg-seed-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  background: var(--panel-3, #232a36);
+  border: 1px solid var(--rule, #2a3242);
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--ink-dim, #8895a8);
+  transition: background 80ms ease, border-color 80ms ease, color 80ms ease;
+  white-space: nowrap;
+}
+.rg-seed-chip:hover {
+  background: var(--panel, #0f141d);
+  color: var(--ink, #e6edf6);
+}
+.rg-seed-chip.active {
+  background: var(--accent, #f5a524);
+  color: #0b0e13;
+  border-color: var(--accent, #f5a524);
+  font-weight: 600;
+}
+.rg-seed-chip .rg-seed-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.rg-seed-chip .rg-seed-idx {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.rg-seed-chip .rg-seed-meta {
+  color: inherit;
+  opacity: 0.75;
+}
+
 /* 2026-05-20: cursor-unit picker on the PCA comparator header. Pill
    group of buttons (1w / 5w / 10w / 25w / L2 / Cand) — same gesture as
    the |Z| panel's nav lanes so users don't have to learn a second
    model when scrubbing inside the comparator. */
-#pcaCompScrubUnits button[data-scrub-unit] {
+#pcaCompScrubUnits button[data-scrub-unit],
+#rgModeBar button[data-rg-mode] {
   background: transparent;
   color: var(--ink-dim);
   border: 0;
@@ -5226,11 +5388,13 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
   cursor: pointer;
   transition: background 80ms ease, color 80ms ease;
 }
-#pcaCompScrubUnits button[data-scrub-unit]:hover {
+#pcaCompScrubUnits button[data-scrub-unit]:hover,
+#rgModeBar button[data-rg-mode]:hover {
   background: rgba(255,255,255,0.06);
   color: var(--ink);
 }
-#pcaCompScrubUnits button[data-scrub-unit].active {
+#pcaCompScrubUnits button[data-scrub-unit].active,
+#rgModeBar button[data-rg-mode].active {
   background: var(--accent);
   color: #0b0e13;
   font-weight: 600;

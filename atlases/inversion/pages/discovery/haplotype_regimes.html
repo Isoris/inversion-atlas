@@ -36,6 +36,36 @@
         </div>
       </div>
 
+      <!-- 2026-05-20: seeds inspector strip. Horizontal scrollable chip
+           list — one chip per Stage 1 seed produced by the pipeline.
+           Click a chip to set focal_seed_index + repaint the 4 panels.
+           Hidden until the pipeline produces seeds; populated by
+           _renderSeedsStrip() in haplotype_regimes.js. -->
+      <div id="rgSeedsStripWrap" style="
+        flex: 0 0 auto;
+        margin: 0 12px 8px 12px;
+        padding: 4px 6px;
+        background: var(--panel-2, #181d27);
+        border: 1px solid var(--rule, #2a3242);
+        border-radius: 4px;
+        display: none;
+        gap: 6px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        white-space: nowrap;
+      ">
+        <span style="
+          flex: 0 0 auto;
+          padding: 3px 6px 3px 2px;
+          color: var(--ink-dimmer, #5a6472);
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+        ">seeds:</span>
+        <div id="rgSeedsStripList" style="display: inline-flex; gap: 4px; align-items: center;"></div>
+      </div>
+
       <!-- 2x2 panel grid -->
       <div class="regimes-grid" style="
         flex: 1 1 0;
@@ -126,6 +156,24 @@
         gap: 12px;
         align-items: center;
       ">
+        <!-- 2026-05-20: mode toggle. Long-range = the V-walker Stage 1
+             seed discovery + Stage 3 locus construction (the default
+             pipeline). Short-range = use the user's curated candidate
+             list as seeds — no V-walker, no auto-discovery. Helpful for
+             reviewing user-flagged regions instead of waiting for the
+             whole-chrom sweep. -->
+        <span id="rgModeBar" title="Seed source for the pipeline."
+              style="display: inline-flex; align-items: center; gap: 2px;
+                     background: var(--panel-2, #181d27);
+                     border: 1px solid var(--rule, #2a3242);
+                     border-radius: 3px; padding: 1px 2px;
+                     font: 10px ui-monospace, monospace;">
+          <span style="color: var(--ink-dimmer, #5a6472); padding: 0 6px 0 4px;">seeds:</span>
+          <button type="button" data-rg-mode="long" class="active"
+                  title="Stage 1 V-walker: anchor sweep + Cramér's V boundary detection across the whole chromosome.">long-range</button>
+          <button type="button" data-rg-mode="short"
+                  title="User-curated candidates from local_pca_dosage (lock-promote / L3-draft confirms). No automatic discovery — review what you already drafted.">short-range</button>
+        </span>
         <button id="rgExportCatalogueBtn" class="rg-tb-btn" disabled
           title="Serialize the in-memory pipeline result to a regime catalogue JSON. Disabled until the pipeline has run."
           style="

@@ -501,6 +501,165 @@ function _renderLinesBackground(w, h, dpr, pad, plotW, plotH, series,
   return off;
 }
 
+// ---------------------------------------------------------------------------
+// Phase 2 (2026-05-20): per-sample 3-axis trajectory + concordance score.
+//
+// `paintTrajectory(state, si)` paints the sample's (PC1, PC2) trajectory
+// across all windows into 3 stacked canvases — one per evidence axis.
+// Each canvas plots PC1 vs. PC2 with the cursor's window marked as a
+// bright dot and the rest of the trajectory as a faint polyline so the
+// reader can see "does this fish loop / drift in similar shapes across
+// the 3 axes?"
+//
+// `computeConcordance(state, si)` returns the fraction of windows where
+// the sample's PC1 SIGN agrees across all 3 axes (a rough proxy for
+// "this fish is on the same haplotype side in all three signals"). The
+// header badge surfaces this as a 0-100% number with green/amber/red
+// tinting. Cheap to compute and meaningful for the inversion use case.
+// ---------------------------------------------------------------------------
+
+const _TRAJ_CANVAS_IDS = {
+  dosage:   'pcaCompTrajDosage',
+  theta_pi: 'pcaCompTrajThetaPi',
+  ghsl:     'pcaCompTrajGhsl',
+};
+
+export function paintTrajectory(state, si) {
+  if (typeof document === 'undefined') return;
+  if (!Number.isFinite(si) || si < 0) return;
+  const ss = state && state.sharedState;
+  if (!ss || !ss.data) return;
+  const d = ss.data;
+  for (const layer of ['dosage', 'theta_pi', 'ghsl']) {
+    const canvas = document.getElementById(_TRAJ_CANVAS_IDS[layer]);
+    if (!canvas) continue;
+    _paintOneTrajectory(state, canvas, layer, si, d);
+  }
+}
+
+function _paintOneTrajectory(state, canvas, layer, si, d) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const { cssW: w, cssH: h } = _fitCanvas(canvas, ctx);
+  ctx.clearRect(0, 0, w, h);
+  // Walk all windows; collect (pc1, pc2) per window for this sample.
+  const xs = [], ys = [];
+  const ss = state.sharedState;
+  const cur = ss.cur | 0;
+  const nWin = (Array.isArray(d.windows) && d.windows.length) || (d.n_windows | 0);
+  for (let i = 0; i < nWin; i++) {
+    let pc1Vec = null, pc2Vec = null;
+    if (layer === 'dosage') {
+      const w0 = d.windows[i];
+      if (w0 && w0.pc1 && w0.pc2) { pc1Vec = w0.pc1; pc2Vec = w0.pc2; }
+    } else {
+      const lp = _resolveLp(d, layer);
+      if (lp && Array.isArray(lp.pc_loadings_aligned)) {
+        const a = lp.pc_loadings_aligned;
+        if (a[0] && a[1] && i < a[0].length) {
+          pc1Vec = a[0][i]; pc2Vec = a[1][i];
+        }
+      }
+    }
+    if (!pc1Vec || !pc2Vec || si >= pc1Vec.length) { xs.push(NaN); ys.push(NaN); continue; }
+    xs.push(+pc1Vec[si]); ys.push(+pc2Vec[si]);
+  }
+  // Plot bounds.
+  let xMin = +Infinity, xMax = -Infinity, yMin = +Infinity, yMax = -Infinity;
+  for (let i = 0; i < xs.length; i++) {
+    if (!Number.isFinite(xs[i]) || !Number.isFinite(ys[i])) continue;
+    if (xs[i] < xMin) xMin = xs[i]; if (xs[i] > xMax) xMax = xs[i];
+    if (ys[i] < yMin) yMin = ys[i]; if (ys[i] > yMax) yMax = ys[i];
+  }
+  if (!Number.isFinite(xMin) || !Number.isFinite(yMin)) {
+    _drawEmpty(ctx, w, h, `${layer} — no data`);
+    return;
+  }
+  if (xMax === xMin) xMax = xMin + 1;
+  if (yMax === yMin) yMax = yMin + 1;
+  const pad = { l: 6, r: 6, t: 14, b: 6 };
+  const plotW = Math.max(1, w - pad.l - pad.r);
+  const plotH = Math.max(1, h - pad.t - pad.b);
+  const toX = (v) => pad.l + ((v - xMin) / (xMax - xMin)) * plotW;
+  const toY = (v) => pad.t + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+  // Faint trajectory polyline.
+  ctx.strokeStyle = 'rgba(160,200,235,0.35)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < xs.length; i++) {
+    if (!Number.isFinite(xs[i]) || !Number.isFinite(ys[i])) { started = false; continue; }
+    const X = toX(xs[i]), Y = toY(ys[i]);
+    if (!started) { ctx.moveTo(X, Y); started = true; }
+    else ctx.lineTo(X, Y);
+  }
+  ctx.stroke();
+  // Dots: small everywhere, bright at the current cursor's window.
+  for (let i = 0; i < xs.length; i++) {
+    if (!Number.isFinite(xs[i]) || !Number.isFinite(ys[i])) continue;
+    const X = toX(xs[i]), Y = toY(ys[i]);
+    ctx.fillStyle = (i === cur) ? '#f5a524' : 'rgba(120,160,200,0.45)';
+    const r = (i === cur) ? 3 : 1.2;
+    ctx.beginPath();
+    ctx.arc(X, Y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Header label.
+  ctx.fillStyle = 'rgba(160,180,200,0.75)';
+  ctx.font = '9.5px ui-monospace, monospace';
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  ctx.fillText(layer, 4, 2);
+}
+
+function _resolveLp(d, layer) {
+  if (layer === 'theta_pi') {
+    return d.theta_pi_local_pca
+        || (d.theta_pi_view && d.theta_pi_view.theta_pi_local_pca)
+        || (d.theta_pi_view && d.theta_pi_view.local_pca);
+  }
+  if (layer === 'ghsl') {
+    return d.ghsl_local_pca
+        || (d.ghsl_view && d.ghsl_view.ghsl_local_pca)
+        || (d.ghsl_view && d.ghsl_view.local_pca)
+        || (d.ghsl_panel && d.ghsl_panel.local_pca);
+  }
+  return null;
+}
+
+export function computeConcordance(state, si) {
+  const ss = state && state.sharedState;
+  if (!ss || !ss.data || !Number.isFinite(si) || si < 0) return null;
+  const d = ss.data;
+  const nWin = (Array.isArray(d.windows) && d.windows.length) || (d.n_windows | 0);
+  if (nWin <= 0) return null;
+  const tpiLp = _resolveLp(d, 'theta_pi');
+  const ghslLp = _resolveLp(d, 'ghsl');
+  if (!tpiLp && !ghslLp) return null;
+  const tpiPc1 = tpiLp && tpiLp.pc_loadings_aligned && tpiLp.pc_loadings_aligned[0];
+  const ghslPc1 = ghslLp && ghslLp.pc_loadings_aligned && ghslLp.pc_loadings_aligned[0];
+  let agree = 0, total = 0;
+  for (let i = 0; i < nWin; i++) {
+    const dw = d.windows[i];
+    if (!dw || !dw.pc1) continue;
+    const dPc1 = dw.pc1[si];
+    if (!Number.isFinite(dPc1)) continue;
+    const tPc1 = (tpiPc1 && tpiPc1[i] && Number.isFinite(tpiPc1[i][si])) ? tpiPc1[i][si] : null;
+    const gPc1 = (ghslPc1 && ghslPc1[i] && Number.isFinite(ghslPc1[i][si])) ? ghslPc1[i][si] : null;
+    // Need at least 2 layers' PC1 to compare; count windows where all 3 are present.
+    if (tPc1 == null && gPc1 == null) continue;
+    total++;
+    const dSign = dPc1 >= 0 ? 1 : -1;
+    let layersAgree = 0;
+    let layersChecked = 0;
+    if (tPc1 != null) { layersChecked++; if ((tPc1 >= 0 ? 1 : -1) === dSign) layersAgree++; }
+    if (gPc1 != null) { layersChecked++; if ((gPc1 >= 0 ? 1 : -1) === dSign) layersAgree++; }
+    if (layersChecked > 0 && layersAgree === layersChecked) agree++;
+  }
+  if (total === 0) return null;
+  return { agree, total, frac: agree / total };
+}
+
 // Click-to-scrub: translate an x pixel coordinate inside the lines canvas
 // into the corresponding window index. Returns -1 if outside the plot box.
 export function windowAtLinesX(px) {

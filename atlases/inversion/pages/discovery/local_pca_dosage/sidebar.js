@@ -77,6 +77,7 @@ import {
 } from './pca_panel.js';
 import { renderL3Panel } from './l3_panel.js';
 import { wireGPanel } from './g_panel.js';
+import { wireLinesSettingsPanel } from './lines_settings_panel.js';
 import {
   exportKLabelsTSV,
   makeCandidateFromLock,
@@ -122,6 +123,14 @@ export function attachSidebarHandlers(state) {
   _wireLayoutMode(state);
   _wireViewMode(state);
   _wirePanelCollapseButtons(state);
+  // 2026-05-19: lines-settings flying panel — must run BEFORE
+  // _wireNewShellControls because the panel stamps
+  // #linesHeaderMoreToggle.dataset.wiredAsSettings=1, which the legacy
+  // ▾more click-handler at line ~492 reads to skip its own wiring.
+  // If we wired AFTER, both handlers would attach and clicks would
+  // double-fire (modal + legacy inline toggle).
+  try { wireLinesSettingsPanel(state); }
+  catch (e) { console.warn('[wireLinesSettingsPanel]', e); }
   _wireNewShellControls(state);
   _wireActiveModeBar(state);
   _wireL3Controls(state);
@@ -177,6 +186,13 @@ function _wireL3Controls(state) {
         container.querySelectorAll('button[' + dataAttr + ']').forEach(b => {
           b.classList.toggle('active', b === btn);
         });
+        // 2026-05-20: mirror state.l3Layout onto body[data-l3-layout]
+        // so the CUSUM dual-pane CSS rules (and any future layout-aware
+        // chrome) can react. Done here so every layout button stays in
+        // sync; the restore branch below does the same after pageload.
+        if (stateKey === 'l3Layout' && document.body && document.body.dataset) {
+          document.body.dataset.l3Layout = val;
+        }
         repaint();
       });
     });
@@ -186,6 +202,9 @@ function _wireL3Controls(state) {
       container.querySelectorAll('button[' + dataAttr + ']').forEach(b => {
         b.classList.toggle('active', b.getAttribute(dataAttr) === cur);
       });
+      if (stateKey === 'l3Layout' && document.body && document.body.dataset) {
+        document.body.dataset.l3Layout = cur;
+      }
     }
   };
 
@@ -486,9 +505,21 @@ function _wireNewShellControls(state) {
   // and persists the choice. User feedback (chat 2026-05-18): "in
   // the per sample lines the settings are still too many they
   // should be put under some toggle tab".
+  // 2026-05-19: this inline "▾ more / ▴ less" toggle has been replaced
+  // by the flying settings modal in lines_settings_panel.js. The button
+  // text + click handler now belong to wireLinesSettingsPanel(); the
+  // dataset.wiredAsSettings guard prevents the legacy click handler
+  // below from also running. Kept here as a no-op default so older
+  // builds (without lines_settings_panel.js loaded) keep working with
+  // the inline collapse. When the panel module IS loaded, it sets
+  // dataset.wiredAsSettings=1 on the button BEFORE this code runs
+  // (page1 mount calls wireLinesSettingsPanel before applyData →
+  // _wireNewShellControls), and we skip the legacy wiring entirely.
   const moreBtn = $('linesHeaderMoreToggle');
   const moreGroup = $('linesHeaderMoreGroup');
-  if (moreBtn && moreGroup && moreBtn.dataset.wired !== '1') {
+  if (moreBtn && moreGroup
+      && moreBtn.dataset.wired !== '1'
+      && moreBtn.dataset.wiredAsSettings !== '1') {
     let on = false;
     try { on = localStorage.getItem('inversion_atlas.linesHeaderMoreOn') === '1'; }
     catch (_) {}
@@ -504,6 +535,14 @@ function _wireNewShellControls(state) {
       apply();
     });
     moreBtn.dataset.wired = '1';
+  }
+  // When the settings modal is wired, force the inline group hidden so
+  // its children only ever surface inside the modal. (Without this, the
+  // group remains display:none from its inline HTML default, which is
+  // already correct — but we set it explicitly here too as a belt &
+  // braces guard.)
+  if (moreBtn && moreGroup && moreBtn.dataset.wiredAsSettings === '1') {
+    moreGroup.style.display = 'none';
   }
 
   // ===========================================================================

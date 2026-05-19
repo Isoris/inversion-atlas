@@ -208,6 +208,39 @@ function _wireActionBar(root, state, atlasState) {
   const promoteBtn = root.querySelector('#rgPromoteSeedBtn');
   const statusEl   = root.querySelector('#rgStatus');
 
+  // 2026-05-20: mode toggle (long-range V-walker vs short-range
+  // user-curated candidate list). Restored from localStorage; click
+  // updates state._regimesMode and changes the run-pipeline button's
+  // tooltip so the user knows what'll run.
+  state._regimesMode = state._regimesMode || 'long';
+  try {
+    const saved = localStorage.getItem('haplotype_regimes.mode');
+    if (saved === 'short' || saved === 'long') state._regimesMode = saved;
+  } catch (_) {}
+  const modeBar = root.querySelector('#rgModeBar');
+  if (modeBar) {
+    modeBar.querySelectorAll('button[data-rg-mode]').forEach(b => {
+      b.classList.toggle('active', b.dataset.rgMode === state._regimesMode);
+      b.addEventListener('click', () => {
+        state._regimesMode = b.dataset.rgMode;
+        try { localStorage.setItem('haplotype_regimes.mode', state._regimesMode); } catch (_) {}
+        modeBar.querySelectorAll('button[data-rg-mode]').forEach(b2 => {
+          b2.classList.toggle('active', b2 === b);
+        });
+        if (runBtn) {
+          runBtn.title = state._regimesMode === 'short'
+            ? "Build seeds from the local_pca_dosage candidate list (no auto-discovery — review what you've drafted)."
+            : "Run the V-walker Stage 1 + Stage 3 locus construction across the whole chromosome.";
+        }
+      });
+    });
+    if (runBtn) {
+      runBtn.title = state._regimesMode === 'short'
+        ? "Build seeds from the local_pca_dosage candidate list (no auto-discovery — review what you've drafted)."
+        : "Run the V-walker Stage 1 + Stage 3 locus construction across the whole chromosome.";
+    }
+  }
+
   if (runBtn) {
     runBtn.addEventListener('click', async () => {
       await _runPipeline(root, state);
@@ -245,6 +278,34 @@ async function _runPipeline(root, state) {
     _setStatus(root, 'pipeline ctx not wired — reload the page');
     return;
   }
+  // 2026-05-20: dispatch on mode. Short-range builds seeds from the
+  // local_pca_dosage candidate list (no V-walker). Long-range = the
+  // original V-walker pipeline.
+  if (state._regimesMode === 'short') {
+    _setStatus(root, 'building short-range seeds from candidate list…');
+    await new Promise(r => setTimeout(r, 0));
+    const t0 = performance.now();
+    let result = null;
+    try { result = _buildShortRangeResult(state); }
+    catch (e) {
+      console.error('short-range build threw:', e);
+      _setStatus(root, `short-range failed: ${e.message}`);
+      return;
+    }
+    const ms = (performance.now() - t0).toFixed(0);
+    if (!result || !result.stage3 || result.stage3.loci.length === 0) {
+      _setStatus(root,
+        `short-range: 0 candidates on this chrom. Promote candidates in local_pca_dosage first (lock colors → ★ promote).`);
+      return;
+    }
+    _setStatus(root,
+      `short-range ran in ${ms}ms · ` +
+      `${result.stage3.loci.length} candidate${result.stage3.loci.length === 1 ? '' : 's'} as seeds`);
+    state._regimesResult = result;
+    state._regimesOpts   = {};
+    _afterPipelineRun(root, state, result);
+    return;
+  }
   _setStatus(root, 'running pipeline…');
   // The pipeline is synchronous and CPU-heavy; yield to the browser first
   // so the status update paints.
@@ -277,35 +338,330 @@ async function _runPipeline(root, state) {
     `${summary.n_targets || 0} targets · ` +
     `${summary.n_stability_upgraded || 0} COHERENT_SPLIT promotions`);
 
-  // Initialise the regimes page (this builds state.regimesPanel and renders
-  // the four panels). We pass classifyProjection as the static classifier;
-  // the panels can override via classifyOpts.
+  _afterPipelineRun(root, state, result, opts);
+}
+
+// 2026-05-20: shared post-pipeline render path. Both the long-range
+// V-walker path and the short-range candidate-list path call this so
+// the 4 panels + export/promote buttons + seeds strip all wire up the
+// same way regardless of seed origin.
+function _afterPipelineRun(root, state, result, opts) {
+  const ctx = state._regimesCtx;
   initRegimesPage(state, {
     bandingResult:       result,
-    getLabels:           ctx.getLabels,
-    getK:                ctx.getK,
+    getLabels:           ctx && ctx.getLabels,
+    getK:                ctx && ctx.getK,
     getPC1:              state._regimesGetPC1,
-    getMacroDosage:      null,    // wire later when dosage chunks available
+    getMacroDosage:      null,
     classifyFn:          classifyProjection,
-    classifyOpts:        opts.projection || {},
+    classifyOpts:        (opts && opts.projection) || {},
     bandComboMode:       'additive',
     current_chromosome_idx: 0,
-    enable_genome_view:  false,    // single chromosome — genome-scope is degenerate
+    enable_genome_view:  false,
   });
 
-  // Enable the export button now that there's something to serialize.
   const exportBtn = root.querySelector('#rgExportCatalogueBtn');
   if (exportBtn) exportBtn.disabled = false;
-  // 2026-05-20: enable the promote-seed button when seeds exist.
   const promoteBtn = root.querySelector('#rgPromoteSeedBtn');
   if (promoteBtn) {
-    const nSeeds = (result.stage1 && Array.isArray(result.stage1.seeds))
-      ? result.stage1.seeds.length : 0;
-    promoteBtn.disabled = nSeeds === 0;
-    promoteBtn.title = nSeeds === 0
-      ? 'No Stage 1 seeds were discovered on this chromosome — nothing to promote.'
-      : `Promote the focal Stage 1 seed (${nSeeds} discovered) to a candidate inversion. Arrow keys cycle which seed is focal.`;
+    const nLoci = (result.stage3 && Array.isArray(result.stage3.loci))
+      ? result.stage3.loci.length : 0;
+    promoteBtn.disabled = nLoci === 0;
+    promoteBtn.title = nLoci === 0
+      ? 'No seeds discovered on this chromosome — nothing to promote.'
+      : `Promote the focal seed (${nLoci} discovered) to a candidate inversion. Arrow keys cycle which seed is focal.`;
   }
+  try { _renderSeedsStrip(root, state); }
+  catch (e) { console.warn('_renderSeedsStrip:', e); }
+  _wireSeedStripFocalSync(root, state);
+}
+
+// =========================================================================
+// Short-range pipeline result builder (2026-05-20)
+// =========================================================================
+// Synthesizes a runBandingPipeline-shaped result from the local_pca_dosage
+// candidate list. The 4 regime panels iterate stage3.loci, so we
+// produce one locus per candidate on the active chrom; the rest of
+// the result envelope (stage1.seeds, stage4 = null, summary) is
+// filled in just enough for downstream renderers + the export
+// catalogue to function.
+//
+// Each candidate → locus mapping:
+//   cand.start_w, cand.end_w    → s_window, e_window
+//   cand.K                       → K
+//   cand.locked_labels            → per_band_samples (sample-idx Sets per band)
+//   cand.ref_window               → seed.anchor_w (so the seeds strip
+//                                    can anchor each chip at the cur
+//                                    window the user promoted from)
+//   1.0                           → min_internal_jaccard (user-defined,
+//                                    perfect by construction)
+//
+// Filters to the active chrom so loci from other chromosomes don't
+// appear when scrubbing a single chrom.
+function _buildShortRangeResult(state) {
+  if (!state || !state.data) return null;
+  const data = state.data;
+  const activeChrom = state.activeChrom || data.chrom || null;
+  // Pull candidates from the local_pca_dosage stash. The stash is set
+  // up at module load time via the cross-page bridge — see
+  // candidates.js#setCandidate which also dual-writes to
+  // inv._local_pca_dosage_state. Falls back to an empty list when no
+  // candidates have been promoted yet.
+  const inv = (typeof window !== 'undefined' && window.atlasState && window.atlasState.inversion)
+            || {};
+  const stash = inv._local_pca_dosage_state || {};
+  const cands = Array.isArray(stash.candidateList) ? stash.candidateList
+              : (Array.isArray(state.candidateList) ? state.candidateList : []);
+  const onChrom = cands.filter(c => c && (!activeChrom || c.chrom === activeChrom));
+  if (onChrom.length === 0) {
+    return {
+      stage1: { seeds: [], per_chrom_summary: [] },
+      stage2: null,
+      stage3: { loci: [] },
+      stage4: null,
+      summary: {
+        n_seeds_after_plateau: 0,
+        n_loci:                0,
+        n_targets:             0,
+        n_stability_upgraded:  0,
+      },
+    };
+  }
+  // Sort by start_w so the seeds strip + arrow-key navigation walk
+  // left-to-right along the chromosome.
+  onChrom.sort((a, b) => (a.start_w | 0) - (b.start_w | 0));
+  const seeds = [];
+  const loci  = [];
+  for (let i = 0; i < onChrom.length; i++) {
+    const c = onChrom[i];
+    const s_window = c.start_w | 0;
+    const e_window = c.end_w   | 0;
+    const K = c.K | 0;
+    // per_band_samples from locked_labels: group sample indices by band.
+    const per_band_samples = [];
+    const per_band_size    = new Array(K).fill(0);
+    for (let b = 0; b < K; b++) per_band_samples.push(new Set());
+    const labels = c.locked_labels;
+    if (labels && labels.length) {
+      for (let s = 0; s < labels.length; s++) {
+        const k = labels[s];
+        if (k >= 0 && k < K) {
+          per_band_samples[k].add(s);
+          per_band_size[k]++;
+        }
+      }
+    }
+    seeds.push({
+      seed_id:               i,
+      chromosome_idx:        0,
+      anchor_w:              Number.isFinite(c.ref_window) ? c.ref_window | 0 : Math.round((s_window + e_window) / 2),
+      anchor_band_quality:   1.0,    // user-curated
+      K_a:                   K,
+      anchor_labels:         null,
+      n_tracked:             labels ? labels.length : 0,
+      s_window,
+      e_window,
+      n_windows:             e_window - s_window + 1,
+      classifications:       null,
+      classifications_s_window: s_window,
+      v_track:               null,
+      h_off_track:           null,
+      track_s_window:        s_window,
+      track_e_window:        e_window,
+      hit_left_edge:         false,
+      hit_right_edge:        false,
+    });
+    loci.push({
+      seed_id:                i,
+      chromosome_idx:         0,
+      s_window,
+      e_window,
+      K,
+      chain:                  { s: s_window, e: e_window, K },
+      per_band_samples,
+      per_band_size,
+      per_band_first_size:    per_band_size.slice(),
+      n_samples_dropped:      0,
+      band_set_aggregation:   'short_range_promote',
+      n_unreliable_skipped:   0,
+      min_internal_jaccard:   1.0,
+      stage2_verdict:         null,
+      stage2_linkage_group:   null,
+    });
+  }
+  return {
+    stage1: { seeds, per_chrom_summary: [{ chr: 0, n_seeds: seeds.length }] },
+    stage2: null,
+    stage3: { loci },
+    stage4: null,
+    summary: {
+      n_seeds_after_plateau: seeds.length,
+      n_loci:                loci.length,
+      n_targets:             0,
+      n_stability_upgraded:  0,
+    },
+  };
+}
+
+// =========================================================================
+// Seeds inspector strip (2026-05-20)
+// =========================================================================
+// Horizontal scrollable chip list at the top of the page, one chip per
+// Stage 3 locus (the panels iterate stage3.loci, so the chip indexes
+// match what arrow keys + ★ promote target). Click a chip to set
+// state.regimesPanel.focal.seed_index + repaint the 4 panels. Hover a
+// chip to see the full anchor/span tooltip. The active chip is
+// accent-filled; others are panel-2.
+//
+// Bonus columns on each chip:
+//   #N     — seed list index (1-based for readability)
+//   ●      — color-dot from band_quality / min_internal_jaccard
+//            (greener = stronger structural signal)
+//   X Mb   — anchor center in Mb (from data.windows[anchor_w].center_mb)
+//   Nw     — n_windows the locus spans
+
+function _renderSeedsStrip(root, state) {
+  if (!root || typeof document === 'undefined') return;
+  const wrap = root.querySelector('#rgSeedsStripWrap');
+  const list = root.querySelector('#rgSeedsStripList');
+  if (!wrap || !list) return;
+  const result = state && state._regimesResult;
+  const loci   = result && result.stage3 && Array.isArray(result.stage3.loci)
+    ? result.stage3.loci : [];
+  const seeds  = result && result.stage1 && Array.isArray(result.stage1.seeds)
+    ? result.stage1.seeds : [];
+  if (loci.length === 0) {
+    wrap.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+  wrap.style.display = 'flex';
+  const data = state.data;
+  const wins = (data && Array.isArray(data.windows)) ? data.windows : null;
+  const focal = (state.regimesPanel && state.regimesPanel.focal
+                 && Number.isFinite(state.regimesPanel.focal.seed_index))
+    ? state.regimesPanel.focal.seed_index | 0 : 0;
+  // Rebuild the chip list.
+  list.innerHTML = '';
+  for (let i = 0; i < loci.length; i++) {
+    const locus = loci[i];
+    if (!locus) continue;
+    const seed = (Number.isFinite(locus.seed_id) && seeds[locus.seed_id]) ? seeds[locus.seed_id] : null;
+    const anchorW = seed && Number.isFinite(seed.anchor_w)
+      ? seed.anchor_w | 0
+      : Math.round((locus.s_window + locus.e_window) / 2);
+    const mb = (wins && wins[anchorW] && Number.isFinite(wins[anchorW].center_mb))
+      ? wins[anchorW].center_mb : null;
+    const nw = (locus.e_window - locus.s_window + 1) | 0;
+    const quality = seed && Number.isFinite(seed.anchor_band_quality)
+      ? seed.anchor_band_quality
+      : (Number.isFinite(locus.min_internal_jaccard) ? locus.min_internal_jaccard : 0.5);
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'rg-seed-chip' + (i === focal ? ' active' : '');
+    chip.dataset.seedIdx = String(i);
+    chip.title = [
+      `seed #${i} (id=${locus.seed_id != null ? locus.seed_id : '?'})`,
+      `anchor: window ${anchorW}${mb != null ? ` · ${mb.toFixed(3)} Mb` : ''}`,
+      `span: ${nw} windows (${locus.s_window}–${locus.e_window})`,
+      `K: ${locus.K | 0}`,
+      `min internal jaccard: ${
+        Number.isFinite(locus.min_internal_jaccard) ? locus.min_internal_jaccard.toFixed(3) : '—'
+      }`,
+      locus.stage2_verdict ? `stage2 verdict: ${locus.stage2_verdict}` : null,
+      'Click to make this seed focal (arrow keys also navigate).',
+    ].filter(Boolean).join('\n');
+    chip.innerHTML =
+      '<span class="rg-seed-dot" style="background:' + _qualityDotColor(quality) + ';"></span>' +
+      '<span class="rg-seed-idx">#' + i + '</span>' +
+      '<span class="rg-seed-meta">' +
+        (mb != null ? mb.toFixed(2) + ' Mb · ' : '') +
+        nw + 'w' +
+      '</span>';
+    chip.addEventListener('click', () => _focusSeedFromChip(state, i));
+    list.appendChild(chip);
+  }
+}
+
+function _qualityDotColor(q) {
+  // 0..1 → red → amber → green. Anything ≥ 0.7 is green; ≥ 0.4 is amber; below is red.
+  if (!Number.isFinite(q)) return '#5a6472';
+  if (q >= 0.7) return '#3cc08a';
+  if (q >= 0.4) return '#f5a524';
+  return '#e0555c';
+}
+
+function _focusSeedFromChip(state, idx) {
+  if (!state || !state.regimesPanel || !state.regimesPanel.focal) return;
+  const loci = state._regimesResult && state._regimesResult.stage3
+            && state._regimesResult.stage3.loci;
+  if (!Array.isArray(loci) || idx < 0 || idx >= loci.length) return;
+  const rp = state.regimesPanel;
+  rp.focal.seed_index = idx;
+  // Reset band_mask to the first available subset for the new locus.
+  rp.focal.band_mask = 1;
+  // If the new seed lives on a different chromosome, snap chrom panels too.
+  const newChr = loci[idx].chromosome_idx;
+  if (newChr != null && newChr !== rp.current_chromosome_idx) {
+    rp.current_chromosome_idx = newChr;
+    if (state._regimesGenomeState) {
+      state._regimesGenomeState.regimesPanel.current_chromosome_idx = newChr;
+    }
+    rp.track = null;
+  }
+  // Update active-chip styling synchronously so the visual feedback is
+  // instant; the 4 panels repaint via window._refreshRegimesPanels which
+  // initRegimesPage installs as a global re-render entry point.
+  const list = document.getElementById('rgSeedsStripList');
+  if (list) {
+    list.querySelectorAll('.rg-seed-chip').forEach(c => {
+      c.classList.toggle('active', (c.dataset.seedIdx | 0) === idx);
+    });
+  }
+  // Re-paint by re-running initRegimesPage's draw chain — simplest
+  // available API. The pipeline result + ctx are still cached on state
+  // from the last _runPipeline.
+  if (typeof window !== 'undefined' && typeof window._refreshRegimesPanels === 'function') {
+    try { window._refreshRegimesPanels(state); } catch (_) {}
+  } else {
+    // Fallback: bump the focal & rely on the next user gesture to repaint.
+    // The arrow-key handler also re-renders directly when fired; the
+    // strip-click path mirrors that via the global hook above.
+  }
+}
+
+// Sync the strip's active chip with arrow-key navigation. The keyboard
+// handler in regimes_page.js mutates rp.focal.seed_index then triggers
+// the panel repaint chain — we hook a MutationObserver-free poll by
+// listening for keydown at document level and re-running the active-
+// class update after the keydown handler runs (rAF defers us to AFTER).
+function _wireSeedStripFocalSync(root, state) {
+  if (!root || typeof document === 'undefined') return;
+  if (document._rgSeedStripFocalSyncWired === '1') return;
+  document._rgSeedStripFocalSyncWired = '1';
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight'
+        && e.key !== 'Home' && e.key !== 'End') return;
+    // Defer so regimes_page.js's keyboard handler runs first.
+    requestAnimationFrame(() => {
+      const rp = state && state.regimesPanel;
+      if (!rp || !rp.focal) return;
+      const focal = rp.focal.seed_index | 0;
+      const list = document.getElementById('rgSeedsStripList');
+      if (!list) return;
+      let target = null;
+      list.querySelectorAll('.rg-seed-chip').forEach(c => {
+        const isActive = (c.dataset.seedIdx | 0) === focal;
+        c.classList.toggle('active', isActive);
+        if (isActive) target = c;
+      });
+      // Scroll the active chip into view if it slid off-screen.
+      if (target && typeof target.scrollIntoView === 'function') {
+        try { target.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+        catch (_) {}
+      }
+    });
+  });
 }
 
 /**
