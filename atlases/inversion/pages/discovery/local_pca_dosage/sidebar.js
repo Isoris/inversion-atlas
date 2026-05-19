@@ -306,6 +306,36 @@ function _wireNewShellControls(state) {
   }
 
   // ===========================================================================
+  // Lines-panel header "▾ more" disclosure (2026-05-18). The
+  // #linesYsourceBar held ~10 inline secondary toggles (SNP-dens,
+  // trans-rate, regime, lineage, band-trace cluster, cand-bands,
+  // Σ-cusum) that wrapped to 2-3 rows and crowded the header. The
+  // markup now wraps these in #linesHeaderMoreGroup (hidden by
+  // default); the #linesHeaderMoreToggle button flips visibility
+  // and persists the choice. User feedback (chat 2026-05-18): "in
+  // the per sample lines the settings are still too many they
+  // should be put under some toggle tab".
+  const moreBtn = $('linesHeaderMoreToggle');
+  const moreGroup = $('linesHeaderMoreGroup');
+  if (moreBtn && moreGroup && moreBtn.dataset.wired !== '1') {
+    let on = false;
+    try { on = localStorage.getItem('inversion_atlas.linesHeaderMoreOn') === '1'; }
+    catch (_) {}
+    const apply = () => {
+      moreGroup.style.display = on ? 'inline-flex' : 'none';
+      moreBtn.textContent = on ? '▴ less' : '▾ more';
+    };
+    apply();
+    moreBtn.addEventListener('click', () => {
+      on = !on;
+      try { localStorage.setItem('inversion_atlas.linesHeaderMoreOn', on ? '1' : '0'); }
+      catch (_) {}
+      apply();
+    });
+    moreBtn.dataset.wired = '1';
+  }
+
+  // ===========================================================================
   // Lines-panel band-trace buttons (WIRE_AUDIT Group A — were never wired).
   // ===========================================================================
   _wireLinesBandTrace(state);

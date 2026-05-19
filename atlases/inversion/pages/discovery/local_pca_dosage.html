@@ -633,11 +633,19 @@
                      was considered but the per-segment refactor on the hot path
                      is large; the shade mode achieves the same diagnostic goal
                      without touching the line stroke path. -->
-        <!-- 2026-05-18 redesign: dropped the "off" button per user request.
-             strip and shade are mutually-exclusive toggles. Click an inactive
-             button → activate (other goes inactive). Click the active one →
-             deactivate (both off). state.linesSnpDensityMode ∈
-             {null, 'strip', 'shade'}. -->
+        <!-- 2026-05-18: collapsible "more controls" group. User reported the
+             lines header has too many inline toggles — wrap the secondary
+             ones (SNP-dens, trans-rate, regime, lineage, band-trace cluster,
+             cand-bands, Σ-cusum) in a span that hides by default and toggles
+             via the "▾ more" button at the end of the bar. The main controls
+             (color mode + lasso) stay always-visible. -->
+        <button id="linesHeaderMoreToggle"
+                title="Show/hide the secondary line-panel controls (SNP-density, trans-rate, regime, lineage, band-trace, cand-bands, Σ-cusum). Hidden by default; preference persists per-user."
+                style="background: var(--panel-2); border: 1px solid var(--rule);
+                       color: var(--ink-dim); border-radius: 3px;
+                       padding: 1px 8px; font-family: var(--mono); font-size: 10px;
+                       cursor: pointer;">▾ more</button>
+        <span id="linesHeaderMoreGroup" style="display: none; gap: 6px; align-items: center; flex-wrap: wrap;">
         <span id="linesSnpDensityBar"
               style="display: flex; gap: 0; align-items: center; padding-left: 6px;
                      border-left: 1px solid var(--rule);"
@@ -791,6 +799,7 @@
           <input type="checkbox" id="linesCandBandsToggle" checked />
           <span style="color: var(--ink-dim);">cand bands</span>
         </label>
+        </span><!-- /#linesHeaderMoreGroup -->
         <!-- v3.84: candidate overlay badge. Visible when a candidate is active
              (state.candidate set). Shows "candidate · g0a/g0b/... " inline as
              a legend for the amber band + ⚠ markers on the PC1 sub-panel.
