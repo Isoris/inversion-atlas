@@ -25,7 +25,7 @@
 // only honoured 'family' and 'lineage' in its per-sample-coloring
 // branch. The other modes existed in the dropdown but were no-ops.
 
-import { computeHetRateForRange } from './dosage_chunks.js';
+import { computeHetRateForRange, computeDosageMeanForRange } from './dosage_chunks.js';
 import { hetRateColor } from './het_rate.js';
 
 const CONFOUNDER_FROH_THRESHOLD = 0.05;
@@ -109,16 +109,21 @@ export function perSampleValuesForMode(state, mode, range) {
   }
 
   if (mode === 'dosage') {
-    // Per-sample mean dosage requires walking dosage_chunks the same
-    // way het does, but summing values instead of HET indicators. The
-    // helper exists in shared/dosage_chunks.js but isn't yet exported
-    // as a stand-alone "mean dosage" function. For now, fall back to
-    // the het computation and the user can use the L3 panel's dosage
-    // strip for the precise mean — this gates the dosage mode behind
-    // the dosage_chunks layer the same way het is gated.
-    // TODO: add shared/dosage_chunks.js#computeDosageMeanForRange and
-    // route here.
-    return null;
+    // Per-sample mean dosage across the visible range. 2026-05-18 —
+    // computeDosageMeanForRange (shared/dosage_chunks.js) gates on
+    // the dosage_chunks layer being loaded; returns NaN-filled when
+    // not. Same caching pattern as het.
+    const w = d.windows;
+    if (!w || !w[startW] || !w[endW]) return null;
+    const startBp = w[startW].start_bp != null ? w[startW].start_bp
+                                                : w[startW].center_bp;
+    const endBp   = w[endW].end_bp != null ? w[endW].end_bp
+                                            : w[endW].center_bp;
+    if (!Number.isFinite(startBp) || !Number.isFinite(endBp)) return null;
+    return computeDosageMeanForRange(state, startBp, endBp, {
+      getCachedChunk: state._linesPanelGetCachedChunk || null,
+      cacheKey: `lines:dosage:${startW}-${endW}`,
+    });
   }
 
   return null;
@@ -229,6 +234,14 @@ export function perSampleColorFor(mode, value, valuesArr) {
     return _sequentialBlueToYellow(t);
   }
 
+  if (mode === 'dosage') {
+    // Diploid dosage on [0, 2] scale: 0 = HOMO_REF, 1 = HET, 2 = HOMO_ALT.
+    // Use a divergent ramp so 1 (het) sits at the visual midpoint and
+    // 0 / 2 stand out at opposite ends. Cool teal → grey → warm red.
+    const t = Math.max(0, Math.min(1, value / 2));   // 0..1
+    return _divergentTealRedThroughGrey(t);
+  }
+
   return null;
 }
 
@@ -249,5 +262,22 @@ function _sequentialBlueToYellow(t) {
   const r = Math.round( 43 + (240 -  43) * t);
   const g = Math.round(108 + (193 - 108) * t);
   const b = Math.round(168 + ( 75 - 168) * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+function _divergentTealRedThroughGrey(t) {
+  // t=0 → teal #2c8fa1, t=0.5 → grey #9aa1a8, t=1 → red #d94f4f.
+  // Two linear segments meeting at the grey midpoint.
+  if (t <= 0.5) {
+    const u = t * 2;
+    const r = Math.round( 44 + (154 -  44) * u);
+    const g = Math.round(143 + (161 - 143) * u);
+    const b = Math.round(161 + (168 - 161) * u);
+    return `rgb(${r},${g},${b})`;
+  }
+  const u = (t - 0.5) * 2;
+  const r = Math.round(154 + (217 - 154) * u);
+  const g = Math.round(161 + ( 79 - 161) * u);
+  const b = Math.round(168 + ( 79 - 168) * u);
   return `rgb(${r},${g},${b})`;
 }

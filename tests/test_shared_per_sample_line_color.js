@@ -116,6 +116,55 @@ group('perSampleColorFor');
 
   // Unknown mode → null
   check('unknown mode → null', perSampleColorFor('bogus', 0.5, arr) === null);
+
+  // dosage: divergent ramp 0..2; midpoint should be grey-ish; ends diverge.
+  const cD0 = perSampleColorFor('dosage', 0,  null);
+  const cD1 = perSampleColorFor('dosage', 1,  null);
+  const cD2 = perSampleColorFor('dosage', 2,  null);
+  check('dosage: 0 → rgb()',                /^rgb\(/.test(cD0));
+  check('dosage: 0 / 1 / 2 all distinct',   cD0 !== cD1 && cD1 !== cD2 && cD0 !== cD2);
+  check('dosage: NaN → null',               perSampleColorFor('dosage', NaN, null) === null);
+}
+
+// =====================================================================
+group('perSampleValuesForMode — dosage');
+{
+  // Mock state with one synthetic dosage chunk in range. Each sample has
+  // mean dosage = ((sum of mock markers)/n).
+  const state = {
+    data: {
+      n_samples: 3,
+      n_windows: 4,
+      windows: [
+        { start_bp: 0,    end_bp: 1000 },
+        { start_bp: 1000, end_bp: 2000 },
+        { start_bp: 2000, end_bp: 3000 },
+        { start_bp: 3000, end_bp: 4000 },
+      ],
+      samples: [{ id: 'A' }, { id: 'B' }, { id: 'C' }],
+      layersPresent: new Set(['dosage_chunks']),
+    },
+    _linesPanelGetCachedChunk: (startBp, endBp) => ({
+      samples: ['A', 'B', 'C'],
+      markers: [
+        { pos_bp:  500 },
+        { pos_bp: 1500 },
+        { pos_bp: 2500 },
+      ],
+      // row[marker_idx][sample_idx]
+      dosage: [
+        [0, 1, 2],   // marker 0
+        [0, 1, 2],   // marker 1
+        [0, 1, 2],   // marker 2
+      ],
+    }),
+  };
+  const vals = perSampleValuesForMode(state, 'dosage', { startW: 0, endW: 3 });
+  check('dosage: returns Float32Array of length 3',
+        vals && vals.length === 3);
+  check('dosage: sample A mean = 0',  vals && Math.abs(vals[0] - 0) < 1e-6);
+  check('dosage: sample B mean = 1',  vals && Math.abs(vals[1] - 1) < 1e-6);
+  check('dosage: sample C mean = 2',  vals && Math.abs(vals[2] - 2) < 1e-6);
 }
 
 console.log('\n=================');

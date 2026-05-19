@@ -1,44 +1,51 @@
-# `pages/review/` — classification-stage pages
+# `pages/review/` — disk dir hosting pages now spread across 4 stages
 
-This directory hosts pages for the **classification** workflow
-stage — where the user takes a promoted candidate from discovery
-and **reviews + refines** it.
+This directory hosts pages whose source still lives on disk under
+`pages/review/` for historical reasons, but whose manifest stages
+diverged after the 2026-05-18 stage re-org (`STAGE_AUDIT_2026-05-18.md`).
+The `review` dir name no longer matches a single manifest stage — see
+the per-page stage column below for the current routing.
 
-(Per legacy naming: this dir is `review` but the manifest stage is
-`classification` — which absorbed the legacy refinement +
-classification + synthesis stages in the chat-36 stage
-consolidation.)
+(Same dir/stage divergence pattern as `pages/discovery/page8`, which
+lives there for historical grouping but routes under `catalogue`.)
 
-## What classification is for
+## What each page does after the re-org
 
-> "We have a promoted candidate. Now we need to characterize it and
-> commit to it as a real call."
+| page | manifest stage | label | summary |
+|------|----------------|-------|---------|
+| `karyotype_tier` | classification | karyotype / tier | per-candidate karyotype rows (K=3 H-system locked labels) + 14-axis tier classification grid |
+| `marker_readiness` | classification | marker readiness | private-indel architecture tiers (1–4) for genotyping-marker design |
+| `boundary_refinement` | discovery_2 | boundaries | boundary-zone refinement (9 scan radii; E/F/B/R/A hotkeys; TE + ncRNA + focal-vs-bg panels) |
+| `sv_evidence` | discovery_2 | SV evidence | per-candidate SV table + UpSet + dosage heatmap; thin loader for `window.AtlasSVEvidence` object |
+| `ancestry_per_window` | evolution | ancestry | per-window ancestry view (K-cluster label / Q-value heatmap / Δ12 confidence); thin loader for `window.renderAncestryPage` |
+| `fish_ancestry_scroller` | evolution | Fish Ancestry Scroller | per-fish ancestry painting with F-based label-switching alignment + ancestry bricks (3 numbered layers + brick-metrics heatmap) |
+| `popstats` | synthesis | popstats | per-window track stack (\|Z\|, SNP density, BEAGLE uncertainty, depth, θπ, F_ST, Hobs/Hexp, ancestry Δ12); thin loader for `window.renderPopstatsPage` |
 
-The classification stage answers that. The user opens a candidate
-on candidate_focus (discovery_2 deep-dive), then walks through the review
-pages to:
+## Why pages diverged across stages
 
-1. Verify the karyotype assignment (`karyotype_tier` karyotype sub-view).
-2. Read population stats around the candidate (`popstats` popstats).
-3. Check ancestry confound (`ancestry_per_window` ancestry + `fish_ancestry_scroller`).
-4. Refine the boundary zones (`boundary_refinement` boundaries).
-5. Inspect SV evidence around the breakpoints (`sv_evidence`).
-6. Score the candidate on 14 axes (`karyotype_tier` Tier sub-view).
+The stage audit (`_handoff_docs/STAGE_AUDIT_2026-05-18.md`) flagged
+that the original `review`-as-`classification` grouping conflated
+three distinct workflow concerns:
 
-Once a candidate passes review, it's flipped to `confirmed: true`
-(typically on candidate_focus) and becomes visible to the inheritance pipeline
-+ lines-panel highlights + confirmed_carousel confirmed carousel.
+- **Detection refinement** — `boundary_refinement` + `sv_evidence`
+  answer *"is this region really an inversion, and where exactly?"*.
+  That's late-detection, not classification of a confirmed candidate.
+  → moved to `discovery_2`.
+- **Ancestry analysis** — `ancestry_per_window` + `fish_ancestry_scroller`
+  ARE evolution. They answer *"where did each haplotype come from?"*
+  → moved to `evolution`.
+- **Cohort synthesis** — `popstats` is a chromosome-wide pop-gen
+  summary, not per-candidate classification.
+  → moved to `synthesis`.
 
-## Pages in this directory
+`classification` shrank from 9 pages to just `karyotype_tier` +
+`marker_readiness`, which is the workflow-correct scope: classify the
+karyotype of a per-candidate carrier set, then design the markers.
 
-| page | label | summary |
-|------|-------|---------|
-| `karyotype_tier` | karyotype / tier | per-candidate karyotype rows (K=3 H-system locked labels) + 14-axis tier classification grid |
-| `popstats` | popstats | per-window track stack (\|Z\|, SNP density, BEAGLE uncertainty, depth, θπ, F_ST, Hobs/Hexp, ancestry Δ12); thin loader for `window.renderPopstatsPage` |
-| `ancestry_per_window` | ancestry | per-window ancestry view (K-cluster label / Q-value heatmap / Δ12 confidence); thin loader for `window.renderAncestryPage` |
-| `boundary_refinement` | boundaries | boundary-zone refinement (9 scan radii; E/F/B/R/A hotkeys; TE + ncRNA + focal-vs-bg panels) |
-| `sv_evidence` | SV evidence | per-candidate SV table + UpSet + dosage heatmap; thin loader for `window.AtlasSVEvidence` object |
-| `fish_ancestry_scroller` | Fish Ancestry Scroller | per-fish ancestry painting with F-based label-switching alignment + ancestry bricks (3 numbered layers + brick-metrics heatmap) |
+The 5 review-stage entries that legacy used (refinement,
+classification, synthesis) are recovered across this disk dir and
+the new stages.
+
 
 ## Vocabulary contracts (critical)
 
