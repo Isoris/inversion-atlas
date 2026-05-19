@@ -39,6 +39,7 @@ import {
   invalidateLineageCache,
   _bandTraceClearCache,
 } from './local_pca_dosage/_state.js';
+import { invalidateColorScales } from '../../shared/sample_color.js';
 import {
   loadActiveSamples,
   refreshActiveSamplesBadge,
@@ -126,6 +127,10 @@ export function applyData(state, data) {
   // data swaps, drop the cached result so the next paint re-triggers
   // compute on the new chromosome's L2 inventory.
   invalidateLineageCache(state);
+  // 2026-05-19: drop the per-mode color-scale cache (min/max for
+  // theta_pi / ghsl / froh ramps). The cache keys on (mode, cur) so a
+  // chrom swap means every entry is stale.
+  invalidateColorScales(state);
   // turn 161: clear the band-trace cache (per-chromosome, per-fish-set)
   // and re-hydrate the on/off toggle + fish-set from localStorage. The
   // fish-set is cohort-wide so it survives chrom changes, but the

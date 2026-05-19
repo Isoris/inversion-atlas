@@ -143,14 +143,21 @@ function inferLayersFromV1(data) {
 export const _LINES_COLOR_MODES = [
   { id: 'kmeans',           layer: null,                   label: 'kmeans' },
   { id: 'dosage',           layer: 'dosage_chunks',        label: 'dosage' },
-  { id: 'ghsl',             layer: 'ghsl_panel',           label: 'GHSL' },
+  { id: 'ghsl',             layer: 'ghsl_local_pca',       label: 'GHSL' },
   { id: 'het',              layer: 'dosage_chunks',        label: 'het' },
-  { id: 'theta_pi',         layer: 'per_sample_theta_pi',  label: 'θπ' },
+  { id: 'theta_pi',         layer: 'theta_pi_per_window',  label: 'θπ' },
   { id: 'froh',             layer: 'sample_froh',          label: 'F_ROH' },
   { id: 'family',           layer: null,                   label: 'family' },
   { id: 'confounder_alert', layer: 'sample_froh',          label: '⚠ confounder' },
   { id: 'lineage',          layer: null,                   label: 'lineage' },
 ];
+// 2026-05-19 — gate field names aligned with the actual pipeline output:
+//   ghsl_panel       → ghsl_local_pca       (new GHSL JSON top-level field)
+//   per_sample_theta_pi → theta_pi_per_window (canonical theta-pi field)
+// These names match what detectSchemaAndLayers adds to state.layersPresent.
+// Note: enabling a mode here unlocks the dropdown option; the actual
+// per-sample color computation for dosage/het/theta_pi/ghsl is in
+// lines_panel.js's per-mode branch and may need its own wiring.
 
 export function _isLinesColorModeAvailable(state, modeId) {
   const def = _LINES_COLOR_MODES.find(m => m.id === modeId);
@@ -311,6 +318,16 @@ export function detectSchemaAndLayers(data) {
                                             (Array.isArray(data.theta_pi_envelopes.l1) ||
                                              Array.isArray(data.theta_pi_envelopes.l2) ||
                                              Array.isArray(data.theta_pi_envelopes.candidate_intervals))],
+      // 2026-05-19 — GHSL local-PCA: same shape as theta_pi_local_pca
+      // (the producer mirrors the theta-pi schema). Merged onto state.data
+      // by local_pca_dosage.mount() from the scrubber_ghsl layer.
+      ['ghsl_local_pca',             () => !!data.ghsl_local_pca &&
+                                            !!data.ghsl_local_pca.pc_loadings_aligned &&
+                                            Array.isArray(data.ghsl_local_pca.pc_loadings_aligned)],
+      ['ghsl_envelopes',             () => !!data.ghsl_envelopes &&
+                                            (Array.isArray(data.ghsl_envelopes.l1) ||
+                                             Array.isArray(data.ghsl_envelopes.l2) ||
+                                             Array.isArray(data.ghsl_envelopes.candidate_intervals))],
     ];
     for (const [name, check] of _RECOVERY_CHECKS) {
       if (actual.has(name)) continue;
