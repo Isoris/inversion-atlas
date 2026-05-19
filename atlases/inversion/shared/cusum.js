@@ -224,4 +224,155 @@ if (typeof window !== 'undefined') {
   window._perSampleCusum            = perSampleCusum;
   window._cusumGroupAggregate       = cusumGroupAggregate;
   window._perSampleCusumByKaryotype = perSampleCusumByKaryotype;
+  window._perSampleCusumPanel       = perSampleCusumPanel;
+}
+
+// ---------------------------------------------------------------------
+// Panel-flavoured CUSUM for sparse / multi-scale layers
+//
+// θπ and GHSL aren't on the dense per-window PCA grid — they live on
+// panel objects like state.data.theta_pi_panel and state.data.ghsl_panel
+// with the shape:
+//
+//   panel.div_roll[scaleKey][sample_idx][col_idx]   // values
+//   panel.start_bp[col_idx], panel.end_bp[col_idx]  // bp range per col
+//   panel.scales = [scaleKey, ...]                   // available scales
+//   panel.primary_scale                              // default scale
+//
+// Different scales = different column densities. The user
+// (chat 2026-05-18): "for theta pi or GHSL haplotype divergence by
+// sequence length its a bit too sparse in markers. so we must
+// consider a bit more dense scale". perSampleCusumPanel lets the
+// caller pick which scale to walk so they can trade sparsity for
+// signal at boundary candidates.
+//
+// Centering / residual options + NaN carry-forward semantics match
+// perSampleCusum exactly — the only difference is the column source.
+// ---------------------------------------------------------------------
+
+/**
+ * Per-sample CUSUM over a panel layer (θπ / GHSL).
+ *
+ * @param {object} state
+ * @param {string} panelKey  — 'theta_pi_panel' | 'ghsl_panel' | etc.;
+ *                             must resolve to a panel with the
+ *                             expected div_roll / start_bp / end_bp shape
+ * @param {{
+ *   scale?: string,                            // default panel.primary_scale
+ *   startBp?: number, endBp?: number,          // optional bp filter
+ *   residual?: 'cohort_mean'|'band_mean'|'zero',
+ *   labels?: ArrayLike<number>,                // required when residual='band_mean'
+ *   K?: number,                                // required when residual='band_mean'
+ * }} [opts]
+ * @returns {{
+ *   cusums: Float64Array[],     // per-sample arrays of length nCols
+ *   colStartBp: Float64Array,   // per-column bp range (for plotting)
+ *   colEndBp: Float64Array,
+ *   scale: string,              // resolved scale key
+ *   nCols: number,
+ * } | null}
+ */
+export function perSampleCusumPanel(state, panelKey, opts) {
+  if (!state || !state.data) return null;
+  const panel = state.data[panelKey];
+  if (!panel || !panel.div_roll) return null;
+  const o = opts || {};
+  const scale = o.scale
+              || panel.primary_scale
+              || (panel.scales && panel.scales[0])
+              || Object.keys(panel.div_roll)[0];
+  if (!scale || !panel.div_roll[scale]) return null;
+  const M = panel.div_roll[scale];
+  if (!Array.isArray(M) || M.length === 0) return null;
+  if (!panel.start_bp || !panel.end_bp
+      || panel.start_bp.length !== panel.end_bp.length) return null;
+
+  const nS = state.data.n_samples | 0;
+  if (nS <= 0) return null;
+
+  // Resolve column subset by bp range if requested.
+  const N = panel.start_bp.length;
+  const colIdx = [];
+  const useFilter = Number.isFinite(o.startBp) && Number.isFinite(o.endBp);
+  for (let i = 0; i < N; i++) {
+    if (useFilter) {
+      const mid = (panel.start_bp[i] + panel.end_bp[i]) / 2;
+      if (mid < o.startBp || mid > o.endBp) continue;
+    }
+    colIdx.push(i);
+  }
+  if (colIdx.length === 0) return null;
+  const nC = colIdx.length;
+
+  const residualMode = o.residual || 'cohort_mean';
+  if (residualMode === 'band_mean' && (!o.labels || !o.K)) return null;
+
+  const cusums = new Array(nS);
+  for (let si = 0; si < nS; si++) cusums[si] = new Float64Array(nC);
+
+  for (let ci = 0; ci < nC; ci++) {
+    const c = colIdx[ci];
+    // Centering offset for this column.
+    let cohortMean = 0;
+    let bandMean = null;
+    if (residualMode === 'cohort_mean') {
+      let sum = 0, cnt = 0;
+      for (let si = 0; si < nS; si++) {
+        const row = M[si];
+        if (!row) continue;
+        const v = row[c];
+        if (Number.isFinite(v)) { sum += v; cnt++; }
+      }
+      cohortMean = cnt > 0 ? sum / cnt : 0;
+    } else if (residualMode === 'band_mean') {
+      const K = o.K | 0;
+      bandMean = new Float64Array(K);
+      const bandCnt = new Int32Array(K);
+      for (let si = 0; si < nS; si++) {
+        const row = M[si];
+        if (!row) continue;
+        const v = row[c];
+        const k = o.labels[si];
+        if (!Number.isFinite(v)) continue;
+        if (k < 0 || k >= K) continue;
+        bandMean[k] += v;
+        bandCnt[k]++;
+      }
+      for (let k = 0; k < K; k++) {
+        if (bandCnt[k] > 0) bandMean[k] /= bandCnt[k];
+        else                bandMean[k]  = 0;
+      }
+    }
+    for (let si = 0; si < nS; si++) {
+      const row = M[si];
+      const v = row ? row[c] : NaN;
+      const prev = (ci > 0) ? cusums[si][ci - 1] : 0;
+      if (!Number.isFinite(v)) {
+        cusums[si][ci] = prev;
+        continue;
+      }
+      let residual;
+      if (residualMode === 'zero') {
+        residual = v;
+      } else if (residualMode === 'cohort_mean') {
+        residual = v - cohortMean;
+      } else {
+        const k = o.labels[si];
+        residual = (k >= 0 && k < o.K) ? (v - bandMean[k]) : 0;
+      }
+      cusums[si][ci] = prev + residual;
+    }
+  }
+
+  // Stash per-column bp range so the renderer can plot at bp positions
+  // (panel cols aren't on the dense PCA window grid; the cusum index
+  // ci doesn't correspond to dosage windows).
+  const colStartBp = new Float64Array(nC);
+  const colEndBp   = new Float64Array(nC);
+  for (let ci = 0; ci < nC; ci++) {
+    colStartBp[ci] = panel.start_bp[colIdx[ci]];
+    colEndBp[ci]   = panel.end_bp[colIdx[ci]];
+  }
+
+  return { cusums, colStartBp, colEndBp, scale, nCols: nC };
 }

@@ -4,6 +4,7 @@ import {
   perSampleCusum,
   cusumGroupAggregate,
   perSampleCusumByKaryotype,
+  perSampleCusumPanel,
 } from '../atlases/inversion/shared/cusum.js';
 
 let pass = 0, fail = 0;
@@ -147,6 +148,119 @@ group('perSampleCusumByKaryotype convenience');
   check('cusums length = nS',     r.cusums.length === 6);
   check('bandTraj length = K',    r.bandTraj.length === 3);
   check('end-of-chrom band 2 ≈ +5', approx(r.bandTraj[2][4], 5));
+}
+
+// =====================================================================
+// perSampleCusumPanel — θπ / GHSL panel layers (sparse, multi-scale).
+// Fixture builds a fake state.data.theta_pi_panel with:
+//   3 samples × 4 panel columns at scale 'win5'
+//   per-column cohort mean is exactly 0 by construction
+// =====================================================================
+function makePanelState() {
+  const nS = 3;
+  const nCols = 4;
+  // Per-column values per sample chosen so the column-cohort mean is 0
+  // (sample 0 = -1, sample 1 = 0, sample 2 = +1) and the per-column
+  // sample residual stays constant across columns → CUSUMs are linear.
+  const M = [
+    new Float64Array(nCols),  // sample 0 (band 0)
+    new Float64Array(nCols),  // sample 1 (band 1)
+    new Float64Array(nCols),  // sample 2 (band 2)
+  ];
+  for (let c = 0; c < nCols; c++) {
+    M[0][c] = -1;
+    M[1][c] =  0;
+    M[2][c] = +1;
+  }
+  const panel = {
+    primary_scale: 'win5',
+    scales: ['win5', 'win10'],
+    div_roll: { win5: M },
+    start_bp: new Float64Array([1000, 2000, 3000, 4000]),
+    end_bp:   new Float64Array([2000, 3000, 4000, 5000]),
+  };
+  return {
+    state: { data: { n_samples: nS, n_windows: 99, windows: [], theta_pi_panel: panel } },
+    labels: [0, 1, 2],
+    panel,
+    nS, nCols,
+  };
+}
+
+group('perSampleCusumPanel — cohort_mean residual');
+{
+  const { state, nS, nCols } = makePanelState();
+  const r = perSampleCusumPanel(state, 'theta_pi_panel', { residual: 'cohort_mean' });
+  check('returns { cusums, colStartBp, colEndBp, scale, nCols }',
+        r && r.cusums && r.colStartBp && r.colEndBp && r.scale === 'win5' && r.nCols === 4);
+  check('cusums length = nS',           r.cusums.length === nS);
+  check('per-sample length = nCols',    r.cusums[0].length === nCols);
+  // Sample 0 (residual=-1 every col) → CUSUMs = -1, -2, -3, -4
+  check('sample 0 CUSUM at last col = -4', approx(r.cusums[0][3], -4));
+  check('sample 1 CUSUM at last col = 0',  approx(r.cusums[1][3],  0));
+  check('sample 2 CUSUM at last col = +4', approx(r.cusums[2][3],  4));
+  // Column bp metadata preserved
+  check('colStartBp[0] = 1000',          r.colStartBp[0] === 1000);
+  check('colEndBp[3]   = 5000',          r.colEndBp[3]   === 5000);
+}
+
+group('perSampleCusumPanel — bp-range filter');
+{
+  const { state } = makePanelState();
+  // Restrict to the middle 2 columns (bp range ~2000-4000)
+  const r = perSampleCusumPanel(state, 'theta_pi_panel', {
+    residual: 'cohort_mean',
+    startBp: 2000, endBp: 4000,
+  });
+  check('range filter narrows to 2 columns', r && r.nCols === 2);
+  check('sample 0 CUSUM at last filtered col = -2',
+        r && approx(r.cusums[0][1], -2));
+}
+
+group('perSampleCusumPanel — scale selection');
+{
+  const { state, panel } = makePanelState();
+  // Add a denser scale (win1) with 8 columns; user can opt into it.
+  panel.div_roll.win1 = [
+    new Float64Array(8), new Float64Array(8), new Float64Array(8),
+  ];
+  // Same per-sample pattern (-1 / 0 / +1) across all 8 cols
+  for (let c = 0; c < 8; c++) {
+    panel.div_roll.win1[0][c] = -1;
+    panel.div_roll.win1[1][c] =  0;
+    panel.div_roll.win1[2][c] = +1;
+  }
+  // Need start_bp/end_bp arrays matching the win1 column count
+  // (the panel keeps a single bp axis — these tests work because
+  // the panel uses the same axis for every scale; in real precomp
+  // sparse panels would carry separate axes). We don't model that
+  // here — perSampleCusumPanel uses panel.start_bp.length to size
+  // the column iteration, which on a real multi-axis panel would
+  // require the producer to expose per-scale bp axes. Caveat
+  // documented in the SPEC.
+  panel.start_bp = new Float64Array(8);
+  panel.end_bp   = new Float64Array(8);
+  for (let i = 0; i < 8; i++) {
+    panel.start_bp[i] = 1000 + i * 500;
+    panel.end_bp[i]   = 1500 + i * 500;
+  }
+  const r = perSampleCusumPanel(state, 'theta_pi_panel', {
+    residual: 'cohort_mean', scale: 'win1',
+  });
+  check('scale=win1 selects 8 columns', r && r.nCols === 8);
+  check('scale resolved correctly',     r && r.scale === 'win1');
+  check('sample 0 CUSUM at last (8th) col = -8',
+        r && approx(r.cusums[0][7], -8));
+}
+
+group('perSampleCusumPanel — guards');
+{
+  check('null state → null',         perSampleCusumPanel(null, 'theta_pi_panel') === null);
+  check('no panel → null',
+        perSampleCusumPanel({ data: {} }, 'theta_pi_panel') === null);
+  check('band_mean without labels → null',
+        perSampleCusumPanel(makePanelState().state, 'theta_pi_panel',
+                            { residual: 'band_mean' }) === null);
 }
 
 console.log('\n=================');
