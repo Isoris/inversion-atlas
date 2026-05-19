@@ -2169,6 +2169,33 @@ body.resizing-l3, body.resizing-l3 * { cursor: ns-resize !important; user-select
   border-color: #3cc08a; font-weight: 600;
 }
 #dataModeBar button:disabled { cursor: not-allowed; }
+
+/* 2026-05-19 — subtle mode tint applied to the main page when not in
+   the default dosage mode. The body gets a data attribute set by
+   setActiveMode (data-active-mode="dosage"|"theta_pi"|"ghsl"); the CSS
+   below paints a faint coloured wash on the PCA scatter container and
+   the tracked-samples sidebar so the user knows at a glance which axis
+   is active without scanning the toolbar. The wash is alpha-blended on
+   the existing dark panel background so the underlying readability is
+   unchanged.
+   - dosage:    no tint (default)
+   - theta_pi:  amber/yellow (warmer than the cool blue dosage accent)
+   - ghsl:      blue        (cooler, distinct from theta_pi)
+   The selectors below are scoped to #pcaPanel + #trackedSamplesPanel so
+   the wash doesn't bleed into the |Z|, sim_mat, lines, or L3 panels —
+   those already have strong colors of their own. */
+body[data-active-mode="theta_pi"] #pcaPanel,
+body[data-active-mode="theta_pi"] #trackedSamplesPanel {
+  background-image:
+    linear-gradient(rgba(240, 175, 60, 0.045), rgba(240, 175, 60, 0.045));
+  border-color: rgba(240, 175, 60, 0.35) !important;
+}
+body[data-active-mode="ghsl"] #pcaPanel,
+body[data-active-mode="ghsl"] #trackedSamplesPanel {
+  background-image:
+    linear-gradient(rgba(80, 140, 200, 0.06), rgba(80, 140, 200, 0.06));
+  border-color: rgba(80, 140, 200, 0.4) !important;
+}
 /* turn 128: #jumpToWindowsBtn (📊 Windows (N)) is the arrow-step cycler.
    Quentin's bug report: "in window mode for cursor navigation in page 1
    we have 3 choices window (1) window (5) and window (10) and it works

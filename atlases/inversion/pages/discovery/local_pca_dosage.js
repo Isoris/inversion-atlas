@@ -399,6 +399,9 @@ export async function mount(root, atlasState, registry) {
   document.body.dataset.layoutMode = restoredMode;
   legacyState.layoutMode = restoredMode;
   try { localStorage.setItem('pca_scrubber_v3.layoutmode', restoredMode); } catch (_) {}
+  // The body[data-active-mode] attribute is set AFTER applyData runs
+  // (further below), because applyData is what restores state.activeMode
+  // from localStorage — we'd be writing 'undefined' here.
 
   // Resolve the precomp data layer for the active chromosome.
   const chrom = atlasState.shared.activeChrom;
@@ -502,6 +505,10 @@ export async function mount(root, atlasState, registry) {
   // Apply data through the legacy entry point. This populates state.data,
   // state.tracks, state.windows, etc. — everything the draw functions need.
   applyData(legacyState, data);
+  // Mode shade — body data-attribute mirrors state.activeMode so the
+  // CSS wash on the PCA + tracked-samples panels reflects the restored
+  // mode immediately on mount, not only after a user toggle.
+  try { document.body.dataset.activeMode = legacyState.activeMode || 'dosage'; } catch (_) {}
 
   // Re-apply the preserved cursor / tracked-samples now that applyData's
   // defaults have been written.
@@ -826,6 +833,10 @@ export function setActiveMode(state, mode) {
   try { updateWinLabel(state); }   catch (_) {}
   // Refresh the toolbar UI (highlight the active segment).
   try { _refreshModeToggleUI(state); } catch (_) {}
+  // CSS shade: tint the PCA scatter + tracked-samples sidebar so the
+  // user can tell at a glance which axis is active. inversion.css reads
+  // `body[data-active-mode="…"]` to apply the wash.
+  try { document.body.dataset.activeMode = mode; } catch (_) {}
   // Persist active mode to localStorage so it survives reload.
   try { localStorage.setItem(_ACTIVE_MODE_STORAGE_KEY, mode); } catch (_) {}
 }

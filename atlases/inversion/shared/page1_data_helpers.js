@@ -402,11 +402,59 @@ export function getActiveModeView(state) {
   return d;
 }
 
+// Per-mode whitelist for the right-side track strip. The atlas JSONs
+// for theta-pi and GHSL ship 6-7 per-window summary tracks (median,
+// z_mds, z_direct, lambda_ratio, mds1, mds2, …). Many of those
+// (z_mds / z_direct / lambda_ratio) are different presentations of the
+// SAME underlying signal that the canonical |Z| panel already shows.
+// Showing all 6 next to the |Z| panel is redundant and visually noisy.
+// The whitelist keeps the one or two tracks that add information
+// orthogonal to |Z|: per-window median (the unaggregated raw signal)
+// and one mds coordinate (geometry). Other tracks are dropped from the
+// view's `tracks` object so they don't render as strips.
+const _MODE_TRACK_KEEP = {
+  theta_pi: new Set(['theta_pi_median', 'theta_pi_mds1']),
+  ghsl:     new Set(['ghsl_div_median', 'ghsl_mds1']),
+};
+
+function _filterTracksForMode(view, modeKey) {
+  if (!view || !view.tracks) return;
+  const keep = _MODE_TRACK_KEEP[modeKey];
+  if (!keep) return;
+  const filtered = {};
+  for (const k of Object.keys(view.tracks)) {
+    if (keep.has(k)) filtered[k] = view.tracks[k];
+  }
+  // Stash the unfiltered set under _all_tracks so future UI (a "show all
+  // tracks" toggle) can opt back in without re-fetching the JSON.
+  if (!view._all_tracks) view._all_tracks = view.tracks;
+  view.tracks = filtered;
+}
+
 // Attach the dosage-shaped top-level fields (per-window pc1/pc2,
 // l1_envelopes, l2_envelopes, sim_scales, cusum) onto the theta-pi
 // envelope so panels can read them without knowing about the mode.
 function _synthesizeThetaPiView(tv) {
   const lp = tv.theta_pi_local_pca;
+  // The theta-pi atlas JSON does NOT have a top-level `windows[]` array
+  // (unlike the dosage z-blocks JSON). The window bp positions live at
+  // theta_pi_per_window.windows as `[{idx, start_bp, end_bp}, ...]`.
+  // Hoist them to `tv.windows` and synthesize center_mb so panels that
+  // read `view.windows[i].center_mb` (axis ranges, cursor, click-to-jump)
+  // keep working.
+  if (!Array.isArray(tv.windows)) {
+    const tpw = tv.theta_pi_per_window;
+    if (tpw && Array.isArray(tpw.windows)) {
+      tv.windows = tpw.windows.map(w => {
+        const center_mb = (Number.isFinite(w.start_bp) && Number.isFinite(w.end_bp))
+          ? ((w.start_bp + w.end_bp) / 2 / 1e6)
+          : NaN;
+        return { idx: w.idx, start_bp: w.start_bp, end_bp: w.end_bp, center_mb };
+      });
+    } else {
+      tv.windows = [];
+    }
+  }
   // Per-window pc1/pc2 from pc_loadings_aligned [npc][n_windows][n_samples].
   if (lp && Array.isArray(lp.pc_loadings_aligned) && Array.isArray(tv.windows)) {
     const pcs = lp.pc_loadings_aligned;
@@ -421,6 +469,9 @@ function _synthesizeThetaPiView(tv) {
       if (w.z === undefined && lp.z && lp.z[i] !== undefined) w.z = lp.z[i];
     }
   }
+  // n_samples (some panels read this directly off view, not state.data).
+  if (tv.n_samples == null && lp && Number.isFinite(lp.n_samples)) tv.n_samples = lp.n_samples;
+  if (tv.n_windows == null && Array.isArray(tv.windows)) tv.n_windows = tv.windows.length;
   // L1 / L2 envelopes from theta_pi_envelopes.
   if (tv.theta_pi_envelopes) {
     if (!tv.l1_envelopes && Array.isArray(tv.theta_pi_envelopes.l1)) {
@@ -448,15 +499,61 @@ function _synthesizeThetaPiView(tv) {
         z:     lp.z,
         q_lo:  0.05,
         q_hi:  0.95,
-        z_max: lp.max_z_axis || 2.5,
+        // max_z_axis is a PER-WINDOW array in the actual JSON (not a
+        // scalar). Reduce to a single representative value so panels
+        // calling `scale.z_max.toFixed(...)` don't blow up.
+        z_max: _scalarizeMaxZ(lp.max_z_axis),
       },
     };
     if (!tv.default_sim_scale) tv.default_sim_scale = 'default';
   }
+  // Drop redundant z-variants from the track strip — the |Z| main panel
+  // already shows the canonical z, no need for 6 strips next to it.
+  _filterTracksForMode(tv, 'theta_pi');
+}
+
+// max_z_axis is either a scalar (older schema) or a per-window array
+// (current schema). The sim_panel renderer formats z_max with toFixed,
+// so we must hand it a number. Strategy: take the 95th percentile of
+// the array (or max if short), falling back to 2.5 when absent.
+function _scalarizeMaxZ(mz) {
+  if (Number.isFinite(mz)) return mz;
+  if (!Array.isArray(mz) || mz.length === 0) return 2.5;
+  const sorted = Array.from(mz).filter(Number.isFinite).sort((a, b) => a - b);
+  if (sorted.length === 0) return 2.5;
+  // 95th percentile so a few extreme outliers don't blow up the axis.
+  const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95));
+  return sorted[idx];
 }
 
 function _synthesizeGhslView(gv) {
   const lp = gv.ghsl_local_pca;
+  // GHSL JSON has no top-level `windows[]` array AND no per_window block
+  // (unlike theta-pi). Synthesize windows from n_windows + chrom length
+  // by uniform spacing. This is approximate but works for axis
+  // positioning + click-to-jump. If a future GHSL schema adds explicit
+  // window bp positions, this block becomes a fallback path.
+  if (!Array.isArray(gv.windows)) {
+    const nw = (lp && Number.isFinite(lp.n_windows)) ? lp.n_windows
+             : (Number.isFinite(gv.n_windows) ? gv.n_windows : 0);
+    if (nw > 0) {
+      // Best-effort chrom length: pull from sim_mat_n or the loadings
+      // sub-array length. Cap at 100 Mb if unresolvable.
+      // Step = totalBp / nw; center_mb = (i+0.5) * step / 1e6.
+      // The downstream click-to-jump only needs monotonic center_mb;
+      // exact bp positions matter less.
+      const approxChromBp = 100_000_000;   // placeholder; refined when grid_map lands
+      const stepBp = approxChromBp / nw;
+      gv.windows = new Array(nw);
+      for (let i = 0; i < nw; i++) {
+        const start_bp = Math.round(i * stepBp);
+        const end_bp = Math.round((i + 1) * stepBp);
+        gv.windows[i] = { idx: i, start_bp, end_bp, center_mb: (start_bp + end_bp) / 2 / 1e6 };
+      }
+    } else {
+      gv.windows = [];
+    }
+  }
   if (lp && Array.isArray(lp.pc_loadings_aligned) && Array.isArray(gv.windows)) {
     const pcs = lp.pc_loadings_aligned;
     const nw = Math.min(gv.windows.length, (pcs[0] && pcs[0].length) || 0);
@@ -469,6 +566,8 @@ function _synthesizeGhslView(gv) {
       if (w.z === undefined && lp.z && lp.z[i] !== undefined) w.z = lp.z[i];
     }
   }
+  if (gv.n_samples == null && lp && Number.isFinite(lp.n_samples)) gv.n_samples = lp.n_samples;
+  if (gv.n_windows == null && Array.isArray(gv.windows)) gv.n_windows = gv.windows.length;
   if (gv.ghsl_envelopes) {
     if (!gv.l1_envelopes && Array.isArray(gv.ghsl_envelopes.l1)) {
       gv.l1_envelopes = gv.ghsl_envelopes.l1;
@@ -489,11 +588,12 @@ function _synthesizeGhslView(gv) {
         z:     lp.z,
         q_lo:  0.05,
         q_hi:  0.95,
-        z_max: lp.max_z_axis || 2.5,
+        z_max: _scalarizeMaxZ(lp.max_z_axis),
       },
     };
     if (!gv.default_sim_scale) gv.default_sim_scale = 'default';
   }
+  _filterTracksForMode(gv, 'ghsl');
 }
 
 // Convenience: invalidate the synthesis flag so the next call re-runs.
