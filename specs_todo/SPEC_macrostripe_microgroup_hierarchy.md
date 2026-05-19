@@ -306,6 +306,23 @@ explicit.
 > together, suggesting linked sub-haplotype backgrounds rather than
 > family, ancestry, or technical structure.
 
+## Sibling SPECs (2026-05-18)
+
+- **`SPEC_cramers_v_seed_merge.md`** — alternative seed-merge
+  auto-promote pipeline. Two modes (`insulated_local`,
+  `post_long_range`) so the user can compare with L2-sweep and
+  band-tracking. Per the user direction "do b + alternative to c".
+- **`SPEC_haplotype_burden_coloring.md`** — schema-in/color-out
+  contract for attaching burden / phenotype / marker-haplotype
+  layers to the macrostripe + microgroup labels defined here. The
+  Phase 1 deliverable for that SPEC is the per-candidate group-
+  label TSV export — the user's weekly goal.
+
+Together: this SPEC defines the LABELS, `SPEC_cramers_v_seed_merge`
+defines an ALTERNATIVE PROMOTION pipeline, and
+`SPEC_haplotype_burden_coloring` defines the DOWNSTREAM CONSUMER
+(coloring + TSV).
+
 ## References
 
 - `specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md`
