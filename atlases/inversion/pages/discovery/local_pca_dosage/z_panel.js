@@ -17,7 +17,7 @@ import { fitCanvas, niceTicks, themeColor } from '../../../shared/page1_utils.js
 import { karyoColor } from '../../../shared/color_helpers.js';
 
 import { _lineageColor, _pageState, _setActiveState } from './_state.js';
-import { currentMbRange, getL2Cluster } from './_data.js';
+import { currentMbRange, getL2Cluster, getActiveModeView } from './_data.js';
 import { _assignCandidateLanes, _drawWRow, _drawWinNavLane, _ensureCsOverlayIndex, _wRowBand, _winNavBand, drawCandidateBar } from './candidates.js';
 import { bandTraceGetOrCompute } from './band_trace_state.js';
 import { BTRACE_REGIME_COLOR } from '../../../shared/band_trace.js';
@@ -788,7 +788,10 @@ export function drawZ(state) {
     ctx.fillText('Robust |Z| profile renders here once data is loaded.', w / 2, h / 2 + 10);
     return;
   }
-  const d = state.data;
+  // 2026-05-19 mode-switch — paint from the active mode's view so |Z|,
+  // windows, envelopes, candidate bars all reflect the chosen axis.
+  const d = getActiveModeView(state);
+  if (!d) return;
   // v3.61: when collapsed, render a COMPACT view that keeps the L1/L2 zone
   // bars + boundary arrows + a yellow candidate strip visible. Previously
   // collapsing the Z panel hid everything (including the L1/L2 zone bars,

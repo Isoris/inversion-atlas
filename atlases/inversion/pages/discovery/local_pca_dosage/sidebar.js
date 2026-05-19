@@ -123,6 +123,58 @@ export function attachSidebarHandlers(state) {
   _wireViewMode(state);
   _wirePanelCollapseButtons(state);
   _wireNewShellControls(state);
+  _wireActiveModeBar(state);
+}
+
+// =============================================================================
+// Active-mode bar (2026-05-19) — dosage / θπ / GHSL toggle
+// =============================================================================
+// Click each segment to switch the underlying data source for every
+// panel; press 'M' to cycle forward. Buttons for modes whose data isn't
+// loaded are disabled (state.data.theta_pi_view / .ghsl_view absent).
+function _wireActiveModeBar(state) {
+  const bar = document.getElementById('dataModeBar');
+  if (!bar) return;
+  bar.querySelectorAll('button[data-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = btn.dataset.mode;
+      if (!m || btn.disabled) return;
+      // Dynamic import to break a circular dep — sidebar.js is loaded
+      // by local_pca_dosage.js itself.
+      import('../local_pca_dosage.js').then(mod => {
+        if (typeof mod.setActiveMode === 'function') mod.setActiveMode(state, m);
+      });
+    });
+  });
+  // 'M' hotkey — cycle forward through dosage → θπ → GHSL → dosage.
+  // Skip when an input is focused (don't fight text entry).
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'm' && ev.key !== 'M') return;
+    if (ev.ctrlKey || ev.altKey || ev.metaKey) return;
+    const t = ev.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    import('../local_pca_dosage.js').then(mod => {
+      if (typeof mod.cycleActiveMode === 'function') mod.cycleActiveMode(state);
+    });
+  });
+  // Initial render — highlights the right segment + greys out unavailable modes.
+  _refreshActiveModeBar(state);
+}
+
+function _refreshActiveModeBar(state) {
+  const bar = document.getElementById('dataModeBar');
+  if (!bar) return;
+  const mode = state.activeMode || 'dosage';
+  for (const btn of bar.querySelectorAll('button[data-mode]')) {
+    const m = btn.dataset.mode;
+    btn.classList.toggle('active', m === mode);
+    const available =
+      m === 'dosage' ||
+      (m === 'theta_pi' && !!(state.data && state.data.theta_pi_view)) ||
+      (m === 'ghsl'     && !!(state.data && state.data.ghsl_view));
+    btn.disabled = !available;
+    btn.style.opacity = available ? '' : '0.4';
+  }
 }
 
 // =============================================================================

@@ -43,4 +43,6 @@ export {
   _fmt4,
   _fmtP,
   groupColor,
+  getActiveModeView,
+  invalidateModeView,
 } from '../../../shared/page1_data_helpers.js';

@@ -17,7 +17,7 @@
 import { fitCanvas, fmt, fmtMb, formatTrackVal, shortId, themeColor } from '../../../shared/page1_utils.js';
 
 import { _pageState, _setActiveState } from './_state.js';
-import { allSampleIdx, currentMbRange, getL2Cluster, getPC } from './_data.js';
+import { allSampleIdx, currentMbRange, getActiveModeView, getL2Cluster, getPC } from './_data.js';
 // Note: autoPickRadial is imported from pca_panel.js below. pca_panel.js
 // also imports from events.js (setCur, onPCAClick), so this is a mutual
 // import cycle — fine at runtime because both names are functions invoked
@@ -306,11 +306,14 @@ export function buildTrackPanels(state) {
   const container = document.getElementById('tracksContainer');
   if (!container) return;
   container.innerHTML = '';
-  if (!state.data || !state.data.tracks) return;
-  const labels = Object.keys(state.data.tracks);
+  // 2026-05-19 mode-switch — show the active mode's tracks (dosage atlas
+  // tracks for 'dosage'; theta-pi-view.tracks for 'theta_pi'; etc.).
+  const d = getActiveModeView(state) || state.data;
+  if (!d || !d.tracks) return;
+  const labels = Object.keys(d.tracks);
   if (labels.length === 0) return;
   for (const label of labels) {
-    const trk = state.data.tracks[label];
+    const trk = d.tracks[label];
     const panel = document.createElement('div');
     panel.className = 'track-panel';
     panel.dataset.trackLabel = label;
@@ -326,14 +329,16 @@ export function buildTrackPanels(state) {
       rng.textContent = `${formatTrackVal(trk.min)} – ${formatTrackVal(trk.max)}`;
     }
     panel.appendChild(rng);
-    // Click-to-jump (same gesture as Z panel)
+    // Click-to-jump (same gesture as Z panel) — uses the active mode's
+    // window grid so the click maps to the right window index.
     panel.addEventListener('click', e => {
       const rect = cv.getBoundingClientRect();
       const pad = { l: 44, r: 16 };
       const x = e.clientX - rect.left;
       const plotW = rect.width - pad.l - pad.r;
       const frac = Math.max(0, Math.min(1, (x - pad.l) / plotW));
-      const wins = state.data.windows;
+      const view = getActiveModeView(state) || state.data;
+      const wins = view.windows;
       const mbMin = wins[0].center_mb, mbMax = wins[wins.length - 1].center_mb;
       const targetMb = mbMin + frac * (mbMax - mbMin);
       let bestI = 0, bestD = Infinity;
@@ -350,14 +355,15 @@ export function buildTrackPanels(state) {
 // --- drawTracks(state) — legacy lines 32860-32872 ---
 export function drawTracks(state) {
   _setActiveState(state);
-  if (!state.data || !state.data.tracks) return;
+  const d = getActiveModeView(state) || state.data;
+  if (!d || !d.tracks) return;
   const container = document.getElementById('tracksContainer');
   if (!container) return;
   const panels = container.querySelectorAll('.track-panel');
   for (const panel of panels) {
     const label = panel.dataset.trackLabel;
     const cv = panel.querySelector('canvas');
-    const trk = state.data.tracks[label];
+    const trk = d.tracks[label];
     if (!trk || !trk.values) continue;
     drawOneTrack(state, cv, trk, label);
   }

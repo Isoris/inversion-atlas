@@ -404,6 +404,21 @@
               data-mode="fixed">📐 fixed</button>
       <button id="resetLayoutBtn"
               title="Reset layout to defaults (sidebar expanded, panels at default size)">↺ reset layout</button>
+      <!-- 2026-05-19 — active-mode toggle. Switches every panel
+           (sim_mat, |Z|, lines, PCA, L3, tracks) between dosage,
+           θπ, and GHSL data sources. Color mode (kmeans / family
+           / dosage / θπ / GHSL / F_ROH / het) stays independent.
+           Press 'M' to cycle. Buttons are disabled when their mode's
+           data isn't loaded for the current chromosome.
+           ID is `dataModeBar` to avoid collision with the pre-existing
+           `#activeModeBar` (a different ctrlBar widget for "default vs
+           detailed merge logic"). -->
+      <span id="dataModeBar"
+            title="Active data axis — switches every panel between dosage / θπ / GHSL. Press M to cycle.">
+        <button data-mode="dosage"   class="active">📊 dosage</button>
+        <button data-mode="theta_pi" title="Switch panels to θπ local-PCA (per-sample nucleotide diversity)">θπ</button>
+        <button data-mode="ghsl"     title="Switch panels to GHSL local-PCA (group-haplotype similarity by locus)">GHSL</button>
+      </span>
       <!-- v3.99 turn 5: viewModeBar moved here from header. Sits between
            slider and window stats.
            v3.99 turn 8: added L2 zoom button — shows only the current L2

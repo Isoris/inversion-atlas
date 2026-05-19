@@ -2145,6 +2145,30 @@ body.resizing-l3, body.resizing-l3 * { cursor: ns-resize !important; user-select
   background: var(--accent); color: #0e1116;
   border-color: var(--accent); font-weight: 600;
 }
+
+/* 2026-05-19 — #dataModeBar (active data axis: dosage / θπ / GHSL).
+   Same visual contract as #viewModeBar so it slots into ctrlBar without
+   looking out of place, but a distinct accent colour (green/teal) to
+   communicate "this changes the underlying data" rather than "this
+   changes the zoom level". Tinted disabled state for modes whose data
+   isn't loaded for the current chromosome. */
+#dataModeBar { display: inline-flex; gap: 2px; align-items: stretch; }
+#dataModeBar button {
+  background: var(--panel-2); color: var(--ink-dim);
+  border: 1px solid var(--rule); border-radius: 3px;
+  padding: 4px 10px; font-family: var(--mono); font-size: 11px;
+  cursor: pointer; transition: color 100ms, border-color 100ms, background 100ms;
+  white-space: nowrap; line-height: 1;
+  display: inline-flex; align-items: center;
+}
+#dataModeBar button:hover:not(:disabled) {
+  color: var(--ink); border-color: var(--ink-dimmer);
+}
+#dataModeBar button.active {
+  background: #3cc08a; color: #0e1116;
+  border-color: #3cc08a; font-weight: 600;
+}
+#dataModeBar button:disabled { cursor: not-allowed; }
 /* turn 128: #jumpToWindowsBtn (📊 Windows (N)) is the arrow-step cycler.
    Quentin's bug report: "in window mode for cursor navigation in page 1
    we have 3 choices window (1) window (5) and window (10) and it works

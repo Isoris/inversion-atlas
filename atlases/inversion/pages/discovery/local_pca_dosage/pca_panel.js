@@ -18,7 +18,7 @@ import { escapeHtml, fitCanvas, themeColor, withAlpha } from '../../../shared/pa
 import { contextFromState, sampleSpreadL2 } from '../../../shared/per_l2_cluster.js';
 
 import { _pageState, _setActiveState, _vColor, getSampleColor, trackedColor } from './_state.js';
-import { allSampleIdx, availablePCs, getL2Cluster, getPC, getPCRender, groupColor, setPcaXY, setViewControlsLinked } from './_data.js';
+import { allSampleIdx, availablePCs, getActiveModeView, getL2Cluster, getPC, getPCRender, groupColor, setPcaXY, setViewControlsLinked } from './_data.js';
 import { buildLinesPanel, buildLinesPanelCheckboxes } from './lines_panel.js';
 import { drawLinesPanel } from './lines_panel.js';
 import { renderL3Panel } from './l3_panel.js';
@@ -263,7 +263,10 @@ export function drawPCA(state) {
   ctx.clearRect(0, 0, w, h);
   if (!state.data) return;
   document.getElementById('emptyState').style.display = 'none';
-  const d = state.data;
+  // 2026-05-19 mode-switch — read PC scatter from the active mode's view.
+  // For dosage this is state.data; for θπ / GHSL it's the synthesized
+  // view with pc1/pc2 attached to each window from pc_loadings_aligned.
+  const d = getActiveModeView(state) || state.data;
   const cur = state.cur;
   const trailStart = Math.max(0, cur - state.trailN);
 
@@ -590,7 +593,9 @@ export function drawAnchorStrip(state) {
   const { ctx, w, h } = fit;
   ctx.clearRect(0, 0, w, h);
   if (!state.data) return;
-  const N = state.data.n_windows;
+  // Mode-aware window count for the anchor strip.
+  const view = getActiveModeView(state) || state.data;
+  const N = (view.windows && view.windows.length) || view.n_windows || state.data.n_windows;
   // v3.59: defensive recompute. If samples are tracked but concord is missing
   // or stale (e.g. data just loaded, or some upstream caller forgot to call
   // recomputeAnchorConcord), do it inline so the strip never silently shows

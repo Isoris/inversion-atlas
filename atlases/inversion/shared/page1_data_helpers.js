@@ -50,7 +50,14 @@ const FAMILY_PALETTE_BASE = [
 // Resolve which scale to render. Falls back to legacy `sim_thumb` when
 // no scales were embedded.
 export function getActiveSimScale(state) {
-  const d = state && state.data;
+  if (!state || !state.data) return null;
+  // 2026-05-19 mode-switch — route through the active mode's view so
+  // theta_pi / ghsl modes use their own sim_mat (synthesized via
+  // getActiveModeView). For 'dosage' mode the view IS state.data so
+  // behavior is unchanged.
+  const d = (state.activeMode && state.activeMode !== 'dosage')
+    ? getActiveModeView(state)
+    : state.data;
   if (!d) return null;
   // New multi-scale path
   if (d.sim_scales && Object.keys(d.sim_scales).length > 0) {
@@ -71,10 +78,17 @@ export function getActiveSimScale(state) {
 
 // --- currentMbRange(state) — legacy lines 31781-31834 ---
 export function currentMbRange(state) {
-  if (!state || !state.data || !Array.isArray(state.data.windows) || state.data.windows.length === 0) {
+  if (!state || !state.data) return { mbMin: 0, mbMax: 1 };
+  // 2026-05-19 mode-switch — read the active mode's windows array.
+  const d = (state.activeMode && state.activeMode !== 'dosage')
+    ? getActiveModeView(state)
+    : state.data;
+  if (!d || !Array.isArray(d.windows) || d.windows.length === 0) {
     return { mbMin: 0, mbMax: 1 };
   }
-  const wins = state.data.windows;
+  // All windows / envelope reads below route through `d` (the view) so
+  // the L1/L2 zoom branch operates on the active mode's window grid.
+  const wins = d.windows;
   const genomeMin = wins[0].center_mb;
   const genomeMax = wins[wins.length - 1].center_mb;
   const mode = state.viewMode || 'genome';
@@ -83,9 +97,9 @@ export function currentMbRange(state) {
   if (mode === 'l2') {
     const cur = state.cur;
     const l2i = (state.windowToL2 && cur != null) ? state.windowToL2[cur] : -1;
-    if (l2i != null && l2i >= 0 && Array.isArray(state.data.l2_envelopes)
-        && state.data.l2_envelopes[l2i]) {
-      const e = state.data.l2_envelopes[l2i];
+    if (l2i != null && l2i >= 0 && Array.isArray(d.l2_envelopes)
+        && d.l2_envelopes[l2i]) {
+      const e = d.l2_envelopes[l2i];
       const lo = wins[Math.max(0, e._s0)].center_mb;
       const hi = wins[Math.min(wins.length-1, e._e0)].center_mb;
       const pad = (hi - lo) * 0.05;
@@ -96,15 +110,15 @@ export function currentMbRange(state) {
   const cur = state.cur;
   const l1i = (state.windowToL1 && cur != null) ? state.windowToL1[cur] : -1;
   if (l1i == null || l1i < 0) {
-    if (Array.isArray(state.data.l1_envelopes) && state.data.l1_envelopes.length > 0) {
+    if (Array.isArray(d.l1_envelopes) && d.l1_envelopes.length > 0) {
       let best = 0, bestD = Infinity;
-      for (let i = 0; i < state.data.l1_envelopes.length; i++) {
-        const e = state.data.l1_envelopes[i];
+      for (let i = 0; i < d.l1_envelopes.length; i++) {
+        const e = d.l1_envelopes[i];
         const center = (e._s0 + e._e0) / 2;
         const dd = Math.abs(center - cur);
         if (dd < bestD) { bestD = dd; best = i; }
       }
-      const e = state.data.l1_envelopes[best];
+      const e = d.l1_envelopes[best];
       const lo = wins[Math.max(0, e._s0)].center_mb;
       const hi = wins[Math.min(wins.length-1, e._e0)].center_mb;
       const pad = (hi - lo) * 0.05;
@@ -112,7 +126,7 @@ export function currentMbRange(state) {
     }
     return { mbMin: genomeMin, mbMax: genomeMax };
   }
-  const e = state.data.l1_envelopes[l1i];
+  const e = d.l1_envelopes[l1i];
   const lo = wins[Math.max(0, e._s0)].center_mb;
   const hi = wins[Math.min(wins.length-1, e._e0)].center_mb;
   const pad = (hi - lo) * 0.05;
@@ -344,6 +358,152 @@ export function detectSchemaAndLayers(data) {
 // --- listLayers(state) — legacy lines 54175-54177 ---
 export function listLayers(state) {
   return state && state.layersPresent ? Array.from(state.layersPresent).sort() : [];
+}
+
+// --- getActiveModeView(state) — mode-switch adapter (2026-05-19) ---
+//
+// Returns a "data view" object that every local_pca_dosage panel reads
+// from instead of `state.data` directly. For the default 'dosage' mode
+// this is a passthrough (zero-cost). For 'theta_pi' and 'ghsl' modes
+// the adapter returns the namespaced sub-envelope (state.data.theta_pi_view
+// or .ghsl_view set by local_pca_dosage.mount during the selective merge)
+// with synthesized per-window pc1/pc2 + top-level z/sim_scales/envelopes
+// attached lazily so the same panel renderers paint mode-correct content
+// without per-panel mode switches.
+//
+// State surface:
+//   state.activeMode = 'dosage' | 'theta_pi' | 'ghsl'   (defaults to 'dosage')
+//
+// Idempotent — only the first call per (view, mode) synthesizes the
+// missing fields; subsequent calls return the same view object.
+export function getActiveModeView(state) {
+  if (!state || !state.data) return state && state.data;
+  const mode = state.activeMode || 'dosage';
+  const d = state.data;
+  if (mode === 'dosage') return d;
+  if (mode === 'theta_pi') {
+    const tv = d.theta_pi_view;
+    if (!tv) return d;   // theta-pi data not loaded — fall back to dosage view
+    if (!tv._mode_synthesized) {
+      _synthesizeThetaPiView(tv);
+      tv._mode_synthesized = true;
+    }
+    return tv;
+  }
+  if (mode === 'ghsl') {
+    const gv = d.ghsl_view;
+    if (!gv) return d;
+    if (!gv._mode_synthesized) {
+      _synthesizeGhslView(gv);
+      gv._mode_synthesized = true;
+    }
+    return gv;
+  }
+  return d;
+}
+
+// Attach the dosage-shaped top-level fields (per-window pc1/pc2,
+// l1_envelopes, l2_envelopes, sim_scales, cusum) onto the theta-pi
+// envelope so panels can read them without knowing about the mode.
+function _synthesizeThetaPiView(tv) {
+  const lp = tv.theta_pi_local_pca;
+  // Per-window pc1/pc2 from pc_loadings_aligned [npc][n_windows][n_samples].
+  if (lp && Array.isArray(lp.pc_loadings_aligned) && Array.isArray(tv.windows)) {
+    const pcs = lp.pc_loadings_aligned;
+    const nw = Math.min(tv.windows.length, (pcs[0] && pcs[0].length) || 0);
+    for (let i = 0; i < nw; i++) {
+      const w = tv.windows[i] || (tv.windows[i] = {});
+      if (w.pc1 === undefined && pcs[0]) w.pc1 = pcs[0][i];
+      if (w.pc2 === undefined && pcs[1]) w.pc2 = pcs[1][i];
+      if (w.pc3 === undefined && pcs[2]) w.pc3 = pcs[2][i];
+      if (w.pc4 === undefined && pcs[3]) w.pc4 = pcs[3][i];
+      // theta-pi z is a chrom-wide per-window scalar (robust |Z|).
+      if (w.z === undefined && lp.z && lp.z[i] !== undefined) w.z = lp.z[i];
+    }
+  }
+  // L1 / L2 envelopes from theta_pi_envelopes.
+  if (tv.theta_pi_envelopes) {
+    if (!tv.l1_envelopes && Array.isArray(tv.theta_pi_envelopes.l1)) {
+      tv.l1_envelopes = tv.theta_pi_envelopes.l1;
+    }
+    if (!tv.l2_envelopes && Array.isArray(tv.theta_pi_envelopes.l2)) {
+      tv.l2_envelopes = tv.theta_pi_envelopes.l2;
+    }
+    if (!tv.candidate_proposals && Array.isArray(tv.theta_pi_envelopes.candidate_intervals)) {
+      tv.candidate_proposals = tv.theta_pi_envelopes.candidate_intervals;
+    }
+  }
+  // Cusum (already may exist as theta_pi_cusum; alias if local_pca_dosage's
+  // renderer reads `cusum_theta` — which it does in some places — we
+  // also expose as `cusum` since the canonical mode-agnostic name).
+  if (!tv.cusum_theta && tv.theta_pi_cusum) tv.cusum_theta = tv.theta_pi_cusum;
+  if (!tv.cusum && tv.theta_pi_cusum) tv.cusum = tv.theta_pi_cusum;
+  // sim_scales — wrap the single theta_pi_local_pca.sim_mat in the
+  // multi-scale shape `getActiveSimScale` expects.
+  if (lp && lp.sim_mat && !tv.sim_scales) {
+    tv.sim_scales = {
+      default: {
+        sim:   lp.sim_mat,
+        n:     lp.sim_mat_n || (Array.isArray(lp.sim_mat) ? lp.sim_mat.length : 0),
+        z:     lp.z,
+        q_lo:  0.05,
+        q_hi:  0.95,
+        z_max: lp.max_z_axis || 2.5,
+      },
+    };
+    if (!tv.default_sim_scale) tv.default_sim_scale = 'default';
+  }
+}
+
+function _synthesizeGhslView(gv) {
+  const lp = gv.ghsl_local_pca;
+  if (lp && Array.isArray(lp.pc_loadings_aligned) && Array.isArray(gv.windows)) {
+    const pcs = lp.pc_loadings_aligned;
+    const nw = Math.min(gv.windows.length, (pcs[0] && pcs[0].length) || 0);
+    for (let i = 0; i < nw; i++) {
+      const w = gv.windows[i] || (gv.windows[i] = {});
+      if (w.pc1 === undefined && pcs[0]) w.pc1 = pcs[0][i];
+      if (w.pc2 === undefined && pcs[1]) w.pc2 = pcs[1][i];
+      if (w.pc3 === undefined && pcs[2]) w.pc3 = pcs[2][i];
+      if (w.pc4 === undefined && pcs[3]) w.pc4 = pcs[3][i];
+      if (w.z === undefined && lp.z && lp.z[i] !== undefined) w.z = lp.z[i];
+    }
+  }
+  if (gv.ghsl_envelopes) {
+    if (!gv.l1_envelopes && Array.isArray(gv.ghsl_envelopes.l1)) {
+      gv.l1_envelopes = gv.ghsl_envelopes.l1;
+    }
+    if (!gv.l2_envelopes && Array.isArray(gv.ghsl_envelopes.l2)) {
+      gv.l2_envelopes = gv.ghsl_envelopes.l2;
+    }
+    if (!gv.candidate_proposals && Array.isArray(gv.ghsl_envelopes.candidate_intervals)) {
+      gv.candidate_proposals = gv.ghsl_envelopes.candidate_intervals;
+    }
+  }
+  if (!gv.cusum && gv.ghsl_cusum) gv.cusum = gv.ghsl_cusum;
+  if (lp && lp.sim_mat && !gv.sim_scales) {
+    gv.sim_scales = {
+      default: {
+        sim:   lp.sim_mat,
+        n:     lp.sim_mat_n || (Array.isArray(lp.sim_mat) ? lp.sim_mat.length : 0),
+        z:     lp.z,
+        q_lo:  0.05,
+        q_hi:  0.95,
+        z_max: lp.max_z_axis || 2.5,
+      },
+    };
+    if (!gv.default_sim_scale) gv.default_sim_scale = 'default';
+  }
+}
+
+// Convenience: invalidate the synthesis flag so the next call re-runs.
+// Useful if data is mutated underneath the view (rare; mostly called
+// implicitly when applyData rebuilds state.data from scratch).
+export function invalidateModeView(state) {
+  const d = state && state.data;
+  if (!d) return;
+  if (d.theta_pi_view) delete d.theta_pi_view._mode_synthesized;
+  if (d.ghsl_view)     delete d.ghsl_view._mode_synthesized;
 }
 
 // --- availablePCs(state) — legacy lines 9980-9991 ---
