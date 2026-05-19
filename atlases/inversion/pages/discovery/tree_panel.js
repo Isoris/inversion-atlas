@@ -254,24 +254,12 @@ function _paintTreeCanvas(state) {
   if (!state.layout) {
     state.layout = layoutFromMglTree(state.tree, { cladogram: true });
   }
-  // 2026-05-20: fit canvas to CSS box × DPR. paintTree reads
-  // canvas.width / canvas.height for its scale math, so after the
-  // setTransform we set canvas.width/height to CSS px for the duration
-  // of the paint call. The browser ignores backing-store reassignments
-  // that don't change the actual pixel array as long as setTransform
-  // is already in effect — net effect: paintTree paints in CSS px on
-  // a backing store sized for DPR. Restored afterwards.
-  const fit = _fitTreeCanvas(canvas);
-  const realW = canvas.width, realH = canvas.height;
-  if (fit) {
-    // Temporarily report CSS-px dims to paintTree's `canvas.width`
-    // reads. Property assignment on a canvas resets the backing store
-    // — but we've already set the transform, so subsequent draw ops
-    // use the transform's scale. We achieve the effect via overriding
-    // the property descriptor for the paint call.
-    Object.defineProperty(canvas, 'width', { configurable: true, value: fit.cssW, writable: true });
-    Object.defineProperty(canvas, 'height', { configurable: true, value: fit.cssH, writable: true });
-  }
+  // 2026-05-20: fit canvas to CSS box × DPR before painting. paintTree
+  // (renderer.js) was updated to honor canvas.__cssW / __cssH when
+  // present (falls back to canvas.width / .height otherwise) — we
+  // stash CSS dims so the renderer's scale math runs in CSS px while
+  // the backing store stays at DPR for crisp pixels.
+  _fitTreeCanvas(canvas);
   // Map leaf_id → colour.
   const leaf_colors_by_id = _buildLeafColorMap(state);
   const paint = paintTree(canvas, state.layout, {
@@ -280,15 +268,6 @@ function _paintTreeCanvas(state) {
     show_labels:         true,
   });
   state.hit_regions = paint.leaf_hit_regions;
-  // Restore the real backing-store dims so subsequent fitCanvas calls
-  // see the correct pixel array size.
-  if (fit) {
-    delete canvas.width;
-    delete canvas.height;
-    canvas.width  = realW;
-    canvas.height = realH;
-    canvas.getContext('2d').setTransform(fit.dpr, 0, 0, fit.dpr, 0, 0);
-  }
 }
 
 function _buildLeafColorMap(state) {
