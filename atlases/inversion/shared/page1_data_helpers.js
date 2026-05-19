@@ -412,9 +412,13 @@ export function getActiveModeView(state) {
 // orthogonal to |Z|: per-window median (the unaggregated raw signal)
 // and one mds coordinate (geometry). Other tracks are dropped from the
 // view's `tracks` object so they don't render as strips.
+// 2026-05-19: Quentin asked for a single track per mode (not median + mds1).
+// Default = mds1 (the geometry / clustering axis), which is what the |Z| and
+// scatter panels are actually driven by in the alternate modes. The median is
+// still in `_all_tracks` for later opt-in.
 const _MODE_TRACK_KEEP = {
-  theta_pi: new Set(['theta_pi_median', 'theta_pi_mds1']),
-  ghsl:     new Set(['ghsl_div_median', 'ghsl_mds1']),
+  theta_pi: new Set(['theta_pi_mds1']),
+  ghsl:     new Set(['ghsl_mds1']),
 };
 
 function _filterTracksForMode(view, modeKey) {
@@ -671,6 +675,39 @@ export function getPC(state, winIdx) {
 }
 
 // --- buildIndexes(state) — legacy lines 9881-9927 ---
+// 2026-05-19 — rebuild state.windowToL1 / windowToL2 against an arbitrary
+// view (not state.data). Used by setActiveMode when swapping modes:
+// theta-pi and GHSL have different window counts AND different L1/L2
+// envelope boundaries than dosage, so the indexes built at applyData
+// time (from state.data) are wrong-sized + wrong-content on mode swap.
+// Calling this with the active view rebuilds both arrays in place.
+export function rebuildIndexesFromView(state, view) {
+  if (!state || !view) return;
+  const N = (Array.isArray(view.windows) && view.windows.length) || view.n_windows || 0;
+  if (!Number.isFinite(N) || N <= 0) return;
+  state.windowToL1 = new Int32Array(N).fill(-1);
+  state.windowToL2 = new Int32Array(N).fill(-1);
+  const clamp = (i) => Math.max(0, Math.min(N - 1, i | 0));
+  if (Array.isArray(view.l1_envelopes)) {
+    view.l1_envelopes.forEach((e, i) => {
+      const rawS0 = (Number.isFinite(e.start_w) ? e.start_w : (e._s0 + 1)) - 1;
+      const rawE0 = (Number.isFinite(e.end_w)   ? e.end_w   : (e._e0 + 1)) - 1;
+      e._s0 = clamp(rawS0);
+      e._e0 = clamp(rawE0);
+      for (let w = e._s0; w <= e._e0; w++) state.windowToL1[w] = i;
+    });
+  }
+  if (Array.isArray(view.l2_envelopes)) {
+    view.l2_envelopes.forEach((e, i) => {
+      const rawS0 = (Number.isFinite(e.start_w) ? e.start_w : (e._s0 + 1)) - 1;
+      const rawE0 = (Number.isFinite(e.end_w)   ? e.end_w   : (e._e0 + 1)) - 1;
+      e._s0 = clamp(rawS0);
+      e._e0 = clamp(rawE0);
+      for (let w = e._s0; w <= e._e0; w++) state.windowToL2[w] = i;
+    });
+  }
+}
+
 export function buildIndexes(state) {
   const d = state && state.data;
   if (!d) return;

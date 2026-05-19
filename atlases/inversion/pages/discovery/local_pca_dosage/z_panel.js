@@ -816,7 +816,11 @@ export function drawZ(state) {
     const _mbR = currentMbRange(state);
     const mbMin = _mbR.mbMin, mbMax = _mbR.mbMax;
     const toX = (mb) => pad.l + ((mb - mbMin) / (mbMax - mbMin)) * plotW;
-    const xOfWin = (wi) => toX(d.windows[wi].center_mb);
+    const xOfWin = (wi) => {
+      const i = Math.max(0, Math.min(d.windows.length - 1, wi | 0));
+      const w0 = d.windows[i];
+      return w0 ? toX(w0.center_mb) : NaN;
+    };
     // v3.99 t14e+ continue: Candidate bar — pending grey + confirmed gold ★
     // sitting ABOVE the L1/L2 zone bars
     drawCandidateBar(ctx, d, toX, pad.t, candBarTotal);
@@ -948,7 +952,8 @@ export function drawZ(state) {
     // v4 turn 33: include nav-lane too.
     const _wExtraCur = _wBandC ? (_wBandC.h + _wBandC.gap) : 0;
     const _vertExtraCur = _navExtraC + _wExtraCur;
-    const xCur = toX(d.windows[state.cur].center_mb);
+    const _curW = d.windows[Math.max(0, Math.min(d.windows.length - 1, state.cur | 0))];
+    const xCur = _curW ? toX(_curW.center_mb) : NaN;
     ctx.strokeStyle = '#f5a524';
     ctx.lineWidth = 1.2;
     ctx.beginPath();
@@ -1042,7 +1047,11 @@ export function drawZ(state) {
   // v4 turn 10: + _wExtra so the W-row sits between the L2 bar and the arrows.
   // v4 turn 33: switched to _vertExtra (which includes the always-on nav-lane).
   const toY = (z)  => zoneTop + zoneH + _vertExtra + peaksH + plotH - ((z - zMin) / (zMax - zMin)) * plotH;
-  const xOfWin = (wi) => toX(d.windows[wi].center_mb);
+  const xOfWin = (wi) => {
+    const i = Math.max(0, Math.min(d.windows.length - 1, wi | 0));
+    const w0 = d.windows[i];
+    return w0 ? toX(w0.center_mb) : NaN;
+  };
 
   // L1 zone bars (top half of zoneH, deeper blue per Quentin's request).
   // v3.99 turn 13 ask 3: colors darkened to be more legible against the
@@ -1382,7 +1391,8 @@ export function drawZ(state) {
   // bar) all the way down to plot bottom, so it visually links the candidate
   // strip with the L1/L2 bars and the z-scatter as one continuous indicator.
   // v4 turn 10: + _wExtra so the cursor reaches plot bottom in W-row mode too.
-  const xCur = toX(d.windows[state.cur].center_mb);
+  const _curW2 = d.windows[Math.max(0, Math.min(d.windows.length - 1, state.cur | 0))];
+  const xCur = _curW2 ? toX(_curW2.center_mb) : NaN;
   ctx.strokeStyle = '#f5a524';
   ctx.lineWidth = 1.5;
   ctx.beginPath();

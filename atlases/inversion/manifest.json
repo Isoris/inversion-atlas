@@ -15,28 +15,6 @@
       "_was_id": "page1"
     },
     {
-      "id": "local_pca_theta_pi",
-      "slug": "local_pca_theta_pi",
-      "label": "local PCA \u03b8\u03c0",
-      "stage": "discovery",
-      "fragment": "atlases/inversion/pages/discovery/local_pca_theta_pi.html",
-      "module": "atlases/inversion/pages/discovery/local_pca_theta_pi.js",
-      "_was_id": "page12",
-      "hidden": true,
-      "_hidden_reason": "Stub page \u2014 functions deferred. The local_pca_dosage page is being extended to carry an axis toggle (dosage / \u03b8\u03c0 / GHSL); pca_comparator already shows all three side-by-side. Hidden from the tab bar until the merge ships."
-    },
-    {
-      "id": "local_pca_ghsl",
-      "slug": "local_pca_ghsl",
-      "label": "local PCA GHSL",
-      "stage": "discovery",
-      "fragment": "atlases/inversion/pages/discovery/local_pca_ghsl.html",
-      "module": "atlases/inversion/pages/discovery/local_pca_ghsl.js",
-      "_was_id": "page15",
-      "hidden": true,
-      "_hidden_reason": "Stub page \u2014 functions deferred. See local_pca_theta_pi._hidden_reason."
-    },
-    {
       "id": "candidate_focus",
       "slug": "candidate_focus",
       "label": "candidate focus",

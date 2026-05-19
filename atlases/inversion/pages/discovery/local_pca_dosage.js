@@ -52,7 +52,7 @@ import {
 } from './local_pca_dosage/l2_sweep.js';
 import { idbPersistChrom } from './local_pca_dosage/idb.js';
 import { replayEnrichmentsFromIdb } from './local_pca_dosage/idb_restore.js';
-import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayers, listLayers, loadViewControls, populateSimScales, reconcileViewControlsForData } from './local_pca_dosage/_data.js';
+import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayers, getActiveModeView, listLayers, loadViewControls, populateSimScales, rebuildIndexesFromView, reconcileViewControlsForData } from './local_pca_dosage/_data.js';
 import { drawSim, drawSimMini } from './local_pca_dosage/sim_panel.js';
 import { drawZ } from './local_pca_dosage/z_panel.js';
 import { attachLinesLasso, buildLinesPanel, buildLinesPanelCheckboxes, drawLinesPanel, refreshLinesColorMode, setLinesPanelCandidateBands } from './local_pca_dosage/lines_panel.js';
@@ -437,9 +437,19 @@ export async function mount(root, atlasState, registry) {
   // become reachable from data.* without touching the z-blocks fields.
   // Rename theta_pi_cusum → cusum_theta to match the legacy schema's
   // canonical field name (page12 / theta-pi renderer reads cusum_theta).
+  // 2026-05-19 — wrap with Promise.resolve(...) because registry.resolve()
+  // returns the cached value SYNCHRONOUSLY when hot-tier cache hits
+  // (which is the common case here — the prewarm scheduler fetches
+  // scrubber_thetapi + scrubber_ghsl on chrom_change, populating the
+  // cache before mount() runs). Calling .catch() on the bare return
+  // value crashes when it's a plain object instead of a Promise; that
+  // was the root cause of `TypeError: registry.resolve(...).catch is
+  // not a function` blocking the entire mount, including the dataModeBar
+  // availability check (which made GHSL look unavailable even when its
+  // JSON was loaded). Promise.resolve flattens Promises and wraps values.
   const [tpData, ghslData] = await Promise.all([
-    registry.resolve('scrubber_thetapi', { chrom }).catch(() => null),
-    registry.resolve('scrubber_ghsl',    { chrom }).catch(() => null),
+    Promise.resolve(registry.resolve('scrubber_thetapi', { chrom })).catch(() => null),
+    Promise.resolve(registry.resolve('scrubber_ghsl',    { chrom })).catch(() => null),
   ]);
   // 2026-05-19 SELECTIVE MERGE — earlier shallow `Object.assign(data, tpData)`
   // clobbered shared top-level fields (data.tracks, data.n_windows,
@@ -819,6 +829,15 @@ export function setActiveMode(state, mode) {
   // n_windows; a naive cur-preservation would jump to a wrong bp.
   // Fall back to 0 if remap fails.
   state.cur = _remapCurByMb(state, oldCenterMb);
+  // Rebuild windowToL1 / windowToL2 indexes against the NEW mode's
+  // view. Without this, drawZ's xOfWin crashes on `d.windows[wi]` when
+  // wi is a window index from the old (dosage) grid pointing past the
+  // end of the new (theta-pi / ghsl) windows array; the |Z| panel
+  // either fails to paint or renders only a fragment of the span.
+  try {
+    const newView = getActiveModeView(state);
+    if (newView) rebuildIndexesFromView(state, newView);
+  } catch (e) { console.warn('rebuildIndexesFromView mode-swap:', e); }
   // Rebuild the track-panel DOM — each mode has a different set of
   // track names (dosage tracks vs theta_pi_* tracks vs ghsl_* tracks),
   // so we tear down the existing panels and re-render from view.tracks.

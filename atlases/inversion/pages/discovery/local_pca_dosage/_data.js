@@ -45,4 +45,5 @@ export {
   groupColor,
   getActiveModeView,
   invalidateModeView,
+  rebuildIndexesFromView,
 } from '../../../shared/page1_data_helpers.js';
