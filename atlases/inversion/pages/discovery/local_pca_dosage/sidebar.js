@@ -363,6 +363,50 @@ function _initAttentionPulses() {
 }
 
 // ---------------------------------------------------------------------------
+// Rebuild the linesBandTracePickSelect dropdown options from the focal
+// candidate's per-band sample counts. Port of legacy 40363-40407.
+// Idempotent — safe to call on every candidate change or every trace
+// click. Preserves the user's current selection when it's still valid;
+// falls back to "largest" otherwise.
+// ---------------------------------------------------------------------------
+function _updateBandTracePickOptions(state) {
+  if (typeof document === 'undefined') return;
+  const sel = document.getElementById('linesBandTracePickSelect');
+  if (!sel) return;
+  const c = state && state.candidate;
+  const prevValue = sel.value;
+  // Reset to just the "largest" sentinel.
+  while (sel.options && sel.options.length > 1) sel.remove(1);
+  if (!c || !c.locked_labels || !c.locked_labels.length) {
+    sel.value = 'largest';
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  const K = c.K || (state && state.k) || 3;
+  const counts = new Int32Array(K);
+  const labels = c.locked_labels;
+  for (let s = 0; s < labels.length; s++) {
+    const lab = labels[s];
+    if (lab >= 0 && lab < K) counts[lab]++;
+  }
+  for (let k = 0; k < K; k++) {
+    const opt = document.createElement('option');
+    opt.value = String(k);
+    opt.textContent = `b${k} (n=${counts[k]})`;
+    sel.appendChild(opt);
+  }
+  // Restore previous selection if still valid.
+  if (prevValue === 'largest') {
+    sel.value = 'largest';
+  } else {
+    const want = parseInt(prevValue, 10);
+    sel.value = (Number.isInteger(want) && want >= 0 && want < K)
+                ? String(want) : 'largest';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Lines-panel band-trace + linkage button wires. The HTML
 // (linesBandTraceToggle / linesBandTraceFromCandBtn /
 // linesBandTraceExportBtn / linesBandTraceExportRunsBtn /
@@ -384,11 +428,26 @@ function _wireLinesBandTrace(state) {
     toggle.dataset.wired = '1';
   }
 
-  // 2. linesBandTraceFromCandBtn — 🔍 trace: seed bandTraceFishSet from
-  // the focal candidate's largest band (or the pick-select choice).
+  // 2. linesBandTracePickSelect — band-picker dropdown. Legacy
+  // _updateBandTracePickOptions (40363-40407): rebuild options from the
+  // focal candidate's locked_labels with per-band counts. Initial paint
+  // on wire; refresh on candidate change is wired below via the trace
+  // button + exposed window function.
+  _updateBandTracePickOptions(state);
+  // Expose so other code paths (lines_panel, events) can trigger a
+  // refresh when state.candidate changes without importing this file.
+  if (typeof window !== 'undefined') {
+    window._updateBandTracePickOptions = () => _updateBandTracePickOptions(state);
+  }
+
+  // 3. linesBandTraceFromCandBtn — 🔍 trace.
   const traceBtn = $('linesBandTraceFromCandBtn');
   if (traceBtn && traceBtn.dataset.wired !== '1') {
     traceBtn.addEventListener('click', () => {
+      // Rebuild the dropdown first so the per-band counts reflect the
+      // *current* focal candidate (the user may have scrubbed since the
+      // last rebuild).
+      _updateBandTracePickOptions(state);
       const pick = $('linesBandTracePickSelect');
       const opts = {};
       if (pick && pick.value && pick.value !== 'largest') {
@@ -397,7 +456,6 @@ function _wireLinesBandTrace(state) {
       }
       const result = bandTraceFromFocalCandidate(state, opts);
       if (result) {
-        // Auto-turn-on the strip so the user immediately sees the trace.
         if (!state.bandTraceOn) {
           setBandTraceOn(state, true);
           if (toggle) toggle.checked = true;
@@ -1439,6 +1497,12 @@ function _wireDisplay(state) {
         try { updateColorModeInfo(); } catch (_) {}
       }
       drawPCA(state);
+      // 2026-05-18: also redraw the per-sample lines panel — many modes
+      // (family, lineage) affect both surfaces. The lines panel reads its
+      // own state.linesColorMode, so this is a no-op when the lines mode
+      // is independent (kmeans default), but it picks up changes to the
+      // shared scope-color modes (family/lineage) cleanly.
+      try { drawLinesPanel(state); } catch (_) {}
       renderL3Panel(state);
     });
   });

@@ -35,6 +35,17 @@ export function drawLinesPanel(state) {
   const subs = container.querySelectorAll('.lines-subpanel');
   if (!subs || subs.length === 0) return;
 
+  // 2026-05-18: keep the band-trace pick dropdown in sync with the focal
+  // candidate. The full rebuild fires only when the candidate ID changes
+  // (one-shot per scrub), so the cost is amortized to ~free.
+  const curCandId = state.candidate ? state.candidate.id : null;
+  if (state._lastBandTracePickCandId !== curCandId) {
+    state._lastBandTracePickCandId = curCandId;
+    if (typeof window !== 'undefined' && window._updateBandTracePickOptions) {
+      try { window._updateBandTracePickOptions(); } catch (_) {}
+    }
+  }
+
   const d = state.data;
   const nWin = d.n_windows;
   const nS = d.n_samples;
@@ -328,14 +339,21 @@ export function drawLinesPanel(state) {
       const offCtx = off.getContext('2d');
       offCtx.lineWidth = 0.6;
       // v4 turn 108: per-sample coloring. For modes that produce one color
-      // per sample (family, F_ROH, kmeans-as-stable-band), call the resolver
-      // per sample. For 'kmeans' we keep the legacy grey-cloud behavior
-      // because the per-window lane assignments are conveyed by the WALKING
-      // of each line through the band y-positions, not by line color (every
-      // sample is the same grey). For 'family', each fish gets its family
-      // color across all windows; alpha bumped to 0.25 so saturated colors
-      // remain readable when 226 lines overlap.
-      const usePerSampleColor = (lcMode === 'family');
+      // per sample (family, lineage, F_ROH, kmeans-as-stable-band), call
+      // the resolver per sample. For 'kmeans' we keep the legacy grey-cloud
+      // behavior because the per-window lane assignments are conveyed by
+      // the WALKING of each line through the band y-positions, not by line
+      // color (every sample is the same grey). For 'family' / 'lineage',
+      // each fish gets its family / lineage color across all windows; alpha
+      // bumped to 0.25 so saturated colors remain readable when 226 lines
+      // overlap.
+      // 2026-05-18: 'lineage' added. The dropdown previously offered it
+      // but the lines stayed grey — only 'family' triggered the
+      // per-sample-coloring branch. Other window-varying modes (het /
+      // dosage / θπ / GHSL / F_ROH) still need per-sample-mean resolvers
+      // (separate port; per-window coloring would require breaking the
+      // line into colored segments which is a larger render change).
+      const usePerSampleColor = (lcMode === 'family' || lcMode === 'lineage');
       const baseAlpha = usePerSampleColor ? 0.25 : 0.10;
       const defaultStroke = `rgba(180,190,210,${baseAlpha.toFixed(3)})`;
       offCtx.strokeStyle = defaultStroke;
