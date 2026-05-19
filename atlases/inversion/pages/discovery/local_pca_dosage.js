@@ -328,12 +328,18 @@ export async function mount(root, atlasState, registry) {
   // Legacy CSS rules for main#local_pca_dosage grid layout are gated on
   // body[data-layout-mode]. Without this attribute the PCA / lines / L3
   // grid rows collapse and the canvases get 0px height. Restore the
-  // persisted mode if it exists AND we trust the new shell with it; for
-  // now we force 'fixed' on every mount to match legacy default and
-  // because free/compact have layout quirks we haven't fully reproduced.
-  document.body.dataset.layoutMode = 'fixed';
-  legacyState.layoutMode = 'fixed';
-  try { localStorage.setItem('pca_scrubber_v3.layoutmode', 'fixed'); } catch (_) {}
+  // persisted mode if it exists; default to 'compact' (the user
+  // explicitly asked for this on 2026-05-18 — fewer scrolls + 2×2 grid
+  // shows everything at once). 'free' and 'fixed' still selectable via
+  // the layoutModeBtn cycler.
+  let restoredMode = 'compact';
+  try {
+    const v = localStorage.getItem('pca_scrubber_v3.layoutmode');
+    if (v === 'fixed' || v === 'free' || v === 'compact') restoredMode = v;
+  } catch (_) {}
+  document.body.dataset.layoutMode = restoredMode;
+  legacyState.layoutMode = restoredMode;
+  try { localStorage.setItem('pca_scrubber_v3.layoutmode', restoredMode); } catch (_) {}
 
   // Resolve the precomp data layer for the active chromosome.
   const chrom = atlasState.shared.activeChrom;

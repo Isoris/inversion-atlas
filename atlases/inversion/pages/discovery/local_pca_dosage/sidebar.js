@@ -76,6 +76,7 @@ import {
   renderTrackedList,
 } from './pca_panel.js';
 import { renderL3Panel } from './l3_panel.js';
+import { wireGPanel } from './g_panel.js';
 import {
   exportKLabelsTSV,
   makeCandidateFromLock,
@@ -347,6 +348,23 @@ function _wireNewShellControls(state) {
   _wireSelectionModeHotkey(state);
 
   // ===========================================================================
+  // G hotkey + #gPanelOpenBtn click — open the unified-groups modal.
+  // User feedback (chat 2026-05-18): "when I push G nothing happens".
+  // Phase 0: hotkey + button + 3-tab scaffold; tab bodies are
+  // placeholders pointing at the SPEC. Full per-tab ports land later.
+  // ===========================================================================
+  try { wireGPanel(state); } catch (e) { console.warn('[wireGPanel]', e); }
+
+  // ===========================================================================
+  // Tracked-samples compact panel collapse arrow — user-reported wire
+  // gap (chat 2026-05-18): "the arrow down of settings in tracked
+  // samples PCA it does nothing on page 1". The compact panel's head
+  // has a ▼/▶ arrow that was supposed to toggle the body display
+  // but no JS wired it.
+  // ===========================================================================
+  _wireCompactTrackedCollapse(state);
+
+  // ===========================================================================
   // First-use attention pulses (v4 turn 80 — never wired in modular tree).
   // CSS classes `.attention-pulse` + `.attention-pulse-fade` already exist
   // in inversion.css (lines 143-172). Apply pulse to the key onboarding
@@ -481,6 +499,55 @@ function _wireSelectionModeHotkey(state) {
       try { drawPCA(state); } catch (_) {}
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Tracked-samples compact panel collapse arrow. The head + arrow live
+// in #trackedSamplesPanelCompactHead / #trackedSamplesPanelCompactArrow;
+// the CSS already supports body[data-tracked-compact-collapsed="1"]
+// (inversion.css L733) but no JS was setting the attribute. Restore
+// from localStorage on mount; flip on click. Idempotent.
+// ---------------------------------------------------------------------------
+const _TRACKED_COMPACT_LS_KEY = 'inversion_atlas.trackedCompactCollapsed';
+
+function _wireCompactTrackedCollapse(state) {
+  if (typeof document === 'undefined') return;
+  const head = document.getElementById('trackedSamplesPanelCompactHead');
+  const arrow = document.getElementById('trackedSamplesPanelCompactArrow');
+  const body = document.getElementById('trackedSamplesPanelCompactBody');
+  if (!head || !body) return;
+
+  // Restore persisted state on first wire.
+  let collapsed = false;
+  try { collapsed = localStorage.getItem(_TRACKED_COMPACT_LS_KEY) === '1'; }
+  catch (_) {}
+
+  const apply = () => {
+    body.style.display = collapsed ? 'none' : '';
+    if (arrow) arrow.textContent = collapsed ? '▶' : '▼';
+    // The CSS rule body[data-tracked-compact-collapsed="1"] hides the
+    // panel's grid row entirely so the adjacent PCA + lines grow into
+    // the freed space.
+    if (document.body && document.body.dataset) {
+      document.body.dataset.trackedCompactCollapsed = collapsed ? '1' : '0';
+    }
+  };
+  apply();
+
+  if (head.dataset.wired === '1') return;
+  head.addEventListener('click', () => {
+    collapsed = !collapsed;
+    try { localStorage.setItem(_TRACKED_COMPACT_LS_KEY, collapsed ? '1' : '0'); }
+    catch (_) {}
+    apply();
+    // Repaint adjacent panels since the freed/claimed space changes
+    // their bounds — same chain the ResizeObserver uses.
+    requestAnimationFrame(() => {
+      try { drawPCA(state); }        catch (_) {}
+      try { drawLinesPanel(state); } catch (_) {}
+    });
+  });
+  head.dataset.wired = '1';
 }
 
 // Target buttons by ID. Picked from legacy turn-80 comment (inversion.css L135).
