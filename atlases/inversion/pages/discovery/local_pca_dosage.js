@@ -95,6 +95,18 @@ export function applyData(state, data) {
   if (state.candidate && state.candidate.chrom !== data.chrom) {
     state.candidate = null;
   }
+  // Install the synthetic dosage_chunks bridge (atlas-side <-> server's
+  // /api/dosage/chunk). The precomp atlas JSON does not carry dosage
+  // (it would bloat the file with per-sample × per-site int8 matrices);
+  // instead the server streams chunks per-region from the dosage TSVs in
+  // master_config.roots.cohort_dosage (currently 02_dosage_sites/). We
+  // attach a single-chunk index here with a templated URL so detectSchemaAndLayers
+  // marks dosage_chunks as present, which unlocks the lines-panel
+  // "color: dosage" and "color: het" modes plus the per-L2 het-rate
+  // compute. Actual fetches are lazy — _fetchAndCacheChunk substitutes
+  // __START__/__END__/__CAP__ at the moment the user requests data for
+  // a window. See dosage_bridge.py for the server-side contract.
+  _installSyntheticDosageChunks(data);
   // Schema detection (v3.20). state.layersPresent is the source of truth
   // for conditional UI rendering across the rest of the scrubber.
   // 2026-05-06 round 3: detectSchemaAndLayers extracted from legacy
@@ -586,6 +598,45 @@ function _buildLegacyState(atlasState) {
   legacy.locked_karyotype_groups    = inv.locked_karyotype_groups || {};
 
   return legacy;
+}
+
+/**
+ * Build a single-chunk dosage_chunks index pointing at the server's
+ * /api/dosage/chunk endpoint with templated region placeholders. The
+ * atlas's _resolveChunkUrl substitutes __CHROM__/__START__/__END__/__CAP__
+ * at fetch time, so one synthetic chunk covers the entire chromosome
+ * and any region request lands the matching sub-slice.
+ *
+ * Idempotent: if data.dosage_chunks already exists (e.g. the user
+ * drag-dropped an enrichment JSON with a real chunk index, or a
+ * future pipeline pre-bakes static chunks), we leave it alone.
+ *
+ * Why an end_bp of 1e9 rather than the actual chrom length: the
+ * placeholder is a sentinel for "covers the whole chrom" — the
+ * server-side endpoint clips the request to the actual data extent
+ * regardless. Computing the real end here would require either
+ * reading the chrom_sizes.tsv on every applyData or walking
+ * data.windows for max end_bp; neither is necessary because the
+ * chunk is templated rather than addressed by extent.
+ */
+function _installSyntheticDosageChunks(data) {
+  if (!data || data.dosage_chunks) return;
+  if (!data.chrom) return;
+  data.dosage_chunks = {
+    schema_version: 1,
+    chrom: data.chrom,
+    cap_default: 1000,
+    _source: 'synthetic_bridge',
+    _endpoint: '/api/dosage/chunk',
+    chunks: [
+      {
+        chrom: data.chrom,
+        start_bp: 1,
+        end_bp: 1_000_000_000,
+        url: '/api/dosage/chunk?chrom=__CHROM__&start=__START__&end=__END__&cap=__CAP__',
+      },
+    ],
+  };
 }
 
 function _wireCanvasHandlers(root, state) {
