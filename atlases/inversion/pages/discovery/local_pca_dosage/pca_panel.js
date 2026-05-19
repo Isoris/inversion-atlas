@@ -389,6 +389,24 @@ export function drawPCA(state) {
       const col = withAlpha(baseCol, state.colorMode === 'cluster' ? 0.45 : 0.7);
       ctx.fillStyle = col;
       ctx.beginPath(); ctx.arc(x, y, 2.8, 0, Math.PI * 2); ctx.fill();
+      // 2026-05-18: Phase 1 polish — microgroup halo around
+      // macrostripe-colored dots. When the user is in macrostripe
+      // mode (state.useMacrostripeColors + bandingResult populated),
+      // the dot fill is the macrostripe color; a thin ring carries
+      // the per-window K-means microgroup color so the fine
+      // structure stays visible without dominating. Skipped on
+      // tracked samples (they already get a distinctive trail).
+      if (state.useMacrostripeColors && state.bandingResult
+          && state.colorMode === 'cluster'
+          && groupLabels && groupLabels[si] != null && groupLabels[si] >= 0) {
+        const microCol = ['#4fa3ff', '#b8b8b8', '#f5a524',
+                          '#3cc08a', '#e0555c'][groupLabels[si]] || '#888';
+        if (microCol !== baseCol) {
+          ctx.strokeStyle = withAlpha(microCol, 0.85);
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(x, y, 4.2, 0, Math.PI * 2); ctx.stroke();
+        }
+      }
     }
   }
   // Expose for lasso handler. Plot bounds also stored so lasso can clip

@@ -260,6 +260,67 @@ export function renderL3Panel(state) {
   }
   metaEl.innerHTML = `K=${state.k} · fit=${state.aggMethod} · score=${state.silScoreOn || 'pc1'} · merge τ=${state.mergeThr.toFixed(2)} · α=${state.alpha.toFixed(3)} · min n/grp=${state.minNGroup}`;
 
+  // 2026-05-18: Phase 1 polish — macrostripe composition chip row.
+  // When macrostripe coloring is active AND banding has run, append
+  // a per-stripe summary listing the K-means microgroup composition
+  // of each macrostripe. Helps the user see at a glance "stripe A
+  // has 60 fish split into 3 microgroups of 22/22/16" etc.
+  if (state.useMacrostripeColors && state.bandingResult
+      && typeof window !== 'undefined' && window._getMacrostripeIdPerSample) {
+    try {
+      const macIds = window._getMacrostripeIdPerSample(state);
+      if (macIds && macIds.length) {
+        const cl = getL2Cluster(state, curL2);
+        const microLabels = cl && (cl.fixedKLabels || cl.labels);
+        const K_micro = (state.k | 0) || 3;
+        // Build per-macrostripe member sets + microgroup counts.
+        const buckets = new Map();   // macId → Map<microId, count>
+        for (let si = 0; si < macIds.length; si++) {
+          const mac = macIds[si];
+          if (mac < 0) continue;
+          const micro = microLabels ? microLabels[si] : -1;
+          if (!buckets.has(mac)) buckets.set(mac, new Map());
+          const inner = buckets.get(mac);
+          inner.set(micro, (inner.get(micro) || 0) + 1);
+        }
+        if (buckets.size > 0) {
+          const palette = ['#4fa3ff', '#b8b8b8', '#f5a524', '#3cc08a', '#e0555c'];
+          let chips = '<div style="font-size: 10px; color: var(--ink-dim); '
+                    + 'padding: 2px 10px 0; line-height: 1.5;">';
+          const macList = Array.from(buckets.keys()).sort((a, b) => a - b);
+          for (const mac of macList) {
+            const inner = buckets.get(mac);
+            const total = Array.from(inner.values()).reduce((a, b) => a + b, 0);
+            const macCol = palette[mac] || '#888';
+            chips += `<span style="display: inline-flex; align-items: center; `
+                  +  `gap: 4px; margin-right: 10px;">`
+                  +  `<span style="display: inline-block; width: 9px; height: 9px; `
+                  +    `border-radius: 50%; background: ${macCol};"></span>`
+                  +  `<b style="color: var(--ink);">macro ${mac}</b> `
+                  +  `<span style="color: var(--ink-dim);">n=${total}</span>`;
+            // Microgroup composition — small swatches.
+            const micros = Array.from(inner.entries())
+              .filter(([k]) => k >= 0)
+              .sort((a, b) => b[1] - a[1]);
+            if (micros.length > 0) {
+              chips += ` <span style="color: var(--ink-dimmer);">→</span> `;
+              for (const [microId, n] of micros) {
+                const microCol = palette[microId] || '#888';
+                chips += `<span style="display: inline-block; width: 6px; height: 6px; `
+                      +    `border-radius: 50%; background: ${microCol}; `
+                      +    `margin-right: 2px;"></span>`
+                      +  `<span style="color: var(--ink-dim);">μ${microId} (${n})</span> `;
+              }
+            }
+            chips += `</span>`;
+          }
+          chips += '</div>';
+          metaEl.innerHTML += chips;
+        }
+      }
+    } catch (err) { console.warn('[macrostripe chip row]', err); }
+  }
+
   // ---- DUAL LAYOUT: two pinned L2 envelopes + middle comparison column ----
   if (layoutKey === 'dual' && state.secondaryL2 != null) {
     const aIdx = curL2;
