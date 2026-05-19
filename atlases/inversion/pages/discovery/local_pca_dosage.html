@@ -961,45 +961,29 @@
                       letter-spacing: 0.05em; font-size: 9.5px;
                       display: flex; justify-content: space-between; align-items: center;">
             <span>tracked samples</span>
-            <span id="trackedCountInfoAsideCompact"
-                  style="color: var(--ink-dim); font-size: 9.5px;
-                         font-family: var(--mono); text-transform: none;
-                         letter-spacing: 0;">0/10</span>
+            <div style="display: flex; gap: 4px; align-items: center;">
+              <span id="trackedCountInfoAsideCompact"
+                    style="color: var(--ink-dim); font-size: 9.5px;
+                           font-family: var(--mono); text-transform: none;
+                           letter-spacing: 0;">0/10</span>
+              <!-- 2026-05-18: settings popup toggle. Opens #tPanelOverlay so
+                   the secondary tracked-samples controls (trails / sign-align
+                   PC1 / lasso / scree / trail-back / N tracked) live in a
+                   floating tab instead of crowding the aside. Hotkey 't'. -->
+              <button id="tPanelOpenBtn"
+                      title="Tracked-samples settings (t)"
+                      style="background: transparent; border: 1px solid var(--rule);
+                             color: var(--ink-dim); border-radius: 3px;
+                             padding: 0 5px; font-family: var(--mono); font-size: 9.5px;
+                             cursor: pointer; line-height: 14px;">▾</button>
+            </div>
           </div>
           <div style="padding: 4px 8px; display: flex; flex-direction: column; gap: 4px;">
-            <!-- Row A: trails + sign-align PC1 + lasso (compact) -->
-            <div style="display: flex; gap: 6px; align-items: center; font-size: 10px; flex-wrap: wrap;">
-              <label style="display: flex; align-items: center; gap: 2px; cursor: pointer;">
-                <input type="checkbox" id="trailOnAside" style="margin: 0;" /> trails
-              </label>
-              <label style="display: flex; align-items: center; gap: 2px; cursor: pointer;">
-                <input type="checkbox" id="flipPC1Aside" style="margin: 0;" /> sign-align PC1
-              </label>
-              <!-- v4 turn 2 ask 2: lasso mode for the tracked-samples PCA scatter.
-                   When ON, drag a rectangle on the scatter to select samples by
-                   their position in PC1/PC2 space. The Confirm button replaces
-                   state.tracked with the lassoed set; Clear discards. Mirrors
-                   the per-sample-lines lasso UX (linesLassoToggle). -->
-              <label id="pcaLassoLabel" style="display: flex; align-items: center; gap: 2px;
-                                                cursor: pointer; padding-left: 4px;
-                                                border-left: 1px solid var(--rule);"
-                     title="Lasso mode: drag a rectangle on the PCA scatter to select samples by their PC1/PC2 position. Tracked highlights are suppressed while ON.">
-                <input type="checkbox" id="pcaLassoToggle" style="margin: 0;" /> lasso
-              </label>
-              <!-- turn 120: scree-plot inset toggle. When ON, a mini bar plot of
-                   the top-k local-PCA eigenvalues for the current window appears
-                   in the upper-right corner of the PCA scatter. Reads
-                   w.lam_top_k (schema 2.16) when present, falls back to a 2-bar
-                   [lam1, lam2] inset with a "spectrum k>=3 needs precomp >=2.16"
-                   hint when only the legacy fields are loaded. -->
-              <label id="screeToggleLabel" style="display: flex; align-items: center; gap: 2px;
-                                                  cursor: pointer; padding-left: 4px;
-                                                  border-left: 1px solid var(--rule);"
-                     title="Scree inset: top-k local-PCA eigenvalues for the current window. Steep bar drop = clean inversion structure; flat bars = noisy/unstable window. Needs precomp schema >=2.16 for k>=3 bars; falls back to 2 bars with a hint on older precomps.">
-                <input type="checkbox" id="screeToggle" style="margin: 0;" /> scree
-              </label>
-            </div>
-            <!-- Lasso confirm/clear (hidden until a selection exists) -->
+            <!-- Inline (main) controls — kept always-visible:
+                 K-cycle + K-band buttons + Auto-pick / Clear.
+                 Secondary controls moved to #tPanelOverlay (toggle: ▾ button). -->
+            <!-- Lasso confirm/clear (hidden until a selection exists). Stays
+                 inline because it's transient state, not a setting. -->
             <div id="pcaLassoBar" style="display: none; gap: 4px; align-items: center; font-size: 10px;">
               <span id="pcaLassoBadge"
                     title="Number of samples currently lassoed (not yet committed)"
@@ -1020,20 +1004,6 @@
                              border: 1px solid var(--rule); border-radius: 3px;
                              padding: 1px 8px; font-family: var(--mono); font-size: 10px;
                              cursor: pointer;">Clear</button>
-            </div>
-            <!-- Row B: trail back slider — single line -->
-            <div style="display: flex; gap: 4px; align-items: center; font-size: 10px;">
-              <span style="color: var(--ink-dim); flex: 0 0 48px;">trail bk</span>
-              <input type="range" id="trailNAside" min="0" max="80" value="15" step="1"
-                     style="flex: 1 1 auto; min-width: 0;" />
-              <span class="val" id="trailNValAside" style="flex: 0 0 22px; text-align: right;">15</span>
-            </div>
-            <!-- Row C: N tracked slider — single line -->
-            <div style="display: flex; gap: 4px; align-items: center; font-size: 10px;">
-              <span style="color: var(--ink-dim); flex: 0 0 48px;">N trk</span>
-              <input type="range" id="trackedNAside" min="0" max="30" step="1" value="10"
-                     style="flex: 1 1 auto; min-width: 0;" />
-              <span class="val" id="trackedNValAside" style="flex: 0 0 22px; text-align: right;">10</span>
             </div>
             <!-- Row D: K(N) cycle button + 6 K-colored band buttons.
                  Each button shows just the K-index ("1".."6") in its actual
@@ -1120,6 +1090,77 @@
           </div>
         </div>
       </div><!-- /#pcaPanelBody -->
+    </div>
+
+    <!-- ===================================================================
+         Tracked-samples settings popup (2026-05-18). Modal overlay modeled
+         on #gPanelOverlay (legacy 4761-4764, JS 43948-44030). Holds the
+         secondary controls (trails / sign-align PC1 / lasso / scree /
+         trail-back / N tracked) so the inline aside can stay compact.
+         Toggle: ▾ button in the aside header, or hotkey 't'.
+         =================================================================== -->
+    <div id="tPanelOverlay"
+         style="display: none; position: fixed; inset: 0; z-index: 1000;
+                background: rgba(0,0,0,0.55); align-items: flex-start;
+                justify-content: center; padding: 40px 20px; overflow-y: auto;">
+      <div style="background: var(--panel-2); border: 2px solid var(--accent);
+                  border-radius: 6px; max-width: 520px; width: 100%;
+                  box-shadow: 0 12px 40px rgba(0,0,0,0.5); position: relative;
+                  font-family: var(--mono);">
+        <!-- Header: title + close -->
+        <div style="display: flex; justify-content: space-between; align-items: baseline;
+                    padding: 14px 18px; border-bottom: 1px solid var(--rule);">
+          <div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--accent);">
+              T · tracked samples settings
+            </div>
+            <div style="font-size: 10.5px; color: var(--ink-dim); margin-top: 3px;">
+              scope knobs for the tracked-samples PCA scatter. Main controls
+              (K-cycle · K-band · auto-pick · clear) stay in the aside.
+            </div>
+          </div>
+          <button id="tPanelClose"
+                  style="background: transparent; border: 1px solid var(--rule);
+                         color: var(--ink-dim); padding: 3px 10px; cursor: pointer;
+                         font-family: var(--mono); font-size: 11px; border-radius: 3px;"
+                  title="Close (Esc · t)">✕ close</button>
+        </div>
+        <!-- Body -->
+        <div style="padding: 14px 18px; display: flex; flex-direction: column; gap: 10px;
+                    font-size: 11px;">
+          <!-- Row 1: trails / sign-align PC1 / lasso / scree -->
+          <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+              <input type="checkbox" id="trailOnPopup" /> trails
+            </label>
+            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+              <input type="checkbox" id="flipPC1Popup" /> sign-align PC1
+            </label>
+            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"
+                   title="Lasso mode: drag a rectangle on the PCA scatter to select samples by their PC1/PC2 position.">
+              <input type="checkbox" id="pcaLassoTogglePopup" /> lasso
+            </label>
+            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"
+                   title="Scree inset: top-k local-PCA eigenvalues for the current window. Steep bar drop = clean inversion structure; flat bars = noisy/unstable window.">
+              <input type="checkbox" id="screeTogglePopup" /> scree
+            </label>
+          </div>
+          <!-- Row 2: trail-back slider -->
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span style="color: var(--ink-dim); flex: 0 0 90px;">trail back (windows)</span>
+            <input type="range" id="trailNPopup" min="0" max="80" value="15" step="1"
+                   style="flex: 1 1 auto; min-width: 0;" />
+            <span class="val" id="trailNValPopup" style="flex: 0 0 30px; text-align: right;">15</span>
+          </div>
+          <!-- Row 3: N tracked slider -->
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span style="color: var(--ink-dim); flex: 0 0 90px;">N tracked</span>
+            <input type="range" id="trackedNPopup" min="0" max="30" step="1" value="10"
+                   style="flex: 1 1 auto; min-width: 0;" />
+            <span class="val" id="trackedNValPopup" style="flex: 0 0 30px; text-align: right;">10</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- v3.79: horizontal drag-resize seam between PCA (above) and tracked-

@@ -234,7 +234,9 @@ export function recomputeAnchorConcord() {
 }
 
 // --- _refreshScreeInset — legacy lines 56497-56513 ---
-function _refreshScreeInset() {
+// 2026-05-18: exposed on window so sidebar.js (#screeToggle change handler)
+// can repaint without importing pca_panel internals.
+export function _refreshScreeInset() {
   const state = _pageState;
   const el = document.getElementById('screeInset');
   if (!el) return;

@@ -513,6 +513,7 @@ function _buildLegacyState(atlasState) {
     silThreshold: 0.45,
     aggMethod: 'mean_pc1',
     silScoreOn: 'pc1',
+    tPanelOpen: false,
 
     mergeThr: 0.85,
     alpha: 0.05,

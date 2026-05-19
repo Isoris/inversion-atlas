@@ -114,10 +114,23 @@ function applyMainGrid(state) {
   const linesVisible = linesEl && getComputedStyle(linesEl).display !== 'none';
 
   const rows = ['40px'];                                         // ctrlBar
-  if (simVisible) rows.push(`${Math.max(60, state.simPanelH | 0 || DEFAULTS.simPanelH)}px`);
+  // Sim panel: ALWAYS emit a row so DOM-order grid placement keeps every
+  // downstream panel at its correct row index. When sim is in the minimap
+  // (or otherwise hidden) the row collapses to 0px — see inversion.css
+  // `body[data-sim-in-minimap="1"] #simPanel` (v3.57 fix). Without this,
+  // dropping the row entirely makes l3Panel fall off the explicit
+  // gridTemplateRows into an implicit auto-row, so the freed sim_mat
+  // height stays black instead of redistributing to pca + l3.
+  rows.push(simVisible
+    ? `${Math.max(60, state.simPanelH | 0 || DEFAULTS.simPanelH)}px`
+    : '0px');
   rows.push(`${zH}px`);                                          // zPanel
   rows.push('auto');                                             // tracksContainer
-  if (linesVisible) rows.push(`${Math.max(60, state.linesPanelH | 0 || DEFAULTS.linesPanelH)}px`);
+  // Same reasoning for lines: keep the row, collapse to 0px when hidden,
+  // so pcaPanel + l3Panel claim the rest of the column.
+  rows.push(linesVisible
+    ? `${Math.max(60, state.linesPanelH | 0 || DEFAULTS.linesPanelH)}px`
+    : '0px');
   rows.push('28px');                                             // anchorStripPanel
   rows.push(pcaRow);                                             // pcaPanel
   rows.push(l3Row);                                              // l3Panel

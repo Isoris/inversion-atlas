@@ -42,7 +42,7 @@
 import { shortId } from '../../../shared/page1_utils.js';
 
 import { _setActiveState } from './_state.js';
-import { getL2Cluster } from './_data.js';
+import { getL2Cluster, groupColor } from './_data.js';
 import { drawSim, drawSimMini } from './sim_panel.js';
 import { drawZ } from './z_panel.js';
 import { drawLinesPanel, setLinesPanelCandidateBands } from './lines_panel.js';
@@ -54,6 +54,7 @@ import { drawLinesPanel, setLinesPanelCandidateBands } from './lines_panel.js';
 import { applyMainGrid } from './panel_resize.js';
 import {
   autoPickRadial as _autoPickRadialBridge,
+  cycleKAside,
   drawAnchorStrip,
   drawPCA,
   recomputeAnchorConcord,
@@ -132,7 +133,7 @@ function _wireNewShellControls(state) {
   // Pair each visible checkbox with the same handler as its legacy
   // hidden sibling so toggling either reflects to all of them.
   // Mirror group: flipPC1 (sign-align PC1).
-  const flipMirrors = ['flipPC1', 'flipPC1Aside', 'flipPC1Compact'];
+  const flipMirrors = ['flipPC1', 'flipPC1Aside', 'flipPC1Compact', 'flipPC1Popup'];
   const flipApply = (val) => {
     state.flipPC1 = !!val;
     state.l2GroupCache = null;
@@ -154,7 +155,7 @@ function _wireNewShellControls(state) {
   }
 
   // Mirror group: trailOn (PCA trails for tracked samples).
-  const trailMirrors = ['trailOn', 'trailOnAside', 'trailOnCompact'];
+  const trailMirrors = ['trailOn', 'trailOnAside', 'trailOnCompact', 'trailOnPopup'];
   const trailApply = (val) => {
     state.trailOn = !!val;
     for (const id of trailMirrors) {
@@ -175,7 +176,7 @@ function _wireNewShellControls(state) {
   // state.pcaLassoActive — see local_pca_dosage/pca_panel.js#attachPcaLasso pointer-
   // down handler: when pcaLassoActive is true, plain drag activates the
   // tracked-lasso path; without it, only Shift+drag works.
-  const lassoMirrors = ['pcaLassoToggle', 'pcaLassoToggleCompact'];
+  const lassoMirrors = ['pcaLassoToggle', 'pcaLassoToggleCompact', 'pcaLassoTogglePopup'];
   const lassoApply = (val) => {
     state.pcaLassoActive = !!val;
     for (const id of lassoMirrors) {
@@ -261,6 +262,297 @@ function _wireNewShellControls(state) {
       try { drawZ(state); } catch (err) { console.warn('[linesRegimeBreadthToggle] drawZ:', err); }
     });
     regimeBreadthEl.dataset.wired = '1';
+  }
+
+  // ===========================================================================
+  // Tracked-samples aside controls — kCycleBtnAside, [data-band-aside],
+  // autoPickRadialAside, clearPicksAside, screeToggle mirrors. Legacy
+  // sources cited inline.
+  // ===========================================================================
+  _wireTrackedAside(state);
+
+  // ===========================================================================
+  // T-panel (tracked-samples settings popup) — open/close + body controls.
+  // ===========================================================================
+  _wireTrackedSettingsPopup(state);
+
+  // First paint of K-band button colors. _refreshBandPickAsideColors must
+  // also be called on every K change (from kCycleBtnAside + kSelect).
+  _refreshBandPickAsideColors(state);
+
+  // ===========================================================================
+  // First-use attention pulses (v4 turn 80 — never wired in modular tree).
+  // CSS classes `.attention-pulse` + `.attention-pulse-fade` already exist
+  // in inversion.css (lines 143-172). Apply pulse to the key onboarding
+  // buttons until first click; persist dismissal in localStorage.
+  // ===========================================================================
+  _initAttentionPulses();
+}
+
+// Target buttons by ID. Picked from legacy turn-80 comment (inversion.css L135).
+// Each entry: button-id → localStorage key suffix.
+const _PULSE_TARGETS = [
+  { id: 'fileInput',           key: 'fileInput'       },
+  { id: 'simFitSquare',        key: 'simFitSquare'    },
+  { id: 'simMoveMinimapBtn',   key: 'simMoveMinimap'  },
+  { id: 'jumpToWindowsBtn',    key: 'jumpToWindows'   },
+  { id: 'promoteCandidateBtn', key: 'promoteCand'     },
+];
+
+function _initAttentionPulses() {
+  if (typeof document === 'undefined') return;
+  for (const { id, key } of _PULSE_TARGETS) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    if (el.dataset.pulseWired === '1') continue;
+    el.dataset.pulseWired = '1';
+
+    const storeKey = `inversion_atlas.pulse.${key}.dismissed`;
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(storeKey) === '1'; } catch (_) {}
+    if (dismissed) continue;
+
+    // <input type="file"> can't host the pulse directly (browsers won't paint
+    // outlines on it); pulse the wrapping .ctl per the legacy CSS recipe.
+    const target = (el.tagName === 'INPUT' && el.type === 'file')
+                   ? (el.closest('.ctl') || el)
+                   : el;
+    target.classList.add('attention-pulse');
+
+    const dismiss = () => {
+      target.classList.remove('attention-pulse');
+      target.classList.add('attention-pulse-fade');
+      try { localStorage.setItem(storeKey, '1'); } catch (_) {}
+      setTimeout(() => target.classList.remove('attention-pulse-fade'), 850);
+    };
+    // The dismissal fires once on any of: click / focus / change. We can't
+    // use { once: true } because the *first* interaction across any of the
+    // three handlers should dismiss — use a guard flag instead.
+    let done = false;
+    const onAny = () => { if (done) return; done = true; dismiss(); };
+    el.addEventListener('click',  onAny);
+    el.addEventListener('focus',  onAny);
+    el.addEventListener('change', onAny);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// K-band button painter — port of legacy 55977-55998. Colors each
+// [data-k-band] button by groupColor(ki); disables + dims buttons whose
+// k >= state.k.
+// ---------------------------------------------------------------------------
+function _refreshBandPickAsideColors(state) {
+  if (typeof document === 'undefined') return;
+  // Update the K-cycle button label on every refresh (legacy 55970-55974).
+  for (const id of ['kCycleBtnAside', 'kCycleBtnCompact']) {
+    const btn = document.getElementById(id);
+    if (btn) btn.textContent = `K=${state.k}`;
+  }
+  document.querySelectorAll('[data-k-band]').forEach(b => {
+    const ki = parseInt(b.dataset.kBand, 10);
+    if (!isFinite(ki)) return;
+    if (ki < state.k) {
+      const col = groupColor(ki) || '#666';
+      b.style.background = col;
+      // Contrast text: light backgrounds get dark text.
+      const isLight = /^#[bcdefBCDEF]/.test(col)
+                    || /^rgb.*\b(2[2-5]\d|1[8-9]\d)/.test(col);
+      b.style.color = isLight ? '#0e1116' : '#fff';
+      b.style.borderColor = col;
+      b.style.opacity = '1';
+      b.disabled = false;
+      b.style.cursor = 'pointer';
+    } else {
+      b.style.background = 'var(--panel-2)';
+      b.style.color = 'var(--ink-dimmer)';
+      b.style.borderColor = 'var(--rule)';
+      b.style.opacity = '0.4';
+      b.disabled = true;
+      b.style.cursor = 'not-allowed';
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Aside-control wires that were never ported. Idempotent via dataset.wired.
+// ---------------------------------------------------------------------------
+function _wireTrackedAside(state) {
+  if (typeof document === 'undefined') return;
+  const $ = (id) => document.getElementById(id);
+
+  // K-cycle button — legacy 56536-56565. Delegates to cycleKAside (already
+  // exported from pca_panel.js — handles state.k bump, cache bust, kSelect
+  // mirror, and full repaint), then repaints the K-band button colors.
+  for (const id of ['kCycleBtnAside', 'kCycleBtnCompact']) {
+    const btn = $(id);
+    if (!btn || btn.dataset.wired === '1') continue;
+    btn.addEventListener('click', () => {
+      try { cycleKAside(state); } catch (e) {
+        console.warn('[kCycleBtnAside] cycleKAside:', e);
+      }
+      _refreshBandPickAsideColors(state);
+    });
+    btn.dataset.wired = '1';
+  }
+
+  // [data-band-aside] band picker — legacy 56377-56389. Each button calls
+  // pickFromFocalBand(state, 'all'|0..5) and visually marks the active one.
+  document.querySelectorAll('[data-band-aside]').forEach(btn => {
+    if (btn.dataset.wired === '1') return;
+    btn.addEventListener('click', () => {
+      const v = btn.dataset.bandAside;
+      document.querySelectorAll('[data-band-aside]').forEach(b =>
+        b.classList.remove('active'));
+      btn.classList.add('active');
+      if (v === 'all') pickFromFocalBand(state, 'all');
+      else             pickFromFocalBand(state, parseInt(v, 10));
+    });
+    btn.dataset.wired = '1';
+  });
+
+  // Auto-pick / Clear — legacy 56571-56580.
+  const autoPickAside = $('autoPickRadialAside');
+  if (autoPickAside && autoPickAside.dataset.wired !== '1') {
+    autoPickAside.addEventListener('click', () => {
+      try { _autoPickRadialBridge(state, state.trackedN); } catch (_) {}
+    });
+    autoPickAside.dataset.wired = '1';
+  }
+  const clearPicksAside = $('clearPicksAside');
+  if (clearPicksAside && clearPicksAside.dataset.wired !== '1') {
+    clearPicksAside.addEventListener('click', () => {
+      try { clearPicks(state); } catch (_) {}
+    });
+    clearPicksAside.dataset.wired = '1';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// T-panel (tracked-samples settings popup). Modal pattern modeled on G-panel
+// (legacy 43948-44030): #tPanelOverlay display:flex when open, ✕ close +
+// click-outside + Esc + 't' hotkey.
+// ---------------------------------------------------------------------------
+function _wireTrackedSettingsPopup(state) {
+  if (typeof document === 'undefined') return;
+  const $ = (id) => document.getElementById(id);
+  const overlay = $('tPanelOverlay');
+  if (!overlay) return;
+
+  const open = () => {
+    overlay.style.display = 'flex';
+    state.tPanelOpen = true;
+  };
+  const close = () => {
+    overlay.style.display = 'none';
+    state.tPanelOpen = false;
+  };
+
+  const openBtn = $('tPanelOpenBtn');
+  if (openBtn && openBtn.dataset.wired !== '1') {
+    openBtn.addEventListener('click', () => {
+      state.tPanelOpen ? close() : open();
+    });
+    openBtn.dataset.wired = '1';
+  }
+  const closeBtn = $('tPanelClose');
+  if (closeBtn && closeBtn.dataset.wired !== '1') {
+    closeBtn.addEventListener('click', close);
+    closeBtn.dataset.wired = '1';
+  }
+  if (overlay.dataset.wired !== '1') {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();        // click-outside
+    });
+    overlay.dataset.wired = '1';
+  }
+  if (!document._tPanelHotkeyWired) {
+    document.addEventListener('keydown', (e) => {
+      // Only when local_pca_dosage is the active page and we're not in a
+      // text input. Esc always closes; 't' (no modifiers) toggles.
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.key === 'Escape' && state.tPanelOpen) { e.preventDefault(); close(); return; }
+      if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        state.tPanelOpen ? close() : open();
+      }
+    });
+    document._tPanelHotkeyWired = true;
+  }
+
+  // ----- Popup body controls: trail-back slider + N-tracked slider -----
+  // (the checkboxes — trails / sign-align PC1 / lasso / scree — share
+  // mirror groups with the legacy hidden controls; see flipMirrors etc.)
+  const trailNPopup = $('trailNPopup');
+  if (trailNPopup && trailNPopup.dataset.wired !== '1') {
+    if (state.trailN != null && isFinite(state.trailN)) {
+      trailNPopup.value = String(state.trailN);
+      const lbl = $('trailNValPopup');
+      if (lbl) lbl.textContent = String(state.trailN);
+    }
+    trailNPopup.addEventListener('input', e => {
+      state.trailN = +e.target.value;
+      const lbl = $('trailNValPopup');
+      if (lbl) lbl.textContent = String(state.trailN);
+      // Also write to the legacy hidden #trailN if present, so sidebar stays
+      // synced.
+      const legacy = $('trailN');
+      if (legacy) legacy.value = String(state.trailN);
+      try { drawPCA(state); } catch (_) {}
+    });
+    trailNPopup.dataset.wired = '1';
+  }
+  const trackedNPopup = $('trackedNPopup');
+  if (trackedNPopup && trackedNPopup.dataset.wired !== '1') {
+    if (state.trackedN != null && isFinite(state.trackedN)) {
+      trackedNPopup.value = String(state.trackedN);
+      const lbl = $('trackedNValPopup');
+      if (lbl) lbl.textContent = String(state.trackedN);
+    }
+    trackedNPopup.addEventListener('input', e => {
+      state.trackedN = +e.target.value;
+      const lbl = $('trackedNValPopup');
+      if (lbl) lbl.textContent = String(state.trackedN);
+      // Trim tracked list + sync sidebar slider.
+      if (Array.isArray(state.tracked) && state.tracked.length > state.trackedN) {
+        state.tracked = state.tracked.slice(0, state.trackedN);
+      }
+      const legacy = $('trackedN');
+      if (legacy) legacy.value = String(state.trackedN);
+      const legacyLbl = $('trackedNVal');
+      if (legacyLbl) legacyLbl.textContent = String(state.trackedN);
+      try { drawPCA(state); } catch (_) {}
+      try { renderL3Panel(state); } catch (_) {}
+    });
+    trackedNPopup.dataset.wired = '1';
+  }
+  // Scree toggle — single-control wiring (no existing mirror group for it).
+  const screeMirrors = ['screeToggle', 'screeToggleCompact', 'screeTogglePopup'];
+  const screeApply = (val) => {
+    state.screePlotEnabled = !!val;
+    try { localStorage.setItem('inversion_atlas.screePlotEnabled',
+                                state.screePlotEnabled ? '1' : '0'); } catch (_) {}
+    for (const id of screeMirrors) {
+      const el = $(id);
+      if (el && el.checked !== !!val) el.checked = !!val;
+    }
+    try { if (typeof window !== 'undefined' && window._refreshScreeInset) {
+      window._refreshScreeInset();
+    } else { drawPCA(state); } } catch (_) {}
+  };
+  // Restore from localStorage if not already set.
+  if (state.screePlotEnabled == null) {
+    try {
+      const v = localStorage.getItem('inversion_atlas.screePlotEnabled');
+      if (v === '1') state.screePlotEnabled = true;
+    } catch (_) {}
+  }
+  for (const id of screeMirrors) {
+    const el = $(id);
+    if (!el || el.dataset.wired === '1') continue;
+    el.checked = !!state.screePlotEnabled;
+    el.addEventListener('change', (e) => screeApply(e.target.checked));
+    el.dataset.wired = '1';
   }
 }
 
@@ -694,6 +986,9 @@ function _wireL3Clustering(state) {
       try { drawAnchorStrip(state); } catch (_) {}
       // v3.71: K change → anchor reset → badge needs refresh
       try { _updateConcordBadge(state); } catch (_) {}
+      // 2026-05-18: repaint the K-band button colors (kBand button is
+      // disabled+dim when ki >= state.k; enabled+colored otherwise).
+      _refreshBandPickAsideColors(state);
     });
   }
 
