@@ -179,6 +179,13 @@ export function findSampleAtPixel(state, layer, x, y) {
 
 // ---------------------------------------------------------------------------
 // Layer accessors. Returns { xs, ys, xLabel, yLabel, reason? }.
+//
+// Data shapes (confirmed 2026-05-19 against actual pipeline output):
+//   dosage:   d.windows[cur].pc1[s] / .pc2[s]           — per-window object
+//   theta_pi: d.theta_pi_local_pca.pc_loadings_aligned  — [npc][n_windows][n_samples]
+//             so PC1 at window cur = pc_loadings_aligned[0][cur] (length n_samples).
+//   ghsl:     d.ghsl_local_pca.pc_loadings_aligned      — same [npc][nwin][nS] layout
+//             (NOT d.ghsl_panel.local_pca — that path is from an older schema draft).
 // ---------------------------------------------------------------------------
 function _getLayerPoints(sharedState, layer) {
   const d = sharedState.data;
@@ -191,25 +198,44 @@ function _getLayerPoints(sharedState, layer) {
     return { xs: w.pc1, ys: w.pc2, xLabel: 'PC1 (dosage)', yLabel: 'PC2 (dosage)' };
   }
   if (layer === 'theta_pi') {
-    const tpi = d.theta_pi_local_pca;
-    if (!tpi) return { reason: 'per_sample_theta_pi layer not loaded' };
-    // Expected shape: tpi[cur] = { pc1: Float64Array, pc2: Float64Array }
-    const w = Array.isArray(tpi) ? tpi[cur] : (tpi.windows && tpi.windows[cur]);
-    if (!w || !w.pc1 || !w.pc2) return { reason: 'no θπ PC at window ' + cur };
-    return { xs: w.pc1, ys: w.pc2, xLabel: 'PC1 (θπ)', yLabel: 'PC2 (θπ)' };
+    const lp = d.theta_pi_local_pca;
+    if (!lp) return { reason: 'theta_pi_local_pca not loaded' };
+    return _getPointsFromLoadings(lp, cur, 'θπ');
   }
   if (layer === 'ghsl') {
-    const gp = d.ghsl_panel;
-    if (!gp) return { reason: 'ghsl_panel layer not loaded' };
-    // GHSL is a 4D cube; the panel-level PCA is in gp.local_pca[cur] when
-    // the producer emits it (schema v2.18+).
-    const lp = gp.local_pca;
-    if (!lp) return { reason: 'no ghsl.local_pca at window ' + cur };
-    const w = Array.isArray(lp) ? lp[cur] : (lp.windows && lp.windows[cur]);
-    if (!w || !w.pc1 || !w.pc2) return { reason: 'no GHSL PC at window ' + cur };
-    return { xs: w.pc1, ys: w.pc2, xLabel: 'PC1 (GHSL)', yLabel: 'PC2 (GHSL)' };
+    // Prefer the canonical top-level ghsl_local_pca (matches theta-pi layout).
+    // Fall back to the legacy d.ghsl_panel.local_pca for older fixtures.
+    const lp = d.ghsl_local_pca || (d.ghsl_panel && d.ghsl_panel.local_pca);
+    if (!lp) return { reason: 'ghsl_local_pca not loaded' };
+    return _getPointsFromLoadings(lp, cur, 'GHSL');
   }
   return null;
+}
+
+// Common helper: extract PC1/PC2 at window `cur` from a `*_local_pca` block.
+// Supports two shapes:
+//   (a) pc_loadings_aligned: [npc][n_windows][n_samples]  ← actual pipeline output
+//   (b) per-window object: lp.windows[cur].pc1/pc2        ← older draft schema
+function _getPointsFromLoadings(lp, cur, axisLabel) {
+  if (lp.pc_loadings_aligned) {
+    const a = lp.pc_loadings_aligned;
+    if (!Array.isArray(a) || a.length < 2) return { reason: `${axisLabel}: pc_loadings_aligned needs ≥2 PCs` };
+    const pc1Series = a[0];
+    const pc2Series = a[1];
+    if (!Array.isArray(pc1Series) || cur >= pc1Series.length) {
+      return { reason: `${axisLabel}: no PC at window ${cur}` };
+    }
+    return {
+      xs: pc1Series[cur],
+      ys: pc2Series[cur],
+      xLabel: `PC1 (${axisLabel})`,
+      yLabel: `PC2 (${axisLabel})`,
+    };
+  }
+  // Legacy fallback.
+  const w = Array.isArray(lp) ? lp[cur] : (lp.windows && lp.windows[cur]);
+  if (!w || !w.pc1 || !w.pc2) return { reason: `${axisLabel}: no PC at window ${cur}` };
+  return { xs: w.pc1, ys: w.pc2, xLabel: `PC1 (${axisLabel})`, yLabel: `PC2 (${axisLabel})` };
 }
 
 // Resolve K-band labels from the anchor source.

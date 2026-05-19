@@ -397,6 +397,33 @@ export async function mount(root, atlasState, registry) {
     return;
   }
 
+  // 2026-05-19 — merge θπ + GHSL streams into the data envelope so the
+  // PCA comparator's adapter (pca_comparator/renderer.js#_getLayerPoints)
+  // and the eventual axis-toggle in this page can read all three axes
+  // off a single state.data. Best-effort: each layer fetch returns null
+  // on AUTO_INDEX_EMPTY / 404 (its pipeline output isn't on disk yet);
+  // the comparator's adapter renders a "not loaded" stub in that case,
+  // it doesn't error.
+  //
+  // Field merge: theta_pi and ghsl JSONs carry their top-level fields
+  // (theta_pi_local_pca, ghsl_local_pca, …); we shallow-merge so those
+  // become reachable from data.* without touching the z-blocks fields.
+  // Rename theta_pi_cusum → cusum_theta to match the legacy schema's
+  // canonical field name (page12 / theta-pi renderer reads cusum_theta).
+  const [tpData, ghslData] = await Promise.all([
+    registry.resolve('scrubber_thetapi', { chrom }).catch(() => null),
+    registry.resolve('scrubber_ghsl',    { chrom }).catch(() => null),
+  ]);
+  if (tpData) {
+    Object.assign(data, tpData);
+    if (data.theta_pi_cusum && data.cusum_theta === undefined) {
+      data.cusum_theta = data.theta_pi_cusum;
+    }
+  }
+  if (ghslData) {
+    Object.assign(data, ghslData);
+  }
+
   // 2026-05-18 — preserve cursor + tracked-samples across tab switches.
   // The unmount path keeps the stash alive (see unmount comment); on
   // re-mount, if the saved stash points at the SAME chromosome the
