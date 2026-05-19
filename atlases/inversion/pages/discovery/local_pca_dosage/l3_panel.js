@@ -12,6 +12,7 @@
 import { alignLabels } from '../../../shared/hungarian.js';
 import {
   chiSquare,
+  fisher2x2,
   nmiFromTable,
   amiFromTable,
   ariFromTable,
@@ -1250,6 +1251,91 @@ function compareL2Pair(leftIdx, rightIdx) {
     cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
     cl_usedK: cl.usedK, cr_usedK: cr.usedK,   // for K-mismatch annotation
   };
+}
+
+// =============================================================================
+// compareL2Pair_atK — legacy lines 15032-15063
+// =============================================================================
+// K-aware variant of compareL2Pair: forces both panes to a fixed K
+// instead of using each L2's adaptive K. Used by the L3 panel when the
+// user picks kmeans-K6 in the recluster dropdown.
+//
+// The reference at l3_panel.js:593 was dangling — every K=6 contingency
+// render threw silently (the surrounding try/catch swallowed it). User
+// symptom: "k6 i'm not sure so much" (chat 2026-05-15).
+function compareL2Pair_atK(leftIdx, rightIdx, K) {
+  const state = _pageState;
+  if (leftIdx == null || rightIdx == null) return null;
+  const cl = getL2ClusterAt(state, leftIdx, K);
+  const cr = getL2ClusterAt(state, rightIdx, K);
+  if (!cl || !cr || !cl.labels || !cr.labels) return null;
+  const align = alignLabels(cl.labels, cr.labels, K);
+  let p_value, test_kind;
+  if (K === 2) {
+    p_value = (typeof fisher2x2 === 'function') ? fisher2x2(align.table) : null;
+    test_kind = 'fisher_2x2';
+  } else {
+    const cs = (typeof chiSquare === 'function') ? chiSquare(align.table, K) : null;
+    p_value = cs ? cs.p_approx : null;
+    test_kind = 'chi2_' + K + 'x' + K;
+  }
+  let verdict;
+  if (!cl.ok || !cr.ok)                       verdict = 'LOW_POWER';
+  else if (align.concord >= state.mergeThr)   verdict = 'MERGE';
+  else                                        verdict = 'SEPARATE';
+  return {
+    leftIdx, rightIdx, K,
+    table: align.table,
+    perm: align.perm,
+    concord: align.concord,
+    p_value,
+    test_kind,
+    verdict,
+    cl_ok: cl.ok, cr_ok: cr.ok,
+    cl_reason: cl.reason, cr_reason: cr.reason,
+    cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
+    cl_usedK: K, cr_usedK: K,
+  };
+}
+
+// =============================================================================
+// alignedLabelsTo_atK — legacy lines 15068-15079
+// =============================================================================
+// K-aware variant of alignedLabelsTo: returns the neighbor's labels
+// Hungarian-aligned to focal's labels, both clustered at fixed K. Used
+// by the L3 panel's per-K mini-PCA rendering when the user picks a
+// non-default recluster mode.
+function alignedLabelsTo_atK(focalIdx, neighborIdx, K) {
+  const state = _pageState;
+  if (focalIdx == null || neighborIdx == null) return null;
+  if (focalIdx === neighborIdx) {
+    const cl = getL2ClusterAt(state, focalIdx, K);
+    return cl && cl.labels ? cl.labels : null;
+  }
+  const cf = getL2ClusterAt(state, focalIdx, K);
+  const cn = getL2ClusterAt(state, neighborIdx, K);
+  if (!cf || !cn || !cf.labels || !cn.labels) return null;
+  const a = alignLabels(cf.labels, cn.labels, K);
+  return a.aligned;
+}
+
+// =============================================================================
+// compareL2Pair_byMode — recluster-mode dispatcher (legacy 11733-11774, partial)
+// =============================================================================
+// Routes label-fetch + contingency through the appropriate cluster
+// function based on state.l3ReclusterMode. Currently supports:
+//   - kmeans-K3  → compareL2Pair (default state.k=3 path)
+//   - kmeans-K6  → compareL2Pair_atK at K=6
+// UV modes (distance-uv / uv-rotated / uv-denoise / uv-dbscan /
+// uv-dist-rank / uv-dist-fuzzy) need the UV-rotation cache port from
+// legacy 10928-11200 — separate commit. Until then they fall back to
+// kmeans-K3 and the dropdown options are disabled.
+function compareL2Pair_byMode(leftIdx, rightIdx, mode) {
+  if (!mode || mode === 'kmeans-K3') return compareL2Pair(leftIdx, rightIdx);
+  if (mode === 'kmeans-K6')          return compareL2Pair_atK(leftIdx, rightIdx, 6);
+  // UV modes not yet ported — fall back so the panel still renders
+  // instead of throwing. The dropdown should already disable these.
+  return compareL2Pair(leftIdx, rightIdx);
 }
 
 // =============================================================================
