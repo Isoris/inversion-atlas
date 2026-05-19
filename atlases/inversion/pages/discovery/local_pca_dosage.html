@@ -526,6 +526,26 @@
 
     <div id="tracksContainer"></div>
 
+    <!-- 2026-05-18: CUSUM panel (Phase 1 of the per-sample CUSUM
+         feature, see shared/cusum.js). Hidden by default; toggled via
+         the "Σ cusum" checkbox on the lines-panel header. Paints K
+         per-karyotype band trajectories across the chromosome bp axis.
+         Default settings: residual='cohort_mean', op='mean', axis='pc1'.
+         Override via console: state.cusumResidual / state.cusumOp /
+         state.cusumAxis. -->
+    <div class="panel" id="cusumPanel" style="display: none; position: relative;
+         border-bottom: 1px solid var(--rule); overflow: hidden;">
+      <canvas id="cusumCanvas" style="display: block; width: 100%; height: 100%;
+              background: #0b0e13; cursor: crosshair;"></canvas>
+      <div id="cusumPanelLabel" style="position: absolute; top: 3px; left: 8px;
+           font-size: 10px; color: var(--ink-dim); pointer-events: none;
+           font-family: ui-monospace, monospace; font-weight: 600;
+           text-shadow: 0 0 4px rgba(0,0,0,0.85);">
+        Σ CUSUM <span style="color: var(--ink-dimmer); font-weight: normal;
+        ">(cohort-mean residual · per-band mean)</span>
+      </div>
+    </div>
+
     <!-- v3.70: tracked-samples panel for compact mode. Hidden in fixed/free
          modes (sidebar wins). In compact mode this fills the left column lower
          half with a mirror of the sidebar's tracked-samples controls — same
@@ -747,6 +767,17 @@
                 title="Open the linkage table popover. For the current fish-set (state.bandTraceFishSet from 🔍 trace), shows per-confirmed-candidate purity: which band of each candidate the fish-set falls into, what fraction, and how many fish. Click 🔍 trace first to populate the fish-set. Useful for asking 'these fish co-segregate at I3 — do they ALSO co-segregate at I7 / I12 / etc?'">
           🔗 linkage
         </button>
+        <!-- 2026-05-18: CUSUM panel toggle. Renders a dedicated panel
+             between tracks + lines, showing K=3 per-karyotype band
+             trajectories (cumulative drift from cohort mean) across
+             the chromosome. Default OFF. Per-sample CUSUM + per-band
+             aggregator from shared/cusum.js. -->
+        <label id="linesCusumLabel"
+               style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding-left: 6px; border-left: 1px solid var(--rule);"
+               title="Σ CUSUM panel — per-karyotype band trajectories of cumulative drift from cohort mean across the chromosome. K bold lines (one per band), colored by K-cluster, on a dark backdrop with a 0-baseline rule. Renders into a dedicated panel between the tracks and the per-sample lines so the lines plot stays uncluttered. Override the residual / op via console: state.cusumResidual = 'cohort_mean'|'band_mean'|'zero', state.cusumOp = 'mean'|'median'.">
+          <input type="checkbox" id="linesCusumToggle" />
+          <span style="color: var(--ink-dim);">Σ cusum</span>
+        </label>
         <!-- turn 141 Slice 1: candidate-band highlights. Default ON.
              Each confirmed candidate on the current chrom paints a faint
              full-height vertical band over its [start_bp, end_bp] span,

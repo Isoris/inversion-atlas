@@ -279,6 +279,31 @@ function _wireNewShellControls(state) {
     regimeBreadthEl.dataset.wired = '1';
   }
 
+  // 2026-05-18: Σ CUSUM panel toggle. Shows the dedicated cusumPanel
+  // between #tracksContainer and #linesPanel; the painter
+  // (drawCusumPanel) is a sibling repaint of drawLinesPanel so the
+  // existing draw chain picks it up. Grid row toggles between 0px
+  // and 70px via applyMainGrid (panel_resize.js).
+  const cusumEl = $('linesCusumToggle');
+  if (cusumEl && cusumEl.dataset.wired !== '1') {
+    cusumEl.checked = !!state.cusumStripOn;
+    cusumEl.addEventListener('change', (e) => {
+      state.cusumStripOn = !!e.target.checked;
+      // applyMainGrid reads getComputedStyle on #cusumPanel — set the
+      // display flag here BEFORE the grid recalc so it picks up the
+      // new state. drawCusumPanel will sync display too on next paint.
+      const pan = document.getElementById('cusumPanel');
+      if (pan) pan.style.display = state.cusumStripOn ? '' : 'none';
+      try { applyMainGrid(state); } catch (err) {
+        console.warn('[linesCusumToggle] applyMainGrid:', err);
+      }
+      try { drawLinesPanel(state); } catch (err) {
+        console.warn('[linesCusumToggle] drawLinesPanel:', err);
+      }
+    });
+    cusumEl.dataset.wired = '1';
+  }
+
   // ===========================================================================
   // Lines-panel band-trace buttons (WIRE_AUDIT Group A — were never wired).
   // ===========================================================================

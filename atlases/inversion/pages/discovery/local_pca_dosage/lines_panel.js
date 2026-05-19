@@ -16,6 +16,7 @@
 
 import { fitCanvas, formatTrackVal, themeColor, withAlpha } from '../../../shared/page1_utils.js';
 import { isPerSampleLineColorMode, perSampleValuesForMode, perSampleColorFor } from '../../../shared/per_sample_line_color.js';
+import { drawCusumPanel } from './cusum_panel.js';
 
 import { _resolveSampleScopeColor, _setActiveState, trackedColor } from './_state.js';
 import { _LINES_COLOR_MODES, _isLinesColorModeAvailable, availablePCs, currentMbRange, getLinesGrid, getLinesSignAt, getLinesValuesAt } from './_data.js';
@@ -912,6 +913,14 @@ export function drawLinesPanel(state) {
         ctx.restore();
       }
     } catch (_) { /* fail-soft */ }
+  }
+
+  // 2026-05-18: Σ CUSUM panel — drawn into its own canvas
+  // (#cusumCanvas) between #tracksContainer and #linesPanel. No-op
+  // when state.cusumStripOn is false. Sibling repaint to drawLinesPanel
+  // so the ResizeObserver chain picks it up without a separate hook.
+  try { drawCusumPanel(state); } catch (e) {
+    console.warn('[drawLinesPanel] drawCusumPanel:', e);
   }
 }
 

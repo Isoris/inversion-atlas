@@ -394,14 +394,15 @@ body.light-theme .caution-banner { background: rgba(245, 165, 36, 0.10); }
    similar to the original ratios (520/100/...360); the minmax floor
    prevents any row from collapsing to nothing. */
 .page#local_pca_dosage.active { display: grid;
-                     grid-template-rows: 40px
-                                         minmax(180px, 2.0fr)
-                                         minmax(90px,  0.4fr)
-                                         auto
-                                         0px
-                                         28px
-                                         minmax(160px, 1.6fr)
-                                         minmax(180px, 1.6fr); }
+                     grid-template-rows: 40px        /* ctrlBar */
+                                         minmax(180px, 2.0fr)  /* simPanel (0px when minimap) */
+                                         minmax(90px,  0.4fr)  /* zPanel */
+                                         auto                  /* tracksContainer */
+                                         0px                   /* cusumPanel (70px when shown — see panel_resize.applyMainGrid) */
+                                         0px                   /* linesPanel (collapsed by default) */
+                                         28px                  /* anchorStripPanel */
+                                         minmax(160px, 1.6fr)  /* pcaPanel */
+                                         minmax(180px, 1.6fr); /* l3Panel */ }
 
 /* v3.99 turn 4: flex:1 + min-height:0 instead of `height: calc(100vh - 76px)`.
    The calc was correct in principle (header 44px + tabBar 32px = 76px), but
@@ -545,14 +546,15 @@ aside .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
    same hardcoded-pixel template lived here too (duplicate declaration
    from the legacy split). Replaced with the same minmax pattern so
    panels scale with viewport in fixed layout. */
-main#local_pca_dosage { grid-template-rows: 40px
-                                 minmax(180px, 2.0fr)
-                                 minmax(90px,  0.4fr)
-                                 auto
-                                 0px
-                                 28px
-                                 minmax(160px, 1.6fr)
-                                 minmax(180px, 1.6fr);
+main#local_pca_dosage { grid-template-rows: 40px        /* ctrlBar */
+                                 minmax(180px, 2.0fr)  /* simPanel */
+                                 minmax(90px,  0.4fr)  /* zPanel */
+                                 auto                  /* tracksContainer */
+                                 0px                   /* cusumPanel (70px when shown) */
+                                 0px                   /* linesPanel */
+                                 28px                  /* anchorStripPanel */
+                                 minmax(160px, 1.6fr)  /* pcaPanel */
+                                 minmax(180px, 1.6fr); /* l3Panel */
              overflow: hidden; }
 /* v3.62: free layout mode. main becomes a normal block-flow scrollable
    container, panels stack at their natural / minimum heights, mouse wheel
