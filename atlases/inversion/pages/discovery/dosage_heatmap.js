@@ -84,7 +84,7 @@ export function initDosageHeatmapToolbar() {
 // =====================================================================
 
 export async function mount(root, atlasState, registry) {
-  const pageState = _buildPageState(atlasState);
+  let pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
 
   try { refreshDosageHeatmap(pageState); }
@@ -96,6 +96,121 @@ export async function mount(root, atlasState, registry) {
   if (atlasState.inversion) {
     atlasState.inversion._page_dosage_heatmap_state = pageState;
   }
+
+  // 2026-05-20: auto-fetch a default chunk on direct mount. The page used
+  // to render the empty "feed buildHeatmapFromDosage output…" stub when
+  // the user navigated here without first opening from a candidate. Now
+  // we fetch a sensible default range so the heatmap renders immediately.
+  //
+  // Priority order for the bp range:
+  //   1. Active candidate's start_bp/end_bp (if set on shared state)
+  //   2. Focal L2 envelope of the local_pca_dosage cursor (from the stash)
+  //   3. First ~2 Mb of the active chromosome
+  //
+  // Uses the same /api/dosage/chunk endpoint the candidate-open path
+  // uses, via the synthetic chunk-index template that local_pca_dosage
+  // attaches to state.data.dosage_chunks. Bails silently when no chrom
+  // is loaded or the template URL isn't available.
+  if (!pageState.data) {
+    try {
+      await _autoLoadDefaultChunk(root, atlasState);
+      // Rebuild the page state from the now-populated inv.dosage_heatmap_state
+      // and re-render.
+      pageState = _buildPageState(atlasState);
+      _setActiveState(pageState);
+      try { refreshDosageHeatmap(pageState); }
+      catch (e) { console.warn('dosage_heatmap.mount: post-autoload refresh threw —', e); }
+      if (atlasState.inversion) {
+        atlasState.inversion._page_dosage_heatmap_state = pageState;
+      }
+    } catch (e) {
+      console.warn('dosage_heatmap.mount: auto-load failed:', e);
+    }
+  }
+}
+
+// Auto-fetch a default dosage chunk and stash it on inv.dosage_heatmap_state.
+// Returns silently if no chrom is loaded or the dosage_chunks template URL
+// isn't available (e.g. user opened this page before mounting local_pca_dosage).
+async function _autoLoadDefaultChunk(root, atlasState) {
+  const inv = (atlasState && atlasState.inversion) || {};
+  // If a payload is already set (candidate-open path), don't overwrite.
+  const dh = inv.dosage_heatmap_state || {};
+  if (dh.legacy_chunk || dh.mgl_heatmap_result) return;
+  const stash = inv._local_pca_dosage_state;
+  if (!stash || !stash.data) return;
+  const data = stash.data;
+  const chrom = data.chrom || (atlasState.shared && atlasState.shared.activeChrom);
+  if (!chrom) return;
+  const dc = data.dosage_chunks;
+  const template =
+       (dc && Array.isArray(dc.chunks) && dc.chunks[0] && (dc.chunks[0].url || dc._endpoint))
+    || null;
+  if (!template || template.indexOf('__START__') < 0) return;
+  // Pick a default region.
+  let startBp = null, endBp = null, sourceLabel = null;
+  // 1. Active candidate.
+  const cand = atlasState.shared && atlasState.shared.activeCandidate;
+  if (cand && Number.isFinite(cand.start_bp) && Number.isFinite(cand.end_bp)) {
+    startBp = cand.start_bp; endBp = cand.end_bp;
+    sourceLabel = `candidate ${cand.label || cand.id || ''}`.trim();
+  }
+  // 2. Focal L2 of the current cursor.
+  if (startBp == null && stash.windowToL2 && stash.cur != null
+      && Array.isArray(data.l2_envelopes)) {
+    const li = stash.windowToL2[stash.cur | 0];
+    if (li >= 0 && data.l2_envelopes[li]) {
+      const env = data.l2_envelopes[li];
+      if (Number.isFinite(env.start_bp) && Number.isFinite(env.end_bp)) {
+        startBp = env.start_bp; endBp = env.end_bp;
+        sourceLabel = `focal L2 (window ${stash.cur | 0})`;
+      }
+    }
+  }
+  // 3. First 2 Mb of the chrom — best-effort window-range pull from
+  //    data.windows[0..N].start_bp/end_bp, capped at 2 Mb.
+  if (startBp == null && Array.isArray(data.windows) && data.windows.length > 0) {
+    const w0 = data.windows[0];
+    const firstBp = Number.isFinite(w0.start_bp) ? w0.start_bp : 1;
+    startBp = firstBp;
+    endBp   = firstBp + 2_000_000;
+    sourceLabel = `${chrom} ${(firstBp / 1e6).toFixed(2)}–${(endBp / 1e6).toFixed(2)} Mb (default)`;
+  }
+  if (startBp == null || endBp == null) return;
+  const cap = (dc.cap_default | 0) || 1000;
+  const url = template
+    .replace('__CHROM__', encodeURIComponent(chrom))
+    .replace('__START__', String(startBp | 0))
+    .replace('__END__',   String(endBp | 0))
+    .replace('__CAP__',   String(cap));
+  // Show a "loading" status on the empty-state slot while the fetch is
+  // in flight so the user knows something is happening.
+  _setLoadingHint(root, `loading dosage chunk for ${sourceLabel}…`);
+  let chunk = null;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) {
+      _setLoadingHint(root, `failed to load dosage chunk (HTTP ${r.status}). Open from a candidate to specify a region.`);
+      return;
+    }
+    chunk = await r.json();
+  } catch (e) {
+    _setLoadingHint(root, `dosage chunk fetch failed: ${e && e.message ? e.message : 'network error'}`);
+    return;
+  }
+  if (!chunk || typeof chunk !== 'object') return;
+  inv.dosage_heatmap_state = Object.assign({}, dh, {
+    legacy_chunk:    chunk,
+    candidate_label: dh.candidate_label || sourceLabel,
+    view_label:      dh.view_label || `auto-loaded · ${sourceLabel}`,
+  });
+}
+
+function _setLoadingHint(root, msg) {
+  if (!root) return;
+  const el = (root.querySelector && root.querySelector('#dosageHeatmapEmpty'))
+    || (typeof document !== 'undefined' && document.getElementById('dosageHeatmapEmpty'));
+  if (el) el.textContent = msg;
 }
 
 export async function unmount(root) {

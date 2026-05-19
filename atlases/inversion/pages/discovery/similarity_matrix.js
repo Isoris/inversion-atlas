@@ -46,6 +46,7 @@ import {
   summariseWindow,
   blockSizesFromAssignment,
 } from './similarity_matrix/selection.js';
+import { computeSimilarityAndBlocks } from '../../shared/mgl_similarity_matrix.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   show_block_overlay:    true,
@@ -75,7 +76,7 @@ export function initSimilarityPanelToolbar() {
 // =====================================================================
 
 export async function mount(root, atlasState, registry) {
-  const pageState = _buildPageState(atlasState);
+  let pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
 
   try { refreshSimilarityPanel(pageState); }
@@ -86,6 +87,164 @@ export async function mount(root, atlasState, registry) {
 
   if (atlasState.inversion) {
     atlasState.inversion._page_similarity_matrix_state = pageState;
+  }
+
+  // 2026-05-20: auto-compute on direct mount, same pattern as
+  // dosage_heatmap. Fetch a default dosage chunk, slice its markers
+  // into windows, run computeSimilarityAndBlocks, stash the result
+  // on inv.similarity_panel_state, and re-render.
+  if (!pageState.data || !pageState.data.similarity_result) {
+    try {
+      await _autoComputeSimilarity(root, atlasState);
+      pageState = _buildPageState(atlasState);
+      _setActiveState(pageState);
+      try { refreshSimilarityPanel(pageState); }
+      catch (e) { console.warn('similarity_matrix.mount: post-autoload refresh threw —', e); }
+      if (atlasState.inversion) {
+        atlasState.inversion._page_similarity_matrix_state = pageState;
+      }
+    } catch (e) {
+      console.warn('similarity_matrix.mount: auto-compute failed:', e);
+    }
+  }
+}
+
+// Auto-fetch a dosage chunk + run computeSimilarityAndBlocks on a default
+// region. Returns silently if no chrom is loaded or the dosage_chunks
+// bridge isn't available. The compute slices the chunk's markers into
+// ~12 evenly-sized windows so the transition track has multiple cells
+// to scrub through.
+async function _autoComputeSimilarity(root, atlasState) {
+  const inv = (atlasState && atlasState.inversion) || {};
+  const existing = inv.similarity_panel_state || {};
+  if (existing.similarity_result) return;
+  const stash = inv._local_pca_dosage_state;
+  if (!stash || !stash.data) return;
+  const data = stash.data;
+  const chrom = data.chrom || (atlasState.shared && atlasState.shared.activeChrom);
+  if (!chrom) return;
+  const dc = data.dosage_chunks;
+  const template =
+       (dc && Array.isArray(dc.chunks) && dc.chunks[0] && (dc.chunks[0].url || dc._endpoint))
+    || null;
+  if (!template || template.indexOf('__START__') < 0) return;
+  // Pick a default region (same priority as dosage_heatmap auto-load).
+  let startBp = null, endBp = null, sourceLabel = null;
+  const cand = atlasState.shared && atlasState.shared.activeCandidate;
+  if (cand && Number.isFinite(cand.start_bp) && Number.isFinite(cand.end_bp)) {
+    startBp = cand.start_bp; endBp = cand.end_bp;
+    sourceLabel = `candidate ${cand.label || cand.id || ''}`.trim();
+  }
+  if (startBp == null && stash.windowToL2 && stash.cur != null
+      && Array.isArray(data.l2_envelopes)) {
+    const li = stash.windowToL2[stash.cur | 0];
+    if (li >= 0 && data.l2_envelopes[li]) {
+      const env = data.l2_envelopes[li];
+      if (Number.isFinite(env.start_bp) && Number.isFinite(env.end_bp)) {
+        startBp = env.start_bp; endBp = env.end_bp;
+        sourceLabel = `focal L2 (window ${stash.cur | 0})`;
+      }
+    }
+  }
+  if (startBp == null && Array.isArray(data.windows) && data.windows.length > 0) {
+    const w0 = data.windows[0];
+    const firstBp = Number.isFinite(w0.start_bp) ? w0.start_bp : 1;
+    startBp = firstBp;
+    endBp   = firstBp + 2_000_000;
+    sourceLabel = `${chrom} ${(firstBp / 1e6).toFixed(2)}–${(endBp / 1e6).toFixed(2)} Mb (default)`;
+  }
+  if (startBp == null || endBp == null) return;
+  // Bump cap so the per-window slices each have ≥ ~30 markers for a
+  // useful similarity matrix.
+  const cap = Math.max(((dc.cap_default | 0) || 1000), 800);
+  const url = template
+    .replace('__CHROM__', encodeURIComponent(chrom))
+    .replace('__START__', String(startBp | 0))
+    .replace('__END__',   String(endBp | 0))
+    .replace('__CAP__',   String(cap));
+  _setLoadingHint(root, `computing similarity for ${sourceLabel}…`);
+  let chunk = null;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) {
+      _setLoadingHint(root, `chunk fetch failed (HTTP ${r.status}). Open from a candidate to specify a region.`);
+      return;
+    }
+    chunk = await r.json();
+  } catch (e) {
+    _setLoadingHint(root, `chunk fetch failed: ${e && e.message ? e.message : 'network error'}`);
+    return;
+  }
+  if (!chunk || !Array.isArray(chunk.markers) || !Array.isArray(chunk.dosage)
+      || !Array.isArray(chunk.samples)) {
+    _setLoadingHint(root, 'chunk has unexpected shape — cannot compute similarity.');
+    return;
+  }
+  const n_markers = chunk.markers.length | 0;
+  const n_samples = chunk.samples.length | 0;
+  if (n_markers <= 0 || n_samples <= 0) return;
+  // Flatten chunk.dosage (markers-major, NA = -1) into a Float64Array.
+  // mgl_similarity_matrix expects row-major n_markers × n_samples with
+  // NaN for missing (NOT -1).
+  const flat = new Float64Array(n_markers * n_samples);
+  for (let m = 0; m < n_markers; m++) {
+    const row = chunk.dosage[m];
+    const offset = m * n_samples;
+    if (!row) {
+      for (let s = 0; s < n_samples; s++) flat[offset + s] = NaN;
+      continue;
+    }
+    for (let s = 0; s < n_samples; s++) {
+      const v = row[s];
+      flat[offset + s] = (v == null || !Number.isFinite(v) || v < 0) ? NaN : v;
+    }
+  }
+  // Slice markers into ~12 windows. Each window slice carries its bp
+  // range derived from the marker positions at its boundaries.
+  const N_WINDOWS_TARGET = Math.min(12, Math.max(1, Math.floor(n_markers / 30)));
+  const perWindow = Math.max(1, Math.floor(n_markers / N_WINDOWS_TARGET));
+  const windows = [];
+  for (let wi = 0; wi < N_WINDOWS_TARGET; wi++) {
+    const s = wi * perWindow;
+    const e = (wi === N_WINDOWS_TARGET - 1) ? n_markers - 1 : (s + perWindow - 1);
+    if (s > e) break;
+    const wsMark = chunk.markers[s] || {};
+    const weMark = chunk.markers[e] || {};
+    windows.push({
+      idx:       wi,
+      start_idx: s,
+      end_idx:   e,
+      start_bp:  Number.isFinite(wsMark.pos_bp) ? wsMark.pos_bp : null,
+      end_bp:    Number.isFinite(weMark.pos_bp) ? weMark.pos_bp : null,
+    });
+  }
+  if (windows.length === 0) return;
+  let result = null;
+  try {
+    result = computeSimilarityAndBlocks({
+      dosage:    flat,
+      n_markers,
+      n_samples,
+      windows,
+    });
+  } catch (e) {
+    _setLoadingHint(root, `computeSimilarityAndBlocks threw: ${e && e.message ? e.message : 'error'}`);
+    return;
+  }
+  inv.similarity_panel_state = Object.assign({}, existing, {
+    similarity_result: result,
+    candidate_label:   existing.candidate_label || sourceLabel,
+    metric_label:      existing.metric_label    || 'pearson',
+    sample_labels:     chunk.samples.slice(),
+  });
+}
+
+function _setLoadingHint(root, msg) {
+  const el = (root && root.querySelector && root.querySelector('#similarityPanelEmpty'))
+    || (typeof document !== 'undefined' && document.getElementById('similarityPanelEmpty'));
+  if (el) {
+    el.style.display = '';
+    el.textContent = msg;
   }
 }
 

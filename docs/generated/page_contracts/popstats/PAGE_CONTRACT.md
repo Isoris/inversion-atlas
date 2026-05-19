@@ -1,6 +1,6 @@
 # popstats — popstats — Page Capability Contract
 
-**Atlas**: inversion · **Stage**: classification · **Status**: active (thin loader)
+**Atlas**: inversion · **Stage**: synthesis · **Status**: active (native port)
 
 ## Purpose
 
@@ -20,13 +20,22 @@ The track inventory:
 
 ## Architecture
 
-popstats is a **thin loader stub**. The renderer
-`window.renderPopstatsPage` is defined externally in
-`js/atlas_page6_wiring.js`. The page-level `showPopstatsPage(state)`
-tries `window.renderPopstatsPage` and falls back to a missing-renderer
-empty-state message if absent.
+popstats is a **native ES-module port** (2026-05-20). The renderer lives in
+`./popstats/_render.js`; `popstats.js` resolves the per-chrom precomp via
+`registry.resolve('scrubber_main', { chrom })` and threads it into the
+renderer. Sub-modules:
 
-Talks to a popstats **live server** via `POST /api/popstats/*`.
+| file        | role                                                |
+|-------------|-----------------------------------------------------|
+| `_canvas.js`| fitCanvas / themeColor / drawIdeogram / drawLine    |
+| `_tracks.js`| STATIC_TRACKS + auto-discover from `data.tracks`    |
+| `_view.js`  | chip-toggle persistence (`scrubber_v3_popstats`)    |
+| `_render.js`| top-level `renderPopstatsPage({ root, data, ... })` |
+| `_live.js`  | `POST /api/popstats/groupwise` + `/hobs_groupwise`  |
+| `_state.js` | `_pageState` handle                                 |
+
+`_live.js` is staged for future group-aware overlays; the static paint path
+runs entirely off the scrubber_main precomp.
 
 ## Capabilities
 
@@ -64,12 +73,17 @@ Preview-only — the page renders tracks but commits nothing.
 
 ## Status and known issues
 
-- **REGISTRY MISMATCH (flagged 2026-05-07 step 18)**: the page is
-  chromosome-level but `requires_layers` / `requires_slots` declare
-  candidate-level values (`candidate_gene_cargo` + `activeCandidate`).
-  Should likely be `popstats_tracks` + `activeChrom`. Round-18 was
-  migration-only and did not change the registry.
-- External renderer absence falls back to an empty-state message.
+- **REGISTRY MISMATCH (still open, flagged 2026-05-07 step 18)**: the
+  page is chromosome-level but `pages.registry.json` still declares
+  `requires_layers: ["candidate_gene_cargo"]` + `requires_slots:
+  ["activeCandidate"]`. The native port (2026-05-20) consumes
+  `scrubber_main` + `activeChrom` directly; the registry entry should
+  be updated to match but was deferred to a registry-only round.
+- Live-server overlays (FST/dxy/theta_pi via `POST /api/popstats/groupwise`,
+  Hobs/Hexp via `POST /api/popstats/hobs_groupwise`) require a
+  `groups` slot that is not yet seeded in the new atlas-core state
+  shape. `_live.js` is wired and ready; the page paints from the
+  precomp's auto-discovered `data.tracks` dict in the meantime.
 
 ## Documents
 

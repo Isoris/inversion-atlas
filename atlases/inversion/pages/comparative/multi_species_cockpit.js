@@ -1134,8 +1134,11 @@ function _msRenderActiveHeader() {
     if (link) {
       link.addEventListener('click', (ev) => {
         ev.preventDefault();
-        const btn = document.querySelector('#tabBar button[data-page="cross_species_breakpoints"]');
-        if (btn) btn.click();
+        // 2026-05-19 \u2014 atlas-core router has no #tabBar element; the
+        // legacy `document.querySelector('#tabBar button[data-page=...]')`
+        // returned null and the click was a silent no-op. Navigate via
+        // hash instead so the router mounts the target page.
+        window.location.hash = '#/inversion/cross_species_breakpoints';
       });
     }
     return;
@@ -1155,8 +1158,8 @@ function _msRenderActiveHeader() {
   if (link) {
     link.addEventListener('click', (ev) => {
       ev.preventDefault();
-      const btn = document.querySelector('#tabBar button[data-page="cross_species_breakpoints"]');
-      if (btn) btn.click();
+      // See sibling handler above \u2014 atlas-core uses hash-based nav.
+      window.location.hash = '#/inversion/cross_species_breakpoints';
     });
   }
 }

@@ -38,6 +38,7 @@ import {
   ariBetweenTreeAndClusters,
   createTreePanelSelection,
 } from './tree_panel/selection.js';
+import { autoBuildTreeFromPCA } from './tree_panel/_auto_build.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   show_sample_tree:    true,
@@ -70,6 +71,11 @@ export function initTreePanelToolbar() {
 // =====================================================================
 
 export async function mount(root, atlasState, registry) {
+  // If candidate-mode workflow hasn't stuffed a tree_panel_state yet,
+  // auto-build one from local-PCA dosage so the page never lands on
+  // the bare "No tree loaded" empty state.
+  await _seedTreePanelStateIfMissing(atlasState, registry);
+
   const pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
 
@@ -82,6 +88,56 @@ export async function mount(root, atlasState, registry) {
   if (atlasState.inversion) {
     atlasState.inversion._page_tree_panel_state = pageState;
   }
+}
+
+async function _seedTreePanelStateIfMissing(atlasState, registry) {
+  const inv = (atlasState && atlasState.inversion) || null;
+  if (!inv) return;
+  if (!registry || typeof registry.resolve !== 'function') return;
+  const sh = atlasState.shared || {};
+  const chrom = sh.activeChrom;
+  if (!chrom) return;
+  const candidate = sh.activeCandidate || inv.candidate || null;
+
+  // Keep a candidate-mode-supplied tree as-is; only short-circuit on a
+  // previously-auto-built tree if it was built for THIS chrom + candidate.
+  // Otherwise a chrom switch (or candidate switch) would keep showing the
+  // old tree because tree_panel_state still has a non-null `tree`.
+  const prev = inv.tree_panel_state;
+  if (prev && prev.tree) {
+    const vs = prev.view_state || {};
+    if (!vs.auto_built) return;                                  // manual / external tree — leave alone
+    if (vs._chrom === chrom && vs._candidate_id === (candidate && candidate.id || null)) return;
+  }
+
+  let data;
+  try {
+    // resolve() may return sync (hot-tier cache hit) or a Promise — wrap.
+    data = await Promise.resolve(registry.resolve('scrubber_main', { chrom }));
+  } catch (e) {
+    console.warn('tree_panel.mount: scrubber_main resolve failed —', e);
+    return;
+  }
+  let auto;
+  try {
+    auto = autoBuildTreeFromPCA(data, candidate);
+  } catch (e) {
+    console.warn('tree_panel.mount: autoBuildTreeFromPCA threw —', e);
+    return;
+  }
+  if (!auto) return;
+  inv.tree_panel_state = {
+    tree:                   auto.tree,
+    leaf_cluster_labels:    auto.leaf_cluster_labels,
+    leaf_colors_by_cluster: auto.leaf_colors_by_cluster,
+    candidate_label:        auto.candidate_label,
+    view_state: {
+      auto_built:    true,
+      l2idx:         auto.l2idx,
+      _chrom:        chrom,
+      _candidate_id: candidate && candidate.id || null,
+    },
+  };
 }
 
 export async function unmount(root) {

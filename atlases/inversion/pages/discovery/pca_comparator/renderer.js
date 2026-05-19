@@ -198,15 +198,42 @@ function _getLayerPoints(sharedState, layer) {
     return { xs: w.pc1, ys: w.pc2, xLabel: 'PC1 (dosage)', yLabel: 'PC2 (dosage)' };
   }
   if (layer === 'theta_pi') {
-    const lp = d.theta_pi_local_pca;
-    if (!lp) return { reason: 'theta_pi_local_pca not loaded' };
+    // 2026-05-20: also check the namespaced theta_pi_view for parity with
+    // the GHSL branch below — when scrubber_thetapi data lands via the
+    // selective merge in local_pca_dosage.mount, the canonical PC loadings
+    // wind up under d.theta_pi_view.theta_pi_local_pca, not at top level.
+    const lp =
+         d.theta_pi_local_pca
+      || (d.theta_pi_view && d.theta_pi_view.theta_pi_local_pca)
+      || (d.theta_pi_view && d.theta_pi_view.local_pca);
+    if (!lp) {
+      const chrom = d.chrom || '?';
+      return {
+        reason: `θπ: layer not available for ${chrom} — the theta-pi pipeline (precomp_thetapi root) hasn't produced this chromosome yet.`,
+      };
+    }
     return _getPointsFromLoadings(lp, cur, 'θπ');
   }
   if (layer === 'ghsl') {
-    // Prefer the canonical top-level ghsl_local_pca (matches theta-pi layout).
-    // Fall back to the legacy d.ghsl_panel.local_pca for older fixtures.
-    const lp = d.ghsl_local_pca || (d.ghsl_panel && d.ghsl_panel.local_pca);
-    if (!lp) return { reason: 'ghsl_local_pca not loaded' };
+    // 2026-05-20: widen the lookup. The selective merge in
+    // local_pca_dosage.mount() only copies top-level keys whose name
+    // starts with 'ghsl', so a GHSL precomp shipping `local_pca` (no
+    // prefix) ends up under d.ghsl_view.local_pca only. We also check
+    // the namespaced d.ghsl_view.ghsl_local_pca for parity with the
+    // top-level path. Quentin (2026-05-20): "GHSL local PCA not loaded
+    // despite being loaded for that chrom in the cross evidence PCA
+    // comparator."
+    const lp =
+         d.ghsl_local_pca
+      || (d.ghsl_view && d.ghsl_view.ghsl_local_pca)
+      || (d.ghsl_view && d.ghsl_view.local_pca)
+      || (d.ghsl_panel && d.ghsl_panel.local_pca);
+    if (!lp) {
+      const chrom = d.chrom || '?';
+      return {
+        reason: `GHSL: layer not available for ${chrom} — the GHSL pipeline (precomp_ghsl root) hasn't produced this chromosome yet.`,
+      };
+    }
     return _getPointsFromLoadings(lp, cur, 'GHSL');
   }
   return null;
@@ -219,11 +246,30 @@ function _getLayerPoints(sharedState, layer) {
 function _getPointsFromLoadings(lp, cur, axisLabel) {
   if (lp.pc_loadings_aligned) {
     const a = lp.pc_loadings_aligned;
-    if (!Array.isArray(a) || a.length < 2) return { reason: `${axisLabel}: pc_loadings_aligned needs ≥2 PCs` };
+    if (!Array.isArray(a) || a.length < 2) {
+      return { reason: `${axisLabel}: pc_loadings_aligned has ${a && a.length || 0} PC${(a && a.length) === 1 ? '' : 's'} (need ≥ 2)` };
+    }
     const pc1Series = a[0];
     const pc2Series = a[1];
-    if (!Array.isArray(pc1Series) || cur >= pc1Series.length) {
-      return { reason: `${axisLabel}: no PC at window ${cur}` };
+    // 2026-05-20: explain WHY the window isn't covered. The pipeline
+    // often produces fewer per-window PC rows than the chromosome has
+    // total dosage windows (θπ + GHSL are run on subsets). The blunt
+    // "no PC at window N" left the user wondering whether the layer
+    // was broken — this gives them the data extent so they can scrub
+    // back into the covered range. Quentin: "sometimes it says like
+    // no data for this window but maybe idk".
+    if (!Array.isArray(pc1Series)) {
+      return { reason: `${axisLabel}: PC1 series not an array (got ${typeof pc1Series})` };
+    }
+    if (cur >= pc1Series.length) {
+      const lastBp = lp.windows && lp.windows[pc1Series.length - 1] && lp.windows[pc1Series.length - 1].end_bp;
+      const mb = Number.isFinite(lastBp) ? ` (~${(lastBp / 1e6).toFixed(1)} Mb)` : '';
+      return {
+        reason: `${axisLabel}: cursor at window ${cur} — past the ${axisLabel} data extent (${pc1Series.length} windows${mb}). Scrub left to enter the covered range.`,
+      };
+    }
+    if (cur < 0) {
+      return { reason: `${axisLabel}: cursor at window ${cur} — left of window 0. Scrub right.` };
     }
     return {
       xs: pc1Series[cur],
@@ -317,7 +363,31 @@ export function paintLines(state, axis) {
   yMin -= yPad; yMax += yPad;
   const toY = (y) => pad.t + (1 - (y - yMin) / (yMax - yMin)) * plotH;
 
-  // Background plot area + axis ticks (light).
+  // 2026-05-20: offscreen-canvas cache for the polyline pass. Keyed by
+  // the inputs that change the polyline geometry. Cursor scrub / hover
+  // don't invalidate it, so left/right arrow stays instant after the
+  // first paint. Decimation: when n_windows is huge (LG01 ~9000), we
+  // sample every K-th window so the polyline pass stays under ~100ms.
+  const chrom = d.chrom || '?';
+  const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+  const cacheKey = [chrom, anchor, axKey, nWin, w | 0, h | 0, dpr,
+                    yMin.toFixed(4), yMax.toFixed(4), haveMb ? 1 : 0,
+                    series.nSamples | 0].join('|');
+  const cache = state._linesBgCache;
+  let bg = cache && cache.key === cacheKey ? cache.canvas : null;
+  if (!bg) {
+    // Decimate when n_windows > 2000 — paint every K-th window so the
+    // polyline op count stays bounded. The visual resolution stays
+    // good because the cached canvas is 1:1 with the live canvas;
+    // we're just dropping window-grid density, not pixel density.
+    const stride = Math.max(1, Math.ceil(nWin / 2000));
+    bg = _renderLinesBackground(w, h, dpr, pad, plotW, plotH, series,
+                                 toX, toY, nWin, stride);
+    state._linesBgCache = { key: cacheKey, canvas: bg };
+  }
+
+  // Background plot area + axis ticks (light) drawn on the LIVE canvas
+  // (so they always reflect the current geometry; cheap).
   ctx.fillStyle = 'rgba(255,255,255,0.02)';
   ctx.fillRect(pad.l, pad.t, plotW, plotH);
   ctx.strokeStyle = 'rgba(255,255,255,0.10)';
@@ -327,14 +397,20 @@ export function paintLines(state, axis) {
   ctx.lineTo(pad.l + plotW, pad.t + plotH + 0.5);
   ctx.stroke();
 
-  // Per-sample lines.
-  const nS = (series.nSamples | 0);
-  ctx.lineWidth = 0.8;
-  ctx.globalAlpha = 0.55;
-  for (let s = 0; s < nS; s++) {
+  // Blit the cached polyline canvas.
+  ctx.drawImage(bg, 0, 0, w, h);
+
+  // Hovered-sample re-stroke on top (cheap — single polyline). This is
+  // why we don't bake the hover state into the cache: hovering would
+  // invalidate it on every mousemove and defeat the point of caching.
+  if (state.hoveredSample >= 0 && state.hoveredSample < series.nSamples) {
+    const s = state.hoveredSample;
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = '#f5a524';
     ctx.beginPath();
     let started = false;
-    for (let i = 0; i < nWin; i++) {
+    const stride = Math.max(1, Math.ceil(nWin / 2000));
+    for (let i = 0; i < nWin; i += stride) {
       const v = series.byWin[i];
       if (!v) { started = false; continue; }
       const y = v[s];
@@ -343,10 +419,8 @@ export function paintLines(state, axis) {
       if (!started) { ctx.moveTo(xx, yy); started = true; }
       else ctx.lineTo(xx, yy);
     }
-    ctx.strokeStyle = (state.hoveredSample === s) ? '#f5a524' : 'rgba(160,200,235,0.6)';
     ctx.stroke();
   }
-  ctx.globalAlpha = 1;
 
   // Cursor.
   const cur = Math.max(0, Math.min(nWin - 1, ss.cur | 0));
@@ -381,6 +455,52 @@ export function paintLines(state, axis) {
   _lastLinesRect.haveMb = haveMb;
 }
 
+// 2026-05-20: render the per-sample polylines into an offscreen canvas
+// for caching. Decimation stride drops the per-window step count when
+// n_windows is huge — at stride=K we plot every Kth window, keeping
+// the polyline op count bounded while preserving visual resolution
+// (the canvas is already pixel-aligned with the live canvas). Returns
+// an OffscreenCanvas or a regular HTMLCanvasElement (both blittable
+// via ctx.drawImage). DPR-aware so the cached image stays crisp on
+// retina displays.
+function _renderLinesBackground(w, h, dpr, pad, plotW, plotH, series,
+                                 toX, toY, nWin, stride) {
+  const cw = Math.max(1, Math.ceil(w * dpr));
+  const ch = Math.max(1, Math.ceil(h * dpr));
+  let off;
+  if (typeof OffscreenCanvas === 'function') {
+    off = new OffscreenCanvas(cw, ch);
+  } else {
+    off = document.createElement('canvas');
+    off.width = cw; off.height = ch;
+  }
+  const o = off.getContext('2d');
+  if (!o) return off;
+  o.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // Don't paint the plot frame here — the live canvas redraws it each
+  // frame so the cached image is JUST polylines (which is what's
+  // expensive). Light-blue translucent strokes match the live theme.
+  o.lineWidth = 0.8;
+  o.globalAlpha = 0.55;
+  o.strokeStyle = 'rgba(160,200,235,0.6)';
+  const nS = series.nSamples | 0;
+  for (let s = 0; s < nS; s++) {
+    o.beginPath();
+    let started = false;
+    for (let i = 0; i < nWin; i += stride) {
+      const v = series.byWin[i];
+      if (!v) { started = false; continue; }
+      const y = v[s];
+      if (!Number.isFinite(y)) { started = false; continue; }
+      const xx = toX(i), yy = toY(y);
+      if (!started) { o.moveTo(xx, yy); started = true; }
+      else o.lineTo(xx, yy);
+    }
+    o.stroke();
+  }
+  return off;
+}
+
 // Click-to-scrub: translate an x pixel coordinate inside the lines canvas
 // into the corresponding window index. Returns -1 if outside the plot box.
 export function windowAtLinesX(px) {
@@ -408,12 +528,20 @@ function _getPerWindowSeries(d, anchor, axKey) {
     return { byWin, nSamples };
   }
   if (anchor === 'theta_pi') {
-    const lp = d.theta_pi_local_pca;
+    // 2026-05-20: namespaced-view fallback (see _getLayerPoints).
+    const lp =
+         d.theta_pi_local_pca
+      || (d.theta_pi_view && d.theta_pi_view.theta_pi_local_pca)
+      || (d.theta_pi_view && d.theta_pi_view.local_pca);
     if (!lp || !lp.pc_loadings_aligned) return { reason: 'θπ: pc_loadings_aligned absent' };
     return _seriesFromLoadings(lp.pc_loadings_aligned, axKey, nWin, 'θπ');
   }
   if (anchor === 'ghsl') {
-    const lp = d.ghsl_local_pca || (d.ghsl_panel && d.ghsl_panel.local_pca);
+    const lp =
+         d.ghsl_local_pca
+      || (d.ghsl_view && d.ghsl_view.ghsl_local_pca)
+      || (d.ghsl_view && d.ghsl_view.local_pca)
+      || (d.ghsl_panel && d.ghsl_panel.local_pca);
     if (!lp || !lp.pc_loadings_aligned) return { reason: 'GHSL: pc_loadings_aligned absent' };
     return _seriesFromLoadings(lp.pc_loadings_aligned, axKey, nWin, 'GHSL');
   }
@@ -460,12 +588,37 @@ function _countValid(xs, ys) {
   return n;
 }
 
+// 2026-05-20: word-wrap the empty-state message so longer explanations
+// (e.g. "cursor at window N — past the θπ data extent (M windows ~X Mb).
+// Scrub left to enter the covered range.") render readably instead of
+// truncating off the right edge.
 function _drawEmpty(ctx, w, h, msg) {
-  ctx.fillStyle = 'rgba(160,180,200,0.55)';
+  ctx.fillStyle = 'rgba(160,180,200,0.65)';
   ctx.font = '11px ui-monospace, monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(msg, w / 2, h / 2);
+  const maxW = Math.max(80, w - 32);
+  const lineH = 14;
+  const words = String(msg || '').split(/\s+/);
+  const lines = [];
+  let cur = '';
+  for (const word of words) {
+    const next = cur ? (cur + ' ' + word) : word;
+    if (ctx.measureText(next).width <= maxW) {
+      cur = next;
+    } else {
+      if (cur) lines.push(cur);
+      cur = word;
+    }
+  }
+  if (cur) lines.push(cur);
+  if (lines.length === 0) lines.push(String(msg || ''));
+  const totalH = lines.length * lineH;
+  let y = h / 2 - totalH / 2 + lineH / 2;
+  for (const line of lines) {
+    ctx.fillText(line, w / 2, y);
+    y += lineH;
+  }
 }
 
 // Size the canvas backing-store to CSS-pixel × DPR and pre-transform

@@ -48,17 +48,51 @@ export function drawCusumPanel(state) {
   if (!want) return;
   if (!state || !state.data) return;
 
-  // Resolve labels.
+  // Resolve labels. Strategy (2026-05-20):
+  //   1. lockedLabels (user has explicitly pinned a K-band assignment) — preferred.
+  //   2. current window's L2 cluster labels — the legacy behavior.
+  //   3. NEAREST L2 with valid cluster labels — fallback. In GHSL / θπ
+  //      modes the user's cursor often sits on a window whose L2 hasn't
+  //      produced usable labels (e.g. n_samples_per_group below threshold),
+  //      which used to bail out with "no K-band labels at this window".
+  //      The user (Quentin, 2026-05-20) said "we dont have sparse mode but
+  //      we can still try or not?" — so we now sweep outward from cur to
+  //      find ANY L2 with labels and use those rather than render empty.
+  //      The cusum is per-band-trajectory across the whole chrom; the
+  //      starting label set just defines K, the bands themselves still
+  //      mean the same thing across windows.
   let labels = state.lockedLabels;
+  let labelsSource = labels ? 'locked' : null;
   if (!labels) {
     const curL2 = state.windowToL2 ? state.windowToL2[state.cur] : -1;
     if (curL2 >= 0) {
       const cl = getL2Cluster(state, curL2);
-      if (cl && cl.labels) labels = cl.labels;
+      if (cl && cl.labels) { labels = cl.labels; labelsSource = `L2#${curL2}`; }
+    }
+  }
+  if (!labels && state.data && Array.isArray(state.data.l2_envelopes)) {
+    const wToL2 = state.windowToL2;
+    const N = state.data.l2_envelopes.length;
+    // Sweep adjacent L2s by walker distance, then anywhere on the chrom.
+    const curL2 = (wToL2 && state.cur != null) ? wToL2[state.cur] : -1;
+    const order = [];
+    if (curL2 >= 0) {
+      for (let d = 1; d < N; d++) {
+        if (curL2 - d >= 0) order.push(curL2 - d);
+        if (curL2 + d < N)  order.push(curL2 + d);
+      }
+    } else {
+      for (let i = 0; i < N; i++) order.push(i);
+    }
+    for (const li of order) {
+      try {
+        const cl = getL2Cluster(state, li);
+        if (cl && cl.labels) { labels = cl.labels; labelsSource = `L2#${li} (nearest)`; break; }
+      } catch (_) {}
     }
   }
   if (!labels) {
-    _drawEmpty(canvas, 'Σ CUSUM — no K-band labels at this window');
+    _drawEmpty(canvas, 'Σ CUSUM — no K-band labels anywhere on this chromosome');
     return;
   }
   const K = state.k | 0;

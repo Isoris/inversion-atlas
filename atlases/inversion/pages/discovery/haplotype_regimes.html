@@ -146,6 +146,22 @@
             font: inherit;
             cursor: pointer;
           ">run pipeline</button>
+        <!-- 2026-05-20: promote the focal Stage 1 seed to a candidate inversion.
+             Disabled until the pipeline has run AND a seed is focal (the
+             keyboard nav selects one by default after init). Reuses the
+             addCandidateToList + setCandidate plumbing local_pca_dosage uses
+             for lock-based promotions, so a promoted seed shows up in the
+             same candidate carousel + persists to localStorage. -->
+        <button id="rgPromoteSeedBtn" class="rg-tb-btn" disabled
+          title="Promote the focal Stage 1 seed to a candidate inversion. The seed's anchor labels become the candidate's locked labels; the seed footprint becomes start_w/end_w. Disabled until 'run pipeline' produces a seed."
+          style="
+            background: var(--panel-3, #232a36);
+            color: var(--ink, #e6edf6);
+            border: 1px solid var(--rule, #2a3242);
+            padding: 4px 10px;
+            font: inherit;
+            cursor: pointer;
+          ">&#9733; promote seed&hellip;</button>
         <span id="rgStatus" style="margin-left: auto; color: var(--ink-dim, #8895a8);">
           idle &middot; pipeline not yet run
         </span>

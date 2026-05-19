@@ -2,252 +2,123 @@
 // inversion_review/popstats.js — "8 popstats" tab
 // =============================================================================
 // Stage:        review (per-window popstats track stack)
-// Legacy DOM:   <div id="popstats"> (legacy lines 7647–7658)
-// Renderer:     renderPopstatsPage()  — defined in external js/atlas_page6_wiring.js
-// Tab dispatch: legacy lines 59626–59627, 59729–59730
+// DOM contract: <div id="popstats"> with #psToolbar / #psChips / #psStack /
+//               #psNoChrom / #psGalleryTray
 //
-// What this page does
-// -------------------
-// Stack of population-genetic tracks aligned to the chromosome:
-//   - |Z| / score
-//   - SNP density
-//   - BEAGLE imputation uncertainty
-//   - depth / coverage
-//   - θπ (Tajima's per-window pi)
-//   - F_ST (between karyotype groups)
-//   - Hobs / Hexp (observed vs expected heterozygosity)
-//   - ancestry Δ12 (top-1 minus top-2 Q)
+// Architecture (2026-05-20 — native ES-module port)
+// -------------------------------------------------
+// Round-5-step-18 left this page as a thin loader stub that called
+// window.renderPopstatsPage from the (never-shipped) legacy
+// `js/atlas_page6_wiring.js` bundle. The fallback empty-state was what
+// surfaced to the user on every mount.
 //
-// The track inventory lives in the request layer (atlas_request_layer.js)
-// which talks to a popstats live server (POST /api/popstats/*); the page-6
-// wiring (atlas_page6_wiring.js) wraps that with track-def slot-combine UI
-// and tooltips. Click chips in #psChips to toggle visibility.
+// This rewrite ports the legacy renderPopstatsPage() + collectPopstatsTracks()
+// + drawPopstatsTracks() + canvas primitives directly into ES modules under
+// `./popstats/`:
 //
-// DOM contract:
-//   #psToolbar    — sticky chip bar (<span id="psChips">)
-//   #psStack      — vertical canvas-track stack
-//   #psNoChrom    — empty state when no precomp loaded
-//   #psGalleryTray — collapsible track-discovery sidebar (turn 6.5)
+//   _canvas.js  — fitCanvas / themeColor / drawIdeogram / drawSimCollapse /
+//                 drawLine + frame/breakpoint/crosshair helpers
+//   _tracks.js  — STATIC_TRACKS list + auto-discover from data.tracks
+//   _view.js    — chip-toggle persistence (scrubber_v3_popstats localStorage)
+//   _render.js  — renderPopstatsPage({ root, data, candidate, cur })
+//   _live.js    — POST /api/popstats/groupwise (FST/dxy/theta_pi) +
+//                 POST /api/popstats/hobs_groupwise wrappers. Wired for
+//                 future group-aware overlays; not invoked on the static
+//                 paint path.
+//   _state.js   — _pageState handle, unchanged
 //
-// Round-5-step-18 status (chat 38 cont., 2026-05-07): thin-loader-stub
-// migration — pattern 4 ("stub-preserving + one wired entry") applied.
-// **Direct twin of ancestry_per_window** (the first migrated review-stage page,
-// shipped step 17). Both chat-33 exports preserved verbatim:
-//   - showPopstatsPage(state)    — main entry; tries window.renderPopstatsPage,
-//                                   falls back to a missing-renderer empty-state
-//                                   message if absent.
-//   - refreshPopstatsPage()      — re-render entry; delegates to
-//                                   showPopstatsPage().
-// New: _state.js sub-module + state-aware wrapper refreshPage6 +
-// mount/unmount lifecycle. mount() calls showPopstatsPage(legacyState)
-// so the fallback empty-state renders at mount time even if
-// window.renderPopstatsPage is absent.
-//
-// Second migrated review-stage page (review group: 1 of 5 → 2 of 5).
-//
-// Extraction notes (Batch 2)
-// --------------------------
-// The popstats stack is driven entirely by external JS files (per the script
-// inventory at legacy line 54963–54972):
-//   - js/atlas_request_layer.js  → window.popgenLive
-//   - js/atlas_page6_wiring.js   → window.popgenPage6
-//   - js/atlas_track_gallery.js  → window.popgenGallery
-//
-// Inside Inversion_atlas.html itself there is NO `function renderPopstatsPage`
-// — the legacy code only references it via `if (typeof renderPopstatsPage
-// === 'function')` guards. So the page module here is a thin lifecycle
-// wrapper, like sv_evidence.js + ancestry_per_window.js.
-//
-// Decision (BATCH_2_NOTES): kept the popstats stack as an external-script
-// dep rather than promoting to shared. The whole thing depends on a
-// popstats live server and IndexedDB caching that doesn't fit the
-// "pure-helper" shape of the shared/ modules.
-//
-// Registry mismatch flagged for Quentin
-// -------------------------------------
-// pages.registry.json declares popstats has
-//   "requires_layers": ["candidate_gene_cargo"]
-//   "requires_slots":  ["activeCandidate"]
-//   "preloads":        ["candidate_gene_cargo"]
-// but the popstats.js header + DOM contract clearly describe popstats as a
-// CHROMOSOME-LEVEL popstats track stack driven by per-window metrics
-// (theta_pi, fst, hobs/hexp, depth, ancestry delta12, etc.) keyed on
-// activeChrom + group_set_id. The popstats renderer reads
-// state.popstatsLive (cache), state.popstatsTracksOn (chip set),
-// state.popstatsGalleryOpen, state.candidate (cursor band only), and
-// state.data (per-window layers). The `candidate_gene_cargo` layer +
-// `activeCandidate` slot look like they belong on a different
-// (currently-non-existent) candidate-gene-cargo page, not on the
-// popstats track stack.
-// **Round 18 does NOT change requires_layers / requires_slots** —
-// this is the same architectural-discipline rule established in step
-// 17 for ancestry_per_window: registry content is Quentin's design decision, not a
-// migration concern. The migration only adds _label + _doc describing
-// what the page actually does; the mismatch is documented in the
-// pages.registry.json _doc + here for Quentin's decision (defer to
-// renumbering round recommended).
+// Data source: `registry.resolve('scrubber_main', { chrom: activeChrom })`,
+// which is the same per-chrom precomp JSON every other review page consumes.
 // =============================================================================
 
-
 import { _pageState, _setActiveState } from './popstats/_state.js';
+import { renderPopstatsPage } from './popstats/_render.js';
 
-// -----------------------------------------------------------------------------
-// External-file deps
-// -----------------------------------------------------------------------------
-//
-// TODO_MISSING(renderPopstatsPage)        — js/atlas_page6_wiring.js
-//                                            (dispatched at legacy 59626 + 59729)
-// TODO_MISSING(popgenLive)                — js/atlas_request_layer.js
-//                                            (POST /api/popstats/* wrappers)
-// TODO_MISSING(popgenPage6)               — js/atlas_page6_wiring.js
-// TODO_MISSING(popgenGallery)             — js/atlas_track_gallery.js
-// -----------------------------------------------------------------------------
-
-
-// ---------------------------------------------------------------------------
-// Chat-33 exports — PRESERVED VERBATIM
-// ---------------------------------------------------------------------------
-
-/**
- * Show the popstats page. The renderer is defined in atlas_page6_wiring.js;
- * this wrapper exists so the tab dispatcher has a single ES-module entry
- * to call.
- *
- * @param {object} state  shared state (not used directly here — the legacy
- *                        renderer reads window.state)
- * @returns {void}
- */
-export function showPopstatsPage(state) {
-  if (typeof window === 'undefined') return;
-  const fn = /** @type {any} */ (window).renderPopstatsPage;
-  if (typeof fn === 'function') {
-    try {
-      // TODO_MISSING(renderPopstatsPage)
-      fn();
-    } catch (err) {
-      console.warn('[popstats] renderPopstatsPage threw:', err);
-    }
+export async function mount(root, atlasState, registry) {
+  const chrom = atlasState.shared && atlasState.shared.activeChrom;
+  if (!chrom) {
+    _showStatus(root, 'No chromosome selected — pick one from the scopebar.');
+    _setActiveState({ data: null, candidate: null, cur: null });
     return;
   }
 
-  // Fallback empty state — surfaces the missing-dep clearly to the user.
-  const stack = document.getElementById('psStack');
-  const noChrom = document.getElementById('psNoChrom');
-  if (noChrom) {
-    noChrom.style.display = 'block';
-    noChrom.innerHTML =
-      'Popstats wiring (<code>atlas_page6_wiring.js</code>) not loaded. ' +
-      'Drop the page-6 script bundle alongside this HTML and reload.';
+  let data;
+  try {
+    data = await registry.resolve('scrubber_main', { chrom });
+  } catch (e) {
+    _showStatus(root, `Failed to load scrubber_main for ${chrom}: ${e && e.message ? e.message : e}`);
+    _setActiveState({ data: null, candidate: null, cur: null });
+    return;
   }
-  if (stack) stack.innerHTML = '';
+
+  const candidate = (atlasState.shared && atlasState.shared.activeCandidate) || null;
+  const cur = _resolveCurrentWindow(data, candidate);
+
+  const pageState = { chrom, data, candidate, cur };
+  _setActiveState(pageState);
+  if (atlasState.inversion) atlasState.inversion._page6State = pageState;
+
+  renderPopstatsPage({ root, data, candidate, cur });
 }
 
-
-/**
- * Re-render the popstats page after state changes (e.g. chrom switch,
- * candidate change). Idempotent — safe to call repeatedly.
- *
- * @returns {void}
- */
-export function refreshPopstatsPage() {
-  // Same dispatch as show — the legacy renderer is itself idempotent.
-  showPopstatsPage();
-}
-
-
-// ---------------------------------------------------------------------------
-// State-aware public wrapper (round 5 step 18)
-// ---------------------------------------------------------------------------
-
-/**
- * Public entry — state-aware wrapper around showPopstatsPage.
- *
- * If `state` is passed, sets _pageState as a side effect before delegating
- * (mirrors ancestry_per_window/confirmed_carousel/local_pca_ghsl/help wrapper pattern). The chat-33
- * showPopstatsPage signature already takes state as an explicit arg, so
- * the wrapper just threads _pageState into it.
- */
-export function refreshPage6(state) {
-  if (state) _setActiveState(state);
-  return showPopstatsPage(state || _pageState || {});
-}
-
-// ---------------------------------------------------------------------------
-// Atlas-router lifecycle (chat 38 cont. round 5 step 18, 2026-05-07).
-// ---------------------------------------------------------------------------
-
-/**
- * Mount: called by atlas_router when the user navigates to popstats.
- *
- * Builds a legacy-shape state with the slots popstats will eventually need
- * (data — per-window popstats layers; popstatsLive — IndexedDB cache;
- * popstatsTracksOn — chip Set; popstatsGalleryOpen — gallery tray flag;
- * candidate — for the cursor band). Calls refreshPage6 to render the
- * popstats stack (or the missing-renderer empty state if
- * window.renderPopstatsPage is absent).
- */
-export async function mount(root, atlasState, registry) {
-  const legacyState = _buildLegacyState(atlasState);
-  _setActiveState(legacyState);
-
-  try { refreshPage6(legacyState); }
-  catch (e) { console.warn('popstats.mount: refreshPage6 threw —', e); }
-
-  if (atlasState.inversion) atlasState.inversion._page6State = legacyState;
-}
-
-/**
- * Unmount: clear _pageState so post-unmount callbacks see null.
- */
 export async function unmount(root) {
   _setActiveState(null);
 }
 
-function _buildLegacyState(atlasState) {
-  const inv = atlasState.inversion || {};
-  const legacy = Object.assign({}, inv);
-  // state.data — IS in SLOT_REGISTRY (transient). The popstats renderer
-  // reads its layers (theta_pi, fst, hobs/hexp, depth, ancestry delta12,
-  // etc.) from inside state.data. Default empty object so layer access
-  // doesn't throw if data is absent.
-  legacy.data = inv.data || {};
-  // state.popstatsLive — page-6 cache (IndexedDB-backed responses keyed by
-  // {chrom, group_set_id, metric}). Owned by atlas_request_layer.js;
-  // page-private. Default empty object — populated lazily by the request
-  // layer.
-  legacy.popstatsLive = inv.popstatsLive || {};
-  // state.popstatsTracksOn — Set of currently-active chip IDs. Page-6
-  // private; default empty Set so `.has(chipId)` is safe.
-  legacy.popstatsTracksOn = inv.popstatsTracksOn || new Set();
-  // state.popstatsGalleryOpen — gallery tray collapsed/expanded flag.
-  // Page-6 private; default false (tray collapsed).
-  legacy.popstatsGalleryOpen = inv.popstatsGalleryOpen || false;
-  // state.candidate — IS in SLOT_REGISTRY (cross_atlas). Used for the
-  // "selected candidate" cursor band on each popstats track. Default
-  // null (no candidate selected).
-  legacy.candidate = inv.candidate || null;
-  return legacy;
+/**
+ * Re-render entry. Called by the legacy export name `refreshPage6` so any
+ * caller that still imports it keeps working. Reads the most-recent
+ * pageState from _state.js so chrom + data don't have to be threaded again.
+ */
+export function refreshPage6() {
+  if (!_pageState) return;
+  const root = document.getElementById('app-root') || document;
+  renderPopstatsPage({
+    root,
+    data:      _pageState.data,
+    candidate: _pageState.candidate,
+    cur:       _pageState.cur,
+  });
 }
 
+// Back-compat aliases for the chat-33 export names. Other modules that import
+// these from outside still resolve; the legacy thin-loader fallback message
+// is gone — both names now delegate to the native renderer.
+export const showPopstatsPage     = refreshPage6;
+export const refreshPopstatsPage  = refreshPage6;
 
-// =============================================================================
-// state references not in SLOT_REGISTRY
-// =============================================================================
-//
-// state.data                 — IS in SLOT_REGISTRY (transient). The popstats
-//                              renderer reads its layers (theta_pi, fst,
-//                              hobs/hexp, etc.) from inside state.data.
-// state.candidate            — IS in SLOT_REGISTRY (cross_atlas).
-// state.popstatsLive         — page-6 cache, NOT in SLOT_REGISTRY. Holds
-//                              IndexedDB-backed responses keyed by
-//                              { chrom, group_set_id, metric }. Owned by
-//                              atlas_request_layer.js. Recommendation:
-//                              keep page-private; do NOT promote.
-// state.popstatsTracksOn     — Set of currently-active chip IDs. Page-6
-//                              private. Recommendation: keep page-private.
-// state.popstatsGalleryOpen  — gallery tray collapsed/expanded flag. Page-6
-//                              private.
-//
-// All three popstats-* state slots are page-private and intentionally
-// stay outside SLOT_REGISTRY (they're caches/UI flags, not data).
-// =============================================================================
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function _showStatus(root, msg) {
+  const noChrom = root && root.querySelector ? root.querySelector('#psNoChrom') : null;
+  const stack   = root && root.querySelector ? root.querySelector('#psStack')   : null;
+  const chips   = root && root.querySelector ? root.querySelector('#psChips')   : null;
+  if (noChrom) {
+    noChrom.style.display = 'block';
+    noChrom.textContent = msg;
+  }
+  if (stack) stack.innerHTML = '';
+  if (chips) chips.innerHTML = '';
+}
+
+/**
+ * Pick a default current-window index for the crosshair. Prefers the active
+ * candidate's center; falls back to the chromosome midpoint. Returns null if
+ * no windows array is available.
+ */
+function _resolveCurrentWindow(data, candidate) {
+  if (!data || !Array.isArray(data.windows) || data.windows.length === 0) return null;
+  if (candidate && isFinite(candidate.start_mb) && isFinite(candidate.end_mb)) {
+    const target = (candidate.start_mb + candidate.end_mb) / 2;
+    let bestIdx = 0, bestDist = Infinity;
+    for (let i = 0; i < data.windows.length; i++) {
+      const c = data.windows[i].center_mb;
+      const d = Math.abs(c - target);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    }
+    return bestIdx;
+  }
+  return Math.floor(data.windows.length / 2);
+}

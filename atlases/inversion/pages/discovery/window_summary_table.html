@@ -2,6 +2,26 @@
     <div id="winSummaryToolbar" class="winsum-toolbar">
       <span class="label">windows summary:</span>
       <span id="winSumChips"></span>
+      <!-- 2026-05-19: dosage / θπ / GHSL mode toggle. The data plumbing in
+           window_summary_table.js (_precompFromData) is already mode-aware;
+           these buttons let the user pick which axis the table reflects
+           without leaving the page. Disabled buttons indicate the loaded
+           JSON has no view for that mode (e.g. legacy precomps with only
+           dosage). The active button gets .active; click writes
+           state._mode + re-renders. -->
+      <span id="winSumModeBar"
+            style="display: inline-flex; gap: 2px; margin-left: 12px;"
+            title="Switch the table + strip between the local-PCA dosage view, the θπ view, and the GHSL view of the loaded precomp.">
+        <button data-winsum-mode="dosage"   class="active"
+                style="font-size: 10.5px; padding: 2px 8px;"
+                title="Default local-PCA dosage view (always available).">dosage</button>
+        <button data-winsum-mode="theta_pi"
+                style="font-size: 10.5px; padding: 2px 8px;"
+                title="θπ view (active only when the loaded JSON contains theta_pi_view).">θπ</button>
+        <button data-winsum-mode="ghsl"
+                style="font-size: 10.5px; padding: 2px 8px;"
+                title="GHSL view (active only when the loaded JSON contains ghsl_view).">GHSL</button>
+      </span>
       <span id="winSumMeta" class="winsum-meta"></span>
     </div>
     <div id="winSumNoChrom" class="winsum-no-chrom" style="display:none;">

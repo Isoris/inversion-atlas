@@ -900,24 +900,27 @@
            state.pcaPanelH directly. Position: absolute relative to pcaPanel,
            sits over the bottom edge so drag-down grows PCA, drag-up shrinks. -->
       <div id="pcaResize" title="Drag to resize · double-click to reset"></div>
-      <div id="pcaAxisBar" class="pca-axis-bar" style="display: flex; gap: 8px; align-items: center; padding: 4px 8px; font-size: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--rule, #2a3242);">
-        <span style="color: var(--dim, #888); font-weight: 500;">scatter axes:</span>
-        <label style="display: flex; align-items: center; gap: 3px;">X:
-          <select id="pcaXSelect" data-axis="X" style="font-size: 9.5px; padding: 1px 2px;"></select>
+      <!-- 2026-05-20: refreshed scatter-axes header. Inline styles
+           replaced by .pca-axis-* CSS classes (defined in inversion.css)
+           for proper hover/focus states and a vertical rule between the
+           axes pickers and the linked-views toggle. -->
+      <div id="pcaAxisBar" class="pca-axis-bar">
+        <span class="pca-axis-label">scatter axes:</span>
+        <label class="pca-axis-group">X:
+          <select id="pcaXSelect" data-axis="X"></select>
         </label>
-        <label style="display: flex; align-items: center; gap: 3px;">Y:
-          <select id="pcaYSelect" data-axis="Y" style="font-size: 9.5px; padding: 1px 2px;"></select>
+        <label class="pca-axis-group">Y:
+          <select id="pcaYSelect" data-axis="Y"></select>
         </label>
-        <label style="display: flex; align-items: center; gap: 3px; margin-left: 6px;">
+        <span class="pca-axis-sep" aria-hidden="true"></span>
+        <label class="pca-axis-link"
+               title="When linked, the lines panel above (stage 2) tracks the same PCs as the scatter">
           <input type="checkbox" id="viewControlsLinked" />
-          <span title="When linked, the lines panel above (stage 2) tracks the same PCs as the scatter">link with lines panel</span>
+          <span>link with lines panel</span>
         </label>
-        <span id="pcaAxisAvailNote" style="margin-left: auto; color: var(--dim, #888); font-size: 9.5px;"></span>
-        <button id="pcaCollapseBtn" title="Collapse / expand the PCA panel — drag the L3 panel up to take its space"
-                style="background: var(--panel-2); color: var(--ink-dim);
-                       border: 1px solid var(--rule); border-radius: 3px;
-                       padding: 1px 8px; font-family: var(--mono); font-size: 10.5px;
-                       cursor: pointer; margin-left: 6px;">▼</button>
+        <span id="pcaAxisAvailNote" class="pca-axis-avail"></span>
+        <button id="pcaCollapseBtn" class="pca-axis-collapse"
+                title="Collapse / expand the PCA panel — drag the L3 panel up to take its space">▼</button>
       </div>
       <!-- v3.73: split body — canvas left, optional tracked-samples aside right.
            In fixed mode the aside is shown at 30% width (canvas takes 70%).
@@ -1260,8 +1263,22 @@
                   display: flex; align-items: center; justify-content: space-between;
                   cursor: pointer; user-select: none;"
            title="Click to collapse / expand the tracked samples controls">
-        <span>tracked samples</span>
+        <span>tracked samples <span id="trackedSamplesPanelCompactCount"
+              style="color: var(--ink-dimmer); font-weight: normal;
+                     text-transform: none; letter-spacing: 0;"></span></span>
         <div style="display: flex; gap: 4px; align-items: center;">
+          <!-- 2026-05-20: clear-all button on the panel header so users
+               don't have to expand the body + scroll to the Clear button.
+               Quentin: "there should be a simple way to clear the
+               selected samples in the tracked samples plane." Stops
+               propagation so it doesn't toggle the collapse. -->
+          <button id="clearPicksHeaderBtn"
+                  title="Clear all tracked samples"
+                  style="background: transparent; border: 1px solid var(--rule);
+                         color: var(--ink-dim); border-radius: 3px;
+                         padding: 0 6px; font-family: var(--mono); font-size: 9.5px;
+                         cursor: pointer; line-height: 14px;"
+                  onclick="event.stopPropagation();">&times; clear</button>
           <!-- 2026-05-18 — settings popup toggle (parity with the fixed-mode
                aside's tPanelOpenBtn). Opens the same #tPanelOverlay; secondary
                controls (trails / sign-align PC1 / lasso / scree / trail-back
@@ -1423,21 +1440,22 @@
           <span id="trackedNInfoCompact">10</span>
         </div>
 
-        <!-- v4 turn 73c: action buttons mirroring sidebar — stacked vertically
-             so the labels read fully even at narrow column widths. Each
-             button is a thin proxy that delegates to the existing sidebar
-             handler (no logic duplication). -->
-        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;
-                    display: flex; flex-direction: column; gap: 3px;">
-          <button id="lockColorsBtnCompact"
-                  title="Freeze cluster colors using current L2's labels — stay stable as you scrub"
-                  style="font-size: 10px; padding: 3px 6px; text-align: left;">🔒 lock colors</button>
-          <button id="promoteCandidateBtnCompact" disabled
-                  title="Lock colors on an L2 first (🔒 button above)"
-                  style="font-size: 10px; padding: 3px 6px; text-align: left;">⬆ promote to candidate</button>
-          <button id="exportKLabelsBtnCompact"
-                  title="Download per-(L2, sample) K-means labels as TSV — feed into C++ pop-stats engine"
-                  style="font-size: 10px; padding: 3px 6px; text-align: left;">⬇ export K labels TSV</button>
+        <!-- 2026-05-20: lock-colors / promote-to-candidate / export-K-labels
+             moved OUT of the tracked-samples compact panel. None of them are
+             tracked-samples-specific — they operate on global state (color
+             palette / candidate list / cluster labels). The sidebar (when
+             expanded) and the #tPanelOverlay settings popup carry them. The
+             compact tracked-samples panel now contains ONLY tracked-samples
+             controls. Hidden stub IDs kept (display:none) so sidebar mirror
+             wires that target them don't ReferenceError during the
+             transition.
+             Quentin (2026-05-20): "I feel that these buttons are deprecated
+             or shouldnt be there in the tracked samples. or move them to
+             the settings toggle". -->
+        <div style="display: none;">
+          <button id="lockColorsBtnCompact"></button>
+          <button id="promoteCandidateBtnCompact" disabled></button>
+          <button id="exportKLabelsBtnCompact"></button>
         </div>
 
         <!-- v4 turn 73c: color-mode picker. Same five buttons as sidebar. -->

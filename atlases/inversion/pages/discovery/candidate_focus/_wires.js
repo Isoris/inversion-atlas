@@ -23,32 +23,48 @@ import { addCandidateToList, candidateFromJSON, candidateToJSON, isInCandidateLi
 import { refreshCandidateUI } from '../candidate_focus.js';
 
 // --- wireCandidateButtons — extracted from legacy ---
+// 2026-05-19: navigation rewritten for atlas-core. The legacy DOM
+// (`#tabBar button`, `.page.active`) doesn't exist under the new
+// shell — those clicks were silent no-ops. We now:
+//   1. mutate the surviving local_pca_dosage state stash on
+//      `atlasState.inversion._local_pca_dosage_state` so its next
+//      mount picks up the desired cursor / lockedLabels;
+//   2. set `window.location.hash` so the router mounts the page.
+// This produces the same end-user effect (jump to page 1 with the
+// right cursor / coloring) without depending on always-mounted
+// page elements.
 export function wireCandidateButtons(c, profile) {
   const state = _pageState;
+  const _getInv = () => {
+    if (typeof window === 'undefined') return null;
+    const as = window.atlasState;
+    if (!as) return null;
+    return as.inversion || (as.inversion = {});
+  };
   const jumpBtn = document.getElementById('candidateJumpBtn');
   if (jumpBtn) jumpBtn.addEventListener('click', () => {
-    document.querySelectorAll('#tabBar button').forEach(b => b.classList.remove('active'));
-    const p1Btn = document.querySelector('#tabBar button[data-page="local_pca_dosage"]');
-    if (p1Btn) p1Btn.classList.add('active');
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    const page1El = document.getElementById('local_pca_dosage');
-    if (page1El) page1El.classList.add('active');
-    requestAnimationFrame(() => setCur(c.ref_window));
+    const inv = _getInv();
+    if (inv && inv._local_pca_dosage_state && Number.isFinite(c.ref_window)) {
+      inv._local_pca_dosage_state.cur = c.ref_window | 0;
+    }
+    try { window.location.hash = '#/inversion/local_pca_dosage'; } catch (_) {}
   });
   // "Apply candidate's bands as color lock" — push the candidate's locked labels
-  // back into state.lockedLabels so page 1 PCA also colors using these bands
+  // back into state.lockedLabels so page 1 PCA also colors using these bands.
   const lockBtn = document.getElementById('candidateLockBtn');
   if (lockBtn) lockBtn.addEventListener('click', () => {
     state.lockedLabels = new Int8Array(c.locked_labels);
     state.lockedRefL2 = c.ref_l2;
     if (typeof refreshLockBtn === 'function') refreshLockBtn();
-    document.querySelectorAll('#tabBar button').forEach(b => b.classList.remove('active'));
-    const p1Btn = document.querySelector('#tabBar button[data-page="local_pca_dosage"]');
-    if (p1Btn) p1Btn.classList.add('active');
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    const page1El = document.getElementById('local_pca_dosage');
-    if (page1El) page1El.classList.add('active');
-    requestAnimationFrame(() => { drawPCA(); renderL3Panel(); });
+    // Also mirror onto the local_pca_dosage state stash so when the
+    // router remounts page 1, drawPCA / renderL3Panel pick up the
+    // locked labels without any post-mount cleanup.
+    const inv = _getInv();
+    if (inv && inv._local_pca_dosage_state) {
+      inv._local_pca_dosage_state.lockedLabels = state.lockedLabels;
+      inv._local_pca_dosage_state.lockedRefL2  = state.lockedRefL2;
+    }
+    try { window.location.hash = '#/inversion/local_pca_dosage'; } catch (_) {}
   });
   // 📊 dosage heatmap — switch to the dosage_heatmap page with this
   // candidate's label set. The dosage_heatmap page reads
@@ -58,19 +74,14 @@ export function wireCandidateButtons(c, profile) {
   // payload is loaded (empty state shows context instead of "—").
   const dhBtn = document.getElementById('candidateDosageHeatmapBtn');
   if (dhBtn) dhBtn.addEventListener('click', () => {
-    if (typeof window !== 'undefined' && window.atlasState) {
-      const inv = window.atlasState.inversion || (window.atlasState.inversion = {});
+    const inv = _getInv();
+    if (inv) {
       const prev = inv.dosage_heatmap_state || {};
       inv.dosage_heatmap_state = Object.assign({}, prev, {
         candidate_label: c.label || c.id || null,
       });
     }
-    document.querySelectorAll('#tabBar button').forEach(b => b.classList.remove('active'));
-    const dhTab = document.querySelector('#tabBar button[data-page="dosage_heatmap"]');
-    if (dhTab) dhTab.classList.add('active');
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    const dhPage = document.getElementById('dosage_heatmap');
-    if (dhPage) dhPage.classList.add('active');
+    try { window.location.hash = '#/inversion/dosage_heatmap'; } catch (_) {}
   });
 
   const clearBtn = document.getElementById('candidateClearBtn');

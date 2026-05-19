@@ -10,6 +10,25 @@
         <span id="pcaCompMbLabel" style="color: var(--ink-dim);"></span>
       </div>
       <div style="display: flex; align-items: center; gap: 10px;">
+        <!-- 2026-05-20: cursor-unit picker. Drives the ←/→ step size +
+             snap behavior. 1w / 5w / 10w / 25w / L2 / Cand mirror the
+             |Z| panel's nav lanes so the gesture is the same here. -->
+        <span id="pcaCompScrubUnits"
+              title="Cursor step size for ←/→ navigation. 1w-25w step by N windows; L2 snaps to the next L2 envelope boundary; Cand snaps to the next candidate."
+              style="display: inline-flex; align-items: center; gap: 2px;
+                     background: var(--panel-2); border: 1px solid var(--rule);
+                     border-radius: 3px; padding: 1px 2px;
+                     font-family: var(--mono); font-size: 10px;">
+          <span style="color: var(--ink-dimmer); padding: 0 4px 0 2px;">step:</span>
+          <button type="button" data-scrub-unit="1"     class="active">1w</button>
+          <button type="button" data-scrub-unit="5">5w</button>
+          <button type="button" data-scrub-unit="10">10w</button>
+          <button type="button" data-scrub-unit="25">25w</button>
+          <button type="button" data-scrub-unit="l2"
+                  title="Snap ←/→ to the next/previous L2 envelope boundary on the active chromosome. Uses the local_pca_dosage state's windowToL2 index.">L2</button>
+          <button type="button" data-scrub-unit="cand"
+                  title="Snap ←/→ to the next/previous candidate (state.candidateList) on the active chromosome.">Cand</button>
+        </span>
         <label style="display: flex; align-items: center; gap: 4px; color: var(--ink-dim);"
                title="Anchor for the K-color palette. Each sample keeps its anchor band color across all 3 panels so you can see at a glance where it lands in each evidence axis. Default = dosage (the primary scanner).">
           anchor:

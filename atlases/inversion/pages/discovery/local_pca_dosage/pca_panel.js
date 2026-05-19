@@ -16,8 +16,17 @@
 
 import { escapeHtml, fitCanvas, themeColor, withAlpha } from '../../../shared/page1_utils.js';
 import { contextFromState, sampleSpreadL2 } from '../../../shared/per_l2_cluster.js';
+import { perSampleValuesForMode } from '../../../shared/per_sample_line_color.js';
 
 import { _pageState, _setActiveState, _vColor, getSampleColor, trackedColor } from './_state.js';
+
+// 2026-05-20: ramp modes whose per-sample values getSampleColor maps
+// through perSampleColorFor. drawPCA pre-computes the value array once
+// per frame and stashes it on state._pcaModePsVals so the inner sample
+// loop just does a Float64Array index lookup + color mapping.
+const _PCA_RAMP_MODES = new Set([
+  'het', 'dosage', 'theta_pi', 'ghsl', 'froh', 'confounder_alert',
+]);
 import { allSampleIdx, availablePCs, getActiveModeView, getL2Cluster, getPC, getPCRender, groupColor, setPcaXY, setViewControlsLinked } from './_data.js';
 import { buildLinesPanel, buildLinesPanelCheckboxes } from './lines_panel.js';
 import { drawLinesPanel } from './lines_panel.js';
@@ -233,6 +242,50 @@ export function recomputeAnchorConcord() {
   state.anchorConcord = out;
 }
 
+// 2026-05-20: smart-corner placement for the scree inset. Quentin:
+// "[the scree plot] should be like in repulsion with datapoints and try
+// to go on the corner by default". Algorithm: count scatter dots in
+// each of the 4 plot-area quadrants, pick the LEAST-populated corner,
+// set the inset's `data-corner` attribute so CSS positions it there.
+// Sticky-ish: a 10% margin around the current corner keeps the inset
+// from oscillating between corners while the user scrubs (tiny shifts
+// in dot density would otherwise re-trigger placement on every frame).
+function _positionScreeInsetSmart(state, screenXY, nSamples, pad, plotW, plotH) {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById('screeInset');
+  if (!el || el.style.display === 'none') return;
+  if (!screenXY || !nSamples || plotW <= 0 || plotH <= 0) return;
+  const cx = pad.l + plotW / 2;
+  const cy = pad.t + plotH / 2;
+  let tl = 0, tr = 0, bl = 0, br = 0;
+  for (let si = 0; si < nSamples; si++) {
+    const x = screenXY[si * 2];
+    const y = screenXY[si * 2 + 1];
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    if (x < pad.l || x > pad.l + plotW || y < pad.t || y > pad.t + plotH) continue;
+    if (x < cx) {
+      if (y < cy) tl++; else bl++;
+    } else {
+      if (y < cy) tr++; else br++;
+    }
+  }
+  const corners = [
+    { id: 'tl', n: tl }, { id: 'tr', n: tr },
+    { id: 'bl', n: bl }, { id: 'br', n: br },
+  ];
+  // Hysteresis: prefer to stay in the current corner if it's still
+  // within 10% of the minimum density so we don't snap on every paint.
+  const cur = el.dataset.corner || 'tr';
+  const curEntry = corners.find(c => c.id === cur);
+  corners.sort((a, b) => a.n - b.n);
+  const best = corners[0];
+  if (curEntry && (curEntry.n - best.n) <= Math.max(1, Math.round(nSamples * 0.10))) {
+    el.dataset.corner = cur;
+  } else {
+    el.dataset.corner = best.id;
+  }
+}
+
 // --- _refreshScreeInset — legacy lines 56497-56513 ---
 // 2026-05-18: exposed on window so sidebar.js (#screeToggle change handler)
 // can repaint without importing pca_panel internals.
@@ -269,6 +322,26 @@ export function drawPCA(state) {
   const d = getActiveModeView(state) || state.data;
   const cur = state.cur;
   const trailStart = Math.max(0, cur - state.trailN);
+  // 2026-05-20: pre-compute per-sample value array for the active
+  // color ramp mode. getSampleColor reads from state._pcaModePsVals so
+  // the inner per-sample loop stays O(1). For point-evaluation modes
+  // (theta_pi / ghsl / froh / confounder_alert) the range collapses
+  // to the current window; for chunk-backed modes (het / dosage) the
+  // helper consults state._linesPanelGetCachedChunk (set by the lazy
+  // chunk fetcher) and returns NaN-filled until a chunk lands — the
+  // ramp color then falls back to grey, which is the correct visual
+  // for "no data yet".
+  if (_PCA_RAMP_MODES.has(state.colorMode)) {
+    try {
+      const vals = perSampleValuesForMode(state, state.colorMode, { startW: cur, endW: cur });
+      state._pcaModePsVals = vals ? { mode: state.colorMode, vals } : null;
+    } catch (e) {
+      state._pcaModePsVals = null;
+      console.warn('drawPCA precompute psVals failed:', e);
+    }
+  } else {
+    state._pcaModePsVals = null;
+  }
 
   // v3.25: which two PCs to plot (default PC1×PC2). PC1 keeps its sign-flip
   // rule (signX); other PCs render in raw orientation. The analytics path
@@ -334,18 +407,28 @@ export function drawPCA(state) {
   // says PC1 which is not enough."
   let _pcaPC1Label = 'PC1';
   let _pcaPC2Label = 'PC2';
-  if (state.data && state.data.windows && state.cur >= 0
-      && state.cur < state.data.windows.length) {
-    const _wObj = state.data.windows[state.cur];
-    const _l1 = _wObj && _wObj.lam1;
-    const _l2 = _wObj && _wObj.lam2;
-    if (_l1 != null && isFinite(_l1) && _l2 != null && isFinite(_l2)
-        && (_l1 + _l2) > 1e-12) {
-      const _sum = _l1 + _l2;
-      const _p1 = (100 * _l1 / _sum).toFixed(1);
-      const _p2 = (100 * _l2 / _sum).toFixed(1);
-      _pcaPC1Label = `PC1 (λ₁ ${_p1}%)`;
-      _pcaPC2Label = `PC2 (λ₂ ${_p2}%)`;
+  // 2026-05-20: pull lam1/lam2 from the ACTIVE view's window so the
+  // axis labels (PC1 λ₁ X.X%) match the scatter the user is looking at
+  // in θπ / GHSL mode. Dosage windows carry these fields; the synthesized
+  // theta_pi / ghsl views often don't, in which case the bare "PC1"/"PC2"
+  // fallback is the correct rendering.
+  {
+    const _view = (typeof getActiveModeView === 'function')
+      ? (getActiveModeView(state) || state.data)
+      : state.data;
+    if (_view && _view.windows && state.cur >= 0
+        && state.cur < _view.windows.length) {
+      const _wObj = _view.windows[state.cur];
+      const _l1 = _wObj && _wObj.lam1;
+      const _l2 = _wObj && _wObj.lam2;
+      if (_l1 != null && isFinite(_l1) && _l2 != null && isFinite(_l2)
+          && (_l1 + _l2) > 1e-12) {
+        const _sum = _l1 + _l2;
+        const _p1 = (100 * _l1 / _sum).toFixed(1);
+        const _p2 = (100 * _l2 / _sum).toFixed(1);
+        _pcaPC1Label = `PC1 (λ₁ ${_p1}%)`;
+        _pcaPC2Label = `PC2 (λ₂ ${_p2}%)`;
+      }
     }
   }
   ctx.fillStyle = themeColor('ink-dim');
@@ -416,6 +499,16 @@ export function drawPCA(state) {
   // its drag rectangle to the data area.
   state.__pcaScreenXY = _pcaScreenXY;
   state.__pcaPlotRect = { x: pad.l, y: pad.t, w: plotW, h: plotH };
+  // 2026-05-20: smart-corner placement for the scree inset. Counts the
+  // scatter dots in each of the four quadrants of the plot area and
+  // snaps the inset to the LEAST-populated corner so the bars don't
+  // sit on top of data. CSS uses data-corner=tl|tr|bl|br with the
+  // transition styled in inversion.css so the move animates smoothly
+  // when the user scrubs through windows. Drag-to-reattach is a future
+  // ask (queued); this gives the user automatic "stay out of the data"
+  // behavior today.
+  try { _positionScreeInsetSmart(state, _pcaScreenXY, d.n_samples, pad, plotW, plotH); }
+  catch (e) { console.warn('_positionScreeInsetSmart:', e); }
 
   // Trails (tracked samples)
   if (state.trailOn && state.tracked.length > 0 && state.trailN > 0) {

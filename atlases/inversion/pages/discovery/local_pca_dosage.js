@@ -543,6 +543,11 @@ export async function mount(root, atlasState, registry) {
     installDosageChunkFetcher(legacyState, {
       onLoad: () => {
         try { drawLinesPanel(legacyState); } catch (_) {}
+        // 2026-05-20: also re-render the L3 contingency panel so its
+        // het chip picks up the freshly cached chunk. band_diagnostics.js
+        // calls computeHetRateForRange with cacheKey, which now returns
+        // real values instead of the NaN-filled placeholder.
+        try { renderL3Panel(legacyState); } catch (_) {}
       },
     });
   } catch (e) { console.warn('installDosageChunkFetcher:', e); }

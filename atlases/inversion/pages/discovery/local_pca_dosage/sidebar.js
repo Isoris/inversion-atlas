@@ -124,6 +124,105 @@ export function attachSidebarHandlers(state) {
   _wirePanelCollapseButtons(state);
   _wireNewShellControls(state);
   _wireActiveModeBar(state);
+  _wireL3Controls(state);
+}
+
+// =============================================================================
+// L3 panel controls — layout / color-mode / K-mode / recluster (2026-05-20)
+// =============================================================================
+// The L3 contingency bar has 4 control surfaces that were rendered but
+// never wired (Quentin's report: "when we push these buttons nothing
+// happens. when we recluster with Kmeans nothing happens"). Each control
+// mutates a `state.l3*` slot and calls renderL3Panel — the renderer
+// already reads these state slots, so wiring is all that was missing.
+function _wireL3Controls(state) {
+  if (typeof document === 'undefined') return;
+  const repaint = () => {
+    try { renderL3Panel(state); }
+    catch (e) { console.warn('[l3] renderL3Panel:', e); }
+  };
+  // Restore persisted state slots so a reload lands on the same selection.
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.l3Layout');
+    if (saved) state.l3Layout = saved;
+  } catch (_) {}
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.l3ColorMode');
+    if (saved) state.l3ColorMode = saved;
+  } catch (_) {}
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.l3KMode');
+    if (saved) state.l3KMode = saved;
+  } catch (_) {}
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.l3ReclusterMode');
+    if (saved) state.l3ReclusterMode = saved;
+  } catch (_) {}
+
+  // Helper for click-bar wiring with idempotency + active-class mirror +
+  // optional persist key.
+  const wireBar = (containerSel, dataAttr, stateKey, persistKey) => {
+    const container = document.querySelector(containerSel);
+    if (!container) return;
+    container.querySelectorAll('button[' + dataAttr + ']').forEach(btn => {
+      if (btn.dataset.l3Wired === '1') return;
+      btn.dataset.l3Wired = '1';
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        const val = btn.getAttribute(dataAttr);
+        state[stateKey] = val;
+        if (persistKey) {
+          try { localStorage.setItem(persistKey, val); } catch (_) {}
+        }
+        container.querySelectorAll('button[' + dataAttr + ']').forEach(b => {
+          b.classList.toggle('active', b === btn);
+        });
+        repaint();
+      });
+    });
+    // Reflect restored state on the active class.
+    const cur = state[stateKey];
+    if (cur != null) {
+      container.querySelectorAll('button[' + dataAttr + ']').forEach(b => {
+        b.classList.toggle('active', b.getAttribute(dataAttr) === cur);
+      });
+    }
+  };
+
+  wireBar('#l3Layout',    'data-layout',  'l3Layout',    'pca_scrubber_v3.l3Layout');
+  wireBar('#l3ColorMode', 'data-l3color', 'l3ColorMode', 'pca_scrubber_v3.l3ColorMode');
+  wireBar('#l3KMode',     'data-l3k',     'l3KMode',     'pca_scrubber_v3.l3KMode');
+
+  // Recluster dropdown — change event sets state.l3ReclusterMode + repaints.
+  const reclusterSel = document.getElementById('l3ReclusterSel');
+  if (reclusterSel && reclusterSel.dataset.l3Wired !== '1') {
+    reclusterSel.dataset.l3Wired = '1';
+    if (state.l3ReclusterMode) reclusterSel.value = state.l3ReclusterMode;
+    reclusterSel.addEventListener('change', (e) => {
+      state.l3ReclusterMode = e.target.value;
+      try { localStorage.setItem('pca_scrubber_v3.l3ReclusterMode', e.target.value); }
+      catch (_) {}
+      repaint();
+    });
+  }
+
+  // L3 het-coloring toggle (#l3HetToggle) — flips state.l3HetColoring and
+  // repaints. Persisted to its own key.
+  const l3HetToggle = document.getElementById('l3HetToggle');
+  if (l3HetToggle && l3HetToggle.dataset.l3Wired !== '1') {
+    l3HetToggle.dataset.l3Wired = '1';
+    try {
+      const saved = localStorage.getItem('pca_scrubber_v3.l3HetColoring');
+      if (saved === '1') state.l3HetColoring = true;
+    } catch (_) {}
+    l3HetToggle.checked = !!state.l3HetColoring;
+    l3HetToggle.addEventListener('change', (e) => {
+      state.l3HetColoring = !!e.target.checked;
+      try { localStorage.setItem('pca_scrubber_v3.l3HetColoring', e.target.checked ? '1' : '0'); }
+      catch (_) {}
+      repaint();
+    });
+  }
 }
 
 // =============================================================================
@@ -628,9 +727,16 @@ function _wireCompactTrackedCollapse(state) {
   if (!head || !body) return;
 
   // Restore persisted state on first wire.
-  let collapsed = false;
-  try { collapsed = localStorage.getItem(_TRACKED_COMPACT_LS_KEY) === '1'; }
-  catch (_) {}
+  // 2026-05-20: default to collapsed on fresh load. The compact tracked
+  // panel hosts a long stack of controls (band picker, manual groups,
+  // color-mode picker, ...) most users don't need open while scrubbing.
+  // Returning users keep their saved choice.
+  let collapsed = true;
+  try {
+    const v = localStorage.getItem(_TRACKED_COMPACT_LS_KEY);
+    if (v === '0') collapsed = false;
+    else if (v === '1') collapsed = true;
+  } catch (_) {}
 
   const apply = () => {
     body.style.display = collapsed ? 'none' : '';
@@ -658,6 +764,37 @@ function _wireCompactTrackedCollapse(state) {
     });
   });
   head.dataset.wired = '1';
+
+  // 2026-05-20: clear-all button on the panel header. Stops propagation
+  // so the header's collapse toggle doesn't fire. Mirrors the existing
+  // #clearPicks (sidebar) handler — state.tracked = [], repaint chain.
+  const clearBtn = document.getElementById('clearPicksHeaderBtn');
+  if (clearBtn && clearBtn.dataset.wired !== '1') {
+    clearBtn.dataset.wired = '1';
+    clearBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      state.tracked = [];
+      try { renderTrackedList(state); }  catch (_) {}
+      try { drawPCA(state); }            catch (_) {}
+      try { drawLinesPanel(state); }     catch (_) {}
+      try { renderL3Panel(state); }      catch (_) {}
+      _updateCompactHeaderCount(state);
+    });
+  }
+  // Initial count paint.
+  _updateCompactHeaderCount(state);
+}
+
+// Refresh the small `(n=N)` chip in the compact panel header so the
+// user can read the tracked count without expanding the body. Called
+// from _wireCompactTrackedCollapse + on any tracked-set mutation we
+// can hook (clear-all here; future: pick / lasso confirm).
+function _updateCompactHeaderCount(state) {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById('trackedSamplesPanelCompactCount');
+  if (!el) return;
+  const n = (state && Array.isArray(state.tracked)) ? state.tracked.length : 0;
+  el.textContent = n > 0 ? `· ${n}` : '';
 }
 
 // ---------------------------------------------------------------------------
@@ -1328,12 +1465,21 @@ function _wireTrackedSettingsPopup(state) {
       window._refreshScreeInset();
     } else { drawPCA(state); } } catch (_) {}
   };
-  // Restore from localStorage if not already set.
+  // 2026-05-20: default scree ON on fresh load. Quentin: "I think that
+  // the scree plot in the tracked samples local PCA must be able to be
+  // on By default". Returning users keep their saved choice; only the
+  // unset case lands enabled. (The drag-to-reattach corner feature
+  // mentioned in the same message is queued — for now the inset uses
+  // its existing absolute-positioned upper-right corner, which the
+  // smart-corner-placement logic in pca_panel.js handles by moving
+  // away from dense scatter regions.)
   if (state.screePlotEnabled == null) {
     try {
       const v = localStorage.getItem('inversion_atlas.screePlotEnabled');
-      if (v === '1') state.screePlotEnabled = true;
-    } catch (_) {}
+      if (v === '0') state.screePlotEnabled = false;
+      else if (v === '1') state.screePlotEnabled = true;
+      else state.screePlotEnabled = true;  // fresh-load default = on
+    } catch (_) { state.screePlotEnabled = true; }
   }
   for (const id of screeMirrors) {
     const el = $(id);
@@ -1714,9 +1860,15 @@ function _wireDataSection(state) {
   // Expose the setter on state so non-sidebar code (e.g. _applyViewMode)
   // can move sim to/from the minimap without re-implementing the logic.
   state._setSimInMinimap = _setSimInMinimap;
-  // Restore persisted state on first wire-up.
+  // 2026-05-20: default the sim heatmap into the minimap on fresh load
+  // so the main panel area opens up. Returning users keep their saved
+  // choice; only the unset case flips to '1'. Quentin: "by default we
+  // try to toggle the minimap".
   try {
-    if (localStorage.getItem('pca_scrubber_v3.siminminimap') === '1') {
+    const cur = localStorage.getItem('pca_scrubber_v3.siminminimap');
+    if (cur == null) {
+      requestAnimationFrame(() => _setSimInMinimap(true));
+    } else if (cur === '1') {
       requestAnimationFrame(() => _setSimInMinimap(true));
     }
   } catch (_) {}
@@ -2074,22 +2226,18 @@ function _wireDisplay(state) {
       if (typeof _flashPromoteGreen === 'function') {
         try { _flashPromoteGreen(promoteBtn); } catch (_) {}
       }
-      // Switch to page 2 FIRST so the canvas has non-zero bounding rect.
-      // Under the new atlas-core shell the tabBar may not exist; we
-      // tolerate a missing DOM and just install the candidate.
-      document.querySelectorAll('#tabBar button').forEach(b => b.classList.remove('active'));
-      const p2Btn = document.querySelector('#tabBar button[data-page="candidate_focus"]');
-      if (p2Btn) p2Btn.classList.add('active');
-      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      const p2 = document.getElementById('candidate_focus');
-      if (p2) p2.classList.add('active');
-      // Now install the candidate (this triggers render + drawCandidateSigmaChart)
-      const _setCand = () => {
-        try { setCandidate(state, cand); }
-        catch (e) { console.warn('[promote] setCandidate failed:', e); }
-      };
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(_setCand);
-      else _setCand();
+      // 2026-05-19: install the candidate FIRST, then navigate. The old
+      // code twiddled #tabBar / .page.active (atlas-core has neither),
+      // wrapped setCandidate in rAF, and hoped the DOM would re-resolve
+      // — under the new shell the rAF fired against the still-active
+      // local_pca_dosage DOM, not candidate_focus's. New flow:
+      //   1. setCandidate on the current page's state so the candidate
+      //      list / promote chain runs in its proper home;
+      //   2. hash-navigate to candidate_focus so the router mounts it
+      //      against fresh DOM with the candidate already in state.
+      try { setCandidate(state, cand); }
+      catch (e) { console.warn('[promote] setCandidate failed:', e); }
+      try { window.location.hash = '#/inversion/candidate_focus'; } catch (_) {}
     });
   }
 
@@ -2668,12 +2816,18 @@ function _applySidebarState(state, collapsed) {
 }
 
 function _wireSidebarToggle(state) {
-  // Restore saved sidebar state on load (default: expanded)
-  // --- legacy lines 75465-75471 ---
-  let savedCollapsed = false;
+  // 2026-05-20: default-collapse the parameters pane on first load. The
+  // sidebar carries 20+ controls but most users land on the page wanting
+  // to see the canvases, not the knobs (Quentin: "close the settings
+  // panel on the left ... too messy"). The wheel button on the sidebar
+  // header stays as the toggle. Returning users get whatever they last
+  // saved — only the unset / fresh-install case flips to collapsed.
+  let savedCollapsed = true;
   try {
     const v = localStorage.getItem(_SIDEBAR_STORAGE_KEY);
-    if (v === 'true') savedCollapsed = true;
+    if (v === 'false') savedCollapsed = false;
+    else if (v === 'true') savedCollapsed = true;
+    // null / undefined → keep the new default (true).
   } catch (e) {}
   _applySidebarState(state, savedCollapsed);
 

@@ -2282,6 +2282,9 @@ body[data-active-mode="ghsl"] #trackedSamplesPanel {
    PCA scatter is still visible at the edges. */
 .scree-inset {
   position: absolute;
+  /* 2026-05-20: corner positioning is driven by data-corner (set in
+     pca_panel.js#_positionScreeInsetSmart). Defaults below cover the
+     case where JS hasn't run yet — start in the top-right corner. */
   top: 8px; right: 8px;
   width: 110px;
   /* height auto from content; ~70px with a 5-bar plot */
@@ -2295,7 +2298,12 @@ body[data-active-mode="ghsl"] #trackedSamplesPanel {
   pointer-events: none;
   z-index: 4;
   line-height: 1.2;
+  transition: top 180ms ease, left 180ms ease, right 180ms ease, bottom 180ms ease;
 }
+.scree-inset[data-corner="tl"] { top: 8px;    left: 8px;   right: auto;  bottom: auto; }
+.scree-inset[data-corner="tr"] { top: 8px;    right: 8px;  left: auto;   bottom: auto; }
+.scree-inset[data-corner="bl"] { bottom: 8px; left: 8px;   right: auto;  top: auto;    }
+.scree-inset[data-corner="br"] { bottom: 8px; right: 8px;  left: auto;   top: auto;    }
 .scree-inset-label {
   color: var(--ink-dim, #8b94a3);
   text-transform: uppercase;
@@ -4587,6 +4595,17 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
   background: var(--rule);
   flex-shrink: 0;
 }
+.tree-panel-ari-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--panel);
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-dim);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 
 .tree-panel-body,
 .fingerprint-body,
@@ -5190,6 +5209,125 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
 .pmsa-selected-fields .empty, .ac-metrics-body .empty,
 .mos-counts-body .empty, .lc-counts-body .empty {
   color: var(--ink-dimmer); font-style: italic;
+}
+
+/* 2026-05-20: cursor-unit picker on the PCA comparator header. Pill
+   group of buttons (1w / 5w / 10w / 25w / L2 / Cand) — same gesture as
+   the |Z| panel's nav lanes so users don't have to learn a second
+   model when scrubbing inside the comparator. */
+#pcaCompScrubUnits button[data-scrub-unit] {
+  background: transparent;
+  color: var(--ink-dim);
+  border: 0;
+  border-radius: 2px;
+  padding: 2px 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 80ms ease, color 80ms ease;
+}
+#pcaCompScrubUnits button[data-scrub-unit]:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--ink);
+}
+#pcaCompScrubUnits button[data-scrub-unit].active {
+  background: var(--accent);
+  color: #0b0e13;
+  font-weight: 600;
+}
+
+/* 2026-05-20: scatter-axes header refresh. The legacy bar (inline-styled
+   in the HTML) was cramped — 9.5 px dropdowns, no visual grouping,
+   `link with lines panel` collided with the axis pickers. Quentin's
+   report: "now the scatter axes styling CSS is outdated compared to the
+   old legacy atlas no". This restores the legacy look: refined font
+   size, mono dropdowns with subtle border + hover, a thin vertical rule
+   between the X/Y group and the linked-views toggle, and a soft panel
+   background. */
+.pca-axis-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+  background: linear-gradient(180deg,
+              rgba(255,255,255,0.025) 0%,
+              rgba(255,255,255,0.005) 100%);
+  border-bottom: 1px solid var(--rule);
+}
+.pca-axis-bar .pca-axis-label {
+  color: var(--ink-dimmer);
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+.pca-axis-bar .pca-axis-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pca-axis-bar .pca-axis-group select {
+  background: var(--panel-2);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 100ms ease, background 100ms ease;
+}
+.pca-axis-bar .pca-axis-group select:hover {
+  border-color: var(--accent);
+  background: var(--panel);
+}
+.pca-axis-bar .pca-axis-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(245, 165, 36, 0.25);
+}
+.pca-axis-bar .pca-axis-sep {
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  background: var(--rule);
+  margin: 0 4px;
+  opacity: 0.7;
+}
+.pca-axis-bar .pca-axis-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.pca-axis-bar .pca-axis-link input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.pca-axis-bar .pca-axis-avail {
+  margin-left: auto;
+  color: var(--ink-dimmer);
+  font-size: 10px;
+  font-style: italic;
+}
+.pca-axis-bar .pca-axis-collapse {
+  background: var(--panel-2);
+  color: var(--ink-dim);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 2px 9px;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 100ms ease, border-color 100ms ease;
+}
+.pca-axis-bar .pca-axis-collapse:hover {
+  color: var(--ink);
+  border-color: var(--accent);
 }
 
 /* 2026-05-19: collapsible sidebar sections (used for Tracked samples).

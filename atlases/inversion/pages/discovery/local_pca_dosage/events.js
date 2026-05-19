@@ -41,22 +41,37 @@ import {
 } from './candidates.js';
 
 // --- updateWinLabel(state) — legacy lines 51738-51742 ---
+// 2026-05-19: read window from the active mode view so the "window N at
+// X.YYY Mb" label reflects θπ / GHSL coordinates when in those modes.
 export function updateWinLabel(state) {
   _setActiveState(state);
-  if (!state || !state.data || !state.data.windows) return;
-  const w = state.data.windows[state.cur];
+  if (!state || !state.data) return;
+  const view = getActiveModeView(state) || state.data;
+  const wins = view && view.windows;
+  if (!wins) return;
+  const i = Math.max(0, Math.min(wins.length - 1, state.cur | 0));
+  const w = wins[i];
   if (!w) return;
   const winIdxEl = document.getElementById('winIdx');
   const winBpEl  = document.getElementById('winBp');
   if (winIdxEl) winIdxEl.textContent = state.cur;
-  if (winBpEl)  winBpEl.innerHTML = `· <b>${w.center_mb.toFixed(3)} Mb</b>`;
+  if (winBpEl && Number.isFinite(w.center_mb)) {
+    winBpEl.innerHTML = `· <b>${w.center_mb.toFixed(3)} Mb</b>`;
+  }
 }
 
 // --- setCur() — legacy lines 51747-51792 ---
+// 2026-05-19: clamp cur to the active view's n_windows so a click on a
+// theta-pi-frame x position doesn't fly past the dosage view's bounds
+// (or vice versa). The view's window count is the source of truth.
 export function setCur(state, i) {
   _setActiveState(state);
   if (!state || !state.data) return;
-  state.cur = Math.max(0, Math.min(state.data.n_windows - 1, i | 0));
+  const view = getActiveModeView(state) || state.data;
+  const N = (view && view.n_windows)
+         || (view && view.windows && view.windows.length)
+         || state.data.n_windows;
+  state.cur = Math.max(0, Math.min((N | 0) - 1, i | 0));
   const _scrubEl = document.getElementById('scrubber');
   if (_scrubEl) _scrubEl.value = state.cur;
   // 2026-05-06 round 3 (parity step): bare drawX() / updateWinLabel(state) / etc.
@@ -110,9 +125,16 @@ export function setCur(state, i) {
 }
 
 // --- onSimClick() — legacy lines 52067-52111 ---
+// 2026-05-19: route window-count lookups through getActiveModeView(state)
+// so a click while in θπ / GHSL mode lands on the active view's window
+// frame, not dosage's. Falls back to state.data when no alternate view
+// is loaded (dosage mode).
 export function onSimClick(state, evt) {
   _setActiveState(state);
   if (!state.data) return;
+  const view = getActiveModeView(state) || state.data;
+  const Nw_view = (view && view.n_windows) || (view && view.windows && view.windows.length) || 0;
+  if (Nw_view <= 0) return;
   const rect = document.getElementById('simCanvas').getBoundingClientRect();
   const px = evt.clientX - rect.left;
   const py = evt.clientY - rect.top;
@@ -129,7 +151,7 @@ export function onSimClick(state, evt) {
   {
     const csIdx = _ensureCsOverlayIndex();
     if (csIdx && csIdx.bps.length > 0) {
-      const Nw = state.data.n_windows;
+      const Nw = Nw_view;
       // Replicate drawSim's mapping exactly (it lives inside drawSim's
       // closure so we can't reuse it; re-derive from state._simGeom).
       const _toPx = (wIdx) => g.x0 + (wIdx + 0.5) * g.side / Nw;
@@ -154,10 +176,15 @@ export function onSimClick(state, evt) {
   // Prefer x-axis (horizontal) → window index. The heatmap is symmetric, so
   // either axis works, but x is the natural "scrub through chromosome" gesture.
   const frac = (px - g.x0) / g.side;
-  setCur(state, Math.round(frac * (state.data.n_windows - 1)));
+  setCur(state, Math.round(frac * (Nw_view - 1)));
 }
 
 // --- onZClick() — legacy lines 52112-52202 ---
+// 2026-05-19: route window lookups through getActiveModeView so clicks
+// in θπ / GHSL mode map onto the active view's window frame. Without
+// this, a Z-panel click while in θπ mode landed on the dosage-frame
+// window at that x-fraction, putting state.cur out of sync with the
+// other panels.
 export function onZClick(state, evt) {
   _setActiveState(state);
   if (!state.data) return;
@@ -168,13 +195,17 @@ export function onZClick(state, evt) {
   const y = evt.clientY - rect.top;     // v4 turn 10: track y for W-row hit-test
   const plotW = rect.width - pad.l - pad.r;
   const frac = Math.max(0, Math.min(1, (x - pad.l) / plotW));
-  const d = state.data;
+  const d = getActiveModeView(state) || state.data;
+  const N = (d && d.n_windows) || (d && d.windows && d.windows.length) || 0;
+  if (N <= 0 || !d.windows || !d.windows[0] || !d.windows[N - 1]) return;
   const mbMin = d.windows[0].center_mb;
-  const mbMax = d.windows[d.n_windows - 1].center_mb;
+  const mbMax = d.windows[N - 1].center_mb;
   const targetMb = mbMin + frac * (mbMax - mbMin);
   let bestI = 0, bestD = Infinity;
-  for (let i = 0; i < d.n_windows; i++) {
-    const dd = Math.abs(d.windows[i].center_mb - targetMb);
+  for (let i = 0; i < N; i++) {
+    const w0 = d.windows[i];
+    if (!w0 || !Number.isFinite(w0.center_mb)) continue;
+    const dd = Math.abs(w0.center_mb - targetMb);
     if (dd < bestD) { bestD = dd; bestI = i; }
   }
   // v4 turn 10: if the click landed inside the W-row, treat it as a window-
@@ -376,7 +407,12 @@ export function drawTracks(state) {
 function drawOneTrack(state, canvas, trk, label) {
   const { ctx, w, h } = fitCanvas(canvas);
   ctx.clearRect(0, 0, w, h);
-  const wins = state.data.windows;
+  // 2026-05-19: track values are aligned to the ACTIVE view's window
+  // grid (drawTracks reads tracks from getActiveModeView). Drawing
+  // them against the dosage view's windows misaligned every track when
+  // the active mode was θπ / GHSL. Use the view's windows here too.
+  const view = getActiveModeView(state) || state.data;
+  const wins = (view && view.windows) || state.data.windows;
   const Nwins = wins.length;
   if (Nwins === 0) return;
   const pad = { l: 44, r: 16, t: 16, b: 6 };
@@ -475,16 +511,23 @@ function drawOneTrack(state, canvas, trk, label) {
 }
 
 // --- updateSidebarInfo(state) — legacy lines 51729-51737 ---
+// 2026-05-19: read the current window from the active view so the
+// sidebar's |Z|/λ₁/λ₂ readout reflects θπ / GHSL when the user has
+// switched modes (was always showing dosage values).
 export function updateSidebarInfo(state) {
   _setActiveState(state);
-  if (!state || !state.data || !Array.isArray(state.data.windows)) return;
+  if (!state || !state.data) return;
+  const view = getActiveModeView(state) || state.data;
+  if (!view || !Array.isArray(view.windows)) return;
   const el = document.getElementById('sidebarInfo');
   if (!el) return;
-  const w = state.data.windows[state.cur];
+  const cur = Math.max(0, Math.min(view.windows.length - 1, state.cur | 0));
+  const w = view.windows[cur];
   if (!w) return;
+  const mbStr = Number.isFinite(w.center_mb) ? w.center_mb.toFixed(3) : '—';
   el.innerHTML =
     `<span class="dim">idx</span> ${state.cur}<br>` +
-    `<span class="dim">Mb </span> ${w.center_mb.toFixed(3)}<br>` +
+    `<span class="dim">Mb </span> ${mbStr}<br>` +
     `<span class="dim">|Z|</span> ${fmt(Math.abs(w.z || 0))}<br>` +
     `<span class="dim">λ₁ </span> ${fmt(w.lam1)}<br>` +
     `<span class="dim">λ₂ </span> ${fmt(w.lam2)}`;

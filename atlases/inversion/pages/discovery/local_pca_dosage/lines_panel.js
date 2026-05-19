@@ -28,6 +28,47 @@ import { wireBandTraceTooltip } from './band_trace_tooltip.js';
 import { wireInheritancePillTooltip } from './inheritance_tooltip.js';
 import { maybeShowFishInspectPopover } from './fish_inspect_popover.js';
 
+// 2026-05-20: per-mode "no data" notice text for the lines-panel
+// fallback warning (rendered top-right of the PC1 sub-panel when every
+// sample in the visible range returns null from the per-sample color
+// resolver). Mode-specific so picking "color: dosage" doesn't show
+// "family mode" copy. Keep messages short — the notice has a hard
+// width budget against the line cloud underneath.
+function _modeNoDataNotice(mode, state) {
+  switch (mode) {
+    case 'family':
+      return 'family mode: no family data loaded — drag-drop ngsRelate JSON';
+    case 'lineage':
+      return 'lineage mode: lineage labels unavailable for this chrom';
+    case 'dosage': {
+      // If a chunk fetch is in flight (the lazy fetcher registered an
+      // inflight Promise on state.__dosageInflight), say so — the panel
+      // will repaint when the fetch lands. Otherwise the layer is
+      // disabled / unreachable.
+      const inflight = state && state.__dosageInflight && state.__dosageInflight.size > 0;
+      return inflight
+        ? 'dosage: fetching chunk… repaint pending'
+        : 'dosage: chunk not yet loaded (auto-fetches on demand)';
+    }
+    case 'het': {
+      const inflight = state && state.__dosageInflight && state.__dosageInflight.size > 0;
+      return inflight
+        ? 'het: fetching dosage chunk… repaint pending'
+        : 'het: dosage chunk not yet loaded';
+    }
+    case 'theta_pi':
+      return 'θπ: per-window values absent — theta_pi_per_window layer not loaded';
+    case 'ghsl':
+      return 'GHSL: per-sample PCs unavailable — ghsl_local_pca not loaded';
+    case 'froh':
+      return 'F_ROH: sample_froh layer not loaded';
+    case 'confounder_alert':
+      return 'confounder alert: sample_froh layer not loaded';
+    default:
+      return `${mode || 'color'} mode: no per-sample values available`;
+  }
+}
+
 // --- drawLinesPanel(state) — legacy lines 34894-35744 ---
 export function drawLinesPanel(state) {
   _setActiveState(state);
@@ -439,16 +480,19 @@ export function drawLinesPanel(state) {
     // of ~220 strokes × nGrid segments). Massive speedup on stepping.
     ctx.drawImage(cached.bgCanvas, 0, 0);
 
-    // v4 turn 126: family-mode "no data" notice. When the user picks
-    // "color: family" but the loaded JSON doesn't have family_id on samples,
-    // every line falls back to the default grey stroke — looking identical
-    // to kmeans mode and producing Quentin's "color by family doesn't color"
-    // report. Drawn ONLY on PC1 sub-panel (one notice, not per-subpanel) and
-    // ONLY when the diagnostic flagged us as no-hits. Notice is small,
-    // amber-tinted, top-right of the plot so it doesn't obscure data.
+    // v4 turn 126: per-mode "no data" notice. When the user picks a
+    // per-sample color mode but every line falls back to the default
+    // grey stroke, we surface an explanation. 2026-05-20: the message
+    // was hardcoded to "family mode: no family data loaded" — but the
+    // notice fires for EVERY per-sample mode (dosage / het / θπ / GHSL
+    // / F_ROH / confounder_alert / family / lineage) the moment its
+    // source values come back all-NaN. Now mode-aware so picking
+    // "color: dosage" before the dosage chunk lands shows "dosage:
+    // fetching chunk…" instead of a nonsensical family-data prompt.
+    // Drawn ONLY on PC1 sub-panel; small, amber-tinted, top-right.
     if (source === 'pc1' && cached.bgFamilyMissing) {
       ctx.save();
-      const msg = 'family mode: no family data loaded — drag-drop ngsRelate JSON';
+      const msg = _modeNoDataNotice(lcMode, state);
       ctx.font = '10px ui-monospace, monospace';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'top';

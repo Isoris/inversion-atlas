@@ -3,6 +3,8 @@
 // computeBandDiagnostics (legacy lines 15254-15583, ~330 LOC). Reads
 // per-band statistics from the data layers that local_pca_dosage already carries
 // (GHSL panel, θπ panel, ROH intervals, sample-FROH) and surfaces:
+
+import { computeHetRateForRange } from '../../shared/dosage_chunks.js';
 //
 //   - Per-band rows with mean/median for each available source
 //     (GHSL, het, theta_pi, ROH overlap %, FROH).
@@ -42,20 +44,132 @@ export function computeBandDiagnostics(state, cl, env, l2idx) {
     if (k >= 0 && k < K) sampleIdxByBand[k].push(s);
   }
 
-  // Source presence
-  const ghslPanel = state.data.ghsl_panel || null;
-  const tpiPanel  = state.data.theta_pi_panel || null;
+  // 2026-05-20: adapt the modern theta-pi schema (theta_pi_per_window) to
+  // the legacy "panel" shape this function consumes. The legacy
+  // theta_pi_panel.div_roll was a single per-sample × per-window matrix
+  // with parallel start_bp / end_bp arrays. theta_pi_per_window.values
+  // already IS per-sample × per-window; its windows[] carry start_bp/end_bp.
+  // Hoist into a synthetic panel so the L3 chips actually compute instead
+  // of rendering '?' (the user's report on 2026-05-20: "We need to
+  // calculate the values for het and so on in the contingency tables L3").
+  function _tpiPanelFromPerWindow(d) {
+    const tpw = d && d.theta_pi_per_window;
+    if (!tpw || !Array.isArray(tpw.values) || !Array.isArray(tpw.windows)) return null;
+    if (tpw.windows.length === 0) return null;
+    const start_bp = tpw.windows.map(w => w && Number.isFinite(w.start_bp) ? w.start_bp : NaN);
+    const end_bp   = tpw.windows.map(w => w && Number.isFinite(w.end_bp)   ? w.end_bp   : NaN);
+    // Sanity: at least the first window must have valid bp; otherwise the
+    // env-overlap predicate in _perSampleMeanPanel will reject everything.
+    if (!Number.isFinite(start_bp[0]) || !Number.isFinite(end_bp[0])) return null;
+    return {
+      primary_scale: 'default',
+      div_roll:      { default: tpw.values },
+      start_bp,
+      end_bp,
+    };
+  }
+  // 2026-05-20: GHSL panel adapter. The modern GHSL precomp ships its
+  // signal as ghsl_local_pca.pc_loadings_aligned[npc][nwin][nsamples] —
+  // we synthesize a panel-shape matrix M[sample_idx][window_idx] where
+  // each cell is |PC1| (the haplotype-divergence-direction magnitude).
+  // The legacy ghsl_panel.div_roll carried phased-SNP heterozygous-block
+  // fraction; |PC1| is a reasonable proxy for "how strongly this sample
+  // separates along the local-PCA divergence axis" — high for the
+  // minority arrangement, low for the majority.
+  // Falls back to checking d.ghsl_view.{ghsl_local_pca, local_pca} for
+  // the namespaced merge path (see pca_comparator/renderer.js for the
+  // same fallback chain).
+  function _ghslPanelFromLocalPca(d) {
+    const lp =
+         (d && d.ghsl_local_pca)
+      || (d && d.ghsl_view && d.ghsl_view.ghsl_local_pca)
+      || (d && d.ghsl_view && d.ghsl_view.local_pca);
+    if (!lp || !Array.isArray(lp.pc_loadings_aligned)) return null;
+    const pc1ByWin = lp.pc_loadings_aligned[0];
+    if (!Array.isArray(pc1ByWin) || pc1ByWin.length === 0) return null;
+    // Need per-window bp positions for the env-overlap predicate. Pull
+    // from theta_pi_per_window.windows / data.windows depending on what
+    // the GHSL precomp aligned to. The synthesized ghsl_view.windows is
+    // the cleanest source (idx, start_bp, end_bp).
+    const wins =
+         (d && d.ghsl_view && Array.isArray(d.ghsl_view.windows) && d.ghsl_view.windows)
+      || (d && Array.isArray(d.windows) && d.windows)
+      || null;
+    if (!wins) return null;
+    const nW = Math.min(pc1ByWin.length, wins.length);
+    if (nW === 0) return null;
+    // Build M[sample][window] = |pc1|. pc_loadings_aligned is window-major
+    // (pc1ByWin[w] is a length-nS array). We transpose to sample-major so
+    // _perSampleMeanPanel's M[s][w] lookup works without rebuilding.
+    let nS = 0;
+    for (let i = 0; i < nW; i++) {
+      const row = pc1ByWin[i];
+      if (row && row.length > nS) nS = row.length;
+    }
+    if (nS === 0) return null;
+    const M = new Array(nS);
+    for (let s = 0; s < nS; s++) {
+      const out = new Float32Array(nW);
+      for (let i = 0; i < nW; i++) {
+        const v = pc1ByWin[i] && pc1ByWin[i][s];
+        out[i] = Number.isFinite(v) ? Math.abs(v) : NaN;
+      }
+      M[s] = out;
+    }
+    const start_bp = new Array(nW);
+    const end_bp   = new Array(nW);
+    for (let i = 0; i < nW; i++) {
+      const w = wins[i] || {};
+      start_bp[i] = Number.isFinite(w.start_bp) ? w.start_bp : NaN;
+      end_bp[i]   = Number.isFinite(w.end_bp)   ? w.end_bp   : NaN;
+    }
+    if (!Number.isFinite(start_bp[0]) || !Number.isFinite(end_bp[0])) return null;
+    return {
+      primary_scale: 'default',
+      div_roll:      { default: M },
+      start_bp,
+      end_bp,
+    };
+  }
+  // Source presence — try the legacy paths first, fall back to the
+  // schema v2 fields. ghsl_panel + theta_pi_panel are the legacy names;
+  // theta_pi_per_window is what the modern pipeline ships.
+  // 2026-05-20: GHSL panel synthesized from ghsl_local_pca.pc_loadings_aligned
+  // (per-sample × per-window PC1 magnitudes) when the legacy ghsl_panel is
+  // absent — that's what the modern GHSL precomp emits. Het uses the
+  // dosage_chunks bridge directly (computed below), so it no longer rides
+  // on the GHSL panel.
+  const ghslPanel = state.data.ghsl_panel || _ghslPanelFromLocalPca(state.data);
+  const tpiPanel  = state.data.theta_pi_panel || _tpiPanelFromPerWindow(state.data);
   const rohList   = Array.isArray(state.data.roh_intervals)
     ? state.data.roh_intervals : null;
   const frohArr   = (state.data.sample_froh && state.data.sample_froh.length === n_samples)
     ? state.data.sample_froh : null;
+  // Het availability: chunk fetcher is installed iff dosage_chunks layer
+  // is present. computeHetRateForRange returns NaN-filled when no
+  // covering chunk is cached, so the chip will show "computing…" style
+  // empty values until the fetch lands and a subsequent paint triggers.
+  const hasHetSource = !!(state._linesPanelGetCachedChunk);
   const data_status = {
     ghsl:     !!(ghslPanel && ghslPanel.div_roll && ghslPanel.start_bp && ghslPanel.end_bp),
     theta_pi: !!(tpiPanel  && tpiPanel.div_roll  && tpiPanel.start_bp  && tpiPanel.end_bp),
-    het:      !!(ghslPanel && ghslPanel.div_roll && ghslPanel.start_bp && ghslPanel.end_bp),
+    het:      hasHetSource,
     roh:      !!rohList,
     froh:     !!frohArr,
   };
+  // Pre-compute het for ALL samples in this env's bp range once; per-band
+  // means below just filter by sample index. NaN-filled when the chunk
+  // isn't cached yet — the fetcher's onLoad callback will retrigger the
+  // L3 panel render via the panel's existing cache-invalidation chain.
+  let hetFullCohort = null;
+  if (hasHetSource && Number.isFinite(env.start_bp) && Number.isFinite(env.end_bp)) {
+    try {
+      hetFullCohort = computeHetRateForRange(state, env.start_bp, env.end_bp, {
+        getCachedChunk: state._linesPanelGetCachedChunk,
+        cacheKey: 'band_diag:het:' + env.start_bp + ':' + env.end_bp,
+      });
+    } catch (e) { console.warn('band_diag het compute:', e); }
+  }
 
   // Helper — per-sample mean over panel windows whose bp midpoint falls
   // inside the env's bp range. Returns Float64Array(n_samples), values
@@ -160,9 +274,17 @@ export function computeBandDiagnostics(state, cl, env, l2idx) {
       row.ghsl_mean = mm.mean; row.ghsl_median = mm.median;
     }
     if (data_status.het) {
-      // Heterozygosity uses the same GHSL primary scale — phased-snp het
-      // rate by construction.
-      const v = _perSampleMeanPanel(ghslPanel, idx);
+      // 2026-05-20: het now uses the dosage-chunk-backed hetFullCohort
+      // computed above (computeHetRateForRange over the env's bp range).
+      // Legacy used the GHSL panel's primary scale, but the modern GHSL
+      // precomp doesn't ship the phased-SNP het matrix — dosage chunks
+      // (genotype 1 = het) are the direct source. Filter the cohort-wide
+      // het vector down to this band's sample indices.
+      let v = null;
+      if (hetFullCohort) {
+        v = new Float64Array(idx.length);
+        for (let i = 0; i < idx.length; i++) v[i] = hetFullCohort[idx[i]];
+      }
       const mm = _meanMedian(v);
       row.het_mean = mm.mean; row.het_median = mm.median;
       // v3.93: stash the per-sample het vector so downstream het_shape
