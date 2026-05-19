@@ -356,9 +356,35 @@ export async function mount(root, atlasState, registry) {
     return;
   }
 
+  // 2026-05-18 — preserve cursor + tracked-samples across tab switches.
+  // The unmount path keeps the stash alive (see unmount comment); on
+  // re-mount, if the saved stash points at the SAME chromosome the
+  // user is now viewing, replay its scrubber position + tracked list
+  // onto the fresh legacyState BEFORE applyData (which would
+  // otherwise reset cur to 0 — see local_pca_dosage.js:192). This is
+  // what makes the cursor "stick" when the user tabs to
+  // candidate_focus / pca_comparator / haplotype_regimes and back.
+  const priorStash = atlasState.inversion._local_pca_dosage_state;
+  let restoredCur = null;
+  let restoredTracked = null;
+  if (priorStash && priorStash.data && priorStash.data.chrom === chrom) {
+    if (Number.isFinite(priorStash.cur)) restoredCur = priorStash.cur | 0;
+    if (Array.isArray(priorStash.tracked)) restoredTracked = priorStash.tracked.slice();
+  }
+
   // Apply data through the legacy entry point. This populates state.data,
   // state.tracks, state.windows, etc. — everything the draw functions need.
   applyData(legacyState, data);
+
+  // Re-apply the preserved cursor / tracked-samples now that applyData's
+  // defaults have been written.
+  if (restoredCur != null && Number.isFinite(restoredCur)) {
+    const nW = (legacyState.data && legacyState.data.n_windows) | 0;
+    legacyState.cur = Math.max(0, Math.min(nW - 1, restoredCur));
+  }
+  if (restoredTracked && restoredTracked.length) {
+    legacyState.tracked = restoredTracked;
+  }
 
   // Replay any enrichments the user dropped in a prior session. Async,
   // fire-and-forget; matching enrichments merge onto state.data and
@@ -446,9 +472,14 @@ export async function mount(root, atlasState, registry) {
     }
   } catch (_) {}
 
-  // Stash the legacy state on the atlas bucket for inter-function access
-  // during this mount lifetime. The unmount path clears it.
-  atlasState.inversion._page1State = legacyState;
+  // Stash the legacy state on the atlas bucket so it survives
+  // unmount/mount across tab switches. pca_comparator + future
+  // sibling pages read `inv._local_pca_dosage_state` to follow this
+  // page's cursor + tracked-samples set; the `_page1State` alias is
+  // retained for the legacy unmount cleanup path. 2026-05-18: the
+  // stash now SURVIVES unmount (was deleted, see unmount comment).
+  atlasState.inversion._local_pca_dosage_state = legacyState;
+  atlasState.inversion._page1State = legacyState;   // legacy alias
 }
 
 /**
@@ -472,9 +503,16 @@ export async function unmount(root) {
     try { legacyState._hotkeyDetach(); } catch (_) {}
     legacyState._hotkeyDetach = null;
   }
-  if (state && state.inversion) {
-    delete state.inversion._page1State;
-  }
+  // 2026-05-18 — DON'T delete the stash on unmount. The stash carries
+  // state.cur (scrubber position) + state.tracked across tab
+  // switches; deleting it forced the next mount to start at cur=0
+  // every time the user tabbed back from candidate_focus /
+  // pca_comparator / haplotype_regimes (user-reported: "make sure
+  // the cursor is correctly reassigned for all panels when we switch
+  // discovery mode"). The mount path below now checks the stash and
+  // restores cur+tracked when the same chrom is reloaded.
+  // The playTimer + hotkey listeners ARE detached above because
+  // they're per-mount DOM bindings; only the data + cursor stays.
 }
 
 // --- Helpers ---
