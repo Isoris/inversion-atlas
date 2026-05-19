@@ -95,7 +95,9 @@
       "source": "file",
       "path": "data/precomp/{chrom}/repeat_density.scrubber_windows.json",
       "schema": "schemas/repeat_density.schema.json",
-      "pin_to": "AtlasState.inversion.tracks.{chrom}.repeat_density"
+      "pin_to": "AtlasState.inversion.tracks.{chrom}.repeat_density",
+      "disabled": true,
+      "_disabled_reason": "2026-05-19: pipeline does not currently emit repeat_density.scrubber_windows.json — flagged so prewarm + registry.resolve skip silently instead of spamming 404s. Remove when the pipeline produces the file."
     },
     "_section_2": "==== HOT band_tracking layers (R-pipeline outputs, TSV) ====",
     "band_nodes": {
@@ -103,55 +105,71 @@
       "preload_on": "chrom_change",
       "source": "file",
       "path": "data/precomp/{chrom}/band_nodes.tsv",
-      "format": "tsv"
+      "format": "tsv",
+      "disabled": true,
+      "_disabled_reason": "2026-05-19: pipeline does not currently emit band_nodes.tsv. Re-enable when the R band-tracking pipeline lands."
     },
     "band_edges": {
       "tier": "hot",
       "preload_on": "chrom_change",
       "source": "file",
       "path": "data/precomp/{chrom}/band_edges.tsv",
-      "format": "tsv"
+      "format": "tsv",
+      "disabled": true,
+      "_disabled_reason": "2026-05-19: pipeline does not currently emit band_edges.tsv. Re-enable when the R band-tracking pipeline lands."
     },
     "transition_events": {
       "tier": "hot",
       "preload_on": "chrom_change",
       "source": "file",
       "path": "data/precomp/{chrom}/transition_events.tsv",
-      "format": "tsv"
+      "format": "tsv",
+      "disabled": true,
+      "_disabled_reason": "2026-05-19: pipeline does not currently emit transition_events.tsv."
     },
     "band_trajectories": {
       "tier": "hot",
       "preload_on": "chrom_change",
       "source": "file",
       "path": "data/precomp/{chrom}/band_trajectories.tsv",
-      "format": "tsv"
+      "format": "tsv",
+      "disabled": true,
+      "_disabled_reason": "2026-05-19: pipeline does not currently emit band_trajectories.tsv."
     },
     "het_band_backbones": {
       "tier": "hot",
       "preload_on": "chrom_change",
       "source": "file",
       "path": "data/precomp/{chrom}/het_band_backbones.tsv",
-      "format": "tsv"
+      "format": "tsv",
+      "disabled": true,
+      "_disabled_reason": "2026-05-19: pipeline does not currently emit het_band_backbones.tsv."
     },
     "candidate_track_proposals": {
       "tier": "hot",
       "preload_on": "chrom_change",
       "source": "file",
       "path": "data/precomp/{chrom}/candidate_track_proposals.tsv",
-      "format": "tsv"
+      "format": "tsv",
+      "disabled": true,
+      "_disabled_reason": "2026-05-19: pipeline does not currently emit candidate_track_proposals.tsv."
     },
     "candidate_tracks": {
       "tier": "hot",
       "preload_on": "chrom_change",
       "source": "file",
-      "path": "data/precomp/{chrom}/candidate_tracks.json"
+      "path": "data/precomp/{chrom}/candidate_tracks.json",
+      "disabled": true,
+      "_disabled_reason": "2026-05-19: pipeline does not currently emit candidate_tracks.json."
     },
     "manual_review_queue": {
       "tier": "warm",
       "preload_on": "chrom_change",
       "source": "file",
       "path": "data/precomp/{chrom}/manual_review_queue.tsv",
-      "format": "tsv"
+      "format": "tsv",
+      "disabled": true,
+      "_disabled_reason": "2026-05-19: pipeline does not currently emit manual_review_queue.tsv."
     },
     "_section_3": "==== WARM cohort-level layers (loaded once at app start) ====",
     "_succession_note_3": "These layers are PROVISIONAL in inversion-atlas. They semantically belong to a future population-atlas. When that atlas lands and declares these same keys, the registry's succession rule lets population take over silently. See SPEC_registry_v1.md \u00a77 and README_PAIRING.md \u00a711.",

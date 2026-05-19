@@ -63,6 +63,7 @@ import { buildTrackPanels, drawTracks, onPCAClick, onSimClick, onZClick, setCur,
 import { attachSidebarHandlers } from './local_pca_dosage/sidebar.js';
 import { attachHotkeys } from './local_pca_dosage/hotkeys.js';
 import { attachPcaLasso } from './local_pca_dosage/pca_panel.js';
+import { installDosageChunkFetcher } from '../../shared/dosage_chunks.js';
 
 // Theta-pi mirror (local_pca_theta_pi) and GHSL mirror (local_pca_ghsl) entry points. These are
 // painted from local_pca_dosage's applyData() because the mirror panels share local_pca_dosage's
@@ -530,6 +531,22 @@ export async function mount(root, atlasState, registry) {
     legacyState.tracked = restoredTracked;
   }
 
+  // 2026-05-19 — install the dosage-chunk fetcher so that picking
+  // "color: dosage" or "color: het" in the per-sample lines panel
+  // actually triggers an HTTP fetch + repaint. The fetcher binds to
+  // state._linesPanelGetCachedChunk, which computeDosageMeanForRange /
+  // computeHetRateForRange both consult. onLoad re-renders the lines
+  // panel when a chunk lands so the visual updates without a user
+  // gesture. Idempotent: re-installs on each chrom remount because
+  // the template URL is bound to the chrom inside state.data.
+  try {
+    installDosageChunkFetcher(legacyState, {
+      onLoad: () => {
+        try { drawLinesPanel(legacyState); } catch (_) {}
+      },
+    });
+  } catch (e) { console.warn('installDosageChunkFetcher:', e); }
+
   // Replay any enrichments the user dropped in a prior session. Async,
   // fire-and-forget; matching enrichments merge onto state.data and
   // mark new layersPresent before the user touches anything. Failures
@@ -915,6 +932,7 @@ function _refreshModeToggleUI(state) {
   const bar = document.getElementById('dataModeBar');
   if (!bar) return;
   const mode = state.activeMode || 'dosage';
+  const chrom = (state.data && state.data.chrom) || '—';
   for (const btn of bar.querySelectorAll('button[data-mode]')) {
     btn.classList.toggle('active', btn.dataset.mode === mode);
     const m = btn.dataset.mode;
@@ -924,6 +942,22 @@ function _refreshModeToggleUI(state) {
       (m === 'ghsl'     && !!(state.data && state.data.ghsl_view));
     btn.disabled = !available;
     btn.style.opacity = available ? '' : '0.4';
+    // 2026-05-19: explain WHY a mode is greyed out so the user doesn't
+    // have to dig through the prewarm log. The precomp pipelines don't
+    // produce every chrom every run — when GHSL or θπ is missing for
+    // the active chrom, the button used to grey silently with no clue
+    // ("for some reasons GHSL is not available in LG01 despite having
+    // the JSON" — Quentin's report). The tooltip now points at the
+    // precomp root and the fact that the JSON isn't on disk for this
+    // chrom; restoring availability is a pipeline-side action.
+    if (!available) {
+      const layerName = m === 'theta_pi'
+        ? 'scrubber_thetapi (precomp_thetapi)'
+        : (m === 'ghsl' ? 'scrubber_ghsl (precomp_ghsl)' : m);
+      btn.title = `${m} mode unavailable for ${chrom} — ${layerName} JSON not on disk for this chromosome. Run the corresponding pipeline (or pick a chrom that has it produced).`;
+    } else {
+      btn.title = '';
+    }
   }
 }
 

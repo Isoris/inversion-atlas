@@ -467,6 +467,14 @@ function _wireNewShellControls(state) {
   _wireCompactTrackedCollapse(state);
 
   // ===========================================================================
+  // Collapsible sidebar sections (2026-05-19). Native <details> handles
+  // the visual toggle; this helper just restores the persisted open/closed
+  // state and writes back on user toggle. Each section opts in by carrying
+  // a `data-persist-key` attribute on the <details>.
+  // ===========================================================================
+  _wireSidebarSectionPersist();
+
+  // ===========================================================================
   // First-use attention pulses (v4 turn 80 — never wired in modular tree).
   // CSS classes `.attention-pulse` + `.attention-pulse-fade` already exist
   // in inversion.css (lines 143-172). Apply pulse to the key onboarding
@@ -650,6 +658,40 @@ function _wireCompactTrackedCollapse(state) {
     });
   });
   head.dataset.wired = '1';
+}
+
+// ---------------------------------------------------------------------------
+// Collapsible sidebar sections — persistence for native <details>.
+//
+// Sections opt in by carrying a `data-persist-key="<slug>"` attribute on
+// the <details> element. The slug is appended to a shared localStorage
+// prefix so multiple atlases can coexist. On mount we restore the saved
+// open/closed state (default = closed for the Tracked-samples section,
+// since the aside + popup carry the same controls); on toggle we save.
+// Idempotent via dataset.persistWired.
+// ---------------------------------------------------------------------------
+const _SIDEBAR_SECTION_LS_PREFIX = 'inversion_atlas.sidebarSection.';
+
+function _wireSidebarSectionPersist() {
+  if (typeof document === 'undefined') return;
+  const nodes = document.querySelectorAll('details.sidebar-section[data-persist-key]');
+  nodes.forEach(node => {
+    if (node.dataset.persistWired === '1') return;
+    const key = _SIDEBAR_SECTION_LS_PREFIX + node.dataset.persistKey;
+    // Restore — default is *closed*. If no entry exists, the section
+    // starts collapsed; the user can open it once and the new state
+    // persists from then on.
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored === '1') node.setAttribute('open', '');
+      else if (stored === '0') node.removeAttribute('open');
+      else node.removeAttribute('open');   // default = collapsed
+    } catch (_) {}
+    node.addEventListener('toggle', () => {
+      try { localStorage.setItem(key, node.open ? '1' : '0'); } catch (_) {}
+    });
+    node.dataset.persistWired = '1';
+  });
 }
 
 // Target buttons by ID. Picked from legacy turn-80 comment (inversion.css L135).
@@ -1830,38 +1872,68 @@ function _wireL3Clustering(state) {
 // =============================================================================
 
 function _wireDisplay(state) {
+  // 2026-05-19: shared apply-color-mode routine called from BOTH the
+  // sidebar #colorModeBar and the in-PCA-panel #colorModeBarCompact.
+  // The two bars were drifting because only the sidebar was wired —
+  // the compact buttons looked clickable but did nothing. This factors
+  // out the shared logic so the two surfaces stay in lock-step and
+  // either one repaints the PCA / lines / L3 strip.
+  const applyColorMode = (newMode) => {
+    state.colorMode = newMode;
+    state.colorByL2 = (state.colorMode === 'cluster');   // legacy alias
+    // Mirror the active class onto BOTH bars so the highlight stays in sync.
+    document.querySelectorAll('#colorModeBar button').forEach(b => {
+      b.classList.toggle('active', b.dataset.mode === newMode);
+    });
+    document.querySelectorAll('#colorModeBarCompact button').forEach(b => {
+      b.classList.toggle('active', b.dataset.modeCompact === newMode);
+    });
+    // v4 turn 86: show/hide Q-ancestry sub-controls when mode toggles
+    // to/from q_ancestry. Refresh the K dropdown options from the
+    // registered set each time the panel is shown.
+    const qaSubs = document.getElementById('qAncestrySubControls');
+    if (qaSubs) {
+      if (state.colorMode === 'q_ancestry') {
+        qaSubs.style.display = 'flex';
+        if (typeof _qaPopulateKSelect === 'function') _qaPopulateKSelect();
+      } else {
+        qaSubs.style.display = 'none';
+      }
+    }
+    if (typeof updateColorModeInfo === 'function') {
+      try { updateColorModeInfo(); } catch (_) {}
+    }
+    drawPCA(state);
+    // 2026-05-18: also redraw the per-sample lines panel — many modes
+    // (family, lineage) affect both surfaces. The lines panel reads its
+    // own state.linesColorMode, so this is a no-op when the lines mode
+    // is independent (kmeans default), but it picks up changes to the
+    // shared scope-color modes (family/lineage) cleanly.
+    try { drawLinesPanel(state); } catch (_) {}
+    renderL3Panel(state);
+  };
+
   // --- #colorModeBar button click — legacy lines 66470-66493 ---
   document.querySelectorAll('#colorModeBar button').forEach(btn => {
     btn.addEventListener('click', () => {
       if (btn.disabled) return;
-      document.querySelectorAll('#colorModeBar button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.colorMode = btn.dataset.mode;
-      state.colorByL2 = (state.colorMode === 'cluster');   // legacy alias
-      // v4 turn 86: show/hide Q-ancestry sub-controls when mode toggles
-      // to/from q_ancestry. Refresh the K dropdown options from the
-      // registered set each time the panel is shown.
-      const qaSubs = document.getElementById('qAncestrySubControls');
-      if (qaSubs) {
-        if (state.colorMode === 'q_ancestry') {
-          qaSubs.style.display = 'flex';
-          if (typeof _qaPopulateKSelect === 'function') _qaPopulateKSelect();
-        } else {
-          qaSubs.style.display = 'none';
-        }
-      }
-      if (typeof updateColorModeInfo === 'function') {
-        try { updateColorModeInfo(); } catch (_) {}
-      }
-      drawPCA(state);
-      // 2026-05-18: also redraw the per-sample lines panel — many modes
-      // (family, lineage) affect both surfaces. The lines panel reads its
-      // own state.linesColorMode, so this is a no-op when the lines mode
-      // is independent (kmeans default), but it picks up changes to the
-      // shared scope-color modes (family/lineage) cleanly.
-      try { drawLinesPanel(state); } catch (_) {}
-      renderL3Panel(state);
+      applyColorMode(btn.dataset.mode);
     });
+  });
+  // --- #colorModeBarCompact button click (2026-05-19) ---
+  // The compact bar lives inside the PCA panel card; it has its own
+  // `data-mode-compact` attribute (sidebar uses `data-mode`). Without
+  // this loop, clicking any of the 6 compact buttons fired no handler
+  // — the user saw the buttons but the PCA scatter never recoloured.
+  document.querySelectorAll('#colorModeBarCompact button').forEach(btn => {
+    if (btn.dataset.wired === '1') return;
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      const mode = btn.dataset.modeCompact;
+      if (!mode) return;
+      applyColorMode(mode);
+    });
+    btn.dataset.wired = '1';
   });
 
   // --- #qAncestrySubControls widgets — legacy lines 66495-66548 ---
@@ -2021,22 +2093,48 @@ function _wireDisplay(state) {
     });
   }
 
-  // --- #openDosageHeatmapBtn click (2026-05-18) ---
+  // --- #openDosageHeatmapBtn click (2026-05-18, rewired 2026-05-19) ---
   // Quick jump from local_pca_dosage to the dosage_heatmap page for the
   // active candidate. The dosage_heatmap page reads its rich payload
-  // from atlasState.inversion.dosage_heatmap_state — we stash the
-  // candidate label so the page header reflects context even when no
-  // dosage payload is loaded (empty state shows the candidate).
+  // from atlasState.inversion.dosage_heatmap_state.
+  //
+  // 2026-05-19 — the prior version relied on the LEGACY tab bar's DOM
+  // (#tabBar + .page elements) which doesn't exist under atlas-core.
+  // Clicking did nothing — the page never navigated. New flow:
+  //   1. fetch a dosage chunk covering the candidate's bp span via
+  //      the same /api/dosage/chunk endpoint the lines panel uses
+  //   2. stash it on inv.dosage_heatmap_state as `legacy_chunk` (the
+  //      adapter the page already understands)
+  //   3. navigate by setting window.location.hash — the router picks
+  //      it up and mounts dosage_heatmap.
   const dhBtn = $('openDosageHeatmapBtn');
   if (dhBtn) {
     const _syncDhBtnEnabled = () => { dhBtn.disabled = !state.candidate; };
     _syncDhBtnEnabled();
-    dhBtn.addEventListener('click', () => {
+    dhBtn.addEventListener('click', async () => {
       const cand = state.candidate;
       if (!cand) {
         alert('Focus a candidate first (promote one above, or pick from the saved list).');
         return;
       }
+      const chrom = (state.data && state.data.chrom) || cand.chrom;
+      // Bp span: prefer the candidate's own start/end; fall back to its
+      // start_w/end_w mapped to the window centres if absent.
+      let startBp = Number.isFinite(cand.start_bp) ? cand.start_bp : null;
+      let endBp   = Number.isFinite(cand.end_bp)   ? cand.end_bp   : null;
+      const wins  = state.data && state.data.windows;
+      if ((startBp == null || endBp == null) && wins && Array.isArray(wins)) {
+        const ws = Number.isFinite(cand.start_w) ? cand.start_w | 0 : 0;
+        const we = Number.isFinite(cand.end_w)   ? cand.end_w   | 0 : wins.length - 1;
+        const w0 = wins[Math.max(0, Math.min(wins.length - 1, ws))];
+        const w1 = wins[Math.max(0, Math.min(wins.length - 1, we))];
+        if (w0 && w1) {
+          if (startBp == null) startBp = w0.start_bp != null ? w0.start_bp : w0.center_bp;
+          if (endBp   == null) endBp   = w1.end_bp   != null ? w1.end_bp   : w1.center_bp;
+        }
+      }
+      // Stash candidate label + a placeholder so the page mount can
+      // render the header even while the chunk fetch is in flight.
       if (typeof window !== 'undefined' && window.atlasState) {
         const inv = window.atlasState.inversion || (window.atlasState.inversion = {});
         const prev = inv.dosage_heatmap_state || {};
@@ -2044,12 +2142,41 @@ function _wireDisplay(state) {
           candidate_label: cand.label || cand.id || null,
         });
       }
-      document.querySelectorAll('#tabBar button').forEach(b => b.classList.remove('active'));
-      const dhTab = document.querySelector('#tabBar button[data-page="dosage_heatmap"]');
-      if (dhTab) dhTab.classList.add('active');
-      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      const dhPage = document.getElementById('dosage_heatmap');
-      if (dhPage) dhPage.classList.add('active');
+      // Fire the fetch BEFORE navigating so the data lands on the inv
+      // bucket the next mount reads. If it fails, the page still mounts
+      // and shows its empty state. Re-uses the templated URL from the
+      // synthetic dosage_chunks layer so we don't have to know the
+      // server's host/port here.
+      try {
+        const dc = state.data && state.data.dosage_chunks;
+        const template = dc && Array.isArray(dc.chunks) && dc.chunks[0] && (dc.chunks[0].url || dc._endpoint);
+        if (template && Number.isFinite(startBp) && Number.isFinite(endBp) && chrom) {
+          const cap = (dc.cap_default | 0) || 1000;
+          const url = template
+            .replace('__CHROM__', encodeURIComponent(chrom))
+            .replace('__START__', String(startBp | 0))
+            .replace('__END__',   String(endBp | 0))
+            .replace('__CAP__',   String(cap));
+          const r = await fetch(url);
+          if (r.ok) {
+            const chunk = await r.json();
+            if (typeof window !== 'undefined' && window.atlasState) {
+              const inv = window.atlasState.inversion;
+              inv.dosage_heatmap_state = Object.assign({}, inv.dosage_heatmap_state, {
+                legacy_chunk: chunk,
+              });
+            }
+          } else {
+            console.warn('open dosage heatmap: chunk fetch HTTP', r.status, url);
+          }
+        }
+      } catch (e) {
+        console.warn('open dosage heatmap: chunk fetch failed:', e);
+      }
+      // Navigate via the router's hash-based URL contract.
+      try {
+        window.location.hash = '#/inversion/dosage_heatmap';
+      } catch (_) {}
     });
     // Expose so other code paths (promoteCandidate, candidate-list
     // selection) can re-sync the disabled state when state.candidate

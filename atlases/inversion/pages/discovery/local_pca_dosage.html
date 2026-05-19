@@ -269,31 +269,39 @@
       <span class="val" id="trailNVal">15</span>
     </div>
 
-    <h2>Tracked samples</h2>
-    <div class="ctl hrange">
-      <label class="inline">N</label>
-      <input type="range" id="trackedN" min="0" max="30" step="1" value="10" />
-      <span class="val" id="trackedNVal">10</span>
-    </div>
-    <div class="ctl">
-      <label style="font-size: 11px; color: var(--ink-dim); margin-bottom: 3px;">pick N from focal L2</label>
-      <div class="color-mode-row" id="bandPickBar">
-        <button data-band="all"   class="active">all bands</button>
-        <button data-band="0" data-vocab-band-k3="0">band 1 (lo)</button>
-        <button data-band="1" data-vocab-band-k3="1">band 2 (mid)</button>
-        <button data-band="2" data-vocab-band-k3="2">band 3 (hi)</button>
+    <!-- 2026-05-19: wrap the sidebar's Tracked-samples settings in a
+         native <details> so the user can fold them away. The aside in
+         the PCA card + the #tPanelOverlay popup carry the same controls,
+         so the sidebar copy is the lowest-priority surface; folded by
+         default to reduce vertical scroll. Collapse state persists via
+         the small wiring in sidebar.js (_wireSidebarSectionPersist). -->
+    <details id="trackedSamplesSidebarSection" class="sidebar-section" data-persist-key="trackedSamplesSidebar">
+      <summary><h2 style="display: inline; margin: 0;">Tracked samples</h2></summary>
+      <div class="ctl hrange">
+        <label class="inline">N</label>
+        <input type="range" id="trackedN" min="0" max="30" step="1" value="10" />
+        <span class="val" id="trackedNVal">10</span>
       </div>
-    </div>
-    <div class="ctl"><button id="autoPickRadial">Auto-pick: radial (any window)</button></div>
-    <div class="ctl"><button id="clearPicks">Clear all</button></div>
-    <div class="ctl" id="trackedList"></div>
-    <div class="ctl"><label style="font-size:10px; color: var(--ink-dimmer); line-height:1.4;">
-      Same samples persist as you scrub across L2 boundaries — watch where they land in each
-      envelope's K-means split. Click any dot in the PCA to add/remove. The "pick from focal L2"
-      buttons sample N from a specific K-means band of the current L2 envelope (or spread N across
-      all K bands). Currently
-      <span id="trackedCountInfo">0</span>/<span id="trackedNInfo">10</span>.
-    </label></div>
+      <div class="ctl">
+        <label style="font-size: 11px; color: var(--ink-dim); margin-bottom: 3px;">pick N from focal L2</label>
+        <div class="color-mode-row" id="bandPickBar">
+          <button data-band="all"   class="active">all bands</button>
+          <button data-band="0" data-vocab-band-k3="0">band 1 (lo)</button>
+          <button data-band="1" data-vocab-band-k3="1">band 2 (mid)</button>
+          <button data-band="2" data-vocab-band-k3="2">band 3 (hi)</button>
+        </div>
+      </div>
+      <div class="ctl"><button id="autoPickRadial">Auto-pick: radial (any window)</button></div>
+      <div class="ctl"><button id="clearPicks">Clear all</button></div>
+      <div class="ctl" id="trackedList"></div>
+      <div class="ctl"><label style="font-size:10px; color: var(--ink-dimmer); line-height:1.4;">
+        Same samples persist as you scrub across L2 boundaries — watch where they land in each
+        envelope's K-means split. Click any dot in the PCA to add/remove. The "pick from focal L2"
+        buttons sample N from a specific K-means band of the current L2 envelope (or spread N across
+        all K bands). Currently
+        <span id="trackedCountInfo">0</span>/<span id="trackedNInfo">10</span>.
+      </label></div>
+    </details>
 
     <h2 title="Manually-curated sample groups — overrides K-means coloring when 'manual' color mode is active. Saved per-chromosome by default; pin to cohort to share across LGs.">Manual groups</h2>
     <div class="ctl">

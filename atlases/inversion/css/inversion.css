@@ -5191,3 +5191,35 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
 .mos-counts-body .empty, .lc-counts-body .empty {
   color: var(--ink-dimmer); font-style: italic;
 }
+
+/* 2026-05-19: collapsible sidebar sections (used for Tracked samples).
+   Style the native <details>/<summary> so the toggle reads as the same
+   h2 header style the rest of the sidebar uses, with a chevron that
+   flips when the section is open. */
+details.sidebar-section { margin: 0; padding: 0; border: 0; }
+details.sidebar-section > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 0 4px 0;
+}
+details.sidebar-section > summary::-webkit-details-marker { display: none; }
+details.sidebar-section > summary::before {
+  content: '▸';
+  font-size: 9px;
+  color: var(--ink-dim);
+  transition: transform 80ms ease;
+  display: inline-block;
+}
+details.sidebar-section[open] > summary::before {
+  transform: rotate(90deg);
+}
+details.sidebar-section > summary h2 {
+  font-size: inherit;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}

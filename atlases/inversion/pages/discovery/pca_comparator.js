@@ -25,6 +25,8 @@ import { _pageState, _setActiveState } from './pca_comparator/_state.js';
 import {
   paintPanel,
   findSampleAtPixel,
+  paintLines,
+  windowAtLinesX,
 } from './pca_comparator/renderer.js';
 
 export async function mount(root, atlasState, registry) {
@@ -83,6 +85,7 @@ function _buildPageState(atlasState) {
   return {
     sharedState,
     anchor: 'dosage',        // 'dosage' | 'theta_pi' | 'ghsl'
+    linesAxis: 'pc1',        // 'pc1' | 'pc2' — drives the per-sample lines strip
     hoveredSample: -1,
     _teardownFns: [],
     _canvasIds: {
@@ -140,6 +143,27 @@ function _paintAll(state) {
   paintPanel(state, 'dosage');
   paintPanel(state, 'theta_pi');
   paintPanel(state, 'ghsl');
+  try { paintLines(state, state.linesAxis || 'pc1'); }
+  catch (e) { console.warn('pca_comparator: paintLines threw —', e); }
+  _refreshLinesStatus(state);
+}
+
+function _refreshLinesStatus(state) {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById('pcaCompStatusLines');
+  if (el) el.textContent = `anchor: ${state.anchor || 'dosage'} · ${(state.linesAxis || 'pc1').toUpperCase()}`;
+  // Update the PC1/PC2 button highlight to reflect the active axis.
+  const b1 = document.getElementById('pcaCompLinesAxisPC1');
+  const b2 = document.getElementById('pcaCompLinesAxisPC2');
+  if (b1 && b2) {
+    const isPC1 = (state.linesAxis || 'pc1') === 'pc1';
+    b1.style.background = isPC1 ? 'var(--accent)' : 'var(--panel-2)';
+    b1.style.color      = isPC1 ? '#0b0e13'       : 'var(--ink)';
+    b1.style.border     = isPC1 ? '0'             : '1px solid var(--rule)';
+    b2.style.background = !isPC1 ? 'var(--accent)' : 'var(--panel-2)';
+    b2.style.color      = !isPC1 ? '#0b0e13'       : 'var(--ink)';
+    b2.style.border     = !isPC1 ? '0'             : '1px solid var(--rule)';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -148,14 +172,44 @@ function _paintAll(state) {
 function _wireToolbar(state) {
   if (typeof document === 'undefined') return;
   const anchorSel = document.getElementById('pcaCompAnchor');
-  if (!anchorSel) return;
-  anchorSel.value = state.anchor || 'dosage';
-  const onChange = (e) => {
-    state.anchor = e.target.value;
-    _paintAll(state);
-  };
-  anchorSel.addEventListener('change', onChange);
-  state._teardownFns.push(() => anchorSel.removeEventListener('change', onChange));
+  if (anchorSel) {
+    anchorSel.value = state.anchor || 'dosage';
+    const onChange = (e) => {
+      state.anchor = e.target.value;
+      _paintAll(state);
+    };
+    anchorSel.addEventListener('change', onChange);
+    state._teardownFns.push(() => anchorSel.removeEventListener('change', onChange));
+  }
+  // PC1 / PC2 buttons for the per-sample lines strip.
+  const b1 = document.getElementById('pcaCompLinesAxisPC1');
+  const b2 = document.getElementById('pcaCompLinesAxisPC2');
+  if (b1) {
+    const onB1 = () => { state.linesAxis = 'pc1'; _paintAll(state); };
+    b1.addEventListener('click', onB1);
+    state._teardownFns.push(() => b1.removeEventListener('click', onB1));
+  }
+  if (b2) {
+    const onB2 = () => { state.linesAxis = 'pc2'; _paintAll(state); };
+    b2.addEventListener('click', onB2);
+    state._teardownFns.push(() => b2.removeEventListener('click', onB2));
+  }
+  // Click-to-scrub on the lines canvas.
+  const linesCanvas = document.getElementById('pcaCompLinesCanvas');
+  if (linesCanvas) {
+    const onClick = (e) => {
+      const rect = linesCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const wi = windowAtLinesX(x);
+      if (wi < 0) return;
+      const ss = state.sharedState;
+      if (!ss || !ss.data) return;
+      ss.cur = wi;
+      refresh(state);
+    };
+    linesCanvas.addEventListener('click', onClick);
+    state._teardownFns.push(() => linesCanvas.removeEventListener('click', onClick));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -168,8 +222,13 @@ function _wireHotkeys(state) {
   const onKey = (e) => {
     const tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    // The shell router replaces #app-root.innerHTML between pages and our
+    // mount/unmount handler manages this listener's lifetime — so simply
+    // checking the page element still exists in the DOM is enough.
+    // The old code required a `.active` class that the router never sets,
+    // which silently killed arrow-key navigation here.
     const pageEl = document.getElementById('pca_comparator');
-    if (!pageEl || !pageEl.classList.contains('active')) return;
+    if (!pageEl) return;
     const ss = state.sharedState;
     if (!ss || !ss.data) return;
     const nWin = ss.data.n_windows | 0;
