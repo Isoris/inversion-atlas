@@ -1042,12 +1042,25 @@ function _wireTrackedAside(state) {
     });
     autoPickAside.dataset.wired = '1';
   }
-  const clearPicksAside = $('clearPicksAside');
-  if (clearPicksAside && clearPicksAside.dataset.wired !== '1') {
-    clearPicksAside.addEventListener('click', () => {
-      try { clearPicks(state); } catch (_) {}
-    });
-    clearPicksAside.dataset.wired = '1';
+  // 2026-05-18 — Auto-pick + Clear button mirrors for the COMPACT
+  // tracked-samples panel. Previously only the fixed-mode aside copies
+  // were wired; in compact mode (now the default), clicking Clear or
+  // Auto-pick on the compact panel did nothing. User-reported chat
+  // 2026-05-18: "in the settings or anywhere when we push the 'remove
+  // the group' button or clear tracked samples. nothing happens."
+  const compactClicks = [
+    { id: 'clearPicksAside',       fn: () => clearPicks(state) },
+    { id: 'clearPicksCompact',     fn: () => clearPicks(state) },
+    { id: 'clearPicksCompact2',    fn: () => clearPicks(state) },
+    { id: 'autoPickRadialAside',   fn: () => _autoPickRadialBridge(state, state.trackedN) },
+    { id: 'autoPickRadialCompact', fn: () => _autoPickRadialBridge(state, state.trackedN) },
+    { id: 'autoPickRadialCompact2',fn: () => _autoPickRadialBridge(state, state.trackedN) },
+  ];
+  for (const { id, fn } of compactClicks) {
+    const btn = $(id);
+    if (!btn || btn.dataset.wired === '1') continue;
+    btn.addEventListener('click', () => { try { fn(); } catch (_) {} });
+    btn.dataset.wired = '1';
   }
 }
 
@@ -2046,12 +2059,21 @@ function _wireTrackedSamples(state) {
 // =============================================================================
 
 function _wireManualGroups(state) {
-  // --- #manualGroupsList delegation — legacy lines 56626-56664 ---
-  // Wires click (pin/delete), blur (rename), keydown (enter/escape) on the
-  // sidebar list. The helpers (toggleManualGroupScope, removeManualGroup,
-  // renameManualGroup) live in ./manual_groups.js.
-  const list = $('manualGroupsList');
-  if (list) {
+  // --- manual-groups click/blur/keydown delegation ---
+  // 2026-05-18: dual-write mirror parity. renderManualGroupsList fills
+  // THREE containers (#manualGroupsList sidebar, #manualGroupsListCompact
+  // compact panel, #manualGroupsListPopup G-panel manual tab). Only the
+  // sidebar had its event delegation wired — so in compact mode (now
+  // the default) and in the G-panel modal, clicking ✕ to delete a
+  // group did nothing. User-reported chat 2026-05-18: "when we push
+  // the 'remove the group' button ... nothing happens".
+  //
+  // Each container gets the SAME set of handlers; idempotent via
+  // dataset.wired.
+  const listIds = ['manualGroupsList', 'manualGroupsListCompact', 'manualGroupsListPopup'];
+  for (const id of listIds) {
+    const list = $(id);
+    if (!list || list.dataset.wired === '1') continue;
     list.addEventListener('click', (e) => {
       const t = e.target;
       if (!t || !t.dataset || !t.dataset.mgid) return;
@@ -2090,6 +2112,7 @@ function _wireManualGroups(state) {
         t.blur();
       }
     });
+    list.dataset.wired = '1';
   }
 
   // --- #mgAddBtn click — legacy lines 56584-56587 ---
