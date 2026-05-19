@@ -5,7 +5,7 @@
 // this module is the shared, page-independent store that lets ANY page
 // color its scatter by ANY other page's clusters. Used by the
 // "cluster_dosage" / "cluster_theta_pi" / "cluster_ghsl" sample-color
-// modes in page1/_state.js and elsewhere.
+// modes in local_pca_dosage/_state.js and elsewhere.
 //
 // Legacy origin: lines 36540-36709 of legacy/Inversion_atlas.html.
 // Transformations from legacy:
@@ -26,7 +26,7 @@
 // in-memory registry becomes a thin cache over the registry.read().
 // Signatures (state, source, candId, payload) already match.
 //
-// Page-isolation: this is shared/, not page1/. Pages 1/2/3 import
+// Page-isolation: this is shared/, not local_pca_dosage/. Pages 1/2/3 import
 // from here; they do NOT import each other. That is the whole point.
 
 // =====================================================================

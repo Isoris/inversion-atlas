@@ -1,22 +1,22 @@
 # SPEC — Lines-panel Candidate Bands (per-candidate vertical highlights)
 
 **Status**: SHIPPED — was SPEC ONLY (referenced from `pages/discovery/
-page1/lines_panel.js` + `MIGRATION_INVENTORY.md` + the band-track
+local_pca_dosage/lines_panel.js` + `MIGRATION_INVENTORY.md` + the band-track
 parent SPEC without an on-disk doc) until 2026-05-15.
 **Authored from shipped code** (recovery of a missing SPEC).
 **Originator turn**: turn 141 (per inline `// turn 141 Slice 1:`
 comments at the implementation site).
 
 **Implemented in**:
-- `atlases/inversion/pages/discovery/page1/lines_panel.js` —
+- `atlases/inversion/pages/discovery/local_pca_dosage/lines_panel.js` —
   `setLinesPanelCandidateBands(state, b)` (line 1286);
   `_paintCandidateBands` call site (line 184-203)
-- `atlases/inversion/pages/discovery/page1/candidates.js` —
+- `atlases/inversion/pages/discovery/local_pca_dosage/candidates.js` —
   `_paintCandidateBands(ctx, opts)` (legacy lines 33945-33992)
 - `atlases/inversion/shared/page1_utils.js` — `_assignCandidateLanes`
   (re-exported through `candidates.js`)
 
-**Page contract**: `docs/generated/page_contracts/page1/`
+**Page contract**: `docs/generated/page_contracts/local_pca_dosage/`
 
 **Companion specs**:
 - `specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md`
@@ -29,7 +29,7 @@ comments at the implementation site).
 
 ## §1. Purpose
 
-Paint **per-candidate vertical band highlights** on page1's lines
+Paint **per-candidate vertical band highlights** on local_pca_dosage's lines
 panel as a pure-background layer beneath the per-sample PC1 traces.
 Each confirmed candidate becomes a faint coloured rectangle spanning
 its `[start_bp, end_bp]` in mb-space.
@@ -213,12 +213,12 @@ export const _assignCandidateLanes;              // re-export from page1_utils
 
 ## §12. References
 
-- **Setter**: `pages/discovery/page1/lines_panel.js#setLinesPanelCandidateBands`
+- **Setter**: `pages/discovery/local_pca_dosage/lines_panel.js#setLinesPanelCandidateBands`
   (legacy lines 34002-34007)
-- **Paint helper**: `pages/discovery/page1/candidates.js#_paintCandidateBands`
+- **Paint helper**: `pages/discovery/local_pca_dosage/candidates.js#_paintCandidateBands`
   (legacy lines 33945-33992)
 - **Lane layout** (companion, used elsewhere):
-  `pages/discovery/page1/candidates.js#_assignCandidateLanes`
+  `pages/discovery/local_pca_dosage/candidates.js#_assignCandidateLanes`
 - **Palette**: `_candidateBandColor` (in `candidates.js`) +
   `withAlpha` (in `shared/page1_utils.js`)
 - **Filter rule**: `c.confirmed === true` per
@@ -226,7 +226,7 @@ export const _assignCandidateLanes;              // re-export from page1_utils
 
 ---
 
-**Authored**: 2026-05-15 from `pages/discovery/page1/lines_panel.js`
-lines 184-203 + 1286-1292 + `pages/discovery/page1/candidates.js`
+**Authored**: 2026-05-15 from `pages/discovery/local_pca_dosage/lines_panel.js`
+lines 184-203 + 1286-1292 + `pages/discovery/local_pca_dosage/candidates.js`
 lines 48-95. One of the 8 SPECs identified as missing on disk in
 `_handoff_docs/SPECS_AUDIT.md`.

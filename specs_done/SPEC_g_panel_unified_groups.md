@@ -1,20 +1,20 @@
 # SPEC — G-panel Unified Groups (popup)
 
 **Status**: SHIPPED (Slice 1) — was SPEC ONLY (referenced from
-page1.html + page1/pca_panel.js + page1/manual_groups.js without an
+local_pca_dosage.html + local_pca_dosage/pca_panel.js + local_pca_dosage/manual_groups.js without an
 on-disk doc) until 2026-05-15.
 **Authored from shipped code** (recovery of a missing SPEC).
 **Implemented in (Slice 1)**:
-- `atlases/inversion/pages/discovery/page1.html` — `#gPanelOpenBtn`
+- `atlases/inversion/pages/discovery/local_pca_dosage.html` — `#gPanelOpenBtn`
   trigger button (lines ~1461-1478)
-- `atlases/inversion/pages/discovery/page1/manual_groups.js` —
+- `atlases/inversion/pages/discovery/local_pca_dosage/manual_groups.js` —
   popup re-host plumbing (line 309+)
-- `atlases/inversion/pages/discovery/page1/pca_panel.js` —
+- `atlases/inversion/pages/discovery/local_pca_dosage/pca_panel.js` —
   `renderManualGroupsList` writes to all 3 surfaces (sidebar +
   compact + popup) via `#manualGroupsListPopup`
 - (Slices 2 + 3 pending — see §6)
 
-**Page contract**: `docs/generated/page_contracts/page1/`
+**Page contract**: `docs/generated/page_contracts/local_pca_dosage/`
 
 **Originator turn**: turn 135 (per inline `// turn 135 Slice 1
 (SPEC_g_panel_unified_groups.md):` comments at the implementation
@@ -26,7 +26,7 @@ sites).
 
 A single **unified popup** consolidating three previously-scattered
 group concepts into one place — opened with the lowercase `g`
-hotkey or the `G ▾` button on the page1 toolbar's `⋯ more`
+hotkey or the `G ▾` button on the local_pca_dosage toolbar's `⋯ more`
 expansion area.
 
 Three tabs, in left-to-right order:
@@ -58,7 +58,7 @@ their tab body.
 ### §3.1 Button
 
 `#gPanelOpenBtn` — sits in the L3 toolbar `⋯ more` collapsible
-expansion area (page1.html ~line 1471). Label: `G ▾`. Tooltip
+expansion area (local_pca_dosage.html ~line 1471). Label: `G ▾`. Tooltip
 reads:
 
 > Open the unified groups popup — three tabs covering karyotype
@@ -70,7 +70,7 @@ reads:
 ### §3.2 Hotkey
 
 Lowercase `g` (no modifiers, NOT in input field) toggles the popup.
-Wired in `page1/hotkeys.js` (alongside `f`, `b`, `c`, `n`, `p`,
+Wired in `local_pca_dosage/hotkeys.js` (alongside `f`, `b`, `c`, `n`, `p`,
 arrows, etc.).
 
 The `g` key intentionally does **NOT** require a focused candidate —
@@ -86,7 +86,7 @@ whether or not chromosome data is loaded:
   without data; saving is gated by data presence per existing
   `manual_groups.js` rules).
 - **Karyotype tab** — needs `state.candidate` (a focused candidate's
-  K-banding from page1 / page2).
+  K-banding from local_pca_dosage / candidate_focus).
 - **Inheritance tab** — needs `state.candidateList.filter(c =>
   c.confirmed === true)` to have at least 2 entries (so the
   inheritance-group clustering has something to compare).
@@ -135,21 +135,21 @@ When `state.manualGroups.length === 0`:
 
 ## §6. Slice 2 (Karyotype tab) — outline
 
-Not yet implemented. The tab body will mirror `page4`'s karyotype
+Not yet implemented. The tab body will mirror `karyotype_tier`'s karyotype
 sub-view but scoped to the single focused candidate:
 
 - Per-sample row showing locked K=3 label (HOMO_1 / HET / HOMO_2)
 - Ordered by median PC1
-- Colour swatch matching the page1 `lines_panel` band paint
+- Colour swatch matching the local_pca_dosage `lines_panel` band paint
 - Click-to-select samples → adds to a new manual group?
   (UX decision pending)
-- Re-uses `page4/karyo_rows.js` pure helpers + `page4/karyo_labels.js`
+- Re-uses `karyotype_tier/karyo_rows.js` pure helpers + `karyotype_tier/karyo_labels.js`
   vocabulary.
 
 Empty state when no `state.candidate` focused:
 
-> Focus a candidate (page2 prev/next, or click on a candidate
-> rectangle in page1) to see its karyotype groups here.
+> Focus a candidate (candidate_focus prev/next, or click on a candidate
+> rectangle in local_pca_dosage) to see its karyotype groups here.
 
 ## §7. Slice 3 (Inheritance tab) — outline
 
@@ -167,7 +167,7 @@ inheritance-group clustering result (the same compute used by
 
 Empty state when `< 2` confirmed candidates:
 
-> Confirm at least 2 candidates (page2 — set the confirmed flag) to
+> Confirm at least 2 candidates (candidate_focus — set the confirmed flag) to
 > see cross-candidate inheritance groups.
 
 ## §8. Why "unified"
@@ -176,29 +176,29 @@ Before Slice 1, the three group concepts were **scattered**:
 
 | concept | pre-Slice-1 surface |
 |---------|---------------------|
-| Karyotype | only on page4 (deep-dive review page) |
+| Karyotype | only on karyotype_tier (deep-dive review page) |
 | Inheritance | only as `lines_panel` pills + `l2_sweep` clustering result; no list view |
 | Manual | sidebar list + compact list (no popup) |
 
 Each lived in its own corner; comparing them required navigating
 between pages or panels. The G-panel pulls them into a single
-popup over page1 so the user can:
+popup over local_pca_dosage so the user can:
 
 - Review karyotype assignment for the focused candidate
 - See which inheritance group each sample belongs to (cohort-wide)
 - Cross-check against manually-curated splits
 
-…all without leaving page1.
+…all without leaving local_pca_dosage.
 
 ## §9. State surface (read by the popup; written by the existing controls)
 
 | field | tab consumed by | mutated by |
 |-------|-----------------|------------|
-| `state.manualGroups` | Manual | sidebar / compact / popup edits + lasso (`page1/pca_panel.js#attachPcaLasso`) |
-| `state.candidate` | Karyotype | page1 / page2 candidate-mode |
-| `state.candidateList` | Inheritance | page2 import/export, l2_sweep auto-promote |
-| `state.lineageResult` (cached) | Inheritance | `page1/lineage.js`, `inheritance.js` |
-| `state.l2SweepResult` (cached) | (read by Inheritance hover hints) | `page1/l2_sweep.js#runL2SweepInheritance` |
+| `state.manualGroups` | Manual | sidebar / compact / popup edits + lasso (`local_pca_dosage/pca_panel.js#attachPcaLasso`) |
+| `state.candidate` | Karyotype | local_pca_dosage / candidate_focus candidate-mode |
+| `state.candidateList` | Inheritance | candidate_focus import/export, l2_sweep auto-promote |
+| `state.lineageResult` (cached) | Inheritance | `local_pca_dosage/lineage.js`, `inheritance.js` |
+| `state.l2SweepResult` (cached) | (read by Inheritance hover hints) | `local_pca_dosage/l2_sweep.js#runL2SweepInheritance` |
 
 ## §10. Persistence
 
@@ -214,31 +214,31 @@ in-memory only). The underlying state surfaces persist as before:
 
 ## §11. Hotkey conflicts
 
-`g` is currently used **only** for this popup (per `page1/hotkeys.js`
+`g` is currently used **only** for this popup (per `local_pca_dosage/hotkeys.js`
 audit). No conflict with existing single-letter hotkeys (`n`, `p`,
 `f`, `b`, `c`, `j`).
 
 ## §12. References
 
-- **Trigger button**: `pages/discovery/page1.html` lines 1461-1478
+- **Trigger button**: `pages/discovery/local_pca_dosage.html` lines 1461-1478
   (`#gPanelOpenBtn`)
 - **Manual tab popup div**: `#manualGroupsListPopup` (in popup body,
-  page1.html — lookup by `getElementById` in `pca_panel.js`)
-- **Renderer**: `pages/discovery/page1/pca_panel.js#renderManualGroupsList`
-- **Manual groups state**: `pages/discovery/page1/manual_groups.js`
-- **Hotkey wiring**: `pages/discovery/page1/hotkeys.js` (unverified
+  local_pca_dosage.html — lookup by `getElementById` in `pca_panel.js`)
+- **Renderer**: `pages/discovery/local_pca_dosage/pca_panel.js#renderManualGroupsList`
+- **Manual groups state**: `pages/discovery/local_pca_dosage/manual_groups.js`
+- **Hotkey wiring**: `pages/discovery/local_pca_dosage/hotkeys.js` (unverified
   in this audit; check during Slice 2/3 work)
 - **Karyotype primitives** (Slice 2 prep):
-  `pages/review/page4/karyo_rows.js`, `karyo_labels.js`
+  `pages/review/karyotype_tier/karyo_rows.js`, `karyo_labels.js`
 - **Inheritance primitives** (Slice 3 prep):
-  `pages/discovery/page1/inheritance.js`,
+  `pages/discovery/local_pca_dosage/inheritance.js`,
   `shared/inheritance_groups.js`
 
 ---
 
-**Authored**: 2026-05-15 from `pages/discovery/page1.html` lines
-1461-1478 + `pages/discovery/page1/pca_panel.js` line 740-790 +
-`pages/discovery/page1/manual_groups.js` line 309+. One of the 8
+**Authored**: 2026-05-15 from `pages/discovery/local_pca_dosage.html` lines
+1461-1478 + `pages/discovery/local_pca_dosage/pca_panel.js` line 740-790 +
+`pages/discovery/local_pca_dosage/manual_groups.js` line 309+. One of the 8
 SPECs identified as missing on disk in
 `_handoff_docs/SPECS_AUDIT.md`. Slice 1 only — Slices 2 + 3 will
 extend this SPEC with their own implementation notes when they

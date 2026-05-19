@@ -1,4 +1,4 @@
-# HANDOFF — page1 mounts end-to-end through index.html (parity restored, 18 helpers extracted)
+# HANDOFF — local_pca_dosage mounts end-to-end through index.html (parity restored, 18 helpers extracted)
 
 **Date:** 2026-05-06 (chat ~34, seventh pass)
 **Reads:** `AUDIT_LOG.md` top entry (chat ~34 seventh pass), then this file,
@@ -10,19 +10,19 @@ then `PAGE_MIGRATION_RECIPE.md` migration log tail, then proceed.
 
 ## 30-second orientation
 
-The previous pass (sixth) wrongly claimed page1 migration was done.
-On audit, page1 had 17 unguarded helper calls and 23 bare-form
+The previous pass (sixth) wrongly claimed local_pca_dosage migration was done.
+On audit, local_pca_dosage had 17 unguarded helper calls and 23 bare-form
 drawX()/renderX() calls without `state` arg. mount() would have
 crashed at runtime in any of dozens of places. This pass closes
 that gap: 18 helpers extracted verbatim from legacy, 17 unguarded
 calls wrapped, 23 bare-form calls patched, 8 unguarded DOM accesses
 made null-safe.
 
-**Verified by real-browser-style smoke test:** page1 module loads
+**Verified by real-browser-style smoke test:** local_pca_dosage module loads
 (28 exports), `applyData` populates state correctly, all entry
 points run, mount() and unmount() complete without throwing.
 
-Stubs in page1.js: 29 → 23. 0 TODO_MISSING markers. No registry
+Stubs in local_pca_dosage.js: 29 → 23. 0 TODO_MISSING markers. No registry
 changes. No master_config changes. No schema changes. No engine
 changes.
 
@@ -30,7 +30,7 @@ changes.
 
 ## What this pass shipped
 
-**page1.js (5397 LOC, was 4672)** — everything is JS-internal:
+**local_pca_dosage.js (5397 LOC, was 4672)** — everything is JS-internal:
 
 1. **Inserted "Legacy helpers (parity)" block** (725 LOC) before the
    "Extracted bodies" header. Contains 18 helpers + 5 constants:
@@ -66,7 +66,7 @@ changes.
      these as no-ops; we preserve that behavior.
 
 4. **Made 8 unguarded `document.getElementById(X).Y` accesses null-
-   safe** for elements not in the page1.html fragment (sidebar/topbar
+   safe** for elements not in the local_pca_dosage.html fragment (sidebar/topbar
    territory the new shell doesn't host: `dataStatus`, `headerMeta`,
    `schemaBadge`, `winIdx`, `winBp`, `scrubber`, `playBtn`, `kSelect`).
 
@@ -81,8 +81,8 @@ changes.
 
 ## What this pass did NOT change
 
-- `page1.html`: byte-identical to legacy `<main id="page1">` — verified.
-- `inversion.css`: 49/49 `#page1` selector parity with legacy — verified.
+- `local_pca_dosage.html`: byte-identical to legacy `<main id="local_pca_dosage">` — verified.
+- `inversion.css`: 49/49 `#local_pca_dosage` selector parity with legacy — verified.
 - `manifest.json`: unchanged.
 - `inversion-atlas/registries/data/*.registry.json`: unchanged.
 - `master_config.example.yaml`: unchanged.
@@ -95,10 +95,10 @@ changes.
 
 ## Verification done this pass
 
-- `node --check` clean: page1.js, page12.js, color_helpers.js, all
+- `node --check` clean: local_pca_dosage.js, local_pca_theta_pi.js, color_helpers.js, all
   shared/*.js, all pages/**/*.js, all atlas-core/core/*.js.
 - 23/23 + 13/13 + 4/4 atlas-core engine tests still pass.
-- **Module-load smoke test** (assembled workspace, fake DOM): page1.js
+- **Module-load smoke test** (assembled workspace, fake DOM): local_pca_dosage.js
   loads with 28 exports including `mount`, `unmount`. No load-time
   errors after stubs were trimmed and helpers were added.
 - **Mount-flow smoke test** (assembled workspace, fake DOM with full
@@ -123,7 +123,7 @@ The mount path is now confirmed working in the assembled workspace.
 
 ## Open for next round (round 4)
 
-23 stubs remain in page1.js, in priority order:
+23 stubs remain in local_pca_dosage.js, in priority order:
 
 **Tier A (next): 4 state-bound color helpers**
 - `_vColor`, `trackedColor`, `getSampleColor`, `_resolveSampleScopeColor`
@@ -139,7 +139,7 @@ The mount path is now confirmed working in the assembled workspace.
   `drawCandidateBar`.
 - Touch the candidate registry layers (`candidates`,
   `candidate_lineage`, `arrangement_calls`). Extract when migrating
-  page1's candidate-aware features.
+  local_pca_dosage's candidate-aware features.
 
 **Tier C (blocked on data layers): 9 strip renderers**
 - `_drawBandTraceStrip`, `_drawDiamondOverlay`,
@@ -174,5 +174,5 @@ Quentin is French-native, fluent English, based in Bangkok. PhD on
 LANTA HPC. Manuscript v19→v20 targeting Nature Communications. Terse
 and direct. Wants signal not flattery. Pushes back immediately and
 precisely when outputs are wrong (which is how this pass got
-prioritised — sixth-pass shipped a half-done page1 and labelled it
+prioritised — sixth-pass shipped a half-done local_pca_dosage and labelled it
 done; seventh pass closed the actual gap).

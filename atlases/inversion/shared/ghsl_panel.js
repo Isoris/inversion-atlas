@@ -6,8 +6,8 @@
 // the K-stripes layer is the per-K K-means partition over that cube.
 //
 // Used by:
-//   - L2-as-triangle aggregation in the L3 zone (page1)
-//   - GHSL evidence panel (page15)
+//   - L2-as-triangle aggregation in the L3 zone (local_pca_dosage)
+//   - GHSL evidence panel (local_pca_ghsl)
 //   - cross-page agreement checks against dosage / θπ
 //
 // state.data.ghsl_panel shape:

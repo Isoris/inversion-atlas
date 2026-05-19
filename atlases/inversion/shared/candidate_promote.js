@@ -128,8 +128,8 @@ export function makeCandidateFromL2Merge(state, l2idxs, opts) {
 }
 
 /**
- * Build a candidate from the current page1 lock snapshot. The user
- * locked colors at some L2 via the page1 toolbar; this helper
+ * Build a candidate from the current local_pca_dosage lock snapshot. The user
+ * locked colors at some L2 via the local_pca_dosage toolbar; this helper
  * promotes that snapshot to a candidate.
  *
  * Requires:

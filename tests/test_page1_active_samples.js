@@ -1,13 +1,13 @@
 // tests/test_page1_active_samples.js
 //
 // Unit coverage for the active-samples filter
-// (atlases/inversion/pages/discovery/page1/active_samples.js).
+// (atlases/inversion/pages/discovery/local_pca_dosage/active_samples.js).
 //
 // All entry points take `state` as their first argument and are
 // localStorage-/DOM-tolerant: when those globals are absent they
 // degrade gracefully (load = no-op fail-soft, badge refresh = no-op,
 // save = no-op). The tests synthesise a minimal `state` fixture
-// matching the page1 _pageState shape (just `data.samples`).
+// matching the local_pca_dosage _pageState shape (just `data.samples`).
 
 import {
   ACTIVE_SAMPLES_LS_KEY,
@@ -20,7 +20,7 @@ import {
   isSampleActive,
   activeSampleCounts,
   refreshActiveSamplesBadge,
-} from '../atlases/inversion/pages/discovery/page1/active_samples.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/active_samples.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

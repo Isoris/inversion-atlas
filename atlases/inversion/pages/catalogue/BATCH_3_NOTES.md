@@ -1,6 +1,6 @@
 # Batch 3 — extraction notes
 
-**Pages shipped**: page3, page9, page17, page18, page21
+**Pages shipped**: catalogue, confirmed_carousel, stats_profile, marker_readiness, annotation_cockpit
 **Sub-atlas**: `inversion_catalogue/`
 **Foundation regression**: 455/455 tests still pass, `shared/` byte-identical to handoff.
 **New tests**: 5 files, 65 assertions, all passing.
@@ -15,13 +15,13 @@ The actual page contents per the line ranges:
 
 | Page  | Lines       | Doc said                  | Actually is                                         |
 |-------|-------------|---------------------------|-----------------------------------------------------|
-| page3 |  7261–7368  | "5 catalogue" — table     | ✓ correct (catalogue toolbar + table shell)         |
-| page9 |  7782–7812  | "11 confirmed" carousel   | ✓ correct (carousel shell only)                     |
-| page17|  8110–8127  | Marker readiness panel    | ✗ **Statistical profile** (`spBody`)                |
-| page18|  8134–8157  | Genome-wide linkage table | ✗ **Marker readiness panel** (`mpBody`)             |
-| page21|  7822–7859  | Manual karyotype groups   | ✗ **Annotation cockpit** (canvas-driven)            |
+| catalogue |  7261–7368  | "5 catalogue" — table     | ✓ correct (catalogue toolbar + table shell)         |
+| confirmed_carousel |  7782–7812  | "11 confirmed" carousel   | ✓ correct (carousel shell only)                     |
+| stats_profile|  8110–8127  | Marker readiness panel    | ✗ **Statistical profile** (`spBody`)                |
+| marker_readiness|  8134–8157  | Genome-wide linkage table | ✗ **Marker readiness panel** (`mpBody`)             |
+| annotation_cockpit|  7822–7859  | Manual karyotype groups   | ✗ **Annotation cockpit** (canvas-driven)            |
 
-The two "marker / linkage" descriptions in the doc were swapped, and page21's
+The two "marker / linkage" descriptions in the doc were swapped, and annotation_cockpit's
 description of "manual karyotype groups list" does not match the legacy HTML
 at that line range — that region is the annotation cockpit. Extraction
 followed the line ranges.
@@ -36,20 +36,20 @@ Each page's `pageN.js` follows the same shape:
 - The verbatim legacy code body wrapped between BEGIN/END markers
 - Public ES-module exports at the bottom
 
-### page17.js (stats profile)
+### stats_profile.js (stats profile)
 - Verbatim legacy lines 28445–29306 (~860 lines).
 - All 24 `_sp*` helpers + `SP_DEFAULT_ROWS` + the `_renderStatsProfilePage`
   entry are in one file.
 - Public entry: `renderStatsProfilePage()`.
 - Internal helpers re-exported for tests + merge chat.
 
-### page18.js (marker readiness panel)
+### marker_readiness.js (marker readiness panel)
 - Verbatim legacy lines 29307–30160 (~850 lines).
 - All `_mp*` helpers + Tier-1/2/3/4 logic + AF scoring (`_mpScoreVariantAf`).
 - Public entry: `renderMarkerPanelPage()`.
-- Note: `_mpDeriveAutoPanel` is read by sibling page17 — exported.
+- Note: `_mpDeriveAutoPanel` is read by sibling stats_profile — exported.
 
-### page21.js (annotation cockpit)
+### annotation_cockpit.js (annotation cockpit)
 - Verbatim legacy lines 46970–47616 (~640 lines).
 - Canvas drawing (`_annoCockpitDraw`), keyboard nav (`_annoCockpitOnKey`),
   click-to-jump (`_annoCockpitOnClick`), readouts, linkage panel, hap panel.
@@ -58,7 +58,7 @@ Each page's `pageN.js` follows the same shape:
   replaced with ES-module `export { ... }` at the bottom. Otherwise the
   body is unchanged.
 
-### page9.js (confirmed carousel)
+### confirmed_carousel.js (confirmed carousel)
 - **No verbatim legacy code exists.** The HTML shell (lines 7782–7812)
   has #confirmedNavBar / #confirmedNavPrev / #confirmedNavNext etc., but
   `grep -nE 'confirmedNav' legacy/Inversion_atlas.html` returns only the
@@ -67,7 +67,7 @@ Each page's `pageN.js` follows the same shape:
 - Shipped as a thin shell that shows the empty-state message and reports
   the count of confirmed candidates.
 
-### page3.js (catalogue)
+### catalogue.js (catalogue)
 - **Same situation.** `renderCatalogue` is referenced 9 times in legacy
   (`if (typeof renderCatalogue === 'function') renderCatalogue();`) but
   never defined. Also confirmed:
@@ -82,7 +82,7 @@ Each page's `pageN.js` follows the same shape:
 - The ONE piece of catalogue toolbar JS that DOES exist in legacy is
   `_wireCatalogueBreedingExportBtns` at lines 23668–23715, plus its
   ~480-line dependency block (Turn 146 breeding-card export, lines
-  ~23236–23715). That block is too large to extract into page3 without
+  ~23236–23715). That block is too large to extract into catalogue without
   overstepping batch scope and is left as `TODO_MISSING(_wireCatalogue...)`
   for the merge chat.
 - Shipped as a thin shell that shows the legacy "Load a JSON to populate
@@ -105,16 +105,16 @@ merge chat can route them.
 |---------------------------------------------|----------|------|
 | `_csGetSyntenyBlocks`                       | Batch 5  | Cross-species synteny lookup |
 | `_csPermutationTest`                        | Batch 5  | Cross-species permutation test |
-| `renderCandidateFocus`                      | Batch 1  | page2 candidate-focus renderer (page9 carousel reuses it) |
+| `renderCandidateFocus`                      | Batch 1  | candidate_focus candidate-focus renderer (confirmed_carousel carousel reuses it) |
 | `_gatherActiveCandidatesForInheritance`     | shared?  | Legacy line 41196; gathers active candidates for current chrom |
 | `computeTrackedLinkageProjection`           | shared?  | Legacy line ~46912; tracked-fish band purity |
-| `_wireCandidateHaplotypeAnnotations`        | Batch 1  | Band-annotation UI (probably page2) |
+| `_wireCandidateHaplotypeAnnotations`        | Batch 1  | Band-annotation UI (probably candidate_focus) |
 | `candidateHaplotypeAnnotationsHtml`         | Batch 1  | HTML builder for haplotype-annotation panel |
 
 ### Internal to this batch (cross-module)
 | Function                                    | Owner            | Note |
 |---------------------------------------------|------------------|------|
-| `_mpDeriveAutoPanel`                        | page18 (this)    | Already exported from page18.js — merge chat just wires the import in page17.js |
+| `_mpDeriveAutoPanel`                        | marker_readiness (this)    | Already exported from marker_readiness.js — merge chat just wires the import in stats_profile.js |
 
 ### Page3 catalogue rendering — entire renderer is missing in legacy
 Listed for completeness; none of these exist anywhere in `legacy/Inversion_atlas.html`.
@@ -149,15 +149,15 @@ extract it as a sibling helper (probably `inversion_catalogue/breeding_export.js
 ## Decisions
 
 1. **Followed line ranges, not the doc's "What it does" column**, when the two
-   disagreed. The doc's labels for page17/18/21 were wrong; line ranges were
+   disagreed. The doc's labels for stats_profile/18/21 were wrong; line ranges were
    right.
 
-2. **Extracted page17, page18, page21 verbatim** with a thin ES-module wrapper
+2. **Extracted stats_profile, marker_readiness, annotation_cockpit verbatim** with a thin ES-module wrapper
    (header + `state` shim + verbatim body + bottom exports). No edits to
    legacy logic. The merge chat decides what becomes shared and what stays
    per-module.
 
-3. **Shipped page3 and page9 as shells** matching legacy reality. Both were
+3. **Shipped catalogue and confirmed_carousel as shells** matching legacy reality. Both were
    already shells in legacy (the renderers don't exist there either),
    so faithful extraction meant shipping shells. Documented this loudly in
    the module headers and in this notes file so the merge chat doesn't
@@ -168,8 +168,8 @@ extract it as a sibling helper (probably `inversion_catalogue/breeding_export.js
    `export { ... }`. Behavior preserved (modules can still see these
    helpers; the API surface is just `import` instead of `window`).
 
-5. **Tests exercise pure helpers where possible.** page17 / page18 validators
-   and page21's `_ackBandColor` / `_annoCockpitCandidateAtCursor` are
+5. **Tests exercise pure helpers where possible.** stats_profile / marker_readiness validators
+   and annotation_cockpit's `_ackBandColor` / `_annoCockpitCandidateAtCursor` are
    pure functions and have direct assertions. The DOM-dependent renderers
    are only checked for "doesn't throw in Node-no-DOM environment".
 
@@ -186,16 +186,16 @@ extract it as a sibling helper (probably `inversion_catalogue/breeding_export.js
 ```
 Atlas/inversion_catalogue/
 ├── BATCH_3_NOTES.md       (this file)
-├── page3.html             (108 lines, sed -n '7261,7368p')
-├── page3.js               (stub; renderCataloguePage + initCataloguePage)
-├── page9.html             ( 31 lines, sed -n '7782,7812p')
-├── page9.js               (stub; refreshConfirmedCarousel + initConfirmedCarousel)
-├── page17.html            ( 18 lines, sed -n '8110,8127p')
-├── page17.js              (verbatim from legacy 28445–29306)
-├── page18.html            ( 24 lines, sed -n '8134,8157p')
-├── page18.js              (verbatim from legacy 29307–30160)
-├── page21.html            ( 38 lines, sed -n '7822,7859p')
-└── page21.js              (verbatim from legacy 46970–47616)
+├── catalogue.html             (108 lines, sed -n '7261,7368p')
+├── catalogue.js               (stub; renderCataloguePage + initCataloguePage)
+├── confirmed_carousel.html             ( 31 lines, sed -n '7782,7812p')
+├── confirmed_carousel.js               (stub; refreshConfirmedCarousel + initConfirmedCarousel)
+├── stats_profile.html            ( 18 lines, sed -n '8110,8127p')
+├── stats_profile.js              (verbatim from legacy 28445–29306)
+├── marker_readiness.html            ( 24 lines, sed -n '8134,8157p')
+├── marker_readiness.js              (verbatim from legacy 29307–30160)
+├── annotation_cockpit.html            ( 38 lines, sed -n '7822,7859p')
+└── annotation_cockpit.js              (verbatim from legacy 46970–47616)
 
 Atlas/tests/
 ├── test_catalogue_page3.js   ( 5 assertions)

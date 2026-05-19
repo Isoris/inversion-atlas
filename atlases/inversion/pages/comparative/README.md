@@ -3,7 +3,7 @@
 This directory hosts pages for the **comparative** workflow stage —
 cross-species inversion analysis between *C. gariepinus* (Cgar)
 and *C. macrocephalus* (Cmac), plus phylogenetic placement across
-catfish lineages. Also hosts the static `help` page (page5) because
+catfish lineages. Also hosts the static `help` page (help) because
 of historical grouping.
 
 ## What comparative is for
@@ -21,14 +21,14 @@ The comparative stage answers that.
 
 | page | label | summary |
 |------|-------|---------|
-| `page16` | cross-species breakpoints | Cgar × Cmac wfmash 1-to-1 alignment (`cs_breakpoints_v1` schema); 6-panel dashboard — toolbar, catalogue, focus card, synteny, dotplot, focal-vs-bg permutation test |
-| `page16b` | multi-species cockpit | place each Cgar↔Cmac breakpoint on the catfish phylogeny; click species → homologous-region detail; auto-suggests architecture class A-F from lineage distribution; owns 6 JSON layers |
+| `cross_species_breakpoints` | cross-species breakpoints | Cgar × Cmac wfmash 1-to-1 alignment (`cs_breakpoints_v1` schema); 6-panel dashboard — toolbar, catalogue, focus card, synteny, dotplot, focal-vs-bg permutation test |
+| `multi_species_cockpit` | multi-species cockpit | place each Cgar↔Cmac breakpoint on the catfish phylogeny; click species → homologous-region detail; auto-suggests architecture class A-F from lineage distribution; owns 6 JSON layers |
 
 ### Stage `help`
 
 | page | label | summary |
 |------|-------|---------|
-| `page5` | help | static quick-reference / help page (~1158 LOC HTML); `renderPage5()` is a no-op; PAGE5_META carries tab metadata |
+| `help` | help | static quick-reference / help page (~1158 LOC HTML); `renderPage5()` is a no-op; PAGE5_META carries tab metadata |
 
 ## Three-cohort discipline (CRITICAL)
 
@@ -47,14 +47,14 @@ it.
 
 ## Cross-page dependencies
 
-- **page16b** reads `state.crossSpecies` (owned by page16). If
-  page16 hasn't been mounted on the same chromosome first, page16b
+- **multi_species_cockpit** reads `state.crossSpecies` (owned by cross_species_breakpoints). If
+  cross_species_breakpoints hasn't been mounted on the same chromosome first, multi_species_cockpit
   shows empty-state.
-- **page16** owns `_csGetSyntenyBlocks` + `_csPermutationTest`
-  exports, consumed by **page17** (synthesis stats profile, lives
+- **cross_species_breakpoints** owns `_csGetSyntenyBlocks` + `_csPermutationTest`
+  exports, consumed by **stats_profile** (synthesis stats profile, lives
   in `pages/catalogue/`). Cross-stage dep.
 
-## Architecture classes (page16b auto-suggest)
+## Architecture classes (multi_species_cockpit auto-suggest)
 
 The 6 classes auto-suggested from lineage distribution:
 
@@ -67,9 +67,9 @@ The 6 classes auto-suggested from lineage distribution:
 | E | discordant — breakpoint placement disagrees with phylogeny |
 | F | architecture unclear |
 
-(See page16b source / SPEC for the precise decision tree.)
+(See multi_species_cockpit source / SPEC for the precise decision tree.)
 
-## page16b owns 6 JSON layers
+## multi_species_cockpit owns 6 JSON layers
 
 These are drag-droppable cross-species layers:
 
@@ -97,15 +97,15 @@ In `specs_done/`:
 - `SCHEMA.md` (§12 cross-species breakpoints — `cs_breakpoints_v1`)
 - `SPEC_band_track_extraction_and_l3_single_band_rows.md` (parent
   band-track spec; the Spalax-style TE enrichment at breakpoints is
-  the manuscript hook page16 ships toward)
+  the manuscript hook cross_species_breakpoints ships toward)
 
 In `specs_todo/`:
-- `SPEC_busco_anchors_v1.md` (would feed page16's ribbon-plot ticks
+- `SPEC_busco_anchors_v1.md` (would feed cross_species_breakpoints's ribbon-plot ticks
   once page integration ships)
 
-## page5 special case (the help page)
+## help special case (the help page)
 
-`page5` lives in `pages/comparative/` for **historical reasons**.
+`help` lives in `pages/comparative/` for **historical reasons**.
 Its manifest stage is `help`, not `comparative`. The grouping is
 incorrect from a directory-layout perspective but the stage is
 authoritative for shell routing.
@@ -115,9 +115,9 @@ hotkeys / pipeline reference content. **It is the only in-app user
 help.** PAGE5_META carries `{id, stage, label, num:16, static:true}`
 which the tab router reads.
 
-**NB**: `HANDOFF_BATCH_5.md` mislabelled page5 as
+**NB**: `HANDOFF_BATCH_5.md` mislabelled help as
 "Multi-species comparison page" — that is WRONG. The actual
-multi-species cockpit is **page16b**. Don't confuse the two.
+multi-species cockpit is **multi_species_cockpit**. Don't confuse the two.
 
 ## Per-page contracts
 
@@ -126,17 +126,17 @@ contract.
 
 ## Notes for new contributors
 
-- **page16 is the second-heaviest layer page** (after page16b's 6
+- **cross_species_breakpoints is the second-heaviest layer page** (after multi_species_cockpit's 6
   JSON layers). Loading is a drag-drop affair; cache discipline
   matters.
-- **page16's Spalax-style TE enrichment is the manuscript hook**.
+- **cross_species_breakpoints's Spalax-style TE enrichment is the manuscript hook**.
   If you work on this page, that's the user-facing result to
   preserve.
-- **Don't add more pages to this dir under `help` stage** — page5
+- **Don't add more pages to this dir under `help` stage** — help
   is unique and shouldn't have siblings. New help pages should
   live in their own `pages/help/` dir if/when they ship.
-- **page16 → page17 cross-page dep**: page17 (stats profile, in
+- **cross_species_breakpoints → stats_profile cross-page dep**: stats_profile (stats profile, in
   `pages/catalogue/`) imports `_csGetSyntenyBlocks` +
-  `_csPermutationTest` from page16 via runtime guards. Round 5
-  step 11 promoted these to proper ES exports but page17 still
+  `_csPermutationTest` from cross_species_breakpoints via runtime guards. Round 5
+  step 11 promoted these to proper ES exports but stats_profile still
   uses guard imports — promote-to-imports is a follow-up task.

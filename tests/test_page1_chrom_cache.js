@@ -1,6 +1,6 @@
 // tests/test_page1_chrom_cache.js
 //
-// Unit tests for pages/discovery/page1/chrom_cache.js — the
+// Unit tests for pages/discovery/local_pca_dosage/chrom_cache.js — the
 // per-session in-memory chromosome cache + the #chromSelect dropdown
 // refresher.
 
@@ -13,7 +13,7 @@ import {
   clearChromCache,
   isChromosomeJSON,
   refreshChromSelect,
-} from '../atlases/inversion/pages/discovery/page1/chrom_cache.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/chrom_cache.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

@@ -141,7 +141,7 @@ Re-evaluating with this lens:
 Two parallel lanes of work:
 
 ### Lane A — page migration (this chat sequence)
-Round 3 page1 body extraction → page2 → ... per the migration recipe. Independent of the registry work.
+Round 3 local_pca_dosage body extraction → candidate_focus → ... per the migration recipe. Independent of the registry work.
 
 ### Lane B — registry/versioning (separate chat sequence)
 

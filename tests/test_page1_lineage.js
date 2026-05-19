@@ -1,16 +1,16 @@
 // tests/test_page1_lineage.js
 //
-// Unit tests for pages/discovery/page1/lineage.js — state-managed
+// Unit tests for pages/discovery/local_pca_dosage/lineage.js — state-managed
 // lineage compute wrapping shared/clustering.js and
 // shared/hungarian.js. Drives the per-sample lineage assignments
-// surfaced by _lineageColor in page1's per-sample-lines panel.
+// surfaced by _lineageColor in local_pca_dosage's per-sample-lines panel.
 
 import {
   LINEAGE_DEFAULT_THRESHOLD,
   LINEAGE_MIN_L2_FOR_COMPUTE,
   lineageCacheKey,
   runLineageCompute,
-} from '../atlases/inversion/pages/discovery/page1/lineage.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/lineage.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

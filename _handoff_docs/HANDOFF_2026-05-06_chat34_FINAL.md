@@ -1,4 +1,4 @@
-# HANDOFF — registry v2 done + toolkit_registries cleaned + master_config v1; next is page1 migration round 3
+# HANDOFF — registry v2 done + toolkit_registries cleaned + master_config v1; next is local_pca_dosage migration round 3
 
 **Date:** 2026-05-06 (chat ~34)
 **Reads:** `_handoff_docs/AUDIT_LOG.md` top entry (chat ~34 has TWO entries; read both), then this file, then proceed.
@@ -29,7 +29,7 @@ Three things landed this session:
 
 The next phase is **page-by-page migration from
 `legacy/Inversion_atlas.html` into the 22 split page files**, starting
-with page1.
+with local_pca_dosage.
 
 Quentin's discipline: each migrated function either uses an existing
 registry layer, surfaces a real registry gap (add a layer with proper
@@ -98,14 +98,14 @@ expansion.
 ## What does NOT change this session
 
 - 22 pages in `atlases/inversion/pages/` — untouched.
-- `page1.js` 4588 LOC, 34 stubbed functions — untouched.
+- `local_pca_dosage.js` 4588 LOC, 34 stubbed functions — untouched.
 - 6 scaffolded-but-pending layers (relatedness_ngsrelate, ancestry,
   cross_species) — still pending real data files.
 - 41 structured-block schemas — kept as-is, polished per-page during
   migration.
 - Engine path-resolution code — still uses literal paths from layer
   entries. The root-aware `_fillTemplate` refactor is deferred until
-  page1 migration drives a need.
+  local_pca_dosage migration drives a need.
 - Layer entry paths — not yet rebased onto `root` + `path_under_root`.
   Per-page refactor during migration.
 - popstats_server.py config loader — still reads the old YAML shape.
@@ -138,19 +138,19 @@ DATA_LIFECYCLE / PAGE_MIGRATION_RECIPE.
 
 ---
 
-## Next-session plan: page1 migration round 3
+## Next-session plan: local_pca_dosage migration round 3
 
 Per Quentin: *"focus page by page... we get a working registry and
 server then we go back to merging page 1 or bringing it from legacy
 to the inversion atlas. Resolve all TODOs and we upgrade our registry
 little by little based on the needs of the page."*
 
-**Working file:** `atlases/inversion/pages/discovery/page1.js`
+**Working file:** `atlases/inversion/pages/discovery/local_pca_dosage.js`
 (4588 LOC; 34 stubbed module-level no-op functions; 0 TODO_MISSING).
 
 **Method per stub:**
 1. Find the function name in `legacy/Inversion_atlas.html`.
-2. Extract the body verbatim into the page1.js stub.
+2. Extract the body verbatim into the local_pca_dosage.js stub.
 3. Identify what data the body reads. If it's
    `state.data.<thing>`, that's a registry layer hit — verify the
    layer exists; if it doesn't, add the layer (with schema; if it
@@ -171,7 +171,7 @@ time.
 
 **Discipline reminders:**
 - Audit-first: before adding a registry layer, confirm it doesn't
-  exist already. The 45 layers cover most of what page1 needs.
+  exist already. The 45 layers cover most of what local_pca_dosage needs.
 - DATA_LIFECYCLE rule: classify new data (Category 1 precomp /
   Category 2 raw folder / Category 3 per-candidate-per-version) before
   adding the layer.

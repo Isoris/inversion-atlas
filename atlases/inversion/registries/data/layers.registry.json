@@ -77,7 +77,7 @@
       "source": "file",
       "root": "precomp_thetapi",
       "auto_index": true,
-      "_auto_index_doc": "Same discovery mechanism as scrubber_main but pointed at the theta-pi pipeline root. Layout is nested (04_atlas_json/C_gar_LG{NN}/C_gar_LG{NN}_phase2_theta.json); the server's depth-2 scan handles it. Consumed by page12 (local PCA θπ) via _buildLegacyState's merge of tracks_thetapi into state.data.",
+      "_auto_index_doc": "Same discovery mechanism as scrubber_main but pointed at the theta-pi pipeline root. Layout is nested (04_atlas_json/C_gar_LG{NN}/C_gar_LG{NN}_phase2_theta.json); the server's depth-2 scan handles it. Consumed by local_pca_theta_pi (local PCA θπ) via _buildLegacyState's merge of tracks_thetapi into state.data.",
       "pin_to": "AtlasState.inversion.tracks_thetapi.{chrom}"
     },
     "scrubber_ghsl": {

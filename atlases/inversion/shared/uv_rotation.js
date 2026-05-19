@@ -6,14 +6,22 @@
 // aligned with that axis. u = along-axis (the "STD/HET/INV gradient");
 // v = orthogonal residual.
 //
-// Used by both the L2 rotation cache and the slab UV rotation path on
-// page1. The legacy code keeps the cache slot keyed by L2 idx or
-// (s, e) slab — those callers go in legacy for now. This module
-// extracts the pure compute portion (Phase 2 of UV rotation).
+// 2026-05-18 extension: ported the full pipeline from legacy
+// (10928-11574) on top of the existing computeUVRotationCore:
+//   Phase 1: aggregateWindowRangeForUV
+//   Phase 2: computeUVRotationCore (was the only thing here before)
+//   L2/slab caches: getOrComputeUVRotation, getOrComputeUVRotationSlab
+//   Cluster shape: wrapKmeansResultAsCluster
+//   Phase 3 + L2/slab entry: clusterFromRotation_UVRotated +
+//                            clusterL2_UVRotated / clusterSlab_UVRotated
+// These enable the L3 panel's "uv-rotated" (a.k.a. "distance-uv")
+// re-cluster mode. The 4 other UV-* modes (denoise / dbscan /
+// dist-rank / dist-fuzzy) still need porting from legacy 11195-11540.
 //
 // Legacy origin: lines 11035-11075 of legacy/Inversion_atlas.html
 // (_computeUVRotationCore).
 
+import { contextFromState } from './per_l2_cluster.js';
 import { kmeans2D } from './kmeans.js';
 
 /**
@@ -86,4 +94,218 @@ export function computeUVRotationCore(xs, ys, nS) {
     baseN: k3.n_per_group.slice(),
     degenerate: axisLen2 <= 0,
   };
+}
+
+// ---------------------------------------------------------------------
+// Phase 1 — per-sample (PC1*sign, PC2) mean across windows [s, e].
+//
+// Uses MEAN unconditionally regardless of state.aggMethod: the
+// rotation math doesn't need the median variant; means are stable
+// enough for the principal-axis fit. Slabs keep that convention too
+// (legacy 10974-11005).
+//
+// Legacy: _aggregateWindowRangeForUV (10974-11029).
+//
+// @param {Object} state — atlas state with .data + .pc1Sign + .flipPC1
+// @param {number} s — start window (inclusive)
+// @param {number} e — end window (inclusive)
+// @returns {{xs: Float64Array, ys: Float64Array} | null}
+export function aggregateWindowRangeForUV(state, s, e) {
+  if (!state || !state.data) return null;
+  const nW = e - s + 1;
+  if (nW < 1) return null;
+  const nS = state.data.n_samples;
+  const ctx = contextFromState(state);
+  const xs = new Float64Array(nS);
+  const ys = new Float64Array(nS);
+  for (let w = 0; w < nW; w++) {
+    const { pc1, pc2, sign } = ctx.getPC(s + w);
+    for (let si = 0; si < nS; si++) {
+      xs[si] += pc1[si] * sign;
+      ys[si] += pc2[si];
+    }
+  }
+  for (let si = 0; si < nS; si++) {
+    xs[si] /= nW;
+    ys[si] /= nW;
+  }
+  return { xs, ys };
+}
+
+// ---------------------------------------------------------------------
+// L2 rotation cache. Keyed by l2idx. Data-key invalidates on
+// chrom or n_windows change. Legacy: _getOrComputeUVRotation (10928).
+// ---------------------------------------------------------------------
+export function getOrComputeUVRotation(state, l2idx) {
+  if (!state) return { ok: false, reason: 'NO_STATE' };
+  if (!state.l2UVRotationCache) state.l2UVRotationCache = new Map();
+  const dataKey = state.data ? state.data.chrom + '|' + state.data.n_windows : '';
+  if (state._l2UVRotationCacheDataKey !== dataKey) {
+    state.l2UVRotationCache = new Map();
+    state._l2UVRotationCacheDataKey = dataKey;
+  }
+  if (state.l2UVRotationCache.has(l2idx)) {
+    return state.l2UVRotationCache.get(l2idx);
+  }
+  const d = state.data;
+  if (!d) {
+    const fail = { ok: false, reason: 'NO_DATA' };
+    state.l2UVRotationCache.set(l2idx, fail);
+    return fail;
+  }
+  const env = d.l2_envelopes && d.l2_envelopes[l2idx];
+  if (!env) {
+    const fail = { ok: false, reason: 'NO_ENV' };
+    state.l2UVRotationCache.set(l2idx, fail);
+    return fail;
+  }
+  const nW = env._e0 - env._s0 + 1;
+  if (nW < 1) {
+    const fail = { ok: false, reason: 'NO_WINDOWS' };
+    state.l2UVRotationCache.set(l2idx, fail);
+    return fail;
+  }
+  const agg = aggregateWindowRangeForUV(state, env._s0, env._e0);
+  if (!agg) {
+    const fail = { ok: false, reason: 'NO_WINDOWS' };
+    state.l2UVRotationCache.set(l2idx, fail);
+    return fail;
+  }
+  const result = computeUVRotationCore(agg.xs, agg.ys, d.n_samples);
+  state.l2UVRotationCache.set(l2idx, result);
+  return result;
+}
+
+// ---------------------------------------------------------------------
+// Slab rotation cache. Keyed by `${s}_${e}`; same invalidation as L2.
+// Legacy: _getOrComputeUVRotationSlab (10975-11000).
+// ---------------------------------------------------------------------
+export function getOrComputeUVRotationSlab(state, s, e) {
+  if (!state) return { ok: false, reason: 'NO_STATE' };
+  if (!state.slabUVRotationCache) state.slabUVRotationCache = new Map();
+  const dataKey = state.data ? state.data.chrom + '|' + state.data.n_windows : '';
+  if (state._slabUVRotationCacheDataKey !== dataKey) {
+    state.slabUVRotationCache = new Map();
+    state._slabUVRotationCacheDataKey = dataKey;
+  }
+  const d = state.data;
+  if (!d) return { ok: false, reason: 'NO_DATA' };
+  if (s == null || e == null || s < 0 || e >= d.n_windows || s > e) {
+    return { ok: false, reason: 'BAD_RANGE' };
+  }
+  const cacheKey = `${s}_${e}`;
+  if (state.slabUVRotationCache.has(cacheKey)) {
+    return state.slabUVRotationCache.get(cacheKey);
+  }
+  const agg = aggregateWindowRangeForUV(state, s, e);
+  if (!agg) {
+    const fail = { ok: false, reason: 'NO_WINDOWS' };
+    state.slabUVRotationCache.set(cacheKey, fail);
+    return fail;
+  }
+  const result = computeUVRotationCore(agg.xs, agg.ys, d.n_samples);
+  state.slabUVRotationCache.set(cacheKey, result);
+  return result;
+}
+
+// ---------------------------------------------------------------------
+// Cluster-shape adapter. Wraps a kmeans1D/2D result in the shape
+// getL2Cluster / getL2ClusterAt consumers expect:
+//   { ok, reason, labels, n_per_group,
+//     fam_purity, fam_per_cluster,
+//     coherence, incoherent, usedK,
+//     silhouette, fixedKLabels }
+// Family-purity is computed when state.data.samples is available.
+// Legacy: _wrapKmeansResultAsCluster (11576-11626).
+// ---------------------------------------------------------------------
+export function wrapKmeansResultAsCluster(state, result, K, reasonOverride) {
+  if (!state || !result) {
+    return { ok: false, reason: reasonOverride || 'NO_RESULT' };
+  }
+  const d = state.data;
+  const minNGroup = (state.minNGroup | 0) || 5;
+  const ok = result.n_per_group.every(c => c >= minNGroup);
+  const reason = reasonOverride
+    ? reasonOverride
+    : (ok ? null : 'LOW_GROUP_N');
+
+  let fam_purity = NaN;
+  let fam_per_cluster = null;
+  if (d && d.samples && d.samples.length === d.n_samples) {
+    const famIds = d.samples.map(s => (s && s.family_id != null) ? s.family_id : -1);
+    const sumByCluster = new Array(K).fill(0);
+    const totalByCluster = new Array(K).fill(0);
+    fam_per_cluster = new Array(K).fill(null);
+    for (let k = 0; k < K; k++) {
+      const counts = new Map();
+      for (let si = 0; si < d.n_samples; si++) {
+        if (result.labels[si] !== k) continue;
+        const fid = famIds[si];
+        counts.set(fid, (counts.get(fid) || 0) + 1);
+        totalByCluster[k]++;
+      }
+      let maxCount = 0, maxFid = -1;
+      counts.forEach((cnt, fid) => {
+        if (cnt > maxCount) { maxCount = cnt; maxFid = fid; }
+      });
+      sumByCluster[k] = maxCount;
+      fam_per_cluster[k] = { dom_fid: maxFid, dom_n: maxCount, total: totalByCluster[k] };
+    }
+    const grandTotal = totalByCluster.reduce((a, b) => a + b, 0);
+    const grandDom = sumByCluster.reduce((a, b) => a + b, 0);
+    fam_purity = grandTotal > 0 ? grandDom / grandTotal : NaN;
+  }
+
+  return {
+    ok, reason,
+    labels: result.labels,
+    n_per_group: result.n_per_group,
+    fam_purity,
+    fam_per_cluster,
+    coherence: NaN,
+    incoherent: false,
+    usedK: K,
+    silhouette: null,
+    fixedKLabels: result.labels,
+  };
+}
+
+// ---------------------------------------------------------------------
+// Phase 3 (post-rotation) for uv-rotated mode. Takes a rotation
+// result; runs kmeans2D on (us, vs) for the final 3-cluster partition.
+// Legacy: _clusterFromRotation_UVRotated (11560-11574).
+// ---------------------------------------------------------------------
+export function clusterFromRotation_UVRotated(state, rot) {
+  if (!rot || !rot.ok) {
+    return { ok: false, reason: rot ? rot.reason : 'NO_ROT' };
+  }
+  if (rot.degenerate) {
+    // All centroids coincide — fall back to the K-means3 base partition.
+    return wrapKmeansResultAsCluster(
+      state,
+      { labels: rot.baseLabels, n_per_group: rot.baseN },
+      3, 'UVRotated-degenerate-fallback'
+    );
+  }
+  const result = kmeans2D(rot.us, rot.vs, 3);
+  return wrapKmeansResultAsCluster(state, result, 3, null);
+}
+
+// ---------------------------------------------------------------------
+// L2 + slab entries for the uv-rotated mode.
+// Legacy: clusterL2_UVRotated (11549-11553), clusterSlab_UVRotated (11555-11558).
+// ---------------------------------------------------------------------
+export function clusterL2_UVRotated(state, l2idx) {
+  return clusterFromRotation_UVRotated(state, getOrComputeUVRotation(state, l2idx));
+}
+
+export function clusterSlab_UVRotated(state, s, e) {
+  return clusterFromRotation_UVRotated(state, getOrComputeUVRotationSlab(state, s, e));
+}
+
+if (typeof window !== 'undefined') {
+  window._aggregateWindowRangeForUV   = aggregateWindowRangeForUV;
+  window._computeUVRotationCore       = computeUVRotationCore;
+  window._wrapKmeansResultAsCluster   = (result, K, reasonOverride) =>
+    wrapKmeansResultAsCluster(window.state, result, K, reasonOverride);
 }

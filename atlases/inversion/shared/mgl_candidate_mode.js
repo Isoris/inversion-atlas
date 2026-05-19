@@ -1,9 +1,9 @@
 // shared/mgl_candidate_mode.js
 // =====================================================================
-// Lifecycle helpers for the page1 multi-allelic candidate-mode state
+// Lifecycle helpers for the local_pca_dosage multi-allelic candidate-mode state
 // slot (HANDOFF_2 §"Component 1: candidate-mode state machine").
 //
-// Lives at `state.mglCandidateMode` on page1's legacy state. The
+// Lives at `state.mglCandidateMode` on local_pca_dosage's legacy state. The
 // existing `state.candidateMode` boolean is unrelated legacy
 // scrub-vs-candidate UI plumbing and is left alone.
 //

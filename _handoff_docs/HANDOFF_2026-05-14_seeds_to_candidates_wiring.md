@@ -25,8 +25,8 @@ stage4           — per-target consensus_partition, voter records
 **The wiring gap**: `stage3.loci[]` carry per-band sample membership
 (== "which fish carry which arrangement at this locus") and link to
 long-range haplotype regimes via `stage2_linkage_group` — but they
-never reach `state.candidateList`. Downstream pages (page4 karyotype,
-page17 stats, page_evolution_*) read `state.candidateList`, so the
+never reach `state.candidateList`. Downstream pages (karyotype_tier karyotype,
+stats_profile stats, page_evolution_*) read `state.candidateList`, so the
 seeds-to-regimes work is a dead-end output.
 
 This handoff specs **`analysis/seeds_to_candidates`** — a JSON-in /
@@ -47,7 +47,7 @@ registry-aware adapter.
 
 ```
 scrubber_main.json
-  ↓ (page1 / page22 load)
+  ↓ (local_pca_dosage / page22 load)
 state.data.windows[].labels, .K, .band_quality, .pc1
   ↓ (page22 ctx)
 runBandingPipeline(ctx) — shared/band_tracking/banding_pipeline.js
@@ -60,7 +60,7 @@ state._regimesResult   (page22-private)
   │     (filesystem export; downloads regime catalogue)
   │
   └── ??? — stage3.loci[] NEVER reach state.candidateList
-            page4 / page17 / page_evolution_* therefore have no
+            karyotype_tier / stats_profile / page_evolution_* therefore have no
             seed-derived candidates to operate on.
 ```
 
@@ -71,10 +71,10 @@ After this handoff lands, the second branch becomes:
         → candidates[]  (each with seed_id + linkage_group + per_band_samples)
         → state.candidateList    (via adapter.saveOutput with promote=true)
             ↓
-        page4 (karyotype/tier)          via PR #13 karyotype_assignment
-        page17 (stats profile)          via existing legacy
-        page_evolution_polarize_msa     via canonical candidate shape
-        page_evolution_archaeology_card etc.
+        karyotype_tier (karyotype/tier)          via PR #13 karyotype_assignment
+        stats_profile (stats profile)          via existing legacy
+        polarize_msa_stacked     via canonical candidate shape
+        archaeology_synthesis_card etc.
 ```
 
 Window-chain candidates from PR #14 (`window_chain_to_candidates`)

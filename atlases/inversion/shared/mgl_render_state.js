@@ -19,7 +19,7 @@
 //     the heatmap renderer, the right-panel selected-card) react
 //     to changes without each owning a copy of the state.
 //
-// Pure compute. No DOM, no fetch. Consumed by page1's candidate-mode
+// Pure compute. No DOM, no fetch. Consumed by local_pca_dosage's candidate-mode
 // shell (HANDOFF_2) and by the upcoming tree / fingerprint /
 // similarity panels.
 // =====================================================================

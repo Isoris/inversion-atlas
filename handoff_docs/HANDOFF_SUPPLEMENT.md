@@ -5,37 +5,37 @@ that the original `HANDOFF_MERGE.md` would not have known. Read both.
 
 ---
 
-## Correction 1: page5 is the HELP page, not multi-species
+## Correction 1: help is the HELP page, not multi-species
 
-**The original `HANDOFF_BATCH_5.md` was wrong** about what page5 is.
+**The original `HANDOFF_BATCH_5.md` was wrong** about what help is.
 
 ### What I told Batch 5
 
-> page5 (lines 8159–9316): "Multi-species comparison page. **Big** (1158 lines of HTML). Pairwise dotplots, synteny graph, breakpoint annotations."
+> help (lines 8159–9316): "Multi-species comparison page. **Big** (1158 lines of HTML). Pairwise dotplots, synteny graph, breakpoint annotations."
 
 ### What's actually at lines 8159–9316
 
-A static **help/quick-reference page** (`<button data-page="page5" data-stage="help">` at legacy line 5142). Pure declarative HTML — tables of tabs, hotkeys, schema definitions, pipeline diagrams. No JS render function in the legacy file.
+A static **help/quick-reference page** (`<button data-page="help" data-stage="help">` at legacy line 5142). Pure declarative HTML — tables of tabs, hotkeys, schema definitions, pipeline diagrams. No JS render function in the legacy file.
 
 Batch 5 caught the discrepancy and handled it correctly:
-- Extracted lines 8159–9316 as `page5.html` (1158 lines, the help content)
-- Made `page5.js` a stub with explanatory comments
+- Extracted lines 8159–9316 as `help.html` (1158 lines, the help content)
+- Made `help.js` a stub with explanatory comments
 - Tagged `PAGE5_META.stage = 'help'`, `static: true`
 - Documented in `BATCH_5_NOTES.md`
 
 ### Where the multi-species page actually lives
 
-**`page16b`** (legacy lines 8033–8100) is the multi-species classification cockpit.
-The renderer is `_renderMultiSpeciesPage` at legacy line 27497. **This is correctly extracted** in `inversion_comparative/page16b.js` (2,403 LOC).
+**`multi_species_cockpit`** (legacy lines 8033–8100) is the multi-species classification cockpit.
+The renderer is `_renderMultiSpeciesPage` at legacy line 27497. **This is correctly extracted** in `inversion_comparative/multi_species_cockpit.js` (2,403 LOC).
 
 ### What this means for you (merge chat)
 
 When building `inversion_comparative.html`:
-- `page5` is the help page → it goes in `inversion_catalogue.html` actually, NOT comparative. It's stage `help`. Move it.
-- Update the comparative HTML's tab bar to NOT include page5.
-- Update the catalogue HTML's tab bar to INCLUDE page5 with stage `help`.
+- `help` is the help page → it goes in `inversion_catalogue.html` actually, NOT comparative. It's stage `help`. Move it.
+- Update the comparative HTML's tab bar to NOT include help.
+- Update the catalogue HTML's tab bar to INCLUDE help with stage `help`.
 
-Or alternatively: since page5 is just static help content, you could put it in any sub-atlas (or all of them). Quentin's call. Default: catalogue.
+Or alternatively: since help is just static help content, you could put it in any sub-atlas (or all of them). Quentin's call. Default: catalogue.
 
 ---
 
@@ -44,41 +44,41 @@ Or alternatively: since page5 is just static help content, you could put it in a
 The `data-stage` attribute on legacy tab buttons doesn't map cleanly 1-1 to sub-atlases. Here's the actual stage distribution I see in the legacy:
 
 ```
-discovery       → page1, page12, page15, page2, page19, page3
-refinement      → page11, page4, page8
-classification  → page21, page6, page7
-synthesis       → page9, page17, page18
-compare         → page16, page16b
-help            → page5, page10, page_overview, page_sv_evidence (mixed?)
+discovery       → local_pca_dosage, local_pca_theta_pi, local_pca_ghsl, candidate_focus, negative_regions, catalogue
+refinement      → boundary_refinement, karyotype_tier, window_summary_table
+classification  → annotation_cockpit, popstats, ancestry_per_window
+synthesis       → confirmed_carousel, stats_profile, marker_readiness
+compare         → cross_species_breakpoints, multi_species_cockpit
+help            → help, marker_panels, overview, sv_evidence (mixed?)
 ```
 
 vs. the original sub-atlas mapping I wrote:
 
 ```
-inversion_discovery   → page1, page12, page15, page2, page8, page19
-inversion_review      → page11, page_sv_evidence, page4, page7, page6
-inversion_catalogue   → page3, page9, page21, page17, page18, page10, page_overview
-inversion_comparative → page16, page16b, page5
+inversion_discovery   → local_pca_dosage, local_pca_theta_pi, local_pca_ghsl, candidate_focus, window_summary_table, negative_regions
+inversion_review      → boundary_refinement, sv_evidence, karyotype_tier, ancestry_per_window, popstats
+inversion_catalogue   → catalogue, confirmed_carousel, annotation_cockpit, stats_profile, marker_readiness, marker_panels, overview
+inversion_comparative → cross_species_breakpoints, multi_species_cockpit, help
 ```
 
 **The merge chat decision**: don't try to perfectly align stages with sub-atlases. The sub-atlas split was driven by *workflow*, not stage. Each sub-atlas's HTML should include only the buttons whose pages it owns:
 
 ```
-inversion_discovery.html  buttons: page1, page12, page15, page2, page8, page19
-inversion_review.html     buttons: page11, page_sv_evidence, page4, page7, page6
-inversion_catalogue.html  buttons: page3, page9, page21, page17, page18, page10, page_overview, page5  (+ help)
-inversion_comparative.html buttons: page16, page16b
+inversion_discovery.html  buttons: local_pca_dosage, local_pca_theta_pi, local_pca_ghsl, candidate_focus, window_summary_table, negative_regions
+inversion_review.html     buttons: boundary_refinement, sv_evidence, karyotype_tier, ancestry_per_window, popstats
+inversion_catalogue.html  buttons: catalogue, confirmed_carousel, annotation_cockpit, stats_profile, marker_readiness, marker_panels, overview, help  (+ help)
+inversion_comparative.html buttons: cross_species_breakpoints, multi_species_cockpit
 ```
 
 Just literally include the per-page tab `<button>` HTML for the pages that sub-atlas owns. Don't filter by `data-stage`.
 
 ---
 
-## Correction 3: the "9 confirmed" page is page9 in catalogue, but it consumes confirmed candidates produced by the discovery scrubber
+## Correction 3: the "9 confirmed" page is confirmed_carousel in catalogue, but it consumes confirmed candidates produced by the discovery scrubber
 
-Page9 (catalogue) is downstream of page1 (discovery) — it shows confirmed candidates. They're connected via `state.candidateList` (a `cross_atlas` slot in `SLOT_REGISTRY`).
+Page9 (catalogue) is downstream of local_pca_dosage (discovery) — it shows confirmed candidates. They're connected via `state.candidateList` (a `cross_atlas` slot in `SLOT_REGISTRY`).
 
-This means: **the cross-atlas state contract is doing real work** — Quentin promotes a candidate on page2 (discovery), and page9 (catalogue) reads that from review/inversion/sessions.
+This means: **the cross-atlas state contract is doing real work** — Quentin promotes a candidate on candidate_focus (discovery), and confirmed_carousel (catalogue) reads that from review/inversion/sessions.
 
 The merge chat doesn't need to do anything special here — the foundation already supports it. Just be aware that the user workflow crosses sub-atlases.
 
@@ -98,7 +98,7 @@ The merge chat doesn't need to do anything special here — the foundation alrea
 
 ### What didn't work as well
 
-1. **The handoff docs had errors** that the chats had to detect and document (the page5/multi-species mixup). Future workflow: have batch chats explicitly verify line-range descriptions BEFORE extracting.
+1. **The handoff docs had errors** that the chats had to detect and document (the help/multi-species mixup). Future workflow: have batch chats explicitly verify line-range descriptions BEFORE extracting.
 
 2. **Some pages were over-described.** `BATCH_3` had 7 pages assigned but the descriptions in the handoff were thin — chat had to do a lot of legacy spelunking to figure out what each page actually does.
 

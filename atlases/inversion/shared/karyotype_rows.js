@@ -3,7 +3,7 @@
 // Per-sample karyotype table-row builder + two-track detection
 // (legacy lines 62703-62763: buildKaryotypeRows + _isKaryoTwoTrack +
 // _karyoBandToTrackMap). Pure helpers consumed by the karyotype
-// page (page4) and any view that lists samples ranked by σ /
+// page (karyotype_tier) and any view that lists samples ranked by σ /
 // k-band / family.
 //
 // Inputs:

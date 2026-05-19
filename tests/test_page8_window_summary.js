@@ -1,8 +1,8 @@
 // tests/test_page8_window_summary.js
 //
-// Unit coverage for pages/discovery/page8/window_summary.js.
+// Unit coverage for pages/discovery/window_summary_table/window_summary.js.
 //
-// Legacy shipped page8 as a pure HTML scaffold (zero JS handlers). The
+// Legacy shipped window_summary_table as a pure HTML scaffold (zero JS handlers). The
 // cartridge adds the per-window summary table + strip canvas + filter
 // + sort + bisnp info-toggle implementation.
 //
@@ -21,7 +21,7 @@
 //     change + sort flip + go-button onJump + bisnp toggle
 //   - Headless-tolerance: no document → all DOM helpers return silently
 
-import * as WS from '../atlases/inversion/pages/discovery/page8/window_summary.js';
+import * as WS from '../atlases/inversion/pages/discovery/window_summary_table/window_summary.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

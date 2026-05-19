@@ -44,7 +44,7 @@ LG28's `sv_genotype_counts.json` for `cand_LG28_15Mb` and you see
 8 SV calls inside the 15.1–18.1 Mb candidate window. **Not all
 LG28's SVs.** Just the ones near this candidate's boundaries.
 
-The SV evidence page (`page_sv_evidence.js`) loads exactly these
+The SV evidence page (`sv_evidence.js`) loads exactly these
 per-candidate JSONs via `mod.loadCandidate(cid)` and renders the
 SV table + UpSet plot + dosage heatmap. It is **not** scrolling
 SVs across the chromosome.

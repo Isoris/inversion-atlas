@@ -6,6 +6,7 @@ import {
   computeLassoLinkage,
   lassoLinkageCacheKey,
   lassoLinkageGetOrCompute,
+  lassoLinkageToTSV,
 } from '../atlases/inversion/shared/lasso_linkage.js';
 
 let pass = 0, fail = 0;
@@ -255,6 +256,38 @@ group('lassoLinkageGetOrCompute — cache hit / miss');
   check('empty candidate list → null',          lassoLinkageGetOrCompute(state) === null);
 }
 check('null state → null',                    lassoLinkageGetOrCompute(null) === null);
+
+console.log('\n--- lassoLinkageToTSV ---');
+{
+  const result = {
+    n_fish_selected: 5,
+    n_candidates_seen: 2,
+    purity_threshold: 0.7,
+    min_band_size: 5,
+    strong_links: [],
+    per_candidate: {
+      'I1': { id: 'I1', chrom: 'LG28', start_bp: 15000000, end_bp: 18000000,
+              K: 3, best_band: 0, best_purity: 0.85, n_in_best_band: 5,
+              n_lasso_seen: 5, is_strong_link: true },
+      'I2': { id: 'I2', chrom: 'LG12', start_bp: 1000000,  end_bp: 2000000,
+              K: 3, best_band: 1, best_purity: 0.40, n_in_best_band: 2,
+              n_lasso_seen: 5, is_strong_link: false },
+    },
+  };
+  const tsv = lassoLinkageToTSV(result);
+  check('lassoLinkageToTSV returns string', typeof tsv === 'string');
+  check('TSV has metadata comment',         tsv.includes('# n_fish_selected\t5'));
+  check('TSV has candidate_id column',      tsv.includes('candidate_id\tchrom'));
+  // Strong links should appear first (I1 before I2)
+  const dataRows = tsv.split('\n').filter(l => l && !l.startsWith('#') && !l.startsWith('candidate_id'));
+  check('strong link I1 sorted first',      dataRows[0].startsWith('I1'));
+  check('weak link I2 sorted second',       dataRows[1].startsWith('I2'));
+  check('I1 row has is_strong_link=1',      dataRows[0].endsWith('\t1'));
+  check('I2 row has is_strong_link=0',      dataRows[1].endsWith('\t0'));
+  check('null result → null',               lassoLinkageToTSV(null) === null);
+  check('result without per_candidate → null',
+        lassoLinkageToTSV({ n_fish_selected: 1 }) === null);
+}
 
 // =====================================================================
 console.log('\n=================');

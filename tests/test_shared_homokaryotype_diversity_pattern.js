@@ -2,7 +2,7 @@
 //
 // Unit coverage for shared/homokaryotype_diversity_pattern.js — the
 // 5-pattern classifier (+ HWE-expected-het helper) for the [evo] hover
-// pill on page17's karyotype-aware stat cells.
+// pill on stats_profile's karyotype-aware stat cells.
 
 import {
   HOMOKARYOTYPE_DIVERSITY_PATTERNS,

@@ -1,0 +1,70 @@
+{
+  "page_id": "pca_comparator",
+  "slug": "pca_comparator",
+  "label": "PCA comparator (dosage · θπ · GHSL)",
+  "page_type": "core_page",
+  "stage": "discovery_2",
+  "owner_atlas": "inversion",
+  "status": "Phase 1 (side-by-side) shipped 2026-05-18",
+  "current_path": {
+    "html":      "atlases/inversion/pages/discovery/pca_comparator.html",
+    "js_entry":  "atlases/inversion/pages/discovery/pca_comparator.js",
+    "js_subdir": "atlases/inversion/pages/discovery/pca_comparator/"
+  },
+  "bundle_source": "n/a — new page (no legacy ancestor)",
+  "legacy_source": "n/a — new in this commit; not in legacy/Inversion_atlas.html",
+  "purpose": "Cross-evidence comparator. Three synchronized mini-PCA panels at the active window (state.cur), one per evidence axis (dosage / θπ / GHSL). K-band coloring inherits from the anchor's clustering so each sample keeps its band color across panels. Hover a dot to highlight it in all 3. ←/→ scrubs all 3 windows in lock-step. Phase 1 = side-by-side; Phase 2 + 3 (per-sample 3-axis trajectory and Procrustes overlay) deferred per SPEC.",
+
+  "required_layers": ["scrubber_main"],
+  "required_slots": ["activeChrom"],
+  "preloads": ["scrubber_main"],
+  "requires_operations": [],
+
+  "panels": [
+    {"id": "dosage",   "purpose": "Native dosage PCA at the active window (always available)"},
+    {"id": "theta_pi", "purpose": "θπ local PCA at the active window (optional layer; shows 'absent' status when not loaded)"},
+    {"id": "ghsl",     "purpose": "GHSL local PCA at the active window (optional layer)"},
+    {"id": "header",   "purpose": "window label + Mb badge + anchor selector + hovered-sample readout"}
+  ],
+
+  "subdir_files": [
+    "_state.js — module-local _pageState binding (mirrors tree_panel/_state.js)",
+    "renderer.js — paintPanel + findSampleAtPixel; layer accessors for the 3 data sources; retina-correct canvas fit"
+  ],
+
+  "primitives_used": [
+    "pages/discovery/local_pca_dosage/_data.js → groupColor, getL2Cluster (K-band coloring from the dosage anchor)"
+  ],
+  "adapters_used": [],
+
+  "interactions": [
+    {"id": "anchor_selector",      "type": "parameter_control", "purpose": "pick which evidence axis drives the K-band palette"},
+    {"id": "arrow_keys",           "type": "hotkey",            "purpose": "←/→ (Shift = ±20) scrubs shared window cursor"},
+    {"id": "canvas_hover",         "type": "pointer",           "purpose": "hover dot → highlight in all 3 panels"}
+  ],
+  "hotkeys": ["←/→ — scrub shared window cursor", "Shift+←/→ — 20-window quick-skip"],
+
+  "computed_preview_outputs": [],
+  "committable_outputs": [],
+  "commit_policy": "read_only",
+
+  "documents": {
+    "page_registry_doc": "atlases/inversion/registries/data/pages.registry.json -> pages.pca_comparator._doc",
+    "specs_done": [],
+    "specs_todo": [
+      "specs_todo/SPEC_local_pca_comparator.md (design exploration; Phase 1 shipped, Phases 2 + 3 still proposed)"
+    ],
+    "specs_referenced_but_missing": [],
+    "bundle_meta_docs": [],
+    "handoffs": []
+  },
+
+  "known_issues": [
+    "Phase 1 only — Procrustes overlay (Phase 3) NOT implemented; the 3 panels show their native coordinate spaces (no rotation).",
+    "anchor selector currently informational — all 3 anchor options pull K-band labels from the dosage K-means since θπ + GHSL don't yet ship their own clusterings. The dropdown will activate once those layers land.",
+    "θπ + GHSL panels show 'absent' status when their layer is not loaded (theta_pi_local_pca / ghsl_panel.local_pca). dosage panel always renders.",
+    "slab-mode aggregation (compareUnit ∈ {win5, win10}) not honoured — Phase 1 uses the cursor window only."
+  ],
+
+  "confidence": "phase_1_complete"
+}

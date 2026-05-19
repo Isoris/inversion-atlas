@@ -1,0 +1,76 @@
+{
+  "page_id": "cross_species_breakpoints",
+  "label": "cross-species breakpoints",
+  "page_type": "core_page",
+  "stage": "comparative",
+  "owner_atlas": "inversion",
+  "status": "active",
+  "current_path": {
+    "html": "atlases/inversion/pages/comparative/cross_species_breakpoints.html",
+    "js_entry": "atlases/inversion/pages/comparative/cross_species_breakpoints.js",
+    "js_subdir": "atlases/inversion/pages/comparative/cross_species_breakpoints/"
+  },
+  "legacy_source": "legacy/Inversion_atlas.html lines 20971-21114 (constants + IO/state) + 23717-26025 (cross-species runtime: filter/sort, render*, ideograms, flank charts, synteny, dotplot, focal-vs-bg) + 28367-28419 (_csBuildPermResultHtml)",
+
+  "purpose": "Cross-species comparative dashboard for chromosome-scale rearrangements between Cgar and Cmac, derived from a wfmash 1-to-1 alignment (cs_breakpoints_v1 schema). Each breakpoint renders both species' coordinates, a syntenic-block linking line, and the flanking repeat-element density on both species (drawing from boundary_refinement's TEfull JSONs already loaded into state.repeatDensity). Spalax-style TE enrichment at breakpoints is the manuscript hook.",
+
+  "three_cohort_discipline": "F1 hybrid (assembly paper) ≠ 226-sample pure C. gariepinus (current inversion atlas) ≠ pure C. macrocephalus wild (future paper) — must NEVER conflate",
+
+  "required_layers": ["cs_breakpoints", "phylo_tree"],
+  "required_slots": [],
+  "preloads": ["cs_breakpoints", "phylo_tree"],
+  "owned_state": "state.crossSpecies + cs* synteny caches + hover/wire flags",
+
+  "panels": [
+    {"id": "csToolbar", "purpose": "filter + sort controls"},
+    {"id": "csCatalogue", "purpose": "breakpoint catalogue table"},
+    {"id": "csFocus", "purpose": "focus card for active breakpoint"},
+    {"id": "csSyntenyContent", "purpose": "synteny section"},
+    {"id": "csDotplotContent", "purpose": "dotplot panel"},
+    {"id": "csFocalVsBgContent", "purpose": "focal-vs-background panel (permutation test)"}
+  ],
+
+  "subdir_files": ["_state.js — _pageState + setter"],
+
+  "primitives_used": [
+    "shared/cross_species.js",
+    "shared/cross_species_summary.js"
+  ],
+  "owned_exports_used_by_other_pages": [
+    "_csGetSyntenyBlocks (read by stats_profile via typeof guards; promoted to ES export round 5 step 11)",
+    "_csPermutationTest (read by stats_profile; promoted to ES export round 5 step 11)"
+  ],
+  "adapters_used": [],
+
+  "interactions": [
+    {"id": "filter_controls", "type": "view_control"},
+    {"id": "sort_controls", "type": "view_control"},
+    {"id": "row_click", "type": "click", "purpose": "select active breakpoint"},
+    {"id": "permutation_test_btn", "type": "action", "purpose": "run focal-vs-bg permutation test"}
+  ],
+  "hotkeys": [],
+
+  "computed_preview_outputs": [
+    "filtered/sorted breakpoint catalogue",
+    "focus card with both species' coords + flanking repeat density",
+    "synteny linking lines",
+    "dotplot",
+    "focal-vs-background permutation test result"
+  ],
+  "committable_outputs": ["unknown — likely TSV export"],
+  "commit_policy": "manual_only",
+
+  "documents": {
+    "page_registry_doc": "pages.registry.json -> pages.cross_species_breakpoints._doc",
+    "specs_done": [],
+    "specs_todo": [],
+    "schemas": ["cs_breakpoints_v1 schema (output of STEP_CS01_extract_breakpoints.py)", "registries/schemas/cross_species_breakpoint_reuse.schema.json", "registries/schemas/cross_species_synteny_blocks.schema.json"],
+    "handoffs": ["atlases/inversion/pages/comparative/BATCH_5_NOTES.md", "_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step11_done.md (AST-shim methodology — 50 helpers got shim)"],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [
+    "Cross-page export: _csGetSyntenyBlocks + _csPermutationTest are owned here but consumed by stats_profile (synthesis stats profile). Round 5 step 11 made them proper ES exports; stats_profile still imports via typeof guards (follow-up to promote)."
+  ],
+  "confidence": "high"
+}

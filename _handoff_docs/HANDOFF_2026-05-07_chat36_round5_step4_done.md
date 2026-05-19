@@ -1,4 +1,4 @@
-# HANDOFF — page18 marker readiness panel MIGRATED; page17 is the natural next
+# HANDOFF — marker_readiness marker readiness panel MIGRATED; stats_profile is the natural next
 
 **Date:** 2026-05-07 (chat ~36, round 5 step 4)
 **Reads:** This file FIRST, then the audit log top entry, then
@@ -19,17 +19,17 @@ constants); this round added the atlas-router lifecycle, refactored
 the state pattern, and resolved the only cross-module dependency
 (`_esc` from shared).
 
-**Decision:** kept page18 as a single file (no sub-module split). The
+**Decision:** kept marker_readiness as a single file (no sub-module split). The
 921 LOC body is cohesive (single concern: marker tier classification +
 HTML render). Sub-module splits are justified at >3000 LOC across
-multiple concerns (page1/page2). Page18 doesn't meet that threshold.
+multiple concerns (local_pca_dosage/candidate_focus). Page18 doesn't meet that threshold.
 Pattern parity isn't a goal in itself.
 
 ```
 atlases/inversion/pages/catalogue/
-├── page18.js                       966 LOC ← refactored in-place from chat-33 stub
-└── page18/
-    └── _state.js                    18 LOC ← _pageState + setter (page18's own)
+├── marker_readiness.js                       966 LOC ← refactored in-place from chat-33 stub
+└── marker_readiness/
+    └── _state.js                    18 LOC ← _pageState + setter (marker_readiness's own)
 ```
 
 **Verifications passed (332/332 from a clean tarball reassembly):**
@@ -55,15 +55,15 @@ atlases/inversion/pages/catalogue/
 
 ### Step 0 — registry + manifest fix
 
-- `pages.registry.json` page18: added `_label` ("15 marker panel") and
+- `pages.registry.json` marker_readiness: added `_label` ("15 marker panel") and
   `_doc` documenting the legacy tab definition + tier hierarchy
   (Tier 1 private indel/SNP tag clean dosage; Tier 2 multi-marker or
   strong tag; Tier 3 breakpoint PCR demoted; Tier 4 exploratory).
-- `manifest.json` page18: label "page 18" → **"marker panel"**;
+- `manifest.json` marker_readiness: label "page 18" → **"marker panel"**;
   stage "catalogue" → **"synthesis"** (matching legacy
   `data-stage="synthesis"` at line 5128).
 
-### Step 1 — page18.js refactored in-place
+### Step 1 — marker_readiness.js refactored in-place
 
 The chat-33 stub already had the body extracted. This round refactored
 it for atlas-router compatibility:
@@ -81,12 +81,12 @@ it for atlas-router compatibility:
 - Replaced `export function renderMarkerPanelPage()` with the
   state-aware variant `renderMarkerPanelPage(state)`.
 - Added `mount(root, atlasState, registry)`, `unmount(root)`, and
-  `_buildLegacyState(atlasState)` (mirrors page1/page2/page3 pattern).
+  `_buildLegacyState(atlasState)` (mirrors local_pca_dosage/candidate_focus/catalogue pattern).
 - Removed the chat-33 `__MODULE_ID__` export (no consumers).
 
-### Step 2 — page18/_state.js (NEW, 18 LOC)
+### Step 2 — marker_readiness/_state.js (NEW, 18 LOC)
 
-Same shape as `page1/_state.js`, `page2/_state.js`, `page3/_state.js`.
+Same shape as `local_pca_dosage/_state.js`, `candidate_focus/_state.js`, `catalogue/_state.js`.
 Page18 has its OWN `_pageState`.
 
 ### Step 3 — tests
@@ -119,15 +119,15 @@ Page18 has its OWN `_pageState`.
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1/page2/page3 modules** — completely unchanged.
-- **`shared/page1_data_helpers.js`** — unchanged this round (page18's
+- **local_pca_dosage/candidate_focus/catalogue modules** — completely unchanged.
+- **`shared/page1_data_helpers.js`** — unchanged this round (marker_readiness's
   only shared dependency is `_esc`, already added in round 5 step 2
-  for page2).
-- **page17 (stats profile)** — sibling synthesis page that reads
-  page18's `_mpDeriveAutoPanel` via `typeof X === 'function'` guard.
-  Migrating page17 (likely next round) will resolve the import properly.
+  for candidate_focus).
+- **stats_profile (stats profile)** — sibling synthesis page that reads
+  marker_readiness's `_mpDeriveAutoPanel` via `typeof X === 'function'` guard.
+  Migrating stats_profile (likely next round) will resolve the import properly.
 - **Pages 4, 6, 7, 8, 9, 10, 11, 12, 15, 16, 16b, 17, 19, 21,
-  page_overview, page_sv_evidence** — only parse-checked.
+  overview, sv_evidence** — only parse-checked.
 - **Page renumbering** — deferred per Quentin's directive.
 - **Toolkit-registry vs Atlas-state cache decisions** — Quentin's
   workflow: defer until all pages are migrated.
@@ -138,10 +138,10 @@ Page18 has its OWN `_pageState`.
 
 | Page | Folder | Status | LOC | Tests |
 |---|---|---|---|---|
-| page1 | discovery | ✅ migrated rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
-| page2 | discovery | ✅ migrated step 2 | ~3140 across 5 sub-modules | 58+24 |
-| page3 | catalogue | ✅ migrated step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
-| page18 | catalogue (synthesis) | ✅ migrated step 4 (single file) | ~984 across main + _state | 46+20 |
+| local_pca_dosage | discovery | ✅ migrated rounds 4 + step 1 | ~3300 across 9 sub-modules | 103+33 |
+| candidate_focus | discovery | ✅ migrated step 2 | ~3140 across 5 sub-modules | 58+24 |
+| catalogue | catalogue | ✅ migrated step 3 (breeding-export only) | ~1308 across 2 sub-modules | 19+29 |
+| marker_readiness | catalogue (synthesis) | ✅ migrated step 4 (single file) | ~984 across main + _state | 46+20 |
 
 **Total assertions passing across all migrated pages: 332/332.**
 
@@ -149,33 +149,33 @@ Page18 has its OWN `_pageState`.
 
 ## What to do NEXT
 
-**Quentin's call.** Most natural follow-up: **page17** (stats profile).
+**Quentin's call.** Most natural follow-up: **stats_profile** (stats profile).
 Reasons:
 
 1. Sibling synthesis page (legacy `data-stage="synthesis"`, tab "14 stats profile").
-2. **Reads page18's `_mpDeriveAutoPanel`** via `typeof X === 'function'`
-   guard — migrating page17 lets us properly resolve the import.
-3. Same pattern as page18: pre-extracted body (~939 LOC), refactor
+2. **Reads marker_readiness's `_mpDeriveAutoPanel`** via `typeof X === 'function'`
+   guard — migrating stats_profile lets us properly resolve the import.
+3. Same pattern as marker_readiness: pre-extracted body (~939 LOC), refactor
    in-place rather than split (single concern: stats-profile rows
    + render).
-4. Manuscript-relevant: page17 = "stats profile" = the synthesis figure
+4. Manuscript-relevant: stats_profile = "stats profile" = the synthesis figure
    "what is statistically special about inversion regions?"
 5. Cross-page dependencies (legacy stub note): `_csGetSyntenyBlocks`,
    `_csPermutationTest`, `_mpDeriveAutoPanel`. The first two are
-   likely in page16/16b multi-species cockpit (not migrated); they
+   likely in cross_species_breakpoints/16b multi-species cockpit (not migrated); they
    may have to stay as `typeof X === 'function'` guards. The third
-   is now in page18 — proper import.
+   is now in marker_readiness — proper import.
 
 **Other reasonable candidates:**
 
 | Page | Folder | LOC | Notes |
 |---|---|---|---|
-| page17 | catalogue (synthesis) | 939 | sibling of page18; pre-extracted body |
-| page21 | catalogue | 721 | pre-extracted body |
-| page12 | discovery | 1008 | 18 TODOs flagged |
-| page16, page16b | comparative | 2400+ | multi-species cockpit, large |
-| page8/9/15/19 | discovery/catalogue | <105 | tiny stubs, quick router-wiring |
-| page_overview | catalogue | 35 | empty stub (legacy is empty too) |
+| stats_profile | catalogue (synthesis) | 939 | sibling of marker_readiness; pre-extracted body |
+| annotation_cockpit | catalogue | 721 | pre-extracted body |
+| local_pca_theta_pi | discovery | 1008 | 18 TODOs flagged |
+| cross_species_breakpoints, multi_species_cockpit | comparative | 2400+ | multi-species cockpit, large |
+| window_summary_table/9/15/19 | discovery/catalogue | <105 | tiny stubs, quick router-wiring |
+| overview | catalogue | 35 | empty stub (legacy is empty too) |
 
 ---
 

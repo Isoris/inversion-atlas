@@ -1,6 +1,6 @@
 // tests/test_page1_inheritance_tooltip.js
 //
-// Unit tests for pages/discovery/page1/inheritance_tooltip.js.
+// Unit tests for pages/discovery/local_pca_dosage/inheritance_tooltip.js.
 // Covers the DOM-independent surface: inhPillHitTest +
 // inhTooltipBuildHtml + headless tolerance on the show/hide/wire pair.
 
@@ -10,7 +10,7 @@ import {
   inhTooltipEnsureEl,
   inhTooltipHide,
   wireInheritancePillTooltip,
-} from '../atlases/inversion/pages/discovery/page1/inheritance_tooltip.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/inheritance_tooltip.js';
 import {
   inhGroupColor,
 } from '../atlases/inversion/shared/color_helpers.js';

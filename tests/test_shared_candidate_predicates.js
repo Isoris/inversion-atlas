@@ -33,10 +33,10 @@ check('non-string source → false',     isAutoCandidate({ source: 42 }) === fal
 check('null source → false',           isAutoCandidate({ source: null }) === false);
 
 // =====================================================================
-group('re-export via page1/inheritance.js (backward compat)');
+group('re-export via local_pca_dosage/inheritance.js (backward compat)');
 {
-  const mod = await import('../atlases/inversion/pages/discovery/page1/inheritance.js');
-  check('page1/inheritance re-exports isAutoCandidate',
+  const mod = await import('../atlases/inversion/pages/discovery/local_pca_dosage/inheritance.js');
+  check('local_pca_dosage/inheritance re-exports isAutoCandidate',
         typeof mod.isAutoCandidate === 'function');
   check('re-export matches shared impl on auto_ source',
         mod.isAutoCandidate({ source: 'auto_x' }) === true);

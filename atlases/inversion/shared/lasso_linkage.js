@@ -240,3 +240,52 @@ export function lassoLinkageGetOrCompute(state, opts) {
   state.lassoLinkageCacheKey = key;
   return result;
 }
+
+/**
+ * Format a lasso-linkage compute result as TSV. Verbatim port of legacy
+ * _lassoLinkageToTSV (legacy 40783-40821).
+ */
+export function lassoLinkageToTSV(result) {
+  if (!result || typeof result !== 'object') return null;
+  if (!result.per_candidate) return null;
+  const fmt = (v) => (Number.isFinite(v) ? v.toFixed(6) : '');
+  const lines = [
+    '# n_fish_selected\t'    + (result.n_fish_selected   | 0),
+    '# n_candidates_seen\t'  + (result.n_candidates_seen | 0),
+    '# purity_threshold\t'   + fmt(result.purity_threshold),
+    '# min_band_size\t'      + (result.min_band_size     | 0),
+  ];
+  const cols = ['candidate_id', 'chrom', 'start_bp', 'end_bp', 'K',
+                'best_band', 'best_purity', 'n_in_best_band',
+                'n_lasso_seen', 'is_strong_link'];
+  lines.push(cols.join('\t'));
+  const all = Object.values(result.per_candidate);
+  all.sort((a, b) => {
+    if (a.is_strong_link !== b.is_strong_link) return a.is_strong_link ? -1 : 1;
+    if (b.best_purity !== a.best_purity) return b.best_purity - a.best_purity;
+    if (b.n_in_best_band !== a.n_in_best_band) return b.n_in_best_band - a.n_in_best_band;
+    return String(a.id).localeCompare(String(b.id));
+  });
+  for (const r of all) {
+    lines.push([
+      r.id,
+      r.chrom || '',
+      (r.start_bp != null) ? (r.start_bp | 0) : '',
+      (r.end_bp   != null) ? (r.end_bp   | 0) : '',
+      (r.K | 0),
+      (r.best_band == null ? -1 : (r.best_band | 0)),
+      fmt(r.best_purity),
+      (r.n_in_best_band | 0),
+      (r.n_lasso_seen | 0),
+      r.is_strong_link ? '1' : '0',
+    ].join('\t'));
+  }
+  return lines.join('\n') + '\n';
+}
+
+if (typeof window !== 'undefined') {
+  window._computeLassoLinkage         = computeLassoLinkage;
+  window._lassoLinkageCacheKey        = lassoLinkageCacheKey;
+  window._lassoLinkageGetOrCompute    = lassoLinkageGetOrCompute;
+  window._lassoLinkageToTSV           = lassoLinkageToTSV;
+}

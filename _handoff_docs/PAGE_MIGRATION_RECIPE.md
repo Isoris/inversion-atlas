@@ -3,7 +3,7 @@
 How to migrate a page from `legacy/Inversion_atlas.html` to the new shell.
 
 This is the playbook. The previous chat (2026-05-06 evening) used it
-to migrate page1 partially — see the migration log at the bottom. The
+to migrate local_pca_dosage partially — see the migration log at the bottom. The
 next chat picks up from where we left off.
 
 ---
@@ -61,18 +61,18 @@ or stubbing anything, run a scope check:
 # a closure-scoped false positive — just delete the marker.
 ```
 
-Round 2 found two classes of false positive in page1.js:
+Round 2 found two classes of false positive in local_pca_dosage.js:
 
 1. **Closure-scoped** — every call site is covered by a local
    `const X = ...` defined earlier in the same parent function. The
    extractor produced a marker because it didn't model lexical scope.
-   Delete the marker. Examples in page1: `toX, toY, xOfWin, mbAt,
+   Delete the marker. Examples in local_pca_dosage: `toX, toY, xOfWin, mbAt,
    toPx, toPy, _buildJumpMask, flushRun, strokeSamplePath,
    strokeSamplePathStyled, drawRect`.
 2. **Lexical** — the bare word appears only inside template literals,
    comment text, or DOM `el.dataset.foo` property access, never as
    a function call or unresolved identifier. Delete the marker.
-   Examples in page1: `samples, dataset, hubs, jittered, layer`.
+   Examples in local_pca_dosage: `samples, dataset, hubs, jittered, layer`.
 
 A 30-line Python script to do this check across a page is in the round
 2 chat log (search for `scope_check.py`).
@@ -92,7 +92,7 @@ For each remaining (non-false-positive) name, choose:
   data isn't available), stub it with a one-line `function X() { return; }`
   and add a `// STUBBED:` comment.
 
-**Round-2 stub conventions** (used in page1.js):
+**Round-2 stub conventions** (used in local_pca_dosage.js):
 - Group all stubs into a single labeled "Stubs block" near the top.
 - Match the return shape the call site actually uses:
   - `[r, g, b]` arrays for color helpers (`simColor`, `simColorPDF`, `zColorPDF`)
@@ -114,7 +114,7 @@ For each remaining (non-false-positive) name, choose:
 ### Step 4 — append the mount wrapper
 
 Every page needs a `mount(root, atlasState, registry)` export. See
-`pages/discovery/page1.js` for the canonical example. The wrapper:
+`pages/discovery/local_pca_dosage.js` for the canonical example. The wrapper:
 
 1. Imports `resolve` and `getState` from `../../../../core/atlas_api.js`.
 2. Builds a legacy-shaped state object from atlasState (`_buildLegacyState`).
@@ -128,7 +128,7 @@ If the page has many, factor the wiring into `_wireCanvasHandlers(root, state)`.
 ### Step 5 — also export an `unmount(root)` if needed
 
 Pages that:
-- Run a `playTimer` (page1) → must clear it.
+- Run a `playTimer` (local_pca_dosage) → must clear it.
 - Subscribe to AtlasState events → must unsubscribe.
 - Hold large RAM data → optionally drop it.
 
@@ -198,24 +198,24 @@ function _drawSnpDensityStrip(state) {
 
 The order matters because some pages share extracted helpers.
 
-1. **page1** (4361 LOC, 89 TODOs originally) — THE big page. Discovery focus,
+1. **local_pca_dosage** (4361 LOC, 89 TODOs originally) — THE big page. Discovery focus,
    sim_mat + Z + lines + PCA. Round 1 partial: 7 utility TODOs resolved
    via `shared/page1_utils.js`. Round 2: 15 false-positive TODOs removed
    + 34 truly-missing names stubbed. **0 TODO_MISSING markers remain
    (down from 89).** Real bodies still need to be extracted from legacy
    in future rounds; the page renders fail-soft until then.
-2. **page2** (46 TODOs) — cohort overview. Probably reuses many of
-   page1's helpers. When migrating page2, look at which page1 stubs
+2. **candidate_focus** (46 TODOs) — cohort overview. Probably reuses many of
+   local_pca_dosage's helpers. When migrating candidate_focus, look at which local_pca_dosage stubs
    it would also call — those are the candidates for hoisting to
    `shared/color_helpers.js` etc. (recipe Step 3 option (b)).
-3. **page11** (31 TODOs) — review.
-4. **page3** (26 TODOs) — catalogue.
-5. **page12** (18 TODOs) — discovery.
-6. **page4** (12 TODOs) — review.
-7. **page16** (11 TODOs) — comparative.
+3. **boundary_refinement** (31 TODOs) — review.
+4. **catalogue** (26 TODOs) — catalogue.
+5. **local_pca_theta_pi** (18 TODOs) — discovery.
+6. **karyotype_tier** (12 TODOs) — review.
+7. **cross_species_breakpoints** (11 TODOs) — comparative.
 8. The smaller pages (1–7 TODOs each) — quick wins.
 
-Approximate effort: page1 needs 3–4 chats; the rest of the discovery
+Approximate effort: local_pca_dosage needs 3–4 chats; the rest of the discovery
 pages another 2–3; review + catalogue 2 chats; comparative 1 chat. So
 8–10 chats to migrate everything. NOT one chat. Pace accordingly.
 
@@ -227,20 +227,20 @@ Append-only. One line per migration session.
 
 ```
 2026-05-06 (chat ~30, late evening)
-  page1.js round 1:
+  local_pca_dosage.js round 1:
     - Fixed import paths (../shared/ → ../../shared/) across 9 page files.
     - Extracted 6 utilities into shared/page1_utils.js:
       escapeHtml, fitCanvas, formatTrackVal, niceTicks, themeColor, withAlpha
     - Identified drawRect as false-positive TODO (closure-scoped, line 35691).
     - Appended mount/unmount wrappers (~100 LOC).
     - 7 TODOs resolved (89 → 82). 82 still open.
-    - page1.js parses (node --check).
+    - local_pca_dosage.js parses (node --check).
     - NOT runtime-tested (no test suite this round).
 ```
 
 ```
 2026-05-06 (chat ~31)
-  page1.js round 2:
+  local_pca_dosage.js round 2:
     - Audited all 47 unique remaining TODO_MISSING names (49 total markers
       including dupes) via scope_check.py: for each name, checked whether
       every call site is preceded by a local `const NAME = ...` in the same
@@ -271,7 +271,7 @@ Append-only. One line per migration session.
         3 misc (recomputeAnchorConcord, _resolveSampleScopeColor,
           _refreshScreeInset)
     - 0 TODO_MISSING markers remain (down from 49).
-    - page1.js parses (node --check). No new exports added; all stubs are
+    - local_pca_dosage.js parses (node --check). No new exports added; all stubs are
       module-private. No collision with existing top-level definitions
       (verified: every stubbed name has exactly one top-level definition).
     - File grew from 4513 LOC → 4588 LOC (+75 LOC: comment block expansion
@@ -279,14 +279,14 @@ Append-only. One line per migration session.
     - NOT runtime-tested (no test suite this round, per Quentin).
     - DID NOT extract real bodies from legacy — that is round 3 work.
       Recommended order for round 3: hoist the pure color helpers (simColor,
-      simColorPDF, zColorPDF) to shared/color_helpers.js since page2 will
+      simColorPDF, zColorPDF) to shared/color_helpers.js since candidate_focus will
       reuse them; then extract currentMbRange + getActiveSimScale (small,
       mostly state-read); then the heavier accessors.
 ```
 
 ```
 2026-05-06 (chat ~34, round 3)
-  page1.js round 3:
+  local_pca_dosage.js round 3:
     - Hoisted 3 pure color helpers from legacy into a new shared module
       atlases/inversion/shared/color_helpers.js (~95 LOC):
         simColor       (legacy 31256-31263)
@@ -294,23 +294,23 @@ Append-only. One line per migration session.
         zColorPDF      (legacy 31299-31307)
       Internals (hex, lerpRGB, SIM_PDF_COLORS, Z_LOW/MID/HIGH) kept module-
       private. Pure functions, no state, no DOM.
-    - page1.js: imported the 3 helpers from shared/color_helpers.js;
+    - local_pca_dosage.js: imported the 3 helpers from shared/color_helpers.js;
       removed the 3 round-2 stubs.
-    - page12.js: added the same import so its line-613 typeof-guard
+    - local_pca_theta_pi.js: added the same import so its line-613 typeof-guard
       resolves to the shared module instead of relying on a legacy global.
-      (page12 was the reason for hoisting; page1 alone would not have
+      (local_pca_theta_pi was the reason for hoisting; local_pca_dosage alone would not have
       justified a new shared file.)
     - Replaced 2 module-scope stubs with verbatim legacy bodies, refactored
       to take `state` as first arg (round-2 convention):
         getActiveSimScale(state)  — legacy 31311-31329
         currentMbRange(state)     — legacy 31781-31834
-      Updated all 8 call sites in page1.js (drawSim, drawSimMini, drawZ x2,
+      Updated all 8 call sites in local_pca_dosage.js (drawSim, drawSimMini, drawZ x2,
       drawLinesPanel, buildLinesPanel x3) to pass `state`. All call sites
       were already inside `function X(state) { ... }` so no scope work.
     - Updated the round-2 "RESOLVED / FALSE POSITIVE / STUBBED" accounting
-      comment at the top of page1.js to reflect round 3 progress, and
+      comment at the top of local_pca_dosage.js to reflect round 3 progress, and
       shrunk the "still open" list accordingly.
-    - Stubs in page1.js: 34 → 29 (5 resolved: 3 imported, 2 promoted
+    - Stubs in local_pca_dosage.js: 34 → 29 (5 resolved: 3 imported, 2 promoted
       to real bodies in-place).
       Still open after round 3:
         Subpanel renderers (9): _drawBandTraceStrip, _drawDiamondOverlay,
@@ -326,7 +326,7 @@ Append-only. One line per migration session.
         Per-window/grid accessors (5): getLinesGrid, getLinesSignAt,
           getLinesValuesAt, getL2Cluster, allSampleIdx
         Misc (2): recomputeAnchorConcord, _refreshScreeInset
-    - Verified: page1.js, page12.js, color_helpers.js all parse-clean
+    - Verified: local_pca_dosage.js, local_pca_theta_pi.js, color_helpers.js all parse-clean
       (node --check). All other shared/*.js and pages/**/*.js still parse-
       clean. atlas-core engine: 9/9 files parse-clean; 23/23 assertions
       passing on test_registry_write_and_versioning.js.
@@ -344,20 +344,20 @@ Append-only. One line per migration session.
 
 ```
 2026-05-06 (chat ~34, round 3 step 3 — parity restoration)
-  page1.js seventh-pass:
-    - Audit found the previous "round 3 done" claim was wrong: page1.js
+  local_pca_dosage.js seventh-pass:
+    - Audit found the previous "round 3 done" claim was wrong: local_pca_dosage.js
       had 17 unguarded helper calls in applyData/setCur/autoPickRadial/
       cycleKAside/onPCAClick that would throw ReferenceError at mount
       time, plus 23 bare-form drawX()/renderX() calls without state arg
       (the round-2-convention required state, but the extractor missed
       these), plus 8 unguarded document.getElementById(X).Y accesses
-      for elements not in the page1.html fragment.
-    - Verified page1.html is byte-identical to legacy <main id="page1">
+      for elements not in the local_pca_dosage.html fragment.
+    - Verified local_pca_dosage.html is byte-identical to legacy <main id="local_pca_dosage">
       (1344 LOC, lines 5474-6817 of legacy).
-    - Verified inversion.css has 49/49 #page1 selectors matching legacy
+    - Verified inversion.css has 49/49 #local_pca_dosage selectors matching legacy
       (comment-stripped set comparison: ∅ in both directions).
     - Extracted 18 helpers verbatim from legacy into a new "Legacy
-      helpers (parity)" block in page1.js (725 LOC, before "Extracted
+      helpers (parity)" block in local_pca_dosage.js (725 LOC, before "Extracted
       bodies"):
         Constants: FAMILY_PALETTE_BASE, FAMILY_COLOR_SMALL/SINGLETON/
           UNMATCHED, VIEW_CONTROLS_STORAGE_KEY, _LINES_COLOR_MODES.
@@ -382,15 +382,15 @@ Append-only. One line per migration session.
       legacy was running with these as silent ReferenceErrors absorbed
       by some upstream try/catch).
     - Made 8 unguarded document.getElementById accesses null-safe for
-      sidebar/topbar elements not in the page1.html fragment.
+      sidebar/topbar elements not in the local_pca_dosage.html fragment.
     - Sed-swept 23 bare-form drawX()/renderX()/buildX() calls to pass
       state. Patched 5 setCur(X) → setCur(state, X). Patched 2 getPC(X)
       → getPC(state, X). Verified 0 bare-form calls remain.
     - Widened shared/per_l2_cluster.js imports: added clusterL2AtK,
       sampleSpreadL2, sigmaProfileL2, sampleSpreadRange, aggregateL2.
-    - Stubs in page1.js: 29 → 23 (6 resolved, all from real-body
+    - Stubs in local_pca_dosage.js: 29 → 23 (6 resolved, all from real-body
       replacements).
-    - page1.js LOC: 4672 → 5397 (+725 from the legacy-helpers block,
+    - local_pca_dosage.js LOC: 4672 → 5397 (+725 from the legacy-helpers block,
       net of stub deletions).
     - Real-browser-style smoke test (assembled workspace + fake DOM):
       module loads (28 exports), applyData populates state correctly
@@ -412,7 +412,7 @@ Append-only. One line per migration session.
 
 ```
 2026-05-06 (chat ~34, round 3 step 4 — full legacy parity)
-  page1.js eighth-pass:
+  local_pca_dosage.js eighth-pass:
     - Per Quentin's direction: "finish page 1 fully... then split
       the huge js into smaller per-type-of-analysis files" — this
       pass closes the legacy-parity gap; the split is next session.
@@ -432,9 +432,9 @@ Append-only. One line per migration session.
     - Re-inserted getActiveSimScale + currentMbRange (lost in the
       splice — they had been added during round-3-step-1 inside the
       old stubs block).
-    - Stubs in page1.js: 23 → 4 (the forever-stubbed referenced-
+    - Stubs in local_pca_dosage.js: 23 → 4 (the forever-stubbed referenced-
       but-undefined-in-legacy quartet).
-    - page1.js LOC: 5397 → 6684 (+1287 from extracted bodies +
+    - local_pca_dosage.js LOC: 5397 → 6684 (+1287 from extracted bodies +
       _pageState scaffolding).
     - Smoke tested with N=100 windows, S=50 samples, 2 L1 envelopes,
       2 L2 envelopes, 8 family IDs:
@@ -446,46 +446,46 @@ Append-only. One line per migration session.
           drawPCA/updateWinLabel chain without errors
         unmount() cleans up
     - NO registry / master_config / schema / engine / HTML / CSS edits.
-    - NEXT (round 4): split page1.js into 10 cohesive sub-modules under
-      pages/discovery/page1/. Each module ≤ 1400 LOC. _pageState
-      shared via ES module live-binding semantics from page1/_state.js.
+    - NEXT (round 4): split local_pca_dosage.js into 10 cohesive sub-modules under
+      pages/discovery/local_pca_dosage/. Each module ≤ 1400 LOC. _pageState
+      shared via ES module live-binding semantics from local_pca_dosage/_state.js.
 ```
 
 ```
 2026-05-06 (chat ~35, round 4 — split into sub-modules)
-  page1.js round 4:
+  local_pca_dosage.js round 4:
     - Per the eighth-pass plan: split the 6684-LOC monolith into 10
-      cohesive sub-modules under pages/discovery/page1/. Quentin's
+      cohesive sub-modules under pages/discovery/local_pca_dosage/. Quentin's
       criterion: "easier to work with and faster" — biggest sub-module
       is now z_panel.js at 1375 LOC.
     - Modules created (LOC, concerns):
-        page1.js (main)        431  imports, mount/unmount/applyData,
+        local_pca_dosage.js (main)        431  imports, mount/unmount/applyData,
                                     _buildLegacyState, _wireCanvasHandlers,
                                     public re-exports
-        page1/_state.js        185  export let _pageState, _setActiveState,
+        local_pca_dosage/_state.js        185  export let _pageState, _setActiveState,
                                     FAMILY_PALETTE_BASE + sibling FAMILY_COLOR_*
                                     constants, color helpers
-        page1/_data.js         643  schema/layer detection, PC accessors,
+        local_pca_dosage/_data.js         643  schema/layer detection, PC accessors,
                                     indexing, view controls, line accessors,
                                     range/scale helpers, _LINES_COLOR_MODES,
                                     VIEW_CONTROLS_STORAGE_KEY
-        page1/sim_panel.js     451  drawSim, drawSimMini
-        page1/z_panel.js      1375  drawZ + 9 strip renderers
-        page1/lines_panel.js  1304  drawLinesPanel, buildLinesPanel,
+        local_pca_dosage/sim_panel.js     451  drawSim, drawSimMini
+        local_pca_dosage/z_panel.js      1375  drawZ + 9 strip renderers
+        local_pca_dosage/lines_panel.js  1304  drawLinesPanel, buildLinesPanel,
                                     buildLinesPanelCheckboxes,
                                     refreshLinesColorMode,
                                     setLinesPanelCandidateBands
-        page1/pca_panel.js     626  drawPCA, drawAnchorStrip,
+        local_pca_dosage/pca_panel.js     626  drawPCA, drawAnchorStrip,
                                     recomputeAnchorConcord, _refreshScreeInset,
                                     autoPickRadial, cycleKAside, togglePlay,
                                     renderTrackedList, renderManualGroupsList
-        page1/l3_panel.js      883  renderL3Panel, renderL3PanelSlab,
+        local_pca_dosage/l3_panel.js      883  renderL3Panel, renderL3PanelSlab,
                                     renderL3PanelScaleStability
-        page1/candidates.js    480  _assignCandidateLanes, _paintCandidateBands,
+        local_pca_dosage/candidates.js    480  _assignCandidateLanes, _paintCandidateBands,
                                     _ensureCsOverlayIndex, drawCandidateBar,
                                     refreshBandPickBar, refreshCandidateUI,
                                     + 4 forever-stubs
-        page1/events.js        362  onSimClick/onZClick/onPCAClick, setCur,
+        local_pca_dosage/events.js        362  onSimClick/onZClick/onPCAClick, setCur,
                                     updateWinLabel, buildTrackPanels, drawTracks
     - _pageState shared via ES module live-binding semantics. _state.js
       exports `let _pageState` (live `let` binding) plus `_setActiveState`.
@@ -493,12 +493,12 @@ Append-only. One line per migration session.
       calls _setActiveState(state) on its first line, the binding updates
       and every importer sees the new value. Verified by micro-test:
       stateA → stateB switching observed across 3 module boundaries.
-    - Bodies extracted byte-verbatim from page1.js.bak. The only
+    - Bodies extracted byte-verbatim from local_pca_dosage.js.bak. The only
       programmatic mutation is `export ` prefix injection for names
       imported by another sub-module (idempotent regex skips
       already-exported names). No semantic edits, no cleanups.
-    - Sub-module path discipline: page1/ is one directory deeper than
-      page1.js itself, so all `'../../shared/X.js'` imports become
+    - Sub-module path discipline: local_pca_dosage/ is one directory deeper than
+      local_pca_dosage.js itself, so all `'../../shared/X.js'` imports become
       `'../../../shared/X.js'`. Done programmatically.
     - applyData lives in main, not in _data.js. Reason: applyData
       orchestrates calls to detectSchemaAndLayers (data),
@@ -509,17 +509,17 @@ Append-only. One line per migration session.
       Putting applyData in _data.js would mean _data.js imports from
       every panel — a cycle. Keeping it in main lets the panels stay
       concern-focused; main is the only module with cross-panel imports.
-    - The manifest's `module: "page1.js"` import contract is preserved.
-      page1.js re-exports the 26 public entry points from their
-      sub-modules via `export {drawSim, ...} from './page1/sim_panel.js'`
+    - The manifest's `module: "local_pca_dosage.js"` import contract is preserved.
+      local_pca_dosage.js re-exports the 26 public entry points from their
+      sub-modules via `export {drawSim, ...} from './local_pca_dosage/sim_panel.js'`
       etc. plus mount/unmount/applyData defined locally.
-    - page1.js LOC: 6684 (one file) → 6740 total across 10 files
+    - local_pca_dosage.js LOC: 6684 (one file) → 6740 total across 10 files
       (the +56 LOC is module docstrings + import/export lines).
-    - Symbol-level diff vs page1.js.bak: 90 named definitions present
+    - Symbol-level diff vs local_pca_dosage.js.bak: 90 named definitions present
       in both, 0 added, 0 removed. No definitions lost or duplicated.
     - tests/test_discovery_page1.js: stale path fixed
-      (../inversion_discovery/page1.js → ../atlases/inversion/pages/
-      discovery/page1.js) and extended with sub-module export-coverage
+      (../inversion_discovery/local_pca_dosage.js → ../atlases/inversion/pages/
+      discovery/local_pca_dosage.js) and extended with sub-module export-coverage
       checks. 61/61 assertions pass.
     - Smoke test (assembled workspace + fake DOM, N=100 windows,
       S=50 samples, 2 L1 envelopes, 2 L2 envelopes, 8 family IDs):
@@ -536,15 +536,15 @@ Append-only. One line per migration session.
         33/33 assertions pass.
     - NO registry / master_config / schema / engine / HTML / CSS edits.
       Sibling pages parse-checked but not modified.
-    - page1.js.bak (the pre-split monolith, 6684 LOC) preserved
-      alongside the new page1.js as a reference. Delete after round 5
+    - local_pca_dosage.js.bak (the pre-split monolith, 6684 LOC) preserved
+      alongside the new local_pca_dosage.js as a reference. Delete after round 5
       verifies the split in a real browser.
     - Round-4 split tool: /home/claude/work/split_page1.py (one-shot;
       saved for round 5 cribbing).
-    - NEXT (round 5): page2 migration. See
+    - NEXT (round 5): candidate_focus migration. See
       HANDOFF_2026-05-06_chat34_page2_plan.md. Recipe is mature; one
-      cross-cutting decision to make first — hoist page1+page2 shared
-      helpers from page1/_data.js to atlases/inversion/shared/ (Quentin
+      cross-cutting decision to make first — hoist local_pca_dosage+candidate_focus shared
+      helpers from local_pca_dosage/_data.js to atlases/inversion/shared/ (Quentin
       chat 35: "I feel like using a shared/ if its for a function why
       not"). The pure-on-state helpers in _data.js (getPC*, getL2Cluster*,
       allSampleIdx, getLines*, listLayers, currentMbRange,
@@ -554,13 +554,13 @@ Append-only. One line per migration session.
 
 ---
 
-# 2026-05-07 (chat 36 round 5 step 1) — page1 data helpers HOISTED to shared/
+# 2026-05-07 (chat 36 round 5 step 1) — local_pca_dosage data helpers HOISTED to shared/
 
 ```text
 TODO: round-5 prep — hoist pure-on-state helpers from
-    pages/discovery/page1/_data.js to atlases/inversion/shared/
-    BEFORE starting the page2 body migration. (Plan: round-4-done
-    handoff "Round-5 prep" section + page2 plan Step 5.)
+    pages/discovery/local_pca_dosage/_data.js to atlases/inversion/shared/
+    BEFORE starting the candidate_focus body migration. (Plan: round-4-done
+    handoff "Round-5 prep" section + candidate_focus plan Step 5.)
 
 DECISION (file-move-only, no body edits):
     - 21 names declared in _data.js — 17 exported, 4 internal
@@ -580,11 +580,11 @@ DO:
      - Verbatim bodies of all 21 names from _data.js (lines 27-643).
      - Import of `per_l2_cluster.js` rewritten from
        `../../../shared/per_l2_cluster.js` to `./per_l2_cluster.js`
-       (the new file lives in shared/, not under page1/).
+       (the new file lives in shared/, not under local_pca_dosage/).
      - `import { FAMILY_PALETTE_BASE } from './_state.js'` line
        dropped — the constant moves into this file as a private const.
 
-  2. Replace pages/discovery/page1/_data.js with a re-export shim
+  2. Replace pages/discovery/local_pca_dosage/_data.js with a re-export shim
      (38 LOC):
         export { getActiveSimScale, currentMbRange, _LINES_COLOR_MODES,
                  _isLinesColorModeAvailable, detectSchemaAndLayers,
@@ -598,23 +598,23 @@ DO:
      This preserves every existing `import { ... } from './_data.js'`
      in the 6 panel sub-modules. Live re-export — same identity.
 
-  3. Drop `export` from pages/discovery/page1/_state.js's
+  3. Drop `export` from pages/discovery/local_pca_dosage/_state.js's
      FAMILY_PALETTE_BASE declaration. After the hoist, _data.js's
      `buildFamilyPalette` reads it from its own module scope; nothing
-     else in page1 references it. Single source of truth in shared/.
+     else in local_pca_dosage references it. Single source of truth in shared/.
      Keep FAMILY_COLOR_SMALL/SINGLETON/UNMATCHED in _state.js — they
      are only used by `familyColor()` in the same file.
 
 DO NOT:
   - Edit any sub-module's import path. The shim handles compatibility.
-    Panels still import from `./_data.js`; only NEW code (page2.js)
+    Panels still import from `./_data.js`; only NEW code (candidate_focus.js)
     imports directly from `../../shared/page1_data_helpers.js`.
   - Edit any function body. Bodies are byte-verbatim from _data.js.
     The whole point of this round is "no body edits."
   - Hoist the color helpers from _state.js (trackedColor, _vColor,
     _lineageColor, familyColor, ancestryColor, manualGroupColor,
     getSampleColor, _resolveSampleScopeColor). They read `_pageState`
-    via the page1 shim. Refactoring them to take `state` as first arg
+    via the local_pca_dosage shim. Refactoring them to take `state` as first arg
     is round-N work, not round-5-step-1 work. Defer until a page
     actually needs them shared.
   - Touch atlas-core, registries, manifests, schemas, server, CSS,
@@ -634,55 +634,55 @@ VERIFY:
 WHY THIS UNBLOCKS PAGE2 STEP 5 ("Cross-page imports"):
   Page2's panel modules can now `import { getPC, getL2Cluster, ... }
   from '../../shared/page1_data_helpers.js'` from day one. Because
-  these helpers all take `state` as first arg, page2 never inherits
-  page1's `_pageState` reference. Page2's own `_pageState` (for its
+  these helpers all take `state` as first arg, candidate_focus never inherits
+  local_pca_dosage's `_pageState` reference. Page2's own `_pageState` (for its
   candidate-detail-specific helpers) stays decoupled.
 
 WHAT THIS DID NOT TOUCH:
   - atlas-core engine — completely unchanged.
-  - The other 9 page1 sub-modules — only their _data.js import target
+  - The other 9 local_pca_dosage sub-modules — only their _data.js import target
     changed under them, transparently.
   - Page2 body migration — that is round 5 step 2.
-  - The page2 registry-entry mismatch (page2 plan Step 0). Defer to
+  - The candidate_focus registry-entry mismatch (candidate_focus plan Step 0). Defer to
     round 5 step 2.
 ```
 
 ---
 
-# 2026-05-07 (chat 36 round 5 step 2) — page2 candidate-detail page MIGRATED
+# 2026-05-07 (chat 36 round 5 step 2) — candidate_focus candidate-detail page MIGRATED
 
 ```text
-TODO: migrate page2 from chat-33 stub (251 LOC, 41 TODO_MISSING) to
-    a working candidate-detail deep-dive following the page1 round-4
+TODO: migrate candidate_focus from chat-33 stub (251 LOC, 41 TODO_MISSING) to
+    a working candidate-detail deep-dive following the local_pca_dosage round-4
     pattern. Plan: HANDOFF_2026-05-06_chat34_page2_plan.md.
 
 DECISIONS:
   Step 0 — registry mismatch resolved.
-    Legacy line 5049: page2 tab title "Deep-dive on a single
+    Legacy line 5049: candidate_focus tab title "Deep-dive on a single
     promoted candidate. Multi-panel grid... Toggle 'mark
     confirmed' here to populate page 9." Display label: "3
     candidate focus".
-    pages.registry.json page2.requires_layers updated:
+    pages.registry.json candidate_focus.requires_layers updated:
       OLD: [scrubber_main, cohort_sample_manifest]
       NEW: [scrubber_main, candidate_tracks, cohort_sample_froh,
             ancestry_global_q, het_band_backbones, arrangement_calls]
-    pages.registry.json page2.requires_slots: added activeCandidate.
-    manifest.json: page1 label → "local PCA |z|"; page2 label →
+    pages.registry.json candidate_focus.requires_slots: added activeCandidate.
+    manifest.json: local_pca_dosage label → "local PCA |z|"; candidate_focus label →
     "candidate focus" (both per legacy tab labels).
 
-  5-bucket split (mirrors page1 round-4 with adjustments):
-    page2/_state.js          — _pageState + _setActiveState
-    page2/_html_builders.js  — 16 candidate*Html builders
-    page2/_wires.js          — 7 wire functions (post-DOM)
-    page2/_list.js           — 8 list-management helpers
-    page2/_draw_panels.js    — 7 draw functions (canvas)
-    page2.js (main)          — orchestrators + lifecycle
+  5-bucket split (mirrors local_pca_dosage round-4 with adjustments):
+    candidate_focus/_state.js          — _pageState + _setActiveState
+    candidate_focus/_html_builders.js  — 16 candidate*Html builders
+    candidate_focus/_wires.js          — 7 wire functions (post-DOM)
+    candidate_focus/_list.js           — 8 list-management helpers
+    candidate_focus/_draw_panels.js    — 7 draw functions (canvas)
+    candidate_focus.js (main)          — orchestrators + lifecycle
 
   Cycle resolution: refreshCandidateUI ↔ renderCandidateMetadata ↔
   _list.js's addCandidateToList. Resolved by keeping both
-  orchestrators in main page2.js and using ES module live-binding
+  orchestrators in main candidate_focus.js and using ES module live-binding
   for the back-import (_list.js imports refreshCandidateUI from
-  '../page2.js' — function reference, not parse-time value).
+  '../candidate_focus.js' — function reference, not parse-time value).
 
   Defensive _safeBuild() wrapper on each of the 16 sub-panel
   builders in renderCandidateMetadata. Mirrors legacy's existing
@@ -691,13 +691,13 @@ DECISIONS:
   than aborting the whole page render.
 
 DO:
-  1. Audit legacy line 5049 + 7248 + manifest. Confirm page2 = 
+  1. Audit legacy line 5049 + 7248 + manifest. Confirm candidate_focus = 
      candidate detail. Update registry + manifest.
 
-  2. Audit page2.html (12 LOC, byte-matches legacy) and CSS
+  2. Audit candidate_focus.html (12 LOC, byte-matches legacy) and CSS
      selectors (49 .cand-* class rules in current; sufficient).
 
-  3. Extract the 41 helpers per the page2 plan + 2 entry points
+  3. Extract the 41 helpers per the candidate_focus plan + 2 entry points
      (renderCandidateMetadata, wireCandidateNav). Use a
      brace-matching extractor that handles destructured
      parameter lists (the naive matcher trips on
@@ -718,21 +718,21 @@ DO:
        _BLOCK_DISPLAY_ORDER, _ensureDosageHmState, isInCandidateList)
        inserted alongside their consumers
 
-  6. Build the new page2.js main:
+  6. Build the new candidate_focus.js main:
      - imports from sub-modules
      - public re-exports (preserves manifest's `module:` contract)
      - 4 orchestrators with state-arg signatures
      - `_safeBuild()` defensive wrapper for the innerHTML composition
-     - mount/unmount lifecycle (simpler than page1; no chrom data
+     - mount/unmount lifecycle (simpler than local_pca_dosage; no chrom data
        load, just reads activeCandidate slot)
 
   7. Build smoke_discovery_page2_round5.mjs:
-     - fake DOM (mirror page1's smoke harness)
+     - fake DOM (mirror local_pca_dosage's smoke harness)
      - synth candidate matching legacy's candidate{To,From}JSON schema
      - mount empty-state, mount populated-state, direct orchestrator
        calls, _pageState live-binding, unmount cleanup
 
-  8. Extract page2-private helpers that the smoke path actually hits:
+  8. Extract candidate_focus-private helpers that the smoke path actually hits:
      isInCandidateList (3 LOC), _candWindowRange (9), _candLockedLabels
      (7), makeCandidateId (5), _defaultSingleTrack (24), _ensureTracks
      (47), _candStorageKey (3), candidateLocMiniHtml (11),
@@ -781,23 +781,23 @@ WHAT WAS NOT TOUCHED:
   - Toolkit-registry vs Atlas-state cache decisions. Quentin's plan:
     defer until all pages are migrated.
   - Pages 3, 4, 6, 7, 8, 9, 10, 11, 12, 15, 16, 16b, 17, 18, 19, 21,
-    page_overview, page_sv_evidence.
+    overview, sv_evidence.
 
-NEXT (round 5 step 3): page3 migration. Page3 is the L2 catalogue
+NEXT (round 5 step 3): catalogue migration. Page3 is the L2 catalogue
 (sortable/filterable table, TSV/Markdown export). Lives in
-atlases/inversion/pages/catalogue/page3.js — NOT in pages/discovery/.
+atlases/inversion/pages/catalogue/catalogue.js — NOT in pages/discovery/.
 Page renumbering deferred to end-of-migration.
 ```
 
 ---
 
-# 2026-05-07 (chat 36 round 5 step 3) — page3 catalogue (breeding-export only) MIGRATED
+# 2026-05-07 (chat 36 round 5 step 3) — catalogue catalogue (breeding-export only) MIGRATED
 
 ```text
-TODO: migrate page3 (catalogue page) from chat-33 stub. Page3 lives in
+TODO: migrate catalogue (catalogue page) from chat-33 stub. Page3 lives in
     atlases/inversion/pages/catalogue/ — NOT pages/discovery/. Per
     Quentin chat-36: "we will renumber the page indexes at the
-    complete end" (so page3 stays page3 for now).
+    complete end" (so catalogue stays catalogue for now).
 
 DECISIONS:
   Step 0 — what's actually migratable.
@@ -812,11 +812,11 @@ DECISIONS:
     the Turn-146 bulk breeding-card export (lines ~21484–23715,
     1040 LOC closure across 17 helpers + 1 const).
 
-  2-bucket split (smaller than page1/page2 because the migratable
+  2-bucket split (smaller than local_pca_dosage/candidate_focus because the migratable
   surface is smaller):
-    page3/_state.js            — _pageState + _setActiveState
-    page3/_breeding_export.js  — 17 helpers + _BREEDING_EXPORT_TIER_MODES
-    page3.js (main)            — mount/unmount + renderCataloguePage +
+    catalogue/_state.js            — _pageState + _setActiveState
+    catalogue/_breeding_export.js  — 17 helpers + _BREEDING_EXPORT_TIER_MODES
+    catalogue.js (main)            — mount/unmount + renderCataloguePage +
                                  initCataloguePage + atlasState builder
 
   Cross-page imports: ZERO. Self-contained. Reads only state.candidateList,
@@ -828,7 +828,7 @@ DECISIONS:
   them.
 
 DO:
-  1. Audit legacy line 5051 + 7261-7368 + manifest. Confirm page3
+  1. Audit legacy line 5051 + 7261-7368 + manifest. Confirm catalogue
      identity ("5 catalogue", chromosome-scoped, no activeCandidate).
      Update registry _label / _doc and manifest label.
 
@@ -844,7 +844,7 @@ DO:
      destructuring correctly). Closure: 17 functions + 1 constant,
      ~1040 LOC.
 
-  4. Build _breeding_export.js using the same patcher as page1/page2:
+  4. Build _breeding_export.js using the same patcher as local_pca_dosage/candidate_focus:
      - byte-verbatim helper bodies in dependency order (leaves first)
      - rewrite legacy
          (typeof window !== 'undefined' && window.state) ? window.state : state
@@ -852,20 +852,20 @@ DO:
      - inject `const state = _pageState;` shim where bodies use bare state
      - export prefix on the 3 public names
 
-  5. Build the new page3.js main:
+  5. Build the new catalogue.js main:
      - imports + public re-exports from _breeding_export.js
      - renderCataloguePage(state) — empty-state with hint message
      - initCataloguePage(state) — calls _wireCatalogueBreedingExportBtns,
        leaves the 11 unimplemented toolbar handlers as documented TODOs
      - mount(root, atlasState, registry) — same atlasState→legacyState
-       builder pattern as page1/page2
+       builder pattern as local_pca_dosage/candidate_focus
      - unmount(root) — clears _pageState
 
   6. Build tests/test_catalogue_page3.js (sub-module + main re-export
      coverage; same shape as test_discovery_page2.js).
 
   7. Build tests/smoke_catalogue_page3_round5.mjs:
-     - fake DOM (mirror page1/page2 smoke harness)
+     - fake DOM (mirror local_pca_dosage/candidate_focus smoke harness)
      - localStorage stub (the wire reads/writes the tier pref)
      - mount empty-state, _pageState live-binding observed,
        breeding-export wires bound (#catBreedingTierSel +
@@ -900,20 +900,20 @@ VERIFY:
 
 WHAT WAS NOT TOUCHED:
   - atlas-core engine — completely unchanged.
-  - Page1/page2 sub-modules — completely unchanged this round.
-  - shared/page1_data_helpers.js — unchanged (page3's closure is
+  - Page1/candidate_focus sub-modules — completely unchanged this round.
+  - shared/page1_data_helpers.js — unchanged (catalogue's closure is
     self-contained, reads only state.candidateList /
     state.cohortDiversity / state.data / state.k).
   - 11 catalogue-toolbar handlers + the catalogue table renderer
     (catalogue-rendering pipeline). These were never in legacy.
   - Toolkit-registry vs Atlas-state cache decisions. Defer.
   - Pages 4, 6, 7, 8, 9, 10, 11, 12, 15, 16, 16b, 17, 18, 19, 21,
-    page_overview, page_sv_evidence — only parse-checked.
+    overview, sv_evidence — only parse-checked.
 
 NEXT (round 5 step 4): Quentin's call. Candidates:
-  - page9, page10, page17, page18, page21 — also in pages/catalogue/.
-  - page_overview — non-chromosome-scoped overview.
-  - page4 — does page4 even have a stub yet? (Check inventory.)
+  - confirmed_carousel, marker_panels, stats_profile, marker_readiness, annotation_cockpit — also in pages/catalogue/.
+  - overview — non-chromosome-scoped overview.
+  - karyotype_tier — does karyotype_tier even have a stub yet? (Check inventory.)
   - Or: implement the 11 missing catalogue handlers as new development
     distinct from migration (not in scope as "migration" but useful
     if Quentin wants the catalogue table to actually work).
@@ -921,10 +921,10 @@ NEXT (round 5 step 4): Quentin's call. Candidates:
 
 ---
 
-# 2026-05-07 (chat 36 round 5 step 4) — page18 marker readiness panel MIGRATED
+# 2026-05-07 (chat 36 round 5 step 4) — marker_readiness marker readiness panel MIGRATED
 
 ```text
-TODO: refactor page18 (marker readiness panel, synthesis stage) from
+TODO: refactor marker_readiness (marker readiness panel, synthesis stage) from
     chat-33 "single-file with const state = window.state || {}" pattern
     to atlas-router-compatible mount/unmount + _pageState live-binding.
     Page18 has ~921 LOC of cohesive body already extracted from legacy.
@@ -937,15 +937,15 @@ DECISIONS:
     (851 LOC) — already in chat-33 stub.
 
   Single file (NOT sub-module split):
-    page18.js — 30 functions + 6 constants, all marker-panel-domain
-    page18/_state.js — _pageState + _setActiveState (only sub-module)
+    marker_readiness.js — 30 functions + 6 constants, all marker-panel-domain
+    marker_readiness/_state.js — _pageState + _setActiveState (only sub-module)
     
     Threshold for splitting: ~3000 LOC AND multiple concerns. Page18
     is 921 LOC with one concern (marker tier classification + render).
     Splitting adds complexity without proportional benefit.
 
   Cross-page imports: _esc from shared/page1_data_helpers.js (added in
-  round 5 step 2 for page2). 15 unguarded uses in page18.
+  round 5 step 2 for candidate_focus). 15 unguarded uses in marker_readiness.
 
   State.X reads: state.candidateList, state.crossSpecies,
   state._markerPanel (lazy-init via _mpEnsureState),
@@ -953,22 +953,22 @@ DECISIONS:
   to atlasState.inversion + atlasState.shared.activeChrom.
 
 DO:
-  1. Audit legacy line 5128 + 8134-8157 + manifest. Confirm page18
+  1. Audit legacy line 5128 + 8134-8157 + manifest. Confirm marker_readiness
      identity ("15 marker panel", synthesis stage). Update
      pages.registry.json _label/_doc and manifest.json
      label="marker panel" stage="synthesis".
 
   2. Static-analyze the chat-33 stub for unresolved external references:
-       grep -nE "(?<![\w$.])\b[A-Za-z_$][\w$]*\s*\(" page18.js
+       grep -nE "(?<![\w$.])\b[A-Za-z_$][\w$]*\s*\(" marker_readiness.js
      Filter against locally-defined functions. Find the real missing
-     globals (in page18's case: only _esc).
+     globals (in marker_readiness's case: only _esc).
 
   3. Identify state.X reads:
-       grep -hoE "state\.[a-zA-Z_]+" page18.js | sort -u
+       grep -hoE "state\.[a-zA-Z_]+" marker_readiness.js | sort -u
 
-  4. Refactor page18.js IN-PLACE using a Python AST-aware patcher:
+  4. Refactor marker_readiness.js IN-PLACE using a Python AST-aware patcher:
      - Replace `const state = (typeof window !== 'undefined' && window.state) ? window.state : {};`
-       with `import { _pageState, _setActiveState } from './page18/_state.js';`
+       with `import { _pageState, _setActiveState } from './marker_readiness/_state.js';`
        and `import { _esc } from '../../shared/page1_data_helpers.js';`
      - For each top-level `function NAME(args) {...}`, inject
        `const state = _pageState;` as the first statement IFF:
@@ -981,13 +981,13 @@ DO:
        delegating.
      - Add mount/unmount/_buildLegacyState lifecycle.
 
-  5. Create page18/_state.js (18 LOC, mirrors other pages').
+  5. Create marker_readiness/_state.js (18 LOC, mirrors other pages').
 
   6. Build tests/test_catalogue_page18.js (mirrors test_catalogue_page3.js
      structure: exports + helpers + state + pure-helper exercises).
 
   7. Build tests/smoke_catalogue_page18_round5.mjs:
-     - fake DOM (mirror page1/2/3 smoke harnesses)
+     - fake DOM (mirror local_pca_dosage/2/3 smoke harnesses)
      - localStorage stub, requestAnimationFrame stub, URL/Blob/FileReader stubs
      - mount empty-state, _pageState live-binding observed
      - mount populated-state (synthetic candidate with karyotype
@@ -1000,12 +1000,12 @@ DO:
      __MODULE_ID__, wrong AF key casing).
 
 DO NOT:
-  - Split page18 into sub-modules. 921 LOC of cohesive code doesn't
-    need it. The page1/page2 splits were justified at >3000 LOC and
+  - Split marker_readiness into sub-modules. 921 LOC of cohesive code doesn't
+    need it. The local_pca_dosage/candidate_focus splits were justified at >3000 LOC and
     multi-concern.
-  - Migrate page17 (stats profile) at the same time. Page17 reads
-    page18's _mpDeriveAutoPanel, but only via `typeof X === 'function'`
-    guard — graceful degradation. Migrating page17 in a separate
+  - Migrate stats_profile (stats profile) at the same time. Page17 reads
+    marker_readiness's _mpDeriveAutoPanel, but only via `typeof X === 'function'`
+    guard — graceful degradation. Migrating stats_profile in a separate
     round keeps scopes clean.
   - Renumber pages. Deferred to end-of-migration per Quentin.
 
@@ -1019,39 +1019,39 @@ VERIFY:
 
 WHAT WAS NOT TOUCHED:
   - atlas-core engine.
-  - page1/page2/page3 modules.
+  - local_pca_dosage/candidate_focus/catalogue modules.
   - shared/page1_data_helpers.js.
   - Other pages (only parse-checked).
 
 NEXT (round 5 step 5+): Quentin's call.
-  - page17 (stats profile, sibling synthesis page; reads page18's
+  - stats_profile (stats profile, sibling synthesis page; reads marker_readiness's
     _mpDeriveAutoPanel via typeof guard) — natural follow-up.
-  - page21, page12 — pre-extracted bodies in catalogue.
-  - page16/16b — multi-species cockpit, much larger.
-  - Quick router-wiring rounds for tiny stubs (page8, 9, 15, 19,
-    page_overview).
+  - annotation_cockpit, local_pca_theta_pi — pre-extracted bodies in catalogue.
+  - cross_species_breakpoints/16b — multi-species cockpit, much larger.
+  - Quick router-wiring rounds for tiny stubs (window_summary_table, 9, 15, 19,
+    overview).
 ```
 
 ---
 
-# 2026-05-07 (chat 36 round 5 step 5) — page17 stats profile MIGRATED + cross-page state bridge
+# 2026-05-07 (chat 36 round 5 step 5) — stats_profile stats profile MIGRATED + cross-page state bridge
 
 ```text
-TODO: refactor page17 (stats profile, synthesis stage) from chat-33
+TODO: refactor stats_profile (stats profile, synthesis stage) from chat-33
     "single-file with const state = window.state || {}" pattern to
     atlas-router-compatible mount/unmount + _pageState live-binding.
-    Page17 is sibling synthesis page to page18; reads page18's
+    Page17 is sibling synthesis page to marker_readiness; reads marker_readiness's
     _mpDeriveAutoPanel.
 
 DECISIONS:
-  Step 0 — Same shape as page18 (round 5 step 4). Pre-extracted body
+  Step 0 — Same shape as marker_readiness (round 5 step 4). Pre-extracted body
     (legacy lines 28420-29306, ~939 LOC), 25 functions + 3 constants.
     Single-file (NOT sub-module split) — same threshold rationale.
 
-  Cross-page state bridge: page17.mount calls page18._setActiveState
+  Cross-page state bridge: stats_profile.mount calls marker_readiness._setActiveState
     with the SAME legacy state object. Pages share state because:
-      a) page17 doesn't mutate state.candidateList / state.crossSpecies
-      b) page18's _mpDeriveAutoPanel reads only those + lazy-inits
+      a) stats_profile doesn't mutate state.candidateList / state.crossSpecies
+      b) marker_readiness's _mpDeriveAutoPanel reads only those + lazy-inits
          state._markerPanel
     This pattern is appropriate for synthesis-stage siblings that
     share a domain. Future rounds may need different patterns for
@@ -1059,17 +1059,17 @@ DECISIONS:
 
   Cross-page imports:
     _esc                 from shared/page1_data_helpers.js (18 sites)
-    _mpDeriveAutoPanel   from page18.js                    (1 site, was typeof-guarded)
-    _setActiveState      from page18/_state.js (aliased as _setPage18State)
+    _mpDeriveAutoPanel   from marker_readiness.js                    (1 site, was typeof-guarded)
+    _setActiveState      from marker_readiness/_state.js (aliased as _setPage18State)
 
   Runtime guards kept (NOT promoted to imports):
-    _csGetSyntenyBlocks, _csPermutationTest — page16/16b cross-species
+    _csGetSyntenyBlocks, _csPermutationTest — cross_species_breakpoints/16b cross-species
     helpers, not yet migrated. Stay as `typeof X === 'function'`
-    early-return guards in _spDeriveCsPermutation. When page16/16b
+    early-return guards in _spDeriveCsPermutation. When cross_species_breakpoints/16b
     lands these can be promoted to proper imports.
 
 DO:
-  1. Audit legacy line ~5125 + 8110-8127 + manifest. Confirm page17
+  1. Audit legacy line ~5125 + 8110-8127 + manifest. Confirm stats_profile
      identity ("14 stats profile", synthesis stage). Update
      pages.registry.json _label/_doc and manifest.json
      label="stats profile" stage="synthesis".
@@ -1078,7 +1078,7 @@ DO:
      comments/strings (TODO_MISSING, AF_STD, MODULE_3_ROH, Wilcoxon,
      manuscript_note, GLM, N, Repeat, many_to_many).
 
-  3. Use the same Python AST-aware patcher as page18 round-5-step-4:
+  3. Use the same Python AST-aware patcher as marker_readiness round-5-step-4:
      - Replace state line with imports
      - Inject `const state = _pageState;` shim into top-level functions
        that read bare `state` and don't take `state` as first arg.
@@ -1086,15 +1086,15 @@ DO:
      - Replace public renderXPage() with state-aware variant
      - Add mount/unmount/_buildLegacyState
 
-  4. Bridge state to page18 in page17's lifecycle:
-     - import { _setActiveState as _setPage18State } from './page18/_state.js';
+  4. Bridge state to marker_readiness in stats_profile's lifecycle:
+     - import { _setActiveState as _setPage18State } from './marker_readiness/_state.js';
      - In renderStatsProfilePage(state), call BOTH _setActiveState
        and _setPage18State.
      - In mount(), call BOTH after building legacyState.
-     - In unmount(), do NOT clear page18's state (page18 may have
+     - In unmount(), do NOT clear marker_readiness's state (marker_readiness may have
        its own mount).
 
-  5. Create page17/_state.js (15 LOC).
+  5. Create stats_profile/_state.js (15 LOC).
 
   6. Build tests/test_catalogue_page17.js (34 assertions).
 
@@ -1103,8 +1103,8 @@ DO:
   8. Replace stale chat-33 test.
 
 DO NOT:
-  - Split page17 into sub-modules.
-  - Migrate page16/16b at the same time (cross-species cockpit, much
+  - Split stats_profile into sub-modules.
+  - Migrate cross_species_breakpoints/16b at the same time (cross-species cockpit, much
     larger; would push the cs* helpers properly into shared but
     that's a separate task).
   - Renumber pages.
@@ -1119,45 +1119,45 @@ VERIFY:
 
 WHAT WAS NOT TOUCHED:
   - atlas-core engine.
-  - page1/page2/page3/page18 modules. (Page17 imports FROM page18 but
-    doesn't modify page18's source.)
+  - local_pca_dosage/candidate_focus/catalogue/marker_readiness modules. (Page17 imports FROM marker_readiness but
+    doesn't modify marker_readiness's source.)
   - shared/page1_data_helpers.js.
   - Other pages (only parse-checked).
 
 NEXT (round 5 step 6+): Quentin's call.
-  - page21 (catalogue, 721 LOC pre-extracted) — quick.
-  - page12 (discovery, 1008 LOC, 18 TODOs) — substantial.
-  - page16/16b (comparative, 2400+ each) — major; would resolve
+  - annotation_cockpit (catalogue, 721 LOC pre-extracted) — quick.
+  - local_pca_theta_pi (discovery, 1008 LOC, 18 TODOs) — substantial.
+  - cross_species_breakpoints/16b (comparative, 2400+ each) — major; would resolve
     cs* cross-species helpers.
-  - Tiny stubs (page8/9/15/19/page_overview) — quick router-wiring.
+  - Tiny stubs (window_summary_table/9/15/19/overview) — quick router-wiring.
 ```
 
 ---
 
-# 2026-05-07 (chat 36 round 5 step 6) — page21 annotation cockpit MIGRATED
+# 2026-05-07 (chat 36 round 5 step 6) — annotation_cockpit annotation cockpit MIGRATED
 
 ```text
-TODO: refactor page21 (annotation cockpit, catalogue stage) from chat-33
+TODO: refactor annotation_cockpit (annotation cockpit, catalogue stage) from chat-33
     "single-file with const state = window.state || {}" pattern to
     atlas-router-compatible mount/unmount + _pageState live-binding.
     Page21 is a catalogue-stage page that renders a per-sample-lines
     canvas with cursor-driven candidate selection.
 
 DECISIONS:
-  Step 0 — Same single-file shape as page17/page18. Pre-extracted
+  Step 0 — Same single-file shape as stats_profile/marker_readiness. Pre-extracted
     body (legacy lines 46938-47616, ~720 LOC), 5 constants + 11
     helpers + 1 public entry. Single-file (NOT sub-module split) —
     same threshold rationale.
 
-  No cross-page state bridge: page21 doesn't import from any other
+  No cross-page state bridge: annotation_cockpit doesn't import from any other
     migrated page. Its 4 external helpers
     (_gatherActiveCandidatesForInheritance,
     _wireCandidateHaplotypeAnnotations,
     candidateHaplotypeAnnotationsHtml,
     computeTrackedLinkageProjection)
-    stay as `typeof X === 'function'` runtime guards — same as page17
+    stay as `typeof X === 'function'` runtime guards — same as stats_profile
     with _csGetSyntenyBlocks / _csPermutationTest. They land naturally
-    with page2 / page16 / page16b migration.
+    with candidate_focus / cross_species_breakpoints / multi_species_cockpit migration.
 
   No per-function state shim injection. Page21's body was already
     written to access state through ONE accessor (_ackEnsureState()
@@ -1166,26 +1166,26 @@ DECISIONS:
     _annoCockpitChromExtent) was rewired the same way. This is the
     accessor-pattern shortcut: future pages that already have an
     accessor pattern can use it; pages with scattered state.X reads
-    need the AST-walking shim injection from page17/18.
+    need the AST-walking shim injection from stats_profile/18.
 
 DO:
   1. Audit legacy line ~5125 region + 7822-7859 (HTML shell) +
-     manifest. Confirm page21 identity ("annotation cockpit",
+     manifest. Confirm annotation_cockpit identity ("annotation cockpit",
      catalogue stage). Update pages.registry.json _label/_doc and
      manifest.json label="annotation cockpit".
 
   2. Static-analyze the chat-33 stub for unresolved external
      references. Filter false positives. Find the truly-external
-     references (in page21's case: 4 helpers, all already
+     references (in annotation_cockpit's case: 4 helpers, all already
      runtime-guarded).
 
   3. Identify state.X reads:
-       grep -hoE "state\.[a-zA-Z_]+" page21.js | sort -u
+       grep -hoE "state\.[a-zA-Z_]+" annotation_cockpit.js | sort -u
 
-  4. Refactor page21.js IN-PLACE:
+  4. Refactor annotation_cockpit.js IN-PLACE:
      - Replace `const state = (typeof window !== 'undefined'
        && window.state) ? window.state : {};` with
-       `import { _pageState, _setActiveState } from './page21/_state.js';`.
+       `import { _pageState, _setActiveState } from './annotation_cockpit/_state.js';`.
      - Rewire _ackEnsureState() (the single state accessor) to read
        from _pageState. Lazy-init of cockpitCursor preserved.
      - Rewire _annoCockpitChromExtent() (the only function reading
@@ -1197,7 +1197,7 @@ DO:
      - Remove __MODULE_ID__ export.
      - Add mount/unmount/_buildLegacyState lifecycle.
 
-  5. Create page21/_state.js (16 LOC, mirrors other pages').
+  5. Create annotation_cockpit/_state.js (16 LOC, mirrors other pages').
 
   6. Build tests/test_catalogue_page21.js (41 assertions: exports +
      helpers + constants + _state + pure-helper exercises for
@@ -1205,7 +1205,7 @@ DO:
      _annoCockpitChromExtent / _ackEnsureState).
 
   7. Build tests/smoke_catalogue_page21_round5.mjs:
-     - fake DOM with FakeContext canvas shim (page21's draw path
+     - fake DOM with FakeContext canvas shim (annotation_cockpit's draw path
        uses canvas heavily — getContext, setTransform, fillRect,
        strokeRect, fillText, beginPath/moveTo/lineTo/stroke).
      - localStorage stub, requestAnimationFrame stub, URL/Blob/FileReader stubs
@@ -1219,14 +1219,14 @@ DO:
      - unmount clears _pageState.
 
   8. Replace stale chat-33 test (wrong path
-     `../inversion_catalogue/page21.js`, asserts removed
+     `../inversion_catalogue/annotation_cockpit.js`, asserts removed
      __MODULE_ID__).
 
 DO NOT:
-  - Split page21 into sub-modules (~720 LOC, single concern).
+  - Split annotation_cockpit into sub-modules (~720 LOC, single concern).
   - Promote the 4 runtime-guarded helpers to imports yet
-    (page2/page16 don't have them migrated).
-  - Migrate page17/page18 at the same time (already done in earlier
+    (candidate_focus/cross_species_breakpoints don't have them migrated).
+  - Migrate stats_profile/marker_readiness at the same time (already done in earlier
     rounds).
   - Renumber pages.
 
@@ -1240,26 +1240,26 @@ VERIFY:
 
 WHAT WAS NOT TOUCHED:
   - atlas-core engine.
-  - page1/page2/page3/page17/page18 modules.
-  - shared/page1_data_helpers.js (page21 doesn't call _esc).
+  - local_pca_dosage/candidate_focus/catalogue/stats_profile/marker_readiness modules.
+  - shared/page1_data_helpers.js (annotation_cockpit doesn't call _esc).
   - Other pages (only parse-checked).
 
 NEXT (round 5 step 7+): Quentin's call.
-  - page12 (discovery, 1008 LOC, 18 TODOs) — substantial.
-  - page16/16b (comparative, 2400+ each) — would resolve cs*
-    helpers AND likely computeTrackedLinkageProjection (page21).
-  - Tiny stubs (page8/9/15/19/page_overview) — quick router-wiring,
+  - local_pca_theta_pi (discovery, 1008 LOC, 18 TODOs) — substantial.
+  - cross_species_breakpoints/16b (comparative, 2400+ each) — would resolve cs*
+    helpers AND likely computeTrackedLinkageProjection (annotation_cockpit).
+  - Tiny stubs (window_summary_table/9/15/19/overview) — quick router-wiring,
     could batch several in one round.
-  - Catalogue completion: page9, page10, page_overview.
-  - Review pages: page4, 6, 7, 11, page_sv_evidence.
+  - Catalogue completion: confirmed_carousel, marker_panels, overview.
+  - Review pages: karyotype_tier, 6, 7, 11, sv_evidence.
 ```
 
 ---
 
-# 2026-05-07 (chat 36 round 5 step 7) — page9 confirmed carousel MIGRATED (stub-preserving)
+# 2026-05-07 (chat 36 round 5 step 7) — confirmed_carousel confirmed carousel MIGRATED (stub-preserving)
 
 ```text
-TODO: refactor page9 (confirmed candidates carousel, catalogue stage)
+TODO: refactor confirmed_carousel (confirmed candidates carousel, catalogue stage)
     from chat-33 "single-file with const state = window.state || {}"
     pattern to atlas-router-compatible mount/unmount + _pageState
     live-binding. Page9 is a stub even in legacy: HTML shell exists
@@ -1271,13 +1271,13 @@ DECISIONS:
   Step 0 — Stub-preserving migration. Don't invent functionality
     during migration; preserve the legacy "show empty placeholder"
     contract exactly. The full carousel implementation lands when
-    page2's candidate-focus renderer is accessible.
+    candidate_focus's candidate-focus renderer is accessible.
 
-  Step 0b — Same single-file shape as page21 (round 5 step 6).
+  Step 0b — Same single-file shape as annotation_cockpit (round 5 step 6).
     Pre-extracted body (105 LOC), 2 public entries, 1 bare state.X
     read. Single-file (NOT sub-module split).
 
-  No cross-page state bridge: page9 doesn't import from any other
+  No cross-page state bridge: confirmed_carousel doesn't import from any other
     migrated page. Its 3 TODO_MISSING items
     (_renderConfirmedCarousel, _wireConfirmedCarouselNav,
     renderCandidateFocus) are NOT runtime-guarded yet — they're just
@@ -1285,7 +1285,7 @@ DECISIONS:
     carousel is implemented (separate task).
 
   Accessor-shortcut continues to apply (round 5 step 6 finding):
-    page9 has a single bare `state.candidateList` read inside one
+    confirmed_carousel has a single bare `state.candidateList` read inside one
     function. The refactor was trivial: rename the verbatim function,
     prepend `const state = _pageState || {};` inside it, add the
     state-aware export wrapper + lifecycle. No AST-walking patcher
@@ -1293,7 +1293,7 @@ DECISIONS:
 
 DO:
   1. Audit legacy line ~5076 (page-tab tooltip) + lines 7782-7812
-     (HTML shell only). Confirm page9 identity ("confirmed carousel",
+     (HTML shell only). Confirm confirmed_carousel identity ("confirmed carousel",
      catalogue stage). Update pages.registry.json _label/_doc and
      manifest.json label="confirmed carousel".
 
@@ -1302,10 +1302,10 @@ DO:
      TODO_MISSING items (3 of them) are NOT in the body — they're
      only mentioned in comments.
 
-  3. Refactor page9.js IN-PLACE:
+  3. Refactor confirmed_carousel.js IN-PLACE:
      - Replace `const state = (typeof window !== 'undefined'
        && window.state) ? window.state : {};` with
-       `import { _pageState, _setActiveState } from './page9/_state.js';`.
+       `import { _pageState, _setActiveState } from './confirmed_carousel/_state.js';`.
      - Rename verbatim `function refreshConfirmedCarousel()` →
        internal `function _refreshConfirmedCarousel()`. Inside the
        function, prepend `const state = _pageState || {};` so the
@@ -1319,7 +1319,7 @@ DO:
        BOTH refreshConfirmedCarousel AND initConfirmedCarousel
        (legacy page-tab activation flow).
 
-  4. Create page9/_state.js (13 LOC, mirrors other pages').
+  4. Create confirmed_carousel/_state.js (13 LOC, mirrors other pages').
 
   5. Build tests/test_catalogue_page9.js (14 assertions: exports +
      lifecycle entry-points + __MODULE_ID__ removal + _state +
@@ -1327,7 +1327,7 @@ DO:
      side-effect of refreshConfirmedCarousel(state) on _pageState).
 
   6. Build tests/smoke_catalogue_page9_round5.mjs:
-     - fake DOM (no canvas needed — page9 is HTML-only).
+     - fake DOM (no canvas needed — confirmed_carousel is HTML-only).
      - mount empty-state: #confirmedEmpty visible, navBar + meta hidden.
      - mount populated-state (2 confirmed + 1 unconfirmed): verify
        verbatim legacy stub behaviour — empty element repopulated
@@ -1338,16 +1338,16 @@ DO:
      - unmount clears _pageState.
 
   7. Replace stale chat-33 test (wrong path
-     `../inversion_catalogue/page9.js`, asserts removed
+     `../inversion_catalogue/confirmed_carousel.js`, asserts removed
      __MODULE_ID__).
 
 DO NOT:
   - Try to implement the actual carousel during migration. Page9 was
-    always a stub in legacy; the full implementation requires page2's
+    always a stub in legacy; the full implementation requires candidate_focus's
     candidate-focus renderer to be exposed and is a separate task.
   - Promote the 3 TODO_MISSING items to runtime guards. They're not
     referenced in the body, only mentioned in source comments.
-  - Migrate page_overview or page10 at the same time (catalogue
+  - Migrate overview or marker_panels at the same time (catalogue
     completion is a multi-page task; one page at a time per Quentin's
     directive).
   - Renumber pages.
@@ -1362,31 +1362,31 @@ VERIFY:
 
 WHAT WAS NOT TOUCHED:
   - atlas-core engine.
-  - page1/page2/page3/page17/page18/page21 modules.
+  - local_pca_dosage/candidate_focus/catalogue/stats_profile/marker_readiness/annotation_cockpit modules.
   - shared/page1_data_helpers.js.
   - The 3 TODO_MISSING items (kept as comments — fresh-write task).
   - Other pages (only parse-checked).
 
 NEXT (round 5 step 8+): Quentin's call.
-  - page_overview (catalogue, 35 LOC) or page10 (catalogue, 244 LOC)
+  - overview (catalogue, 35 LOC) or marker_panels (catalogue, 244 LOC)
     — both close out the catalogue group.
-  - page12 (discovery, 1008 LOC, 18 TODOs) — substantial.
-  - page16/16b (comparative, 2400+ each) — would resolve cs*
+  - local_pca_theta_pi (discovery, 1008 LOC, 18 TODOs) — substantial.
+  - cross_species_breakpoints/16b (comparative, 2400+ each) — would resolve cs*
     helpers + computeTrackedLinkageProjection.
-  - Tiny stubs (page8/15/19/page5) — quick router-wiring.
-  - Review pages (page4, 6, 7, 11, page_sv_evidence).
+  - Tiny stubs (window_summary_table/15/19/help) — quick router-wiring.
+  - Review pages (karyotype_tier, 6, 7, 11, sv_evidence).
 ```
 
 ---
 
-# 2026-05-07 (chat 36 round 5 step 8) — page_overview synthesis tab MIGRATED (factory + new lifecycle)
+# 2026-05-07 (chat 36 round 5 step 8) — overview synthesis tab MIGRATED (factory + new lifecycle)
 
 ```text
-TODO: refactor page_overview (synthesis-stage overview tab) from chat-33
+TODO: refactor overview (synthesis-stage overview tab) from chat-33
     factory pattern (wirePageOverview(state) → { renderPageOverview })
     to add the standard atlas-router lifecycle alongside. Page_overview
     is the only chat-33 factory-pattern page in the project. Page is
-    EMPTY in legacy (legacy line 9322 is `<div id="page_overview"
+    EMPTY in legacy (legacy line 9322 is `<div id="overview"
     class="page"></div>`, no JS handlers anywhere — verified by grep).
 
 DECISIONS:
@@ -1411,7 +1411,7 @@ DECISIONS:
     ancestry slots) gets them automatically without a separate
     refactor.
 
-  Stub-preserving migration (continued from page9 round 5 step 7):
+  Stub-preserving migration (continued from confirmed_carousel round 5 step 7):
     Both pages were empty in legacy. Migration preserves no-op
     semantics exactly while wiring the lifecycle. Smoke tests verify
     no-throw + correct empty-state behaviour. When the real
@@ -1420,7 +1420,7 @@ DECISIONS:
 
 DO:
   1. Audit legacy line 5138 (page-tab definition) + line 9322 (HTML
-     body — empty <div>). Confirm page_overview identity ("overview",
+     body — empty <div>). Confirm overview identity ("overview",
      synthesis stage). Confirm via grep that NO JS handlers exist.
      Update pages.registry.json _label/_doc and manifest.json
      stage="synthesis" (was "catalogue").
@@ -1429,9 +1429,9 @@ DO:
      never reads state. The factory pattern is the only thing
      different from siblings.
 
-  3. Refactor page_overview.js IN-PLACE:
+  3. Refactor overview.js IN-PLACE:
      - Add `import { _pageState, _setActiveState } from
-       './page_overview/_state.js';`.
+       './overview/_state.js';`.
      - Rename the factory's inner closure to top-level
        `function _renderPageOverview()` (no-op body, matches legacy).
      - Add `export function renderPageOverview(state)` wrapper that
@@ -1443,7 +1443,7 @@ DO:
      - Add mount/unmount/_buildLegacyState lifecycle (passthrough
        _buildLegacyState).
 
-  4. Create page_overview/_state.js (17 LOC, mirrors other pages').
+  4. Create overview/_state.js (17 LOC, mirrors other pages').
 
   5. Build tests/test_catalogue_page_overview.js (18 assertions:
      exports + factory + default + direct exports + mount/unmount +
@@ -1455,7 +1455,7 @@ DO:
      direct + factory backward-compat smoke + unmount).
 
   7. Replace stale chat-33 test (wrong path
-     `../inversion_catalogue/page_overview.js`).
+     `../inversion_catalogue/overview.js`).
 
 DO NOT:
   - Remove the factory wirePageOverview or the default export. Anyone
@@ -1463,7 +1463,7 @@ DO NOT:
   - Try to implement the actual synthesis overview during migration.
     The design (drop tab vs populate with workflow summary) is a
     Quentin decision deferred to a follow-up round.
-  - Migrate page10 at the same time.
+  - Migrate marker_panels at the same time.
   - Renumber pages.
 
 VERIFY:
@@ -1476,34 +1476,34 @@ VERIFY:
 
 WHAT WAS NOT TOUCHED:
   - atlas-core engine.
-  - page1/page2/page3/page9/page17/page18/page21 modules.
+  - local_pca_dosage/candidate_focus/catalogue/confirmed_carousel/stats_profile/marker_readiness/annotation_cockpit modules.
   - shared/page1_data_helpers.js.
   - The TODO_MISSING(synthesis_overview_design) — kept as TODO.
   - Other pages (only parse-checked).
 
 NEXT (round 5 step 9+): Quentin's call.
-  - page10 (catalogue, 244 LOC) — closes out the catalogue group
+  - marker_panels (catalogue, 244 LOC) — closes out the catalogue group
     entirely (only catalogue page left).
-  - page12 (discovery, 1008 LOC, 18 TODOs) — substantial.
-  - page16/16b (comparative, 2400+ each) — would resolve cs*
+  - local_pca_theta_pi (discovery, 1008 LOC, 18 TODOs) — substantial.
+  - cross_species_breakpoints/16b (comparative, 2400+ each) — would resolve cs*
     helpers + computeTrackedLinkageProjection.
-  - Tiny stubs (page8/15/19/page5) — quick router-wiring.
-  - Review pages (page4, 6, 7, 11, page_sv_evidence).
+  - Tiny stubs (window_summary_table/15/19/help) — quick router-wiring.
+  - Review pages (karyotype_tier, 6, 7, 11, sv_evidence).
 ```
 
 ---
 
-# 2026-05-07 (chat 36 round 5 step 9) — page10 marker panels MIGRATED · CATALOGUE COMPLETE
+# 2026-05-07 (chat 36 round 5 step 9) — marker_panels marker panels MIGRATED · CATALOGUE COMPLETE
 
 ```text
-TODO: refactor page10 (marker panels, catalogue stage) from chat-33
+TODO: refactor marker_panels (marker panels, catalogue stage) from chat-33
     factory pattern (`wirePage10(state) → { renderPage10,
     renderMarkerPage }`) to add the standard atlas-router lifecycle
-    alongside. Page10 uses the same factory pattern as page_overview
+    alongside. Page10 uses the same factory pattern as overview
     (round 5 step 8), so the same migration recipe applies.
 
 DECISIONS:
-  Step 0 — Same playbook as page_overview round 5 step 8 (factory +
+  Step 0 — Same playbook as overview round 5 step 8 (factory +
     new lifecycle alongside). Page10 has 137 LOC of verbatim legacy
     render code inside the factory closure (legacy lines 57837-58043).
     Don't touch the body; add `_setActiveState(state)` at factory
@@ -1521,12 +1521,12 @@ DECISIONS:
     aliased it. Keep both `renderPage10` and `renderMarkerPage` as
     direct exports plus the factory-handle alias.
 
-  Step 0d — Stub: page10 had no TODO_MISSING, no external function
+  Step 0d — Stub: marker_panels had no TODO_MISSING, no external function
     deps, no cross-page imports. Fully self-contained.
 
 DO:
   1. Audit legacy lines 57837-58043 (verbatim 137-LOC body inside
-     factory). Confirm page10 identity ("marker panels", catalogue
+     factory). Confirm marker_panels identity ("marker panels", catalogue
      stage). Update pages.registry.json _label/_doc and manifest.json
      label="marker panels".
 
@@ -1535,9 +1535,9 @@ DO:
      marker_catalogue, marker_primers}, state.candidateList. All
      read-only. No mutations.
 
-  3. Refactor page10.js IN-PLACE:
+  3. Refactor marker_panels.js IN-PLACE:
      - Add `import { _pageState, _setActiveState } from
-       './page10/_state.js';`.
+       './marker_panels/_state.js';`.
      - Inside `wirePage10(state)`: prepend `if (state)
        _setActiveState(state);`. **Do NOT touch the factory body.**
      - Add new external exports:
@@ -1550,7 +1550,7 @@ DO:
        - `export async function unmount(root)` — clears _pageState.
      - KEEP `export default wirePage10`.
 
-  4. Create page10/_state.js (18 LOC, mirrors other pages').
+  4. Create marker_panels/_state.js (18 LOC, mirrors other pages').
 
   5. Build tests/test_catalogue_page10.js (25 assertions). PRESERVE
      all chat-33 behavioural cases verbatim (empty-layers subtitle +
@@ -1559,7 +1559,7 @@ DO:
      propagates to _pageState.
 
   6. Build tests/smoke_catalogue_page10_round5.mjs (26 assertions):
-     - fake DOM (no canvas needed — page10 is HTML-only).
+     - fake DOM (no canvas needed — marker_panels is HTML-only).
      - mount empty-layers: subtitle + slot innerHTML.
      - mount populated (synthetic HIGH-tier panel + matching
        candidate): card rendered with id, tier, accuracy, chrom,
@@ -1569,7 +1569,7 @@ DO:
      - unmount clears _pageState.
 
   7. Replace stale chat-33 test (wrong path
-     `../inversion_catalogue/page10.js`).
+     `../inversion_catalogue/marker_panels.js`).
 
 DO NOT:
   - Modify the factory body. The 137 LOC of verbatim legacy render
@@ -1589,7 +1589,7 @@ VERIFY:
 
 WHAT WAS NOT TOUCHED:
   - atlas-core engine.
-  - page1/page2/page3/page9/page17/page18/page21/page_overview modules.
+  - local_pca_dosage/candidate_focus/catalogue/confirmed_carousel/stats_profile/marker_readiness/annotation_cockpit/overview modules.
   - shared/page1_data_helpers.js.
   - The verbatim 137-LOC legacy render body inside wirePage10.
   - Other pages (only parse-checked).
@@ -1598,23 +1598,23 @@ WHAT WAS NOT TOUCHED:
 pages migrated.
 
 NEXT (round 5 step 10+): Quentin's call.
-  - page12 (discovery, 1008 LOC, 18 TODOs) — next-largest discovery
+  - local_pca_theta_pi (discovery, 1008 LOC, 18 TODOs) — next-largest discovery
     page; substantial.
-  - page16/16b (comparative, 2400+ each) — would resolve cs*
+  - cross_species_breakpoints/16b (comparative, 2400+ each) — would resolve cs*
     helpers + computeTrackedLinkageProjection.
-  - Tiny stubs (page8/15/19/page5) — quick router-wiring rounds.
-  - Review pages (page4, 6, 7, 11, page_sv_evidence) — review stage.
+  - Tiny stubs (window_summary_table/15/19/help) — quick router-wiring rounds.
+  - Review pages (karyotype_tier, 6, 7, 11, sv_evidence) — review stage.
 ```
 
 ---
 
-# 2026-05-07 (chat 36 round 5 step 10) — page12 local-PCA-θπ MIGRATED · 13 TODO_MISSING resolved
+# 2026-05-07 (chat 36 round 5 step 10) — local_pca_theta_pi local-PCA-θπ MIGRATED · 13 TODO_MISSING resolved
 
 ```text
-TODO: refactor page12 (local-PCA-θπ chromosome-wide diversity scanner,
+TODO: refactor local_pca_theta_pi (local-PCA-θπ chromosome-wide diversity scanner,
     discovery stage) from chat-33 "8 verbatim helpers, state-as-first-arg,
     no lifecycle" pattern to add the standard atlas-router lifecycle.
-    Page12 is the θπ sister of page1 (same six-panel layout, reads
+    Page12 is the θπ sister of local_pca_dosage (same six-panel layout, reads
     theta_pi_* layers instead of dosage). Substantial: 1008 LOC of
     verbatim body from legacy lines 53045-54168 + 13 TODO_MISSING
     markers needing scope-check resolution.
@@ -1627,7 +1627,7 @@ DECISIONS:
     encountered so far.
 
   Step 0b — TODO_MISSING is a false-positive class (continued from
-    page1 round 2). All 13 markers (showHide, xToPx, kColor, q,
+    local_pca_dosage round 2). All 13 markers (showHide, xToPx, kColor, q,
     colorFor, palette, has, xAt, yAt, toX, toY, fillFor, yToPx)
     verified as closure-scoped via grep — each name has a local
     `const`/`let` declaration inside its calling function. The
@@ -1648,12 +1648,12 @@ DECISIONS:
 
 DO:
   1. Audit legacy lines 53045-54168 (8 helpers verbatim). Confirm
-     page12 identity ("local PCA θπ", discovery stage). Update
+     local_pca_theta_pi identity ("local PCA θπ", discovery stage). Update
      pages.registry.json _label/_doc and manifest.json
      label="local PCA θπ".
 
   2. Run TODO_MISSING scope check (recipe step 2.5):
-       grep -nE "const (NAME)\s*=|let NAME\b" page12.js
+       grep -nE "const (NAME)\s*=|let NAME\b" local_pca_theta_pi.js
      Confirm every flagged name has a local declaration in its
      calling function. Replace TODO_MISSING block with "RESOLVED"
      comment block with line refs.
@@ -1663,9 +1663,9 @@ DO:
      theta_pi_local_pca, theta_pi_envelopes), state.candidate,
      state.cur, state._simGeom, state._thSimGeom, state._zGeom.
 
-  4. Refactor page12.js IN-PLACE:
+  4. Refactor local_pca_theta_pi.js IN-PLACE:
      - Add `import { _pageState, _setActiveState } from
-       './page12/_state.js';`.
+       './local_pca_theta_pi/_state.js';`.
      - **Do NOT modify** any of the 8 verbatim helper bodies.
      - Replace TODO_MISSING block with RESOLVED comment block.
      - Keep TODO_MISSING_SLOT comments.
@@ -1680,7 +1680,7 @@ DO:
        undefined), pulls chrom precomp from inv.tracks[activeChrom],
        passes geometry caches through.
 
-  5. Create page12/_state.js (18 LOC, mirrors other pages').
+  5. Create local_pca_theta_pi/_state.js (18 LOC, mirrors other pages').
 
   6. Build tests/test_discovery_page12.js (32 assertions: exports +
      wrappers + verbatim helpers + _state + no-document tolerance +
@@ -1694,7 +1694,7 @@ DO:
      (FakeContext._ops > 0 on #thCusumStripCanvas).
 
   8. Replace stale chat-33 test (wrong path
-     `../inversion_discovery/page12.js`).
+     `../inversion_discovery/local_pca_theta_pi.js`).
 
 DO NOT:
   - Touch the 8 verbatim helper bodies. They're correct; the
@@ -1703,7 +1703,7 @@ DO NOT:
     `.has(name)`.
   - Promote state._simGeom / state._thSimGeom / state._zGeom out of
     TODO_MISSING_SLOT. That's a merge-chat decision.
-  - Migrate page8/15/19 at the same time.
+  - Migrate window_summary_table/15/19 at the same time.
   - Renumber pages.
 
 VERIFY:
@@ -1717,41 +1717,41 @@ VERIFY:
 WHAT WAS NOT TOUCHED:
   - atlas-core engine.
   - All 9 previously-migrated page modules.
-  - shared/ modules (page12's existing imports were correct).
-  - The 8 verbatim ~1008-LOC helper bodies inside page12.js.
+  - shared/ modules (local_pca_theta_pi's existing imports were correct).
+  - The 8 verbatim ~1008-LOC helper bodies inside local_pca_theta_pi.js.
   - TODO_MISSING_SLOT comments.
   - Other pages (only parse-checked).
 
-DISCOVERY GROUP STATUS: 3 of 4 migrated (page1, page2, page12). Only
-page8/page15/page19 remain — all tiny stubs.
+DISCOVERY GROUP STATUS: 3 of 4 migrated (local_pca_dosage, candidate_focus, local_pca_theta_pi). Only
+window_summary_table/local_pca_ghsl/negative_regions remain — all tiny stubs.
 
 NEXT (round 5 step 11+): Quentin's call.
-  - page8/page15/page19 (discovery, <50 LOC each) — close out
+  - window_summary_table/local_pca_ghsl/negative_regions (discovery, <50 LOC each) — close out
     discovery group entirely (1-3 quick rounds).
-  - page16/page16b (comparative, 2400+ each) — would resolve cs*
+  - cross_species_breakpoints/multi_species_cockpit (comparative, 2400+ each) — would resolve cs*
     helpers + computeTrackedLinkageProjection.
-  - page5 (comparative, 34 LOC) — tiny help-page stub.
-  - Review pages (page4, 6, 7, 11, page_sv_evidence).
+  - help (comparative, 34 LOC) — tiny help-page stub.
+  - Review pages (karyotype_tier, 6, 7, 11, sv_evidence).
 ```
 
 ---
 
-# 2026-05-07 (chat 36 round 5 step 11) — page16 cross-species breakpoints MIGRATED · page17 guard-resolution unblocked
+# 2026-05-07 (chat 36 round 5 step 11) — cross_species_breakpoints cross-species breakpoints MIGRATED · stats_profile guard-resolution unblocked
 
 ```text
-TODO: refactor page16 (cross-species breakpoints, comparative stage)
+TODO: refactor cross_species_breakpoints (cross-species breakpoints, comparative stage)
     from chat-33 "0 explicit exports, bare-state, plain JS" pattern
     to atlas-router-compatible mount/unmount + _pageState live-binding.
     Page16 owns _csGetSyntenyBlocks (legacy line 1488) +
     _csPermutationTest (legacy line 1791), previously runtime-guarded
-    in page17. Migrating page16 unblocks page17 guard promotion.
+    in stats_profile. Migrating cross_species_breakpoints unblocks stats_profile guard promotion.
 
 DECISIONS:
-  Step 0 — Initial audit pick was page16b (multi-species cockpit,
-    2417 LOC), but audit revealed page16b does NOT own the cs*
-    helpers — page16 does. **Switched to page16.**
+  Step 0 — Initial audit pick was multi_species_cockpit (multi-species cockpit,
+    2417 LOC), but audit revealed multi_species_cockpit does NOT own the cs*
+    helpers — cross_species_breakpoints does. **Switched to cross_species_breakpoints.**
 
-  Step 0b — Same migration shape as page17/page18 (rounds 5 step 4-5):
+  Step 0b — Same migration shape as stats_profile/marker_readiness (rounds 5 step 4-5):
     AST-aware patcher injects `const state = _pageState;` shim into
     every function body that reads bare `state`. 50 top-level
     functions; 28 got the shim (the other 22 are pure utility helpers
@@ -1759,12 +1759,12 @@ DECISIONS:
 
   Step 0c — TODO_MISSING resolution:
     - _esc (×61) → import from shared/page1_data_helpers.js (added
-      round 5 step 2 for page2).
+      round 5 step 2 for candidate_focus).
     - _getRepeatDensity (×3) → KEPT as runtime guard. Lives at legacy
-      line 14477 (page2 territory).
+      line 14477 (candidate_focus territory).
     - setCur, drawZ, drawSim, drawLinesPanel → KEPT as runtime guards.
       Page1 NOW exports all four, but promoting these to imports
-      would couple page16 to page1's module load order. Runtime
+      would couple cross_species_breakpoints to local_pca_dosage's module load order. Runtime
       guards preserve graceful degradation.
     - drawWinSumStrip → KEPT as runtime guard. Not defined in legacy.
     - window.popgenDotplot, window.popgenFocalVsBg → KEPT as runtime
@@ -1772,7 +1772,7 @@ DECISIONS:
 
   Step 0d — 27 explicit ES exports across 5 logical groups:
     constants (4), render entries (7), cross-page helpers (6 —
-    INCLUDING _csGetSyntenyBlocks + _csPermutationTest that page17
+    INCLUDING _csGetSyntenyBlocks + _csPermutationTest that stats_profile
     reads via runtime guards), IO helpers (5), hover/event-wiring
     helpers (2). Plus mount, unmount, renderCrossSpeciesPage.
 
@@ -1781,12 +1781,12 @@ DECISIONS:
     new non-prefixed renderCrossSpeciesPage(state) is purely additive.
 
   Step 0f — confirmed during audit: computeTrackedLinkageProjection
-    (page17 + page21 runtime guard target) lives at legacy line 46751,
-    inside page2-territory chunks. Will land when page2's missing
+    (stats_profile + annotation_cockpit runtime guard target) lives at legacy line 46751,
+    inside candidate_focus-territory chunks. Will land when candidate_focus's missing
     helpers eventually surface. NOT part of this round.
 
 DO:
-  1. Audit. Confirm page16 owns the cs* helpers (not page16b).
+  1. Audit. Confirm cross_species_breakpoints owns the cs* helpers (not multi_species_cockpit).
      Update pages.registry.json _label/_doc and manifest.json
      label="cross-species breakpoints".
 
@@ -1795,14 +1795,14 @@ DO:
      - All others → keep as runtime guards.
      Static-analyze state.X reads (18 distinct slots).
 
-  3. Refactor page16.js IN-PLACE:
+  3. Refactor cross_species_breakpoints.js IN-PLACE:
      - Rewrite header comment to document round 5 step 11 migration
        AND the TODO_MISSING resolution status (per-marker).
      - Add `import { _pageState, _setActiveState } from
-       './page16/_state.js';` and `import { _esc } from
+       './cross_species_breakpoints/_state.js';` and `import { _esc } from
        '../../shared/page1_data_helpers.js';`.
      - Run AST patcher (`/home/claude/work/patch_page16.py`,
-       modeled on page17/18 patcher). Reverse-walk through all 50
+       modeled on stats_profile/18 patcher). Reverse-walk through all 50
        top-level function declarations; inject
        `\n  const state = _pageState;` after `function NAME(args) {`
        for bodies referencing bare state without local declaration.
@@ -1813,7 +1813,7 @@ DO:
      - Append mount/unmount/_buildLegacyState + state-aware wrapper
        renderCrossSpeciesPage(state).
 
-  4. Create page16/_state.js (26 LOC; mirrors other pages').
+  4. Create cross_species_breakpoints/_state.js (26 LOC; mirrors other pages').
 
   5. Build tests/test_comparative_page16.js (40 assertions: lifecycle
      entries + render entries + cross-page helpers + IO helpers +
@@ -1830,7 +1830,7 @@ DO:
 
   7. Replace stale chat-33 test (62-LOC parse-check + dynamic-import
      stub that imports from wrong path
-     `../inversion_comparative/page16.js`).
+     `../inversion_comparative/cross_species_breakpoints.js`).
 
 DO NOT:
   - Modify the 50 verbatim helper bodies. The only edit is the
@@ -1838,8 +1838,8 @@ DO NOT:
     functions that read bare state.
   - Promote setCur/drawZ/drawSim/drawLinesPanel to imports. Runtime
     guards preserve graceful degradation.
-  - Touch page16b. Separate page; will migrate later.
-  - Touch page17's runtime guards. Promotion to imports is a
+  - Touch multi_species_cockpit. Separate page; will migrate later.
+  - Touch stats_profile's runtime guards. Promotion to imports is a
     follow-up round task.
   - Migrate any other page at the same time.
   - Renumber pages.
@@ -1855,25 +1855,25 @@ VERIFY:
 WHAT WAS NOT TOUCHED:
   - atlas-core engine.
   - All 10 previously-migrated page modules.
-  - shared/page1_data_helpers.js (page16's _esc import resolves to
+  - shared/page1_data_helpers.js (cross_species_breakpoints's _esc import resolves to
     the existing export).
   - Other shared/ modules.
-  - The 50 verbatim helper bodies inside page16.js (only the
+  - The 50 verbatim helper bodies inside cross_species_breakpoints.js (only the
     AST-injected shim — 28 of 50 functions).
-  - page16b (audited but separate page).
-  - page17's runtime guards for _csGetSyntenyBlocks +
+  - multi_species_cockpit (audited but separate page).
+  - stats_profile's runtime guards for _csGetSyntenyBlocks +
     _csPermutationTest (kept; promotion is a follow-up round).
   - Other pages (only parse-checked).
 
-STRATEGIC VALUE: page17 guard-resolution unblocked. page16 now
+STRATEGIC VALUE: stats_profile guard-resolution unblocked. cross_species_breakpoints now
 exports _csGetSyntenyBlocks + _csPermutationTest as explicit ES
-exports. A follow-up round can promote page17's runtime guards
+exports. A follow-up round can promote stats_profile's runtime guards
 (typeof X === 'function' early-returns) to proper imports.
 
 NEXT (round 5 step 12+): Quentin's call.
-  - page17 guard promotion — small, fast payoff round (~5 LOC delta).
-  - page8/15/19 (discovery, <50 LOC each) — close out discovery group.
-  - page16b (comparative, 2417 LOC) — multi-species cockpit.
-  - page5 (comparative, 34 LOC) — tiny help-page stub.
-  - Review pages (page4, 6, 7, 11, page_sv_evidence).
+  - stats_profile guard promotion — small, fast payoff round (~5 LOC delta).
+  - window_summary_table/15/19 (discovery, <50 LOC each) — close out discovery group.
+  - multi_species_cockpit (comparative, 2417 LOC) — multi-species cockpit.
+  - help (comparative, 34 LOC) — tiny help-page stub.
+  - Review pages (karyotype_tier, 6, 7, 11, sv_evidence).
 ```

@@ -1,4 +1,4 @@
-// Smoke tests for inversion-atlas page_overview.js's layer-inventory
+// Smoke tests for inversion-atlas overview.js's layer-inventory
 // rendering. This is the FIRST inversion-atlas migration, and it uses
 // the inversion-side fail-soft return shape ({ok, status, json|text,
 // error?}) rather than the throwing pattern used in the four sibling
@@ -52,7 +52,7 @@ function eq(a, b, msg) {
   console.log(`  ok: ${msg}`);
 }
 
-// ----- mirror page_overview.js helpers (byte-equivalent) ----------------
+// ----- mirror overview.js helpers (byte-equivalent) ----------------
 
 async function _populateLayerInventory() {
   const slot = document.getElementById('invLayerInventory');

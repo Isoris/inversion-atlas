@@ -1,0 +1,184 @@
+{
+  "page_id": "local_pca_dosage",
+  "label": "local PCA |Z|",
+  "page_type": "core_page",
+  "stage": "discovery",
+  "owner_atlas": "inversion",
+  "status": "active",
+  "performance_critical": true,
+  "current_path": {
+    "html": "atlases/inversion/pages/discovery/local_pca_dosage.html",
+    "js_entry": "atlases/inversion/pages/discovery/local_pca_dosage.js",
+    "js_subdir": "atlases/inversion/pages/discovery/local_pca_dosage/"
+  },
+  "legacy_source": "legacy/Inversion_atlas.html (the big page; six-panel scrubber)",
+
+  "purpose": "Chromosome-wide PCA-based inversion scanner. The 'big page'. Six side-by-side panels (sim_mat, |Z|, lines, PCA, L3 contingency, sidebar) walk every window of the active chromosome at 60 fps; click on any panel updates state.cur (the central cursor); per-window K-means labels feed L3 concordance tables.",
+
+  "required_layers": [
+    "scrubber_main",
+    "repeat_density",
+    "band_trajectories",
+    "candidate_tracks"
+  ],
+  "required_slots": [
+    "activeChrom"
+  ],
+  "optional_slots": [
+    "activeCandidate"
+  ],
+  "preloads": [
+    "scrubber_main",
+    "repeat_density",
+    "band_nodes",
+    "band_edges",
+    "band_trajectories",
+    "candidate_tracks"
+  ],
+  "optional_layers_per_subdir_imports": [
+    "theta_pi_*",
+    "ghsl_panel",
+    "active_samples",
+    "band_trace",
+    "inheritance_groups",
+    "lineage",
+    "manual_groups",
+    "enrichment files (drag-drop)"
+  ],
+
+  "panels": [
+    {
+      "id": "sim_panel",
+      "module": "local_pca_dosage/sim_panel.js",
+      "exports": ["drawSim", "drawSimMini"],
+      "purpose": "sim_mat heatmap with envelope overlays, L1/L2 boundary lines, anchor strip, triangle-split PDF mode; minimap variant rendered inside |Z| when state.simInMinimap is set"
+    },
+    {
+      "id": "z_panel",
+      "module": "local_pca_dosage/z_panel.js",
+      "exports": ["drawZ"],
+      "purpose": "robust-|Z| waveform with candidate lane/bar overlay, embedded sim_mat minimap, 9 strip renderers (SNP density, transition rate, regime breadth, lineage, diamond, inheritance labels, tracked-linkage, band-trace)"
+    },
+    {
+      "id": "lines_panel",
+      "module": "local_pca_dosage/lines_panel.js",
+      "exports": ["drawLinesPanel", "buildLinesPanel", "buildLinesPanelCheckboxes", "refreshLinesColorMode", "setLinesPanelCandidateBands", "attachLinesLasso"],
+      "purpose": "per-sample PC1/PC2 line traces, secondary y-axis with strip overlays, lasso selection, candidate-band paint, color modes (kmeans, theta_pi, GHSL, het_rate, residual, etc.)"
+    },
+    {
+      "id": "pca_panel",
+      "module": "local_pca_dosage/pca_panel.js",
+      "exports": ["drawPCA", "drawAnchorStrip", "togglePlay", "cycleKAside", "autoPickRadial", "refreshColorModeBar", "refreshLockBtn", "refreshPcaAxisBar", "renderTrackedList", "renderManualGroupsList", "attachPcaLasso"],
+      "purpose": "per-window scatter (PC1×PC2 / PC1×PC3 / PC2×PC3), anchor strip, tracked-samples sidebar, manual-groups sidebar"
+    },
+    {
+      "id": "l3_panel",
+      "module": "local_pca_dosage/l3_panel.js",
+      "exports": ["renderL3Panel", "renderL3PanelSlab", "renderL3PanelScaleStability", "refreshPinUI"],
+      "purpose": "L3 contingency in 3 render modes — primary Hungarian-aligned concordance, per-K slab (K=2..6), scale-stability (NN20/40/80)"
+    }
+  ],
+
+  "primitives_used": [
+    "shared/kmeans.js",
+    "shared/hungarian.js",
+    "shared/contingency.js",
+    "shared/het_rate.js",
+    "shared/per_l2_cluster.js",
+    "shared/clustering.js (lineage)",
+    "shared/band_trace.js",
+    "shared/inheritance_groups.js",
+    "shared/page1_data_helpers.js",
+    "shared/page1_utils.js (escapeHtml)",
+    "shared/diamond_detection.js",
+    "shared/repeat_density.js (drag-drop merge)"
+  ],
+  "adapters_used": [
+    "core/atlas_api.js (resolve, getState)"
+  ],
+  "subdir_files": [
+    "_state.js", "_data.js",
+    "sim_panel.js", "z_panel.js", "lines_panel.js", "pca_panel.js", "l3_panel.js",
+    "candidates.js", "events.js", "hotkeys.js", "sidebar.js",
+    "band_diagnostics.js", "band_diagnostics_html.js",
+    "band_trace_state.js", "band_trace_tooltip.js",
+    "active_samples.js", "diag_residuals.js",
+    "inheritance.js", "inheritance_tooltip.js", "lineage.js",
+    "l2_sweep.js", "manual_groups.js",
+    "chrom_cache.js", "idb.js", "idb_restore.js", "enrichment.js",
+    "panel_resize.js", "fish_inspect_popover.js"
+  ],
+
+  "interactions": [
+    {"id": "scrubber_cursor", "type": "cursor", "target": "state.cur (active window)"},
+    {"id": "canvas_click", "type": "click", "targets": ["onSimClick", "onZClick", "onPCAClick"]},
+    {"id": "panel_resize_drag", "type": "drag", "panels": ["sim", "Z", "lines", "PCA", "L3"]},
+    {"id": "color_mode_bar", "type": "view_control", "modes": ["family", "regime", "kmeans", "theta_pi", "ghsl", "het_rate", "residual", "manual_group", "candidate"]},
+    {"id": "k_selector", "type": "parameter_control", "parameter": "K", "allowed": [2, 3, 4, 5, 6]},
+    {"id": "tracked_samples_sidebar", "type": "selection_list"},
+    {"id": "manual_groups_sidebar", "type": "selection_list"},
+    {"id": "anchor_picker", "type": "parameter_control", "parameter": "anchor_window"},
+    {"id": "candidate_mode_toggle", "type": "view_control", "exports": ["candidateModeBtn"]},
+    {"id": "candidate_lasso_pca", "type": "brush", "module": "pca_panel.js#attachPcaLasso"},
+    {"id": "lines_lasso", "type": "brush", "module": "lines_panel.js#attachLinesLasso"},
+    {"id": "file_drag_drop", "type": "input", "ids": ["fileInput", "drop zones for enrichment/chrom JSON"]},
+    {"id": "l2_sweep_auto_promote", "type": "batch_action", "module": "local_pca_dosage/l2_sweep.js"},
+    {"id": "fish_inspect_popover", "type": "hover_click", "module": "local_pca_dosage/fish_inspect_popover.js"}
+  ],
+
+  "hotkeys": [
+    "Arrow Left / Right — step by state.stepMode (1/5/10/N/L2)",
+    "Shift+Arrow — 20-window skip",
+    "n / p — prev/next L2 or L1 (per state.travelMode)",
+    "f / b / c — candidate-mode draft helpers (flip resolution, nudge boundary, commit)",
+    "j — jumpBtn (jumpTo prompt)",
+    "(see local_pca_dosage/hotkeys.js for full list)"
+  ],
+
+  "computed_preview_outputs": [
+    "per-window kmeans labels (K=2..6)",
+    "L3 contingency tables (Hungarian-aligned)",
+    "PC1 line summaries",
+    "sim_mat heatmap",
+    "robust |Z|",
+    "band diagnostics rows (per L2 envelope)",
+    "lineage cluster assignments",
+    "inheritance group assignments"
+  ],
+  "committable_outputs": [
+    "candidate (promoted into state.candidateList — persisted by registry write path; manual gesture)",
+    "manual_groups (localStorage-persisted)",
+    "active_samples filter (cohort-wide CGA-keyed)",
+    "band_trace state (localStorage-persisted)",
+    "tracked samples (localStorage-persisted)"
+  ],
+  "commit_policy": "manual_only",
+
+  "documents": {
+    "page_registry_doc": "atlases/inversion/registries/data/pages.registry.json -> pages.local_pca_dosage._doc",
+    "specs_done": [
+      "specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md",
+      "specs_done/SPEC_l2_sweep_inheritance.md (authored 2026-05-15 from local_pca_dosage/l2_sweep.js)",
+      "specs_done/SPEC_g_panel_unified_groups.md (Slice 1 shipped; Slices 2+3 pending)",
+      "specs_done/SPEC_lines_panel_candidate_bands.md (authored 2026-05-15 from local_pca_dosage/lines_panel.js + candidates.js)",
+      "specs_done/SPEC_lasso_inheritance_backgrounds.md (Slices 1+3 shipped in legacy turn 164; Slices 2/4/5 deferred)",
+      "specs_done/SPEC_l3_het_dosage_coloring.md (authored 2026-05-15 from local_pca_dosage.html turn-128d annotation)"
+    ],
+    "specs_todo": [
+      "specs_todo/SPEC_page1_candidate_mode_ui.md"
+    ],
+    "specs_referenced_in_code_but_missing": [],
+    "handoffs": [
+      "_handoff_docs/HANDOFF_2026-05-06_chat35_round4_done.md (round-4 split)",
+      "atlases/inversion/pages/discovery/BATCH_1_NOTES.md"
+    ],
+    "user_guide": "unknown — no PAGE-level end-user docs"
+  },
+
+  "known_issues": [
+    "Layer set is the heaviest of any page — 4 required + 6 preloads (60 fps target).",
+    "applyData orchestrates ~10 sub-modules; cross-chrom safety clears state.candidate on chrom switch but mid-state during the switch is a known fragile path."
+  ],
+
+  "confidence": "high"
+}

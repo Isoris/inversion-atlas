@@ -7,7 +7,7 @@
 //   - optional inheritance-group lookup (when an inheritance result
 //     is supplied)
 //
-// The projection drives the PC1-panel background shading on page1: a
+// The projection drives the PC1-panel background shading on local_pca_dosage: a
 // shaded interval per candidate, colored by inheritance group, opacity
 // scaled by purity.
 //

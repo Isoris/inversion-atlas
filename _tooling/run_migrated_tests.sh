@@ -181,13 +181,13 @@ UNITS=(
   test_shared_mgl_dosage_clustering.js
   test_shared_mgl_similarity_matrix.js
   test_shared_mgl_nested_detector.js
-  test_discovery_page_tree_panel.js
-  test_discovery_page_fingerprint_track.js
-  test_discovery_page_similarity_panel.js
-  test_discovery_page_pca_panel.js
-  test_discovery_page_dosage_heatmap.js
-  test_discovery_page_nested_detector.js
-  test_discovery_page_dosage_cluster.js
+  test_discovery_tree_panel.js
+  test_discovery_fingerprint_track.js
+  test_discovery_similarity_matrix.js
+  test_discovery_pca_scatter_per_window.js
+  test_discovery_dosage_heatmap.js
+  test_discovery_nested_inversion_detector.js
+  test_discovery_dosage_cluster_adaptive_k.js
   test_shared_mgl_panel_linkage.js
   test_shared_mgl_stripe_quality.js
   test_shared_mgl_founder_consensus.js
@@ -265,13 +265,13 @@ SMOKES=(
   smoke_review_page4_round5.mjs
   smoke_review_page11_round5.mjs
   smoke_review_page_ancestry_scroller_round5.mjs
-  smoke_discovery_page_tree_panel_round5.mjs
-  smoke_discovery_page_fingerprint_track_round5.mjs
-  smoke_discovery_page_similarity_panel_round5.mjs
-  smoke_discovery_page_pca_panel_round5.mjs
-  smoke_discovery_page_dosage_heatmap_round5.mjs
-  smoke_discovery_page_nested_detector_round5.mjs
-  smoke_discovery_page_dosage_cluster_round5.mjs
+  smoke_discovery_tree_panel_round5.mjs
+  smoke_discovery_fingerprint_track_round5.mjs
+  smoke_discovery_similarity_matrix_round5.mjs
+  smoke_discovery_pca_scatter_per_window_round5.mjs
+  smoke_discovery_dosage_heatmap_round5.mjs
+  smoke_discovery_nested_inversion_detector_round5.mjs
+  smoke_discovery_dosage_cluster_adaptive_k_round5.mjs
   smoke_evolution_page_polarize_msa_round5.mjs
   smoke_evolution_page_haplotype_network_round5.mjs
   smoke_evolution_page_polarize_synteny_round5.mjs

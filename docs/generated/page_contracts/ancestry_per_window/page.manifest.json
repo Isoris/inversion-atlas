@@ -1,0 +1,68 @@
+{
+  "page_id": "ancestry_per_window",
+  "label": "ancestry",
+  "page_type": "core_page (thin-loader stub)",
+  "stage": "classification",
+  "owner_atlas": "inversion",
+  "status": "active (thin loader; external renderer)",
+  "current_path": {
+    "html": "atlases/inversion/pages/review/ancestry_per_window.html",
+    "js_entry": "atlases/inversion/pages/review/ancestry_per_window.js",
+    "js_subdir": "atlases/inversion/pages/review/ancestry_per_window/"
+  },
+  "legacy_source": "legacy/Inversion_atlas.html lines 7660-7670 (HTML shell) + 59629-59630 / 59732-59733 (typeof-guard dispatch sites)",
+  "external_renderer": "window.renderAncestryPage — sibling of js/atlas_page6_wiring.js (external; not inlined)",
+
+  "purpose": "Per-window ancestry view for the active chromosome. Reuses the popstats stack architecture (canvas tracks gated by chip toggles). Three view chips: K-cluster label (per-window argmax-Q), Q-value heatmap (top-1 intensity), Δ12 (top-1 minus top-2 Q — confidence). Driven by a <chrom>_phase4_ancestry.json layer drag-dropped into the page.",
+
+  "required_layers": [
+    "candidate_marker_primers (REGISTRY MISMATCH — page is chromosome-level)"
+  ],
+  "actually_consumed_layers": "<chrom>_phase4_ancestry.json (drag-drop)",
+  "required_slots": [
+    "activeCandidate (REGISTRY MISMATCH — page is chromosome-level)"
+  ],
+  "actually_consumed_slots": ["activeChrom"],
+  "preloads": ["candidate_marker_primers"],
+
+  "panels": [
+    {"id": "ancToolbar", "purpose": "sticky chip bar with 3 view chips"},
+    {"id": "ancStack", "purpose": "vertical canvas-section stack"},
+    {"id": "ancNoChrom", "purpose": "empty state — prompts user to load precomp + ancestry layer"}
+  ],
+
+  "subdir_files": ["_state.js — _pageState + setter"],
+
+  "primitives_used": ["unknown — external renderer handles everything"],
+  "adapters_used": [],
+
+  "interactions": [
+    {"id": "view_chip_k_label", "type": "view_control"},
+    {"id": "view_chip_q_heatmap", "type": "view_control"},
+    {"id": "view_chip_delta12", "type": "view_control"},
+    {"id": "drag_drop_ancestry_json", "type": "input", "purpose": "load <chrom>_phase4_ancestry.json"}
+  ],
+  "hotkeys": [],
+
+  "computed_preview_outputs": [
+    "per-window K-cluster argmax-Q label heatmap",
+    "Q-value heatmap (top-1 intensity)",
+    "Δ12 confidence (top-1 - top-2 Q)"
+  ],
+  "committable_outputs": ["none"],
+  "commit_policy": "none_by_default",
+
+  "documents": {
+    "page_registry_doc": "pages.registry.json -> pages.ancestry_per_window._doc (flags registry mismatch)",
+    "specs_done": [],
+    "specs_todo": [],
+    "handoffs": ["atlases/inversion/pages/review/BATCH_2_NOTES.md", "_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step17_done.md (FIRST review-stage migration)"],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [
+    "REGISTRY MISMATCH (flagged 2026-05-07 step 17): page is chromosome-level but requires_layers/requires_slots declare candidate-level values. Should be ancestry_phase4 + activeChrom.",
+    "External renderer absent → fallback empty-state message."
+  ],
+  "confidence": "high"
+}

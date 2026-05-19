@@ -1,6 +1,6 @@
 // tests/test_shared_mgl_candidate_mode.js
 //
-// Unit coverage for shared/mgl_candidate_mode.js — the page1 state-
+// Unit coverage for shared/mgl_candidate_mode.js — the local_pca_dosage state-
 // slot lifecycle helpers + cache + active-choice plumbing.
 
 import {

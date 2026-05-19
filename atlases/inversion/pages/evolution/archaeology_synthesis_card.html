@@ -1,0 +1,42 @@
+  <div id="archaeology_synthesis_card" class="page">
+
+    <header id="acHeader" class="ac-header">
+      <div class="ac-title">
+        <h2>Archaeology card</h2>
+        <span id="acCandidateLabel" class="ac-meta">—</span>
+      </div>
+      <div class="ac-controls">
+        <span id="acVerdictBadge" class="ac-verdict-badge"
+              title="Archaeology verdict (Step-6 synthesis)">—</span>
+      </div>
+    </header>
+
+    <div class="ac-body">
+      <div class="ac-card-wrap">
+        <div id="acReasonBox" class="ac-reason-box">—</div>
+        <div id="acInterpretationBox" class="ac-interpretation-box">—</div>
+        <div id="acEmpty" class="ac-empty" style="display:none;">
+          No archaeology input. atlasState.inversion.archaeology_card_state
+          needs a metrics bag (pi_inv, dxy, fst, private_inv, ...).
+        </div>
+      </div>
+      <aside class="ac-right">
+        <header class="ac-panel-head">
+          <h4>Per-metric summary</h4>
+        </header>
+        <dl id="acMetricsBody" class="ac-metrics-body"></dl>
+        <section class="ac-conf-section">
+          <h5>Confidence</h5>
+          <div id="acConfBody" class="ac-conf-body">—</div>
+        </section>
+      </aside>
+    </div>
+
+    <footer id="acFooter" class="ac-footer">
+      ⓘ Step-6 synthesis of all evolution-stage signals into one
+      archaeology verdict: young_clean / old_divergent / old_swept /
+      old_leaky / complex_nested / recently_swept / unresolved /
+      insufficient — with reason + interpretation.
+    </footer>
+
+  </div>

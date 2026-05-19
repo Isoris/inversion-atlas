@@ -360,7 +360,7 @@ verify each one is still appropriate given what they discover:
    Decision: per Quentin's chat-message specification.
 
 6. **PC1 panel as sibling of lines_panel.js, not modification.** The
-   regimes-page work does not touch the existing page1. Decision:
+   regimes-page work does not touch the existing local_pca_dosage. Decision:
    isolation.
 
 7. **Three band-combo modes.** additive (default, K steps), informative

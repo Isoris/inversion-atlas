@@ -1,6 +1,6 @@
 // shared/boundary_evidence.js
 //
-// Boundary-refinement constants + pure helpers. Used by page11
+// Boundary-refinement constants + pure helpers. Used by boundary_refinement
 // (boundaries refinement) for the candidate-scoped scan + the
 // boundary_evidence layer accessors.
 //
@@ -25,7 +25,7 @@ import { bsearchWin } from './window_coords.js';
 
 /**
  * Top-level boundary-refinement defaults. Frozen. Toolbar knobs in
- * page11 override SCAN_RADIUS_BP at runtime; everything else is fixed
+ * boundary_refinement override SCAN_RADIUS_BP at runtime; everything else is fixed
  * for the manuscript figure.
  */
 export const BOUNDARY_DEFAULTS = Object.freeze({

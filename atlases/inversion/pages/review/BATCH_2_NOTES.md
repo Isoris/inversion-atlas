@@ -1,6 +1,6 @@
 # Batch 2 — extraction notes
 
-`inversion_review/` pages: page11, page_sv_evidence, page4, page6, page7.
+`inversion_review/` pages: boundary_refinement, sv_evidence, karyotype_tier, popstats, ancestry_per_window.
 
 All shared regression tests pass (455/455). All per-page module tests pass
 (24/24). `shared/` was not modified.
@@ -11,16 +11,16 @@ All shared regression tests pass (455/455). All per-page module tests pass
 
 | File | Lines | Source (legacy) | Notes |
 |---|---|---|---|
-| `inversion_review/page11.html` | 16 | 7906–7921 | DOM mount slot for "4 boundaries" |
-| `inversion_review/page11.js` | ~245 | 30175–30314 (`renderBoundariesPage`) + 30318–30345 (hotkey wiring) | Verbatim entry-point + 5-key hotkey handler. ~25 `_bnd*` helpers marked TODO_MISSING. |
-| `inversion_review/page_sv_evidence.html` | 3 | 9329–9331 | Mount slot only (`#sv_evidence_root`). |
-| `inversion_review/page_sv_evidence.js` | ~135 | (none — external `js/atlas_sv_evidence.js`) | Lifecycle wrapper around `window.AtlasSVEvidence`. |
-| `inversion_review/page4.html` | 73 | 7573–7645 | Two-pane DOM: cand-list pane (left) + karyotype/tier pane (right). |
-| `inversion_review/page4.js` | ~250 | 62508–62526 (`karyoState`) + 62800–62836 (`renderCandidateKaryotype`) + 62840–62861 (`_refreshSubviewButtonStyles`) + 63411–63492 (`renderCandidateTier`) | Verbatim dispatcher, tier renderer, button styler, page-local state. Body + grid helpers marked TODO_MISSING. |
-| `inversion_review/page6.html` | 12 | 7647–7658 | Popstats stack DOM (toolbar + ps-stack + no-chrom + gallery tray). |
-| `inversion_review/page6.js` | ~115 | (none — external `js/atlas_page6_wiring.js` + siblings) | Lifecycle wrapper around `window.renderPopstatsPage`. |
-| `inversion_review/page7.html` | 11 | 7660–7670 | Ancestry stack DOM. |
-| `inversion_review/page7.js` | ~110 | (none — external sibling renderer) | Lifecycle wrapper around `window.renderAncestryPage`. |
+| `inversion_review/boundary_refinement.html` | 16 | 7906–7921 | DOM mount slot for "4 boundaries" |
+| `inversion_review/boundary_refinement.js` | ~245 | 30175–30314 (`renderBoundariesPage`) + 30318–30345 (hotkey wiring) | Verbatim entry-point + 5-key hotkey handler. ~25 `_bnd*` helpers marked TODO_MISSING. |
+| `inversion_review/sv_evidence.html` | 3 | 9329–9331 | Mount slot only (`#sv_evidence_root`). |
+| `inversion_review/sv_evidence.js` | ~135 | (none — external `js/atlas_sv_evidence.js`) | Lifecycle wrapper around `window.AtlasSVEvidence`. |
+| `inversion_review/karyotype_tier.html` | 73 | 7573–7645 | Two-pane DOM: cand-list pane (left) + karyotype/tier pane (right). |
+| `inversion_review/karyotype_tier.js` | ~250 | 62508–62526 (`karyoState`) + 62800–62836 (`renderCandidateKaryotype`) + 62840–62861 (`_refreshSubviewButtonStyles`) + 63411–63492 (`renderCandidateTier`) | Verbatim dispatcher, tier renderer, button styler, page-local state. Body + grid helpers marked TODO_MISSING. |
+| `inversion_review/popstats.html` | 12 | 7647–7658 | Popstats stack DOM (toolbar + ps-stack + no-chrom + gallery tray). |
+| `inversion_review/popstats.js` | ~115 | (none — external `js/atlas_page6_wiring.js` + siblings) | Lifecycle wrapper around `window.renderPopstatsPage`. |
+| `inversion_review/ancestry_per_window.html` | 11 | 7660–7670 | Ancestry stack DOM. |
+| `inversion_review/ancestry_per_window.js` | ~110 | (none — external sibling renderer) | Lifecycle wrapper around `window.renderAncestryPage`. |
 
 | Test | Pass | Fail |
 |---|---|---|
@@ -53,7 +53,7 @@ Every TODO_MISSING is referenced once at its declaration site, by design
 (declaration only — no hand-rolled stubs to chase). The merge chat should
 treat this as a flat catalogue of unresolved deps.
 
-### Boundary refinement (page11) — 25 markers, all unique
+### Boundary refinement (boundary_refinement) — 25 markers, all unique
 
 Boundary algorithm core (likely → `shared/boundaries.js`):
 - `_ensureBoundariesState` — legacy 17763
@@ -63,7 +63,7 @@ Boundary algorithm core (likely → `shared/boundaries.js`):
 - `_computeBoundaryEdges` — legacy 18127
 - `_buildBoundaryRecord` — legacy 18256
 
-Page-local UI helpers (probably stay in `page11.js`):
+Page-local UI helpers (probably stay in `boundary_refinement.js`):
 - `_bndFindCandidate` — legacy 18297
 - `_bndFmtBp` — legacy 18308
 - `_bndCloneRecord` — legacy 18317
@@ -84,7 +84,7 @@ Page-local UI helpers (probably stay in `page11.js`):
 - `_bndRefreshUI` — legacy 18911
 
 Side panels on the boundary page:
-- `_renderBndFocalVsBg` — legacy 20507 (focal-vs-bg widget; also used by page16)
+- `_renderBndFocalVsBg` — legacy 20507 (focal-vs-bg widget; also used by cross_species_breakpoints)
 - `_wireRepeatDensityEscapeReset` — legacy 20583
 - `_wireRepeatDensityClassCycle` — legacy 20856
 - `_wireRepeatDensityAllTeToggle` — legacy 20895
@@ -94,7 +94,7 @@ Cross-page (will be needed by pages 4, 6, 7, 11 → strong shared candidate):
 - `_renderCandidateNavInline` — uncatalogued line; produces the prev/next
   bar with idPrefix per page
 
-### Karyotype / tier (page4) — 8 markers
+### Karyotype / tier (karyotype_tier) — 8 markers
 
 Karyotype body helpers (large copy-port):
 - `_renderCandidateKaryotypeBody` — legacy 63091 (~200 LOC)
@@ -110,14 +110,14 @@ Tier-specific:
 - `_renderTierAxesGrid` — legacy ~63495 (immediately after
   `renderCandidateTier`, not yet line-confirmed)
 
-### SV evidence (page_sv_evidence) — 3 markers
+### SV evidence (sv_evidence) — 3 markers
 
 External-file deps (live in `js/atlas_sv_evidence.js`, not in legacy HTML):
 - `AtlasSVEvidence.init`
 - `AtlasSVEvidence.loadCandidate`
 - `AtlasSVEvidence.destroy`
 
-### Popstats (page6) — 4 markers
+### Popstats (popstats) — 4 markers
 
 External-file deps:
 - `renderPopstatsPage` — `js/atlas_page6_wiring.js` (only ever referenced
@@ -127,7 +127,7 @@ External-file deps:
 - `popgenPage6` — `js/atlas_page6_wiring.js`
 - `popgenGallery` — `js/atlas_track_gallery.js`
 
-### Ancestry (page7) — 2 markers
+### Ancestry (ancestry_per_window) — 2 markers
 
 External-file deps:
 - `renderAncestryPage` — sibling of `atlas_page6_wiring.js` (same pattern
@@ -144,13 +144,13 @@ Functions referenced by ≥2 pages in this batch that should probably go to `sha
 
 | Function | Used by | Where it lives now |
 |---|---|---|
-| `_renderCandidateNavInline` | page4, page6, page7, page11 | inlined in legacy |
-| `getKaryotypeLabel` / `getKaryotypeLabelCaveat` | page4 (and pages 1/2 from batch 1) | legacy 37022 / 37040 |
+| `_renderCandidateNavInline` | karyotype_tier, popstats, ancestry_per_window, boundary_refinement | inlined in legacy |
+| `getKaryotypeLabel` / `getKaryotypeLabelCaveat` | karyotype_tier (and pages 1/2 from batch 1) | legacy 37022 / 37040 |
 | `groupColor` | every page that draws a band | inlined in legacy |
-| `refreshCandidateListUI` | page4 explicitly; cand-list pane appears on multiple pages | legacy 62528 |
+| `refreshCandidateListUI` | karyotype_tier explicitly; cand-list pane appears on multiple pages | legacy 62528 |
 
 The boundary algorithm core (`_ensureBoundariesState` through
-`_buildBoundaryRecord`, legacy 17763–18295) is page11-only at present, but
+`_buildBoundaryRecord`, legacy 17763–18295) is boundary_refinement-only at present, but
 the underlying scoring logic is generic enough that batch 5's comparative
 page might want to reuse `_findSVAnchorsInZone`. Worth keeping the door
 open during merge.
@@ -173,13 +173,13 @@ Catalogued from each page module's footer. Splitting by intent:
 
 ### Page-private (do NOT promote)
 
-- `state.repeatDensity` — TE density layer, page11-only consumer
-- `state.ncRNADensity` — ncRNA density layer, page11-only consumer
+- `state.repeatDensity` — TE density layer, boundary_refinement-only consumer
+- `state.ncRNADensity` — ncRNA density layer, boundary_refinement-only consumer
 - `state.popstatsLive` — IndexedDB-cached responses, owned by
-  `atlas_request_layer.js`, page6-only
-- `state.popstatsTracksOn` — Set of active chip IDs, page6 UI flag
-- `state.popstatsGalleryOpen` — gallery tray collapsed flag, page6 UI flag
-- `state.ancestryViewChips` — Set of active view chips, page7 UI flag
+  `atlas_request_layer.js`, popstats-only
+- `state.popstatsTracksOn` — Set of active chip IDs, popstats UI flag
+- `state.popstatsGalleryOpen` — gallery tray collapsed flag, popstats UI flag
+- `state.ancestryViewChips` — Set of active view chips, ancestry_per_window UI flag
 
 ### Promotion candidate
 
@@ -203,11 +203,11 @@ Catalogued from each page module's footer. Splitting by intent:
 3. **`karyoState` stays page-local.** It's a UI-only object (sortKey,
    sortAsc, filter, bandFilter, subview) used by exactly one page. The
    `subview` field has its own localStorage key (`pca_scrubber_v3.candSubview`)
-   and that persistence is handled inside `page4.js` via the new
+   and that persistence is handled inside `karyotype_tier.js` via the new
    `setKaryoSubview()` export.
 4. **Hotkey wiring (`_bndKeyHandler`/`_bndAttachHotkeys`/`_bndDetachHotkeys`)
-   stays in `page11.js`.** The handler is page11-specific (it gates on
-   `#page11.active` and only fires the bnd hotkeys). The merge chat does
+   stays in `boundary_refinement.js`.** The handler is boundary_refinement-specific (it gates on
+   `#boundary_refinement.active` and only fires the bnd hotkeys). The merge chat does
    not need to promote it.
 5. **`renderBoundariesPage` was extracted verbatim.** All 30+ helper
    references kept as bare global lookups; the merge chat patches them.

@@ -143,14 +143,14 @@ function buildTabBar() {
   }
   // Page buttons
   for (const [page, stage] of [
-    ['page1', 'discovery'], ['page2', 'discovery'],
-    ['page4', 'classification'], ['page6', 'classification'],
-    ['page5', 'help'], ['page_help2', 'help'],
+    ['local_pca_dosage', 'discovery'], ['candidate_focus', 'discovery'],
+    ['karyotype_tier', 'classification'], ['popstats', 'classification'],
+    ['help', 'help'], ['page_help2', 'help'],
   ]) {
     const btn = new FakeNode('button');
     btn.setAttribute('data-page', page);
     btn.setAttribute('data-stage', stage);
-    if (page === 'page1') btn.setAttribute('class', 'active');
+    if (page === 'local_pca_dosage') btn.setAttribute('class', 'active');
     tabBar.appendChild(btn);
   }
   return tabBar;
@@ -177,11 +177,11 @@ check('classification pill gains data-expanded',
       classificationPill.getAttribute('data-expanded') === '1');
 
 // First page button in classification stage should have been clicked.
-const page4 = tabBar.querySelectorAll('button[data-page]').find(
-  b => b.getAttribute('data-page') === 'page4'
+const karyotype_tier = tabBar.querySelectorAll('button[data-page]').find(
+  b => b.getAttribute('data-page') === 'karyotype_tier'
 );
 check('first classification page button clicked',
-      page4 && page4.clickedCount >= 1);
+      karyotype_tier && karyotype_tier.clickedCount >= 1);
 
 // =====================================================================
 group('wireTabStagePills — idempotent (no double-fire on re-wire)');
@@ -194,7 +194,7 @@ cl2.click();
 // First classification page button should have been clicked exactly
 // once per pill click, not 2x (would happen if handlers stacked).
 const page4_2 = tabBar2.querySelectorAll('button[data-page]').find(
-  b => b.getAttribute('data-page') === 'page4'
+  b => b.getAttribute('data-page') === 'karyotype_tier'
 );
 check('re-wire is idempotent (single click → single page click)',
       page4_2 && page4_2.clickedCount === 1);
@@ -231,7 +231,7 @@ classificationPill4.removeAttribute('data-expanded');
 tabBar4.querySelectorAll('.tab-stage-pill')[0].removeAttribute('data-expanded');
 tabBar4.querySelectorAll('button[data-page]')[0]._classes.delete('active');
 const page4_4 = tabBar4.querySelectorAll('button[data-page]')
-  .find(b => b.getAttribute('data-page') === 'page4');
+  .find(b => b.getAttribute('data-page') === 'karyotype_tier');
 page4_4.setAttribute('class', 'active');
 page4_4._classes.add('active');
 
@@ -338,7 +338,7 @@ const boot = bootstrapAtlasChrome({
 check('returns { teardown, chrome }',
       typeof boot.teardown === 'function'
    && boot.chrome && boot.chrome.pills && boot.chrome.settings);
-// Auto-synced pill to the active page (page1 in fixture → discovery).
+// Auto-synced pill to the active page (local_pca_dosage in fixture → discovery).
 check('pills synced to active page on bootstrap',
       tabBar7.getAttribute('data-active-stage') === 'discovery');
 // Settings btn works.

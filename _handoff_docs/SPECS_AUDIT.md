@@ -154,14 +154,14 @@ These names appear in code or docs but have **no on-disk file** with that name:
 | Referenced as | Referenced from | Status |
 |---------------|-----------------|--------|
 | `SPEC_DEFERRED.md` | `_handoff_docs/HANDOFF_2026-05-06_chat34_registry_v2_done.md`, `READ_MODES_CONFIRMED.md`, `AUDIT_LOG.md` | **MISSING** — multiple deferred-decisions references, no doc |
-| `SPEC_distant_band_concordance_fish_trajectory.md` | `specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md`, `docs/MIGRATION_INVENTORY.md`, multiple legacy comments | **RESOLVED 2026-05-15** — Slices 1-5 SPEC authored from legacy comments + round-4 page1 splits + lineage/band-trace shared modules into `specs_done/SPEC_distant_band_concordance_fish_trajectory.md`. Slice 6 (cross-strip chaining) deferred. |
-| `SPEC_g_panel_unified_groups.md` | `pages/discovery/page1/pca_panel.js`, `page1.html` | **RESOLVED 2026-05-15** — Slice 1 SPEC authored from page1.html + pca_panel.js + manual_groups.js into `specs_done/SPEC_g_panel_unified_groups.md`. Slices 2 + 3 (Karyotype + Inheritance tabs) outlined but not yet implemented. |
-| `SPEC_l2_sweep_inheritance.md` | `pages/discovery/page1.html`, `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — authored from `page1/l2_sweep.js` (444 LOC) into `specs_done/SPEC_l2_sweep_inheritance.md` |
-| `SPEC_l3_het_dosage_coloring.md` | `pages/discovery/page1.html` | **RESOLVED 2026-05-15** — Slice 1 SPEC authored from page1.html turn-128d annotation into `specs_done/SPEC_l3_het_dosage_coloring.md` |
-| `SPEC_lasso_inheritance_backgrounds.md` | `handoff_docs/HANDOFF_2026-05-05_turn164_lasso_linkage.md`, `page1.html` | **RESOLVED 2026-05-15** — Slices 1 + 3 SPEC authored from turn-164 handoff + page1.html into `specs_done/SPEC_lasso_inheritance_backgrounds.md`. Slices 2/4/5 deferred. |
-| `SPEC_lines_panel_candidate_bands.md` | `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — SPEC authored from page1/lines_panel.js + page1/candidates.js into `specs_done/SPEC_lines_panel_candidate_bands.md` |
+| `SPEC_distant_band_concordance_fish_trajectory.md` | `specs_done/SPEC_band_track_extraction_and_l3_single_band_rows.md`, `docs/MIGRATION_INVENTORY.md`, multiple legacy comments | **RESOLVED 2026-05-15** — Slices 1-5 SPEC authored from legacy comments + round-4 local_pca_dosage splits + lineage/band-trace shared modules into `specs_done/SPEC_distant_band_concordance_fish_trajectory.md`. Slice 6 (cross-strip chaining) deferred. |
+| `SPEC_g_panel_unified_groups.md` | `pages/discovery/local_pca_dosage/pca_panel.js`, `local_pca_dosage.html` | **RESOLVED 2026-05-15** — Slice 1 SPEC authored from local_pca_dosage.html + pca_panel.js + manual_groups.js into `specs_done/SPEC_g_panel_unified_groups.md`. Slices 2 + 3 (Karyotype + Inheritance tabs) outlined but not yet implemented. |
+| `SPEC_l2_sweep_inheritance.md` | `pages/discovery/local_pca_dosage.html`, `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — authored from `local_pca_dosage/l2_sweep.js` (444 LOC) into `specs_done/SPEC_l2_sweep_inheritance.md` |
+| `SPEC_l3_het_dosage_coloring.md` | `pages/discovery/local_pca_dosage.html` | **RESOLVED 2026-05-15** — Slice 1 SPEC authored from local_pca_dosage.html turn-128d annotation into `specs_done/SPEC_l3_het_dosage_coloring.md` |
+| `SPEC_lasso_inheritance_backgrounds.md` | `handoff_docs/HANDOFF_2026-05-05_turn164_lasso_linkage.md`, `local_pca_dosage.html` | **RESOLVED 2026-05-15** — Slices 1 + 3 SPEC authored from turn-164 handoff + local_pca_dosage.html into `specs_done/SPEC_lasso_inheritance_backgrounds.md`. Slices 2/4/5 deferred. |
+| `SPEC_lines_panel_candidate_bands.md` | `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — SPEC authored from local_pca_dosage/lines_panel.js + local_pca_dosage/candidates.js into `specs_done/SPEC_lines_panel_candidate_bands.md` |
 | `SPEC_review_surfaces_auto_and_lineages.md` | `css/inversion.css`, `MIGRATION_INVENTORY.md`, band-track SPEC | **RESOLVED 2026-05-15** — Slices 0-2 SPEC authored from CSS lines 947-960 + turn-130 + turn-165 handoffs into `specs_done/SPEC_review_surfaces_auto_and_lineages.md`. Slice 3 (lineages tab) deferred. |
-| `SPEC_sv_evidence_page.md` | `engines/producers/sv_evidence/STEP_SV_GT_AGG_aggregate_genotype_counts.py`, `pages/review/page_sv_evidence.js` | **RESOLVED 2026-05-15** — authored from shipped code into `specs_done/SPEC_sv_evidence_page.md` |
+| `SPEC_sv_evidence_page.md` | `engines/producers/sv_evidence/STEP_SV_GT_AGG_aggregate_genotype_counts.py`, `pages/review/sv_evidence.js` | **RESOLVED 2026-05-15** — authored from shipped code into `specs_done/SPEC_sv_evidence_page.md` |
 
 **Also missing — STATUS UPDATE 2026-05-15**:
 - `SCHEMA_V2.md` / `SCHEMA.md` — **RESOLVED 2026-05-15** — authored
@@ -182,7 +182,7 @@ These names appear in code or docs but have **no on-disk file** with that name:
 These are NOT missing — they exist as **sections inside other docs**:
 - `SPEC_0` → contents of `specs_todo/mgl_adapter/SPEC_0_master.md`
 - `SCHEMA §9 / §10 / §19 / §22` → refers to schema sections in some doc; the JSON-schema definitions are in `atlases/inversion/registries/schemas/*.schema.json` (26 schema files exist there) — the prose document doesn't appear to exist anywhere on disk
-- ~~`SCHEMA_V2.md` — pages.registry mentions "cross-refs SCHEMA_V2.md §19" but no file by that name exists; the 14-axis classification schema lives in `pages/review/page4/tier_axes.js`~~ **RESOLVED 2026-05-15** — `specs_done/SCHEMA.md` §19 carries the 14-axis prose schema (pulled from `tier_axes.js#TIER_AXES`).
+- ~~`SCHEMA_V2.md` — pages.registry mentions "cross-refs SCHEMA_V2.md §19" but no file by that name exists; the 14-axis classification schema lives in `pages/review/karyotype_tier/tier_axes.js`~~ **RESOLVED 2026-05-15** — `specs_done/SCHEMA.md` §19 carries the 14-axis prose schema (pulled from `tier_axes.js#TIER_AXES`).
 - legacy-line citations (e.g. "legacy lines 36977-37050") refer to `legacy/Inversion_atlas.html` — confirmed at `/home/user/inversion-atlas/legacy/` if that dir exists (haven't checked)
 
 ---

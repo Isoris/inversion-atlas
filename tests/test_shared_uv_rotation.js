@@ -1,6 +1,15 @@
 // tests/test_shared_uv_rotation.js
 
-import { computeUVRotationCore } from '../atlases/inversion/shared/uv_rotation.js';
+import {
+  computeUVRotationCore,
+  aggregateWindowRangeForUV,
+  getOrComputeUVRotation,
+  getOrComputeUVRotationSlab,
+  wrapKmeansResultAsCluster,
+  clusterFromRotation_UVRotated,
+  clusterL2_UVRotated,
+  clusterSlab_UVRotated,
+} from '../atlases/inversion/shared/uv_rotation.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {
@@ -155,6 +164,174 @@ group('computeUVRotationCore — return shape');
     check('hom1/het/hom2 centroids in (u,v)',
           Number.isFinite(r.hom1_u) && Number.isFinite(r.het_u) && Number.isFinite(r.hom2_u));
   }
+}
+
+// =====================================================================
+// Phase 1: aggregateWindowRangeForUV across a tiny synthetic state.
+// =====================================================================
+group('aggregateWindowRangeForUV');
+{
+  // 3 windows × 4 samples. Each window has a fixed PC1 + PC2 vector.
+  // The aggregator should return the per-sample MEAN across windows.
+  function fakeWin(pc1Vals, pc2Vals) {
+    return { pc1: new Float64Array(pc1Vals), pc2: new Float64Array(pc2Vals) };
+  }
+  const state = {
+    data: {
+      n_samples: 4,
+      n_windows: 3,
+      chrom: 'LG_TEST',
+      windows: [
+        fakeWin([0, 1, 2, 3],  [0, 0, 0, 0]),
+        fakeWin([1, 2, 3, 4],  [1, 1, 1, 1]),
+        fakeWin([2, 3, 4, 5],  [2, 2, 2, 2]),
+      ],
+    },
+    flipPC1: false, pc1Sign: null,
+  };
+  const agg = aggregateWindowRangeForUV(state, 0, 2);
+  check('aggregateWindowRangeForUV returns xs+ys',
+        agg && agg.xs && agg.ys && agg.xs.length === 4);
+  // PC1 sample 0: (0+1+2)/3 = 1.0
+  // PC1 sample 3: (3+4+5)/3 = 4.0
+  check('PC1 mean s=0 → 1.0',  approx(agg.xs[0], 1.0));
+  check('PC1 mean s=3 → 4.0',  approx(agg.xs[3], 4.0));
+  // PC2 mean = (0+1+2)/3 = 1.0 for every sample
+  check('PC2 mean s=0 → 1.0',  approx(agg.ys[0], 1.0));
+  check('PC2 mean s=2 → 1.0',  approx(agg.ys[2], 1.0));
+  check('null state → null',   aggregateWindowRangeForUV(null, 0, 0) === null);
+  check('empty range → null',  aggregateWindowRangeForUV(state, 2, 1) === null);
+}
+
+// =====================================================================
+// L2 + slab rotation caches.
+// =====================================================================
+group('getOrComputeUVRotation L2 cache');
+{
+  function fakeWin(pc1Vals, pc2Vals) {
+    return { pc1: new Float64Array(pc1Vals), pc2: new Float64Array(pc2Vals) };
+  }
+  const nS = 18;
+  // Build 18 samples in 3 clusters at (-1, 0), (0, 0), (1, 0) with tiny jitter.
+  const pc1 = new Float64Array(nS);
+  const pc2 = new Float64Array(nS);
+  for (let g = 0; g < 3; g++) {
+    for (let i = 0; i < 6; i++) {
+      const idx = g * 6 + i;
+      pc1[idx] = (g - 1) + (i - 3) * 0.01;
+      pc2[idx] =  (i - 3) * 0.01;
+    }
+  }
+  // Repeat across 4 windows.
+  const windows = [];
+  for (let w = 0; w < 4; w++) windows.push({ pc1, pc2 });
+  const state = {
+    data: {
+      n_samples: nS,
+      n_windows: 4,
+      chrom: 'LG_TEST',
+      windows,
+      l2_envelopes: [{ _s0: 0, _e0: 3 }],
+      samples: null,
+    },
+    flipPC1: false, pc1Sign: null, minNGroup: 3,
+  };
+  const rot1 = getOrComputeUVRotation(state, 0);
+  check('rotation cache returns ok', rot1.ok === true);
+  // Second call should hit the cache (same object).
+  const rot2 = getOrComputeUVRotation(state, 0);
+  check('rotation cache hit returns the same object', rot1 === rot2);
+  // Bad L2 idx
+  const rotBad = getOrComputeUVRotation(state, 99);
+  check('bad L2 idx → NO_ENV', rotBad.ok === false && rotBad.reason === 'NO_ENV');
+}
+
+group('getOrComputeUVRotationSlab cache');
+{
+  function fakeWin(pc1Vals, pc2Vals) {
+    return { pc1: new Float64Array(pc1Vals), pc2: new Float64Array(pc2Vals) };
+  }
+  const nS = 9;
+  const pc1 = new Float64Array(nS);
+  const pc2 = new Float64Array(nS);
+  for (let g = 0; g < 3; g++) {
+    for (let i = 0; i < 3; i++) {
+      pc1[g * 3 + i] = (g - 1) + 0.05 * i;
+      pc2[g * 3 + i] = 0.05 * (i - 1);
+    }
+  }
+  const state = {
+    data: { n_samples: nS, n_windows: 5, chrom: 'LG_TEST',
+            windows: Array.from({ length: 5 }, () => ({ pc1, pc2 })),
+            samples: null },
+    flipPC1: false, pc1Sign: null, minNGroup: 2,
+  };
+  const r = getOrComputeUVRotationSlab(state, 0, 2);
+  check('slab rotation ok', r.ok === true);
+  // Bad range
+  const rBad = getOrComputeUVRotationSlab(state, 3, 1);
+  check('s > e → BAD_RANGE', rBad.ok === false && rBad.reason === 'BAD_RANGE');
+}
+
+// =====================================================================
+// wrapKmeansResultAsCluster shape.
+// =====================================================================
+group('wrapKmeansResultAsCluster');
+{
+  const state = {
+    data: { n_samples: 9, samples: null },
+    minNGroup: 2,
+  };
+  const fakeResult = {
+    labels: new Int8Array([0, 0, 0, 1, 1, 1, 2, 2, 2]),
+    n_per_group: [3, 3, 3],
+  };
+  const w = wrapKmeansResultAsCluster(state, fakeResult, 3, null);
+  check('wrap ok=true when all groups ≥ minNGroup', w.ok === true);
+  check('wrap exports usedK=3',                     w.usedK === 3);
+  check('wrap has fixedKLabels alias',              w.fixedKLabels === fakeResult.labels);
+  check('wrap has null silhouette (Phase 1)',       w.silhouette === null);
+
+  const lowGroup = { labels: new Int8Array([0, 0, 1, 1, 2]),
+                     n_per_group: [2, 2, 1] };
+  const w2 = wrapKmeansResultAsCluster({ data: { n_samples: 5, samples: null }, minNGroup: 2 },
+                                        lowGroup, 3, null);
+  check('wrap ok=false when a group < minNGroup',
+        w2.ok === false && w2.reason === 'LOW_GROUP_N');
+}
+
+// =====================================================================
+// clusterL2_UVRotated end-to-end on the synthetic state.
+// =====================================================================
+group('clusterL2_UVRotated end-to-end');
+{
+  const nS = 18;
+  const pc1 = new Float64Array(nS);
+  const pc2 = new Float64Array(nS);
+  for (let g = 0; g < 3; g++) {
+    for (let i = 0; i < 6; i++) {
+      const idx = g * 6 + i;
+      pc1[idx] = (g - 1) + (i - 3) * 0.01;
+      pc2[idx] =  (i - 3) * 0.01;
+    }
+  }
+  const state = {
+    data: {
+      n_samples: nS,
+      n_windows: 4,
+      chrom: 'LG_TEST',
+      windows: Array.from({ length: 4 }, () => ({ pc1, pc2 })),
+      l2_envelopes: [{ _s0: 0, _e0: 3 }],
+      samples: null,
+    },
+    flipPC1: false, pc1Sign: null, minNGroup: 3,
+  };
+  const cl = clusterL2_UVRotated(state, 0);
+  check('clusterL2_UVRotated returns ok',  cl.ok === true);
+  check('cluster usedK = 3',               cl.usedK === 3);
+  check('cluster labels length = nS',      cl.labels && cl.labels.length === nS);
+  check('cluster n_per_group sums to nS',
+        cl.n_per_group && cl.n_per_group.reduce((a, b) => a + b, 0) === nS);
 }
 
 // =====================================================================

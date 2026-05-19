@@ -67,7 +67,7 @@ to `popstats_server.py` line numbers. Audited 2026-05-06 (chat ~30).
 (`review_session_writes`, the existing precedent for browser writes
 via download/re-upload).
 
-### page1.js — migration round 2 done
+### local_pca_dosage.js — migration round 2 done
 
 ```
 4588 LOC (was 4513)
@@ -221,11 +221,11 @@ corresponding layer entries. Each one is a 30-second edit.
 
 ### Priority 6 — Page1 round 3 (separate lane)
 
-34 stubbed functions in `pages/discovery/page1.js` need real bodies
+34 stubbed functions in `pages/discovery/local_pca_dosage.js` need real bodies
 extracted from `legacy/Inversion_atlas.html`. Suggested order in
 `PAGE_MIGRATION_RECIPE.md`: hoist `simColor / simColorPDF /
 zColorPDF` to `shared/color_helpers.js` first. ~5-7 sessions total
-to migrate page1 + page2 + ... independent of registry work.
+to migrate local_pca_dosage + candidate_focus + ... independent of registry work.
 
 ---
 
@@ -242,7 +242,7 @@ Two tarballs (full project) + 13 docs (companions for fast reference):
   with all changes from this session: 7 new layer entries, 6 new
   real schemas, 3 new domain folder READMEs (`cohort/relatedness/`,
   `cohort/ancestry/`, `comparative/cross_species/`), the round-2
-  page1.js patch (49 → 0 TODO_MISSING markers).
+  local_pca_dosage.js patch (49 → 0 TODO_MISSING markers).
 
 **Top-level companion docs (in outputs/, also bundled inside the tarballs):**
 - `AUDIT_FIRST.md` — pre-flight checklist (read before coding)
@@ -272,7 +272,7 @@ Two tarballs (full project) + 13 docs (companions for fast reference):
 4. **`SPEC_registry_v2.md`** — the 9-item design
 5. **`CANDIDATE_VERSIONING_LOCAL.md`** if working on Piece β
 6. **`SV_CHROM_VS_CANDIDATE.md`** if working on Piece α
-7. **`PAGE_MIGRATION_RECIPE.md`** if working on round 3 page1
+7. **`PAGE_MIGRATION_RECIPE.md`** if working on round 3 local_pca_dosage
 
 Skip the older critique docs unless trying to reconstruct why a
 decision was made — those are archaeology, not active reference.

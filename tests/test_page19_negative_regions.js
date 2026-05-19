@@ -1,7 +1,7 @@
 // tests/test_page19_negative_regions.js
 //
-// Unit coverage for pages/discovery/page19/negative_regions.js. Legacy
-// shipped page19 as a pure HTML scaffold (zero JS handlers); the
+// Unit coverage for pages/discovery/negative_regions/negative_regions.js. Legacy
+// shipped negative_regions as a pure HTML scaffold (zero JS handlers); the
 // cartridge adds the parsers + renderers + toolbar wiring that legacy
 // only stubbed via inline-comment.
 //
@@ -21,7 +21,7 @@
 //     reset clears state, onChange fires after mutations
 //   - Headless-tolerance: no `document` → DOM helpers return silently
 
-import * as NR from '../atlases/inversion/pages/discovery/page19/negative_regions.js';
+import * as NR from '../atlases/inversion/pages/discovery/negative_regions/negative_regions.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

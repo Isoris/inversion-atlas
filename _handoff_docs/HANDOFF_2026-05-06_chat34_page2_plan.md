@@ -1,8 +1,8 @@
-# HANDOFF — page2 migration plan (the candidate-detail page)
+# HANDOFF — candidate_focus migration plan (the candidate-detail page)
 
 **Date:** 2026-05-06 (chat ~34, page-2 handoff written ahead of work)
 **Reads:** This file FIRST, then `HANDOFF_2026-05-06_chat34_eighth_page1_parity.md`
-(for the recipe that worked on page1), then `PAGE_MIGRATION_RECIPE.md`.
+(for the recipe that worked on local_pca_dosage), then `PAGE_MIGRATION_RECIPE.md`.
 **Project:** MS_Inversions_North_african_catfish — 226-sample pure
 *C. gariepinus* hatchery cohort, LANTA HPC.
 
@@ -14,20 +14,20 @@ Page2 is the candidate-detail page. **41 helpers to migrate, 40 found in
 legacy with real bodies (2359 LOC total); 1 not found** (`renderCatalogue`,
 likely page-4 territory mis-flagged as a page-2 dep — leave stubbed).
 
-**The recipe is identical to page1's eighth-pass.** The work this session
-did on page1 (extract verbatim from legacy → use the `_pageState` shim
+**The recipe is identical to local_pca_dosage's eighth-pass.** The work this session
+did on local_pca_dosage (extract verbatim from legacy → use the `_pageState` shim
 instead of refactoring 19 bodies → smoke-test under fake DOM) generalizes
-1:1 to page2. Expect page2 to take ~30% the time of page1 because:
+1:1 to candidate_focus. Expect candidate_focus to take ~30% the time of local_pca_dosage because:
 - The recipe is now mature and Quentin signed off on it.
-- The shared helpers from `_state.js` and `_data.js` (after the page1
+- The shared helpers from `_state.js` and `_data.js` (after the local_pca_dosage
   split) are reusable as-is.
 - The legacy bodies are mostly HTML-builder strings with much less
-  draw-call complexity than page1's panels.
+  draw-call complexity than local_pca_dosage's panels.
 
-**One important callout:** page2's registry entry is mis-labeled.
-The `pages.registry.json` says page2 = "cohort overview" with
+**One important callout:** candidate_focus's registry entry is mis-labeled.
+The `pages.registry.json` says candidate_focus = "cohort overview" with
 `requires_layers: [scrubber_main, cohort_sample_manifest]`, but the
-page2.js code (and the legacy bodies) is the **candidate detail page**.
+candidate_focus.js code (and the legacy bodies) is the **candidate detail page**.
 The fragment HTML has `#candidateMeta` and `#candidateEmpty` elements,
 and the entry-points are `renderCandidateMetadata` and `wireCandidateNav`.
 **Resolve this BEFORE migrating** (see "Step 0 — registry reality check"
@@ -35,11 +35,11 @@ below).
 
 ---
 
-## What page2 IS
+## What candidate_focus IS
 
 A multi-panel deep-dive on a single promoted candidate inversion.
-The user promotes an interval to the candidate list (from page1 or
-page4), then opens it here.
+The user promotes an interval to the candidate list (from local_pca_dosage or
+karyotype_tier), then opens it here.
 
 `renderCandidateMetadata(state)` builds the entire page from ~15
 sub-panel HTML builders:
@@ -102,24 +102,24 @@ Plus the support / drawing:
 
 **Total: 40 helpers, 2359 LOC** — this is what migrates from legacy.
 The 1 NOT found (`renderCatalogue`) is page-4 territory; leave it as
-a forever-stub if it ends up being called from page2 (audit during
+a forever-stub if it ends up being called from candidate_focus (audit during
 implementation; if it's never called, just delete the TODO).
 
 ---
 
-## Recipe (mirrors page1 eighth-pass exactly)
+## Recipe (mirrors local_pca_dosage eighth-pass exactly)
 
 **Step 0 — registry reality check (DO THIS FIRST):**
 
-The current `pages.registry.json` page2 entry says:
+The current `pages.registry.json` candidate_focus entry says:
 ```json
-"page2": {
+"candidate_focus": {
   "requires_layers": ["scrubber_main", "cohort_sample_manifest"],
   "requires_slots": ["activeChrom"],
   "preloads": ["scrubber_main"]
 }
 ```
-But the actual page2 is the candidate detail page, which needs:
+But the actual candidate_focus is the candidate detail page, which needs:
 - `activeCandidate` slot (NOT just `activeChrom`).
 - `scrubber_main` (yes, for cluster recompute on candidate's L2).
 - `candidate_tracks` and likely several others (`dosage_chunk_layer`,
@@ -127,39 +127,39 @@ But the actual page2 is the candidate detail page, which needs:
   `arrangement_calls`).
 
 Two possible fixes:
-1. **Update page2's registry entry** to match candidate-detail reality.
+1. **Update candidate_focus's registry entry** to match candidate-detail reality.
    Add `activeCandidate` to `requires_slots`, expand `requires_layers`
    to the actual deps, update `_label` to "candidate detail".
-2. **Or** the original intent was that page2 was supposed to be the
+2. **Or** the original intent was that candidate_focus was supposed to be the
    cohort overview and the candidate detail belongs on a different
    page id. Check `manifest.json` page list and the legacy file's
-   page tab labels (legacy line 7248 has `<div id="page2"`) to confirm.
+   page tab labels (legacy line 7248 has `<div id="candidate_focus"`) to confirm.
 
 Audit `legacy/Inversion_atlas.html` line 7248 and the tab bar
 definitions to confirm which intent is correct, then update the
 registry. Don't begin migration until this is resolved — getting it
 wrong here cascades through every layer requirement check.
 
-**Step 1 — Audit page2.html fragment:**
+**Step 1 — Audit candidate_focus.html fragment:**
 
-`atlases/inversion/pages/discovery/page2.html` is currently 12 lines
+`atlases/inversion/pages/discovery/candidate_focus.html` is currently 12 lines
 (the empty-state placeholder). Verify against legacy line 7248. Most
 of the actual UI is built dynamically by `renderCandidateMetadata`,
 so the fragment may legitimately stay tiny — just `#candidateMeta`
 and `#candidateEmpty` containers.
 
-**Step 2 — Audit CSS for page2:**
+**Step 2 — Audit CSS for candidate_focus:**
 
 ```bash
 # Comment-stripped selector parity check
-grep -E "^[^/]*#page2|^[^/]*#candidate" atlases/inversion/css/inversion.css | wc -l
-grep -E "#page2|#candidate" legacy/Inversion_atlas.html | grep -v "^[[:space:]]*//" | wc -l
+grep -E "^[^/]*#candidate_focus|^[^/]*#candidate" atlases/inversion/css/inversion.css | wc -l
+grep -E "#candidate_focus|#candidate" legacy/Inversion_atlas.html | grep -v "^[[:space:]]*//" | wc -l
 ```
 If the counts match, CSS is fine. If not, sync.
 
 **Step 3 — Extract the 40 helpers verbatim:**
 
-Use the same Python script pattern from page1's eighth pass:
+Use the same Python script pattern from local_pca_dosage's eighth pass:
 
 ```python
 import re, json
@@ -221,9 +221,9 @@ def rewrite(name, body):
     return body
 ```
 
-**Step 4 — Wire `_pageState` in page2.js:**
+**Step 4 — Wire `_pageState` in candidate_focus.js:**
 
-Same pattern as page1.js eighth pass — add at the top:
+Same pattern as local_pca_dosage.js eighth pass — add at the top:
 ```js
 let _pageState = null;
 function _setActiveState(s) { _pageState = s; }
@@ -234,9 +234,9 @@ on the first line.
 
 **Step 5 — Cross-page imports (KEY DECISION):**
 
-Page2 reuses several helpers that page1 already defined. After the page1
-split (round 4), these will be in `pages/discovery/page1/_state.js` and
-`pages/discovery/page1/_data.js`. **Don't duplicate them in page2.** Either:
+Page2 reuses several helpers that local_pca_dosage already defined. After the local_pca_dosage
+split (round 4), these will be in `pages/discovery/local_pca_dosage/_state.js` and
+`pages/discovery/local_pca_dosage/_data.js`. **Don't duplicate them in candidate_focus.** Either:
 
 a. Hoist the shared helpers to `atlases/inversion/shared/` (recommended
    for: `getPC`, `getPCByAxis`, `getPCRender`, `availablePCs`,
@@ -247,8 +247,8 @@ a. Hoist the shared helpers to `atlases/inversion/shared/` (recommended
    `loadViewControls`/`saveViewControls`/`reconcileViewControlsForData`,
    the family-palette constants).
 
-b. Or, keep them in page1 modules and have page2 import directly from
-   `pages/discovery/page1/_data.js` (cross-page module imports are fine
+b. Or, keep them in local_pca_dosage modules and have candidate_focus import directly from
+   `pages/discovery/local_pca_dosage/_data.js` (cross-page module imports are fine
    in ES modules; the manifest's `module:` entry just specifies the
    atlas-router entry point).
 
@@ -258,19 +258,19 @@ is in a hurry. Either way, the SAME `_pageState` reference must NOT be
 shared between pages — each page has its own `_pageState` because the
 page's mount sets it. Cross-imports of helpers reading `_pageState`
 will see only the importing module's `_pageState`, which would be
-wrong. So if a helper is used by both page1 AND page2, **it must take
+wrong. So if a helper is used by both local_pca_dosage AND candidate_focus, **it must take
 `state` as an explicit arg**, not read `_pageState`. Either (i) refactor
 those helpers to take state as first arg, or (ii) keep two copies.
 
-**Recommended:** for the page1+page2 shared helpers, make them all
+**Recommended:** for the local_pca_dosage+candidate_focus shared helpers, make them all
 take `state` as first arg in `shared/` (no `_pageState` shim). The
-page1 split will need this anyway because the panel modules will be
+local_pca_dosage split will need this anyway because the panel modules will be
 better off taking `state` explicitly than relying on `_pageState`
 across module boundaries.
 
 **Step 6 — Smoke test:**
 
-Same harness as page1's eighth pass:
+Same harness as local_pca_dosage's eighth pass:
 ```bash
 node /tmp/smoke_page2.mjs   # mount/unmount with synthetic candidate
 ```
@@ -289,23 +289,23 @@ Same docs to update. The pattern is now mature.
 1. **Page2 registry entry mismatch** (Step 0 above). Resolve before
    migrating.
 2. **Cross-page helper sharing strategy** (Step 5 above). Decide before
-   the page1 split.
-3. **Does page2 need `state.candidate` to be a slot in the
+   the local_pca_dosage split.
+3. **Does candidate_focus need `state.candidate` to be a slot in the
    `SLOT_REGISTRY` or is it ad-hoc?** Check `atlases/inversion/shared/state.js`.
 4. **`renderCatalogue` (1 helper not in legacy)** — is it called by any
-   extracted page2 body? If yes, where does its real body live? Likely
+   extracted candidate_focus body? If yes, where does its real body live? Likely
    in a different page's territory or a v4-rename.
 
 ---
 
 ## Sequence of work over upcoming sessions
 
-1. **Round 4 (next):** split page1.js into 10 sub-modules. Plan in
+1. **Round 4 (next):** split local_pca_dosage.js into 10 sub-modules. Plan in
    `HANDOFF_2026-05-06_chat34_eighth_page1_parity.md`. The split
-   resolves Step 5 above for page1 — once panel modules exist, the
-   shared-helper question for page2 is concrete.
+   resolves Step 5 above for local_pca_dosage — once panel modules exist, the
+   shared-helper question for candidate_focus is concrete.
 
-2. **Round 5:** page2 migration following this handoff.
+2. **Round 5:** candidate_focus migration following this handoff.
 
 3. **Rounds 6–N:** pages 3, 4, 6, 7, 8, 12, 15, 19 (and any others
    in the manifest). Each follows the same recipe; the speed picks

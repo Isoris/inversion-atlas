@@ -1,0 +1,67 @@
+  <div id="dosage_heatmap" class="page">
+
+    <header id="dosageHeatmapHeader" class="dh2-header">
+      <div class="dh2-title">
+        <h2>Dosage heatmap</h2>
+        <span id="dosageHeatmapCandidateLabel" class="dh2-meta">—</span>
+      </div>
+      <div class="dh2-controls">
+        <span id="dosageHeatmapViewBadge"
+              class="dh2-view-badge"
+              title="Centering anchor / polarity reference of the loaded heatmap">—</span>
+        <span class="dh2-sep"></span>
+        <label class="dh2-toggle">
+          Sample order
+          <select id="dosageHeatmapSampleOrder" class="dh2-select">
+            <option value="natural">natural</option>
+            <option value="by_group">by group</option>
+            <option value="by_k6">by K6</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          Marker order
+          <select id="dosageHeatmapMarkerOrder" class="dh2-select">
+            <option value="natural">natural</option>
+            <option value="by_polarity">by polarity</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowGroupTrack" type="checkbox" checked>
+          Group track
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowPolarityTrack" type="checkbox" checked>
+          Polarity stripe
+        </label>
+      </div>
+    </header>
+
+    <div class="dh2-body">
+      <div class="dh2-canvas-wrap">
+        <canvas id="dosageHeatmapCanvas" class="dh2-canvas"></canvas>
+        <div id="dosageHeatmapTooltip" class="dh2-tooltip" style="display:none;"></div>
+        <div id="dosageHeatmapEmpty" class="dh2-empty" style="display:none;">
+          No dosage heatmap loaded. Feed buildHeatmapFromDosage output (or a
+          legacy chunk via the adapter) into atlasState first.
+        </div>
+      </div>
+      <aside class="dh2-right">
+        <header class="dh2-panel-head">
+          <h4>Hovered cell</h4>
+          <span id="dosageHeatmapSelectedHint" class="dh2-hint">(hover the matrix)</span>
+        </header>
+        <dl id="dosageHeatmapSelectedFields" class="dh2-selected-fields"></dl>
+        <section id="dosageHeatmapLegend" class="dh2-legend">
+          <h5>Legend</h5>
+          <div id="dosageHeatmapLegendBody" class="dh2-legend-body"></div>
+        </section>
+      </aside>
+    </div>
+
+    <footer id="dosageHeatmapFooter" class="dh2-footer">
+      ⓘ Sample × marker dosage matrix. Sequential cream→deep-red ramp;
+      side tracks show K=3 group / K=6 cluster annotation; top stripe
+      marks polarity-flipped markers (HANDOFF_2 / SPEC_0 §11).
+    </footer>
+
+  </div>

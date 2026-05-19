@@ -1,6 +1,6 @@
-# How to use page11 — boundaries
+# How to use boundary_refinement — boundaries
 
-**Page**: `page11` · stage `classification` · label "boundaries"
+**Page**: `boundary_refinement` · stage `classification` · label "boundaries"
 **Atlas**: `inversion` (the C. gariepinus 226-cohort atlas)
 
 ## What this page does
@@ -9,8 +9,8 @@ Refines a promoted candidate's `[start_bp, end_bp]` into approximate
 **left / right boundary zones** using multiple evidence tracks.
 
 - **Auto-propose** runs a weighted multi-track algorithm
-  (`bndAutoPropose` from `page11/boundaries_ui.js`) using the
-  weights in `BOUNDARY_TRACK_WEIGHTS` (`page11/boundaries.js`).
+  (`bndAutoPropose` from `boundary_refinement/boundaries_ui.js`) using the
+  weights in `BOUNDARY_TRACK_WEIGHTS` (`boundary_refinement/boundaries.js`).
 - **Manual override** at the scrubber cursor via hotkeys E (left)
   / F (right).
 - **Save** persists the boundary annotation onto the candidate;
@@ -28,13 +28,13 @@ Refines a promoted candidate's `[start_bp, end_bp]` into approximate
 ```
 atlases/inversion/
 ├── pages/review/
-│   ├── page11.html                                ← shell: 4 DOM ids only
-│   │                                                (#page11, #page11Header,
+│   ├── boundary_refinement.html                                ← shell: 4 DOM ids only
+│   │                                                (#boundary_refinement, #page11Header,
 │   │                                                #page11Subtitle, #page11Content)
-│   ├── page11.js                                  ← entry; renderBoundariesPage
+│   ├── boundary_refinement.js                                  ← entry; renderBoundariesPage
 │   │                                                builds the toolbar inside
 │   │                                                #page11Content via innerHTML
-│   └── page11/
+│   └── boundary_refinement/
 │       ├── _state.js                                ← _pageState + setter
 │       ├── boundaries.js                            ← pure helpers (809 LOC)
 │       │                                            constants, binary search,
@@ -121,7 +121,7 @@ reviewing SV/junction evidence."*
 
 ## Auto-propose: the 11-track weighted score
 
-`BOUNDARY_TRACK_WEIGHTS` (per `page11/boundaries.js`, sums to 1.0):
+`BOUNDARY_TRACK_WEIGHTS` (per `boundary_refinement/boundaries.js`, sums to 1.0):
 
 | track | weight | polarity (per `BOUNDARY_TRACK_POLARITY`) |
 |-------|------:|:----------------------------------------:|
@@ -164,14 +164,14 @@ Installed at mount via `_bndAttachHotkeys()`; removed at unmount via
 
 Hotkey discipline:
 - Listener runs at `document` level
-- Skips when `#page11` is not the active page (checks `.active`
+- Skips when `#boundary_refinement` is not the active page (checks `.active`
   class)
 - Skips when focus is in INPUT / TEXTAREA / SELECT
 - Skips when Ctrl / Meta / Alt is held
 
 ## How to run
 
-1. **Pick a candidate** (cross-page slot — same as page2 / page4):
+1. **Pick a candidate** (cross-page slot — same as candidate_focus / karyotype_tier):
    the candidate dropdown `#bndCandSelect` is populated by
    `populateCandidateSelect(state)` from `state.candidateList`.
    Both the dropdown and the prev/next nav bar above the toolbar
@@ -198,7 +198,7 @@ Hotkey discipline:
    - `#bndFocalVsBg` — focal-vs-background statistical widget
 
 5. **Refine manually** if needed:
-   - Move page1's cursor (state.cur) to a different window
+   - Move local_pca_dosage's cursor (state.cur) to a different window
    - Hit `E` to set the left edge there; `F` for the right
 
 6. **Save** (`B` or the "save" button) — persists the boundary
@@ -255,10 +255,10 @@ Hotkey discipline:
 ## Common gotchas
 
 1. **"`E` / `F` does nothing."** The override-at-cursor hotkeys
-   require `state.cur` to be a finite number. If page1 hasn't been
+   require `state.cur` to be a finite number. If local_pca_dosage hasn't been
    mounted on the same chromosome (or the cursor hasn't been set
    yet), `state.cur` is null/undefined and the hotkey is a no-op.
-   Move the cursor on page1 first.
+   Move the cursor on local_pca_dosage first.
 
 2. **"Auto-propose returned nothing."** The scan range is
    determined by `boundaryScanRange(cand, SCAN_RADIUS_BP, chromLen,
@@ -284,7 +284,7 @@ Hotkey discipline:
    doesn't have one of those tag names (e.g. a contenteditable
    div); please file a bug.
 
-## What page11 does NOT do
+## What boundary_refinement does NOT do
 
 - **It does NOT call exact breakpoints** — the verdict is a
   **boundary zone**, not a base-pair junction. `exact_breakpoint`
@@ -302,7 +302,7 @@ Hotkey discipline:
 
 ## Registry mismatch flagged
 
-Per `pages.registry.json` `_doc` for page11: the registered
+Per `pages.registry.json` `_doc` for boundary_refinement: the registered
 `requires_layers` are **`candidate_final_class +
 candidate_breeding_card`**, which look misplaced. Page11 actually
 reads:
@@ -314,8 +314,8 @@ reads:
   created)
 - `state.ncRNADensity` (per-chrom ncRNA layer)
 
-A **swap hypothesis** has been raised: page11's declared layers
-may have been swapped with page4's declared
+A **swap hypothesis** has been raised: boundary_refinement's declared layers
+may have been swapped with karyotype_tier's declared
 `candidate_sv_counts + candidate_boundaries`. Do NOT silently fix;
 deferred to a future renumbering round.
 
@@ -326,9 +326,9 @@ In `specs_done/`:
   band-track spec — the per-track shapes consumed by
   `buildBoundaryTrackScores`)
 - `SPEC_l2_sweep_inheritance.md` (the auto-promote pipeline that
-  produces the candidates page11 then refines; defines the
+  produces the candidates boundary_refinement then refines; defines the
   `confirmed: false` discipline)
-- `SPEC_sv_evidence_page.md` (page_sv_evidence's per-SV
+- `SPEC_sv_evidence_page.md` (sv_evidence's per-SV
   classification feeds the `sv_anchor` track at weight 0.02 +
   the user's decision to promote to `SV_supported`)
 - `SCHEMA.md` (§12 / §20 reserve sections for SV evidence + the
@@ -336,7 +336,7 @@ In `specs_done/`:
 
 ## Per-page contract
 
-`docs/generated/page_contracts/page11/PAGE_CONTRACT.md`
+`docs/generated/page_contracts/boundary_refinement/PAGE_CONTRACT.md`
 
 ## Cohort discipline
 
@@ -345,9 +345,9 @@ conflate.
 
 ---
 
-**Authored**: 2026-05-15 from `pages/review/page11.js` (lines
-193-300, 307-337) + `pages/review/page11/boundaries.js` (lines
-17-65, exports list) + `pages/review/page11/boundaries_ui.js`
+**Authored**: 2026-05-15 from `pages/review/boundary_refinement.js` (lines
+193-300, 307-337) + `pages/review/boundary_refinement/boundaries.js` (lines
+17-65, exports list) + `pages/review/boundary_refinement/boundaries_ui.js`
 (header block + lines 1-100). All facts (scan radii, hotkey set,
 track weights, defaults, DOM ids) verified against shipped code.
 The page contract previously cited "31 TODO_MISSING _bnd*

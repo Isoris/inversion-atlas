@@ -1,0 +1,40 @@
+{
+  "page_id": "polarize_msa_stacked",
+  "label": "polarize · MSA",
+  "page_type": "core_page (Phase 1 cartridge)",
+  "stage": "evolution",
+  "owner_atlas": "inversion",
+  "status": "active",
+  "current_path": {
+    "html": "atlases/inversion/pages/evolution/polarize_msa_stacked.html",
+    "js_entry": "atlases/inversion/pages/evolution/polarize_msa_stacked.js",
+    "js_subdir": "atlases/inversion/pages/evolution/polarize_msa_stacked/"
+  },
+  "purpose": "Stacked-consensus MSA viewer for inversion polarization. First cartridge of the evolution stage. Reuses the dosage-heatmap painter — each 'sample' is one consensus row (outgroup, INV founder-like, INV subgroups by 2D-SFS doubleton clustering, STD). Confidence + reason tier per site.",
+  "required_slots": ["activeCandidate"],
+  "input_contract": "atlasState.inversion.polarize_msa_state = { dosage, n_markers, n_samples, inv_idx, std_idx?, outgroup_idx?, marker_labels?, ... }",
+  "subdir_files": [
+    "_state.js — _pageState + setter",
+    "builder.js — build consensus-row stack feeding dosage-heatmap renderer",
+    "renderer.js — thin adapter feeding row-stack into dosage-heatmap painter + tier-confidence stripe",
+    "selection.js — hover {row, col, marker_idx, sample_idx} (sample_idx = row-stack position; 0=outgroup, 1=INV founder, ...)"
+  ],
+  "primitives_used": [
+    "shared/mgl_founder_consensus.js",
+    "shared/mgl_doubleton_sfs_clusters.js",
+    "dosage_heatmap painter (reused as downstream renderer)"
+  ],
+  "interactions": [{"id": "hover_cell", "type": "hover"}],
+  "computed_preview_outputs": ["stacked-consensus MSA: outgroup row + INV founder-like + per-subgroup consensus rows + STD consensus row + tier-confidence stripe"],
+  "committable_outputs": [],
+  "commit_policy": "none_by_default",
+  "documents": {
+    "page_registry_doc": "unknown (not in pages.registry.json)",
+    "specs_done": [],
+    "specs_todo": ["unknown — implements evolution-stage SPEC concepts; no top-level SPEC file"],
+    "handoffs": ["_handoff_docs/HANDOFF_2026-05-* (evolution-stage migration round)"],
+    "user_guide": "unknown"
+  },
+  "known_issues": [],
+  "confidence": "high"
+}

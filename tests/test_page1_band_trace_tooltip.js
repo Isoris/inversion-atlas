@@ -1,6 +1,6 @@
 // tests/test_page1_band_trace_tooltip.js
 //
-// Unit tests for pages/discovery/page1/band_trace_tooltip.js.
+// Unit tests for pages/discovery/local_pca_dosage/band_trace_tooltip.js.
 // Covers the parts that don't need a DOM: bandTraceHitTest and
 // bandTraceTooltipBuildHtml. The show/hide/wire entry points are
 // exercised by the smoke tests once the canvas shim is in scope.
@@ -11,7 +11,7 @@ import {
   bandTraceTooltipEnsureEl,
   bandTraceTooltipHide,
   wireBandTraceTooltip,
-} from '../atlases/inversion/pages/discovery/page1/band_trace_tooltip.js';
+} from '../atlases/inversion/pages/discovery/local_pca_dosage/band_trace_tooltip.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

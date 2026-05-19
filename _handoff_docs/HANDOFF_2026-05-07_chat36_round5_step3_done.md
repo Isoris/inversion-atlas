@@ -1,10 +1,10 @@
-# HANDOFF — page3 catalogue MIGRATED (breeding-export only); next round is Quentin's call
+# HANDOFF — catalogue catalogue MIGRATED (breeding-export only); next round is Quentin's call
 
 **Date:** 2026-05-07 (chat ~36, round 5 step 3)
 **Reads:** This file FIRST, then the audit log top entry, then
 `PAGE_MIGRATION_RECIPE.md` round-5-step-3 section. The
 round-5-step-2 handoff (`HANDOFF_2026-05-07_chat36_round5_step2_done.md`)
-is the prior round; only consult if you need page2 context.
+is the prior round; only consult if you need candidate_focus context.
 **Project:** MS_Inversions_North_african_catfish — 226-sample pure
 *C. gariepinus* hatchery cohort, LANTA HPC.
 
@@ -26,9 +26,9 @@ The ONE catalogue-domain feature with real legacy implementation: the
 
 ```
 atlases/inversion/pages/catalogue/
-├── page3.js                       184 LOC ← entry: mount/unmount + render + init
-└── page3/
-    ├── _state.js                   18 LOC ← _pageState + setter (page3's own)
+├── catalogue.js                       184 LOC ← entry: mount/unmount + render + init
+└── catalogue/
+    ├── _state.js                   18 LOC ← _pageState + setter (catalogue's own)
     └── _breeding_export.js       1106 LOC ← Turn-146 closure
                                             (17 helpers + _BREEDING_EXPORT_TIER_MODES)
 ```
@@ -65,24 +65,24 @@ doesn't exist.**
 
 ### Step 1 — registry + manifest fix
 
-- `pages.registry.json` page3: added `_label` ("5 catalogue") and
+- `pages.registry.json` catalogue: added `_label` ("5 catalogue") and
   `_doc` documenting the legacy tab definition + this round's
   scope (breeding-export only).
-- `manifest.json`: page3 label "page 3" → **"catalogue"**.
+- `manifest.json`: catalogue label "page 3" → **"catalogue"**.
 
-### Step 2 — page3 split into 2 sub-modules + new main
+### Step 2 — catalogue split into 2 sub-modules + new main
 
-- `page3/_state.js` (18 LOC) — same `_pageState`/`_setActiveState`
-  pattern as page1/page2, page3's own.
-- `page3/_breeding_export.js` (1106 LOC) — 17 helpers + 1 constant.
+- `catalogue/_state.js` (18 LOC) — same `_pageState`/`_setActiveState`
+  pattern as local_pca_dosage/candidate_focus, catalogue's own.
+- `catalogue/_breeding_export.js` (1106 LOC) — 17 helpers + 1 constant.
   Bodies extracted byte-verbatim with the same patcher used for
-  page1/page2:
+  local_pca_dosage/candidate_focus:
   - Legacy `(typeof window !== 'undefined' && window.state) ?
     window.state : state` rewritten to `_pageState`.
   - `const state = _pageState;` shim injected in bodies that read
     bare `state`.
   - `export function` prefix on the 3 public names.
-- `page3.js` main (184 LOC) — replaces 157-LOC chat-33 stub.
+- `catalogue.js` main (184 LOC) — replaces 157-LOC chat-33 stub.
   - Re-exports breeding-export public set.
   - `renderCataloguePage(state)`: empty-state with hint message
     (since the catalogue renderer doesn't exist).
@@ -90,7 +90,7 @@ doesn't exist.**
     — the only catalogue-toolbar action with a working legacy
     implementation.
   - `mount(root, atlasState, registry)`: builds a legacy-shape state
-    via `_buildLegacyState` (mirrors page1/page2), calls render +
+    via `_buildLegacyState` (mirrors local_pca_dosage/candidate_focus), calls render +
     init.
   - `unmount(root)`: clears `_pageState`.
 
@@ -99,7 +99,7 @@ doesn't exist.**
 - `tests/test_catalogue_page3.js`: replaced the stale chat-33 stub
   (21 LOC, wrong import path, asserts removed `__MODULE_ID__` export).
   New version: 19 assertions covering sub-module split + main
-  re-export identity (`page3.X === breeding.X`) + `_pageState` setter.
+  re-export identity (`catalogue.X === breeding.X`) + `_pageState` setter.
 - `tests/smoke_catalogue_page3_round5.mjs`: NEW, 270 LOC, 29 assertions:
   - Module exports check
   - `mount()` empty-state DOM (`catEmpty` visible with hint,
@@ -119,14 +119,14 @@ doesn't exist.**
 ## What this round did NOT touch
 
 - **atlas-core engine** — completely unchanged.
-- **page1 / page2 sub-modules** — completely unchanged this round.
-- **`shared/page1_data_helpers.js`** — unchanged (page3's breeding-export
+- **local_pca_dosage / candidate_focus sub-modules** — completely unchanged this round.
+- **`shared/page1_data_helpers.js`** — unchanged (catalogue's breeding-export
   closure is fully self-contained).
 - **The catalogue table renderer + 11 unimplemented toolbar handlers**
   — these don't exist in legacy. See the audit log entry's "What this
   round did NOT migrate" table for the full inventory.
 - **Pages 4, 6, 7, 8, 9, 10, 11, 12, 15, 16, 16b, 17, 18, 19, 21,
-  page_overview, page_sv_evidence** — only parse-checked.
+  overview, sv_evidence** — only parse-checked.
 - **Page renumbering** — deferred per Quentin's directive.
 - **Toolkit-registry vs Atlas-state cache decisions** — Quentin's
   workflow: defer until all pages are migrated.
@@ -139,12 +139,12 @@ doesn't exist.**
 
 | Page | Folder | Likely complexity | Notes |
 |---|---|---|---|
-| **page9** | catalogue | medium | Diversity / cohort overview; check chat-33 BATCH_3_NOTES.md |
-| **page10** | catalogue | unknown | check chat-33 BATCH notes |
-| **page17, 18, 21** | catalogue | unknown | check chat-33 BATCH notes |
-| **page_overview** | catalogue | low? | non-chromosome-scoped overview |
-| **page4** | discovery? | unknown | does page4 even have a stub? |
-| **page_sv_evidence** | ? | unknown | uncategorized |
+| **confirmed_carousel** | catalogue | medium | Diversity / cohort overview; check chat-33 BATCH_3_NOTES.md |
+| **marker_panels** | catalogue | unknown | check chat-33 BATCH notes |
+| **stats_profile, 18, 21** | catalogue | unknown | check chat-33 BATCH notes |
+| **overview** | catalogue | low? | non-chromosome-scoped overview |
+| **karyotype_tier** | discovery? | unknown | does karyotype_tier even have a stub? |
+| **sv_evidence** | ? | unknown | uncategorized |
 
 Or: **separate task** — design and implement the 11 missing catalogue
 handlers (catalogue table renderer, TSV/MD/JSON/gallery exports,
@@ -153,7 +153,7 @@ the catalogue table needs to actually work for the manuscript figures
 or for daily workflow.
 
 The migration recipe (round-5-step-3 section in
-`PAGE_MIGRATION_RECIPE.md`) covers the page3 pattern. The same shape
+`PAGE_MIGRATION_RECIPE.md`) covers the catalogue pattern. The same shape
 applies to any subsequent page: audit legacy lines, identify what's
 real vs ghost, do a closure walk from the meaningful entry points,
 split into sub-modules, build tests + smoke. The smart brace-matching

@@ -3,7 +3,7 @@
 // HANDOFF 2 — Page-1 candidate PCA mode: state slot + transitions +
 // JSON-key composition + manifest loader.
 //
-// Candidate mode is a page1 sub-mode where the cursor traverses
+// Candidate mode is a local_pca_dosage sub-mode where the cursor traverses
 // windows inside ONE candidate interval and the user can switch
 // between pre-computed PCA + heatmap JSONs via dropdowns (view ×
 // weighting × anchor_mode for PCA, view × centering for heatmap).
@@ -18,7 +18,7 @@
 //   - Optional genotype-state JSONs for tri+ sites
 //
 // This module ships the cartridge-side state machinery. The actual
-// drawHeatmap / controls-bar wiring lives elsewhere (page1/
+// drawHeatmap / controls-bar wiring lives elsewhere (local_pca_dosage/
 // candidate_pca_*.js when those land).
 //
 // All entry points take state as their first arg. headless-safe:

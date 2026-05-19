@@ -192,6 +192,81 @@ export function adaptiveK1D(values, kMin, kMax, silThreshold, minNGroup) {
   return { k: bestK, silhouette: bestSil, ...bestResult };
 }
 
+/**
+ * Silhouette score for a 2-D K-means clustering (Euclidean distance over
+ * (xs, ys)). Same semantics as silhouette1D — returns mean silhouette in
+ * [-1, +1]; NaN when n < 4 or any cluster has fewer than 2 samples.
+ *
+ * @param {ArrayLike<number>} xs
+ * @param {ArrayLike<number>} ys
+ * @param {ArrayLike<number>} labels
+ * @param {number} k
+ * @returns {number}
+ */
+export function silhouette2D(xs, ys, labels, k) {
+  const n = xs.length;
+  if (n < 4 || k < 2) return NaN;
+  const indicesByK = Array.from({ length: k }, () => []);
+  for (let i = 0; i < n; i++) indicesByK[labels[i]].push(i);
+  for (let kk = 0; kk < k; kk++) if (indicesByK[kk].length < 2) return NaN;
+  let total = 0, ncount = 0;
+  for (let i = 0; i < n; i++) {
+    const my = labels[i];
+    let aSum = 0, aCnt = 0;
+    for (const j of indicesByK[my]) {
+      if (j === i) continue;
+      const dx = xs[i] - xs[j], dy = ys[i] - ys[j];
+      aSum += Math.sqrt(dx * dx + dy * dy); aCnt++;
+    }
+    const a = aCnt > 0 ? aSum / aCnt : 0;
+    let bMin = Infinity;
+    for (let other = 0; other < k; other++) {
+      if (other === my) continue;
+      let bSum = 0, bCnt = 0;
+      for (const j of indicesByK[other]) {
+        const dx = xs[i] - xs[j], dy = ys[i] - ys[j];
+        bSum += Math.sqrt(dx * dx + dy * dy); bCnt++;
+      }
+      if (bCnt > 0) {
+        const b = bSum / bCnt;
+        if (b < bMin) bMin = b;
+      }
+    }
+    if (!isFinite(bMin)) continue;
+    const s = (bMin - a) / Math.max(a, bMin, 1e-12);
+    total += s; ncount++;
+  }
+  return ncount > 0 ? total / ncount : NaN;
+}
+
+/**
+ * Adaptive K for 2-D K-means: try each k in [kMin..kMax], score with
+ * silhouette2D, pick highest silhouette above silThreshold. Falls back
+ * to kMin if none clear the threshold. Mirrors adaptiveK1D's contract.
+ */
+export function adaptiveK2D(xs, ys, kMin, kMax, silThreshold, minNGroup) {
+  if (xs.length < kMin * minNGroup) return null;
+  let bestK = kMin, bestSil = -Infinity, bestResult = null;
+  for (let k = kMin; k <= kMax; k++) {
+    if (xs.length < k * minNGroup) break;
+    const r = kmeans2D(xs, ys, k);
+    if (r.n_per_group.some(c => c < minNGroup)) continue;
+    const sil = silhouette2D(xs, ys, r.labels, k);
+    if (!isFinite(sil)) continue;
+    if (sil > bestSil) { bestSil = sil; bestK = k; bestResult = r; }
+  }
+  if (bestResult == null) {
+    bestResult = kmeans2D(xs, ys, kMin);
+    bestK = kMin;
+    bestSil = silhouette2D(xs, ys, bestResult.labels, kMin);
+  }
+  // Normalise field name so callers see `centers` like 1D returns.
+  const centers = bestResult.cx || bestResult.centers;
+  return { k: bestK, silhouette: bestSil, labels: bestResult.labels,
+           centers, centers_y: bestResult.cy || null,
+           n_per_group: bestResult.n_per_group };
+}
+
 // ---------------------------------------------------------------------
 // Console-debug exposures (preserves legacy `window.kmeans1D`)
 // ---------------------------------------------------------------------
@@ -199,5 +274,7 @@ if (typeof window !== 'undefined') {
   window.kmeans1D     = kmeans1D;
   window.kmeans2D     = kmeans2D;
   window.silhouette1D = silhouette1D;
+  window.silhouette2D = silhouette2D;
   window.adaptiveK1D  = adaptiveK1D;
+  window.adaptiveK2D  = adaptiveK2D;
 }

@@ -1,7 +1,7 @@
 // shared/cross_species.js
 //
 // cross_species_breakpoints_v1 data layer. The primary backing store
-// for page16 (comparative): per-breakpoint records from a wfmash 1-to-1
+// for cross_species_breakpoints (comparative): per-breakpoint records from a wfmash 1-to-1
 // alignment between the focal species (Cgar) and one comparison species
 // (Cmac) — flanking syntenic blocks, event-type classification
 // (inversion / translocation / fission-or-fusion / mixed), flanking

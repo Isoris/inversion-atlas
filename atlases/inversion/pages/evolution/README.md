@@ -22,15 +22,15 @@ The evolution stage answers that, per the manifest's stage doc:
 
 | page | label | summary |
 |------|-------|---------|
-| `page_evolution_polarize_msa` | polarize · MSA | stacked-consensus MSA viewer (outgroup + INV founder-like + INV subgroups by 2D-SFS doubleton + STD) using the dosage-heatmap painter |
-| `page_evolution_haplotype_network` | haplotype network | MSN of INV chromosomes — Hamming-radius nodes coloured by 2D-SFS subgroup; force-directed layout |
-| `page_evolution_polarize_synteny` | polarize · synteny | per-outgroup-species breakpoint-vote (HOM_A / HOM_B / unresolved) aggregated to an arrangement verdict |
-| `page_evolution_age` | age + divergence | π_inv / π_std / dXY / F_ST sparklines + private/fixed counts + age-class verdict |
-| `page_evolution_mosaicism` | mosaicism / leakage | per-INV-sample × window leakage heatmap (recombinant-tract / polarity-switch detector) |
-| `page_evolution_internal_history` | internal history | sub-PCA on derived-only samples (haplotype clusters / nested rearrangements / sublineages inside INV class) |
-| `page_evolution_layer_cleaning` | layer cleaning | per-sample weighting bar (kinship + family-size downweighting + hatchery-duplicate exclusion) |
-| `page_evolution_event_tree` | event tree | per-candidate × per-candidate relationship matrix (nested / sister / independent / mutual_exclusive) across multiple inversions on same chromosome |
-| `page_evolution_archaeology_card` | archaeology card | Step-6 synthesis card — pulls polarity, age class, integrity, mosaicism, frequency, π/dXY/F_ST, private/fixed, confidence into one verdict |
+| `polarize_msa_stacked` | polarize · MSA | stacked-consensus MSA viewer (outgroup + INV founder-like + INV subgroups by 2D-SFS doubleton + STD) using the dosage-heatmap painter |
+| `haplotype_network` | haplotype network | MSN of INV chromosomes — Hamming-radius nodes coloured by 2D-SFS subgroup; force-directed layout |
+| `polarize_synteny_vote` | polarize · synteny | per-outgroup-species breakpoint-vote (HOM_A / HOM_B / unresolved) aggregated to an arrangement verdict |
+| `age_divergence` | age + divergence | π_inv / π_std / dXY / F_ST sparklines + private/fixed counts + age-class verdict |
+| `mosaicism_leakage` | mosaicism / leakage | per-INV-sample × window leakage heatmap (recombinant-tract / polarity-switch detector) |
+| `inv_internal_substructure` | internal history | sub-PCA on derived-only samples (haplotype clusters / nested rearrangements / sublineages inside INV class) |
+| `layer_cleaning` | layer cleaning | per-sample weighting bar (kinship + family-size downweighting + hatchery-duplicate exclusion) |
+| `event_tree_relative_ordering` | event tree | per-candidate × per-candidate relationship matrix (nested / sister / independent / mutual_exclusive) across multiple inversions on same chromosome |
+| `archaeology_synthesis_card` | archaeology card | Step-6 synthesis card — pulls polarity, age class, integrity, mosaicism, frequency, π/dXY/F_ST, private/fixed, confidence into one verdict |
 
 ## Cartridge architecture (uniform across all 9 pages)
 
@@ -55,7 +55,7 @@ Each page is a thin atlas-side cartridge with the following shape:
 
 | page | primary primitive |
 |------|-------------------|
-| `polarize_msa` | `shared/mgl_founder_consensus.js` + `shared/mgl_doubleton_sfs_clusters.js` (feeds `page_dosage_heatmap` painter for the row-stack render) |
+| `polarize_msa` | `shared/mgl_founder_consensus.js` + `shared/mgl_doubleton_sfs_clusters.js` (feeds `dosage_heatmap` painter for the row-stack render) |
 | `haplotype_network` | `shared/mgl_haplotype_network.js` |
 | `polarize_synteny` | `shared/mgl_outgroup_synteny.js` |
 | `age` | `shared/mgl_inversion_divergence.js` (`computeDivergence`) |
@@ -102,16 +102,16 @@ the evolution-stage pages occupy Stages 5+ after Stage 4's bruteforce
 projection:
 
 ```
-Stage 5.0 Polarization        →  page_evolution_polarize_msa
-                                 page_evolution_polarize_synteny
+Stage 5.0 Polarization        →  polarize_msa_stacked
+                                 polarize_synteny_vote
 Stage 5.1 Founder reconstruct →  (reuses Stage 5.0 founder consensus)
-Stage 5.2 Haplotype network   →  page_evolution_haplotype_network
-Stage 5.3 Internal history    →  page_evolution_internal_history
-Stage 5.4 Layer cleaning      →  page_evolution_layer_cleaning
-Stage 5.5 Age + divergence    →  page_evolution_age
-Stage 5.6 Mosaicism           →  page_evolution_mosaicism
-Stage 5.7 Event tree          →  page_evolution_event_tree
-Stage 6   Archaeology card    →  page_evolution_archaeology_card
+Stage 5.2 Haplotype network   →  haplotype_network
+Stage 5.3 Internal history    →  inv_internal_substructure
+Stage 5.4 Layer cleaning      →  layer_cleaning
+Stage 5.5 Age + divergence    →  age_divergence
+Stage 5.6 Mosaicism           →  mosaicism_leakage
+Stage 5.7 Event tree          →  event_tree_relative_ordering
+Stage 6   Archaeology card    →  archaeology_synthesis_card
 ```
 
 Pipeline stages 5.5/5.6/5.7 in the original v3.4 diagram (the
@@ -130,7 +130,7 @@ In `specs_todo/`:
   SPEC ONLY)
 - `SPEC_copy_origin_painting.md` (Stage 5.6 — SPEC ONLY)
 - `SPEC_fish_ancestry_scroller.md` (Stage 5.7 — partial; the
-  page is now registered as `page_ancestry_scroller` in the
+  page is now registered as `fish_ancestry_scroller` in the
   classification stage, NOT evolution)
 - `SPEC_inversion_age_atlas_surface_AMENDMENT.md` (parent SPEC
   missing on disk — flagged in `_handoff_docs/SPECS_AUDIT.md`)

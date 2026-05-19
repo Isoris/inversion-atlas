@@ -1,7 +1,7 @@
 // atlases/inversion/shared/page1_data_helpers.js
 //
 // Shared data-access helpers, hoisted from
-// pages/discovery/page1/_data.js in chat 36 round 5 step 1
+// pages/discovery/local_pca_dosage/_data.js in chat 36 round 5 step 1
 // (2026-05-07). All functions take `state` as first arg — they are
 // pure or pure-from-state, no `_pageState` shim, no DOM access except
 // for `populateSimScales` (which writes a <select>) and
@@ -26,17 +26,17 @@
 //   - Lines-color-mode availability helpers (_LINES_COLOR_MODES,
 //     _isLinesColorModeAvailable).
 //   - FAMILY_PALETTE_BASE constant (used by buildFamilyPalette;
-//     previously lived in pages/discovery/page1/_state.js).
+//     previously lived in pages/discovery/local_pca_dosage/_state.js).
 //
 // Importers as of round 5 step 1:
-//   - pages/discovery/page1/_data.js — re-exports everything from here
-//     so existing page1 panel imports (`./_data.js`) keep working.
-//   - pages/discovery/page2.js (round 5 main migration) — will import
+//   - pages/discovery/local_pca_dosage/_data.js — re-exports everything from here
+//     so existing local_pca_dosage panel imports (`./_data.js`) keep working.
+//   - pages/discovery/candidate_focus.js (round 5 main migration) — will import
 //     directly from this file.
 
 import { ClusterCache, clusterL2AtK, contextFromState } from './per_l2_cluster.js';
 
-// --- Family / lineage palette constant (legacy 36259-36269; was in page1/_state.js) ---
+// --- Family / lineage palette constant (legacy 36259-36269; was in local_pca_dosage/_state.js) ---
 const FAMILY_PALETTE_BASE = [
   '#332288', '#117733', '#44AA99', '#88CCEE', '#DDCC77',
   '#CC6677', '#AA4499', '#882255', '#999933', '#661100',
@@ -753,11 +753,11 @@ export function sampleSpreadRange(state, s, e) {
 // ---------------------------------------------------------------------------
 // Pure formatting / color helpers (chat 36 round 5 step 2 hoist)
 // ---------------------------------------------------------------------------
-// These were legacy globals used by both page1 and page2. They take no
+// These were legacy globals used by both local_pca_dosage and candidate_focus. They take no
 // state; they're pure functions. Hoisted here rather than to a separate
 // `shared/format_helpers.js` because they're tightly coupled to the
-// page1/page2 rendering call graph and live alongside everything else
-// page1 uses.
+// local_pca_dosage/candidate_focus rendering call graph and live alongside everything else
+// local_pca_dosage uses.
 
 // --- _esc — legacy line 13925 ---
 // HTML escape. Used by every Html-builder for user-supplied / data-bound
@@ -786,8 +786,8 @@ export function _fmtP(p) {
 }
 
 // --- groupColor — legacy line 50895 ---
-// K-means cluster color palette. Used by page1's pca/lines panels and
-// page2's drawCand* functions.
+// K-means cluster color palette. Used by local_pca_dosage's pca/lines panels and
+// candidate_focus's drawCand* functions.
 export function groupColor(k) {
   return ['#4fa3ff','#b8b8b8','#f5a524','#3cc08a','#e0555c','#b07cf7'][k] || '#666';
 }

@@ -284,8 +284,8 @@ invalidateAllForCandidate(candidate_id) {
 > from holding a reference to the registry.
 >
 > **Prerequisite.** This whole section assumes `setActiveCandidate(cand)` is
-> actually called when the user promotes a candidate. The migrated page1
-> path (`pages/discovery/page1/candidates.js setCandidate()` +
+> actually called when the user promotes a candidate. The migrated local_pca_dosage
+> path (`pages/discovery/local_pca_dosage/candidates.js setCandidate()` +
 > `loadCandidateList()`) now bridges into atlas-core's setter; before that
 > bridge landed, the event never fired and this invalidation would have
 > been a no-op for the only code path that matters.
@@ -453,7 +453,7 @@ domain the atlas serves. Format:
 - **Cache tier(s):** hot / warm / cold
 - **Server endpoints:** (if any)
 - **Toolkit table:** (e.g. `evidence_registry/per_candidate/.../<block>`)
-- **Example consumers:** (page1, page11, ...)
+- **Example consumers:** (local_pca_dosage, boundary_refinement, ...)
 ```
 
 Entries: `samples`, `relatedness`, `ancestry`, `diversity`,

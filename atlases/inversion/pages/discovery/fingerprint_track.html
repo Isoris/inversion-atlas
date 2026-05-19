@@ -1,0 +1,57 @@
+  <div id="fingerprint_track" class="page">
+
+    <header id="fingerprintTrackHeader" class="fingerprint-header">
+      <div class="fingerprint-title">
+        <h2>Fingerprint track</h2>
+        <span id="fingerprintCandidateLabel" class="fingerprint-meta">—</span>
+      </div>
+      <div class="fingerprint-controls">
+        <span id="fingerprintScenarioBadge"
+              class="fingerprint-scenario-badge"
+              title="Architecture verdict per HANDOFF_6">—</span>
+        <span class="fingerprint-sep"></span>
+        <label class="fingerprint-toggle">
+          <input id="fingerprintShowBriefSwitches" type="checkbox">
+          Show brief switches
+        </label>
+        <label class="fingerprint-toggle">
+          <input id="fingerprintShowLabels" type="checkbox" checked>
+          Window labels
+        </label>
+      </div>
+    </header>
+
+    <div class="fingerprint-body">
+      <div class="fingerprint-track-wrap">
+        <canvas id="fingerprintTrackCanvas" class="fingerprint-track-canvas"></canvas>
+        <div id="fingerprintTrackEmpty" class="fingerprint-empty" style="display:none;">
+          No fingerprint loaded. Run fingerprintCandidate on a window-profile array first.
+        </div>
+      </div>
+      <aside class="fingerprint-right">
+        <header class="fingerprint-panel-head">
+          <h4>Selected window</h4>
+          <span id="fingerprintSelectedHint" class="fingerprint-hint">(hover or click the track)</span>
+        </header>
+        <dl id="fingerprintSelectedFields" class="fingerprint-selected-fields"></dl>
+        <section id="fingerprintProportions" class="fingerprint-proportions">
+          <h5>Fragment proportions</h5>
+          <canvas id="fingerprintProportionsCanvas"
+                  class="fingerprint-proportions-canvas"
+                  width="220" height="100"></canvas>
+        </section>
+        <section id="fingerprintSwitchList" class="fingerprint-switch-list">
+          <h5>Detected switches</h5>
+          <div id="fingerprintSwitchListBody" class="fingerprint-switch-list-body"></div>
+        </section>
+      </aside>
+    </div>
+
+    <footer id="fingerprintFooter" class="fingerprint-footer">
+      ⓘ Per-window diversity-regime classification (HANDOFF_6). Each
+      coloured segment = one regime; ▲ marks switches detected via
+      rank-equivalence. Click a segment to snap the cursor; hover a
+      switch to inspect.
+    </footer>
+
+  </div>

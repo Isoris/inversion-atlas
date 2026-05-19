@@ -31,21 +31,21 @@ What's left: **resolve TODO markers** and **assemble 4 working sub-atlas HTMLs**
 │   │   ├── contingency.js, hungarian.js, het_rate.js, kmeans.js,
 │   │   ├── per_l2_cluster.js, state.js, state_io.js
 │   ├── inversion_discovery/
-│   │   ├── page1.{js,html}              (4361 LOC JS, 89 TODOs — the monster)
-│   │   ├── page2.{js,html}              (251 LOC, 46 TODOs)
-│   │   ├── page8.{js,html}, page12.{js,html}, page15.{js,html}, page19.{js,html}
+│   │   ├── local_pca_dosage.{js,html}              (4361 LOC JS, 89 TODOs — the monster)
+│   │   ├── candidate_focus.{js,html}              (251 LOC, 46 TODOs)
+│   │   ├── window_summary_table.{js,html}, local_pca_theta_pi.{js,html}, local_pca_ghsl.{js,html}, negative_regions.{js,html}
 │   │   └── BATCH_1_NOTES.md             ← read this for batch-1 context
 │   ├── inversion_review/
-│   │   ├── page11.{js,html}, page4.{js,html}, page6.{js,html}, page7.{js,html},
-│   │   ├── page_sv_evidence.{js,html}
+│   │   ├── boundary_refinement.{js,html}, karyotype_tier.{js,html}, popstats.{js,html}, ancestry_per_window.{js,html},
+│   │   ├── sv_evidence.{js,html}
 │   │   └── BATCH_2_NOTES.md
 │   ├── inversion_catalogue/
-│   │   ├── page3.{js,html}, page9.{js,html}, page10.{js,html}, page17.{js,html},
-│   │   ├── page18.{js,html}, page21.{js,html}, page_overview.{js,html}
+│   │   ├── catalogue.{js,html}, confirmed_carousel.{js,html}, marker_panels.{js,html}, stats_profile.{js,html},
+│   │   ├── marker_readiness.{js,html}, annotation_cockpit.{js,html}, overview.{js,html}
 │   │   └── BATCH_3_NOTES.md, BATCH_4_NOTES.md
 │   ├── inversion_comparative/
-│   │   ├── page5.{js,html} ← STUB! help page, NOT multi-species. See HANDOFF_SUPPLEMENT.md
-│   │   ├── page16.{js,html}, page16b.{js,html} ← multi-species lives in page16b
+│   │   ├── help.{js,html} ← STUB! help page, NOT multi-species. See HANDOFF_SUPPLEMENT.md
+│   │   ├── cross_species_breakpoints.{js,html}, multi_species_cockpit.{js,html} ← multi-species lives in multi_species_cockpit
 │   │   └── BATCH_5_NOTES.md
 │   ├── tests/
 │   │   ├── test_shared_*.js (8 files)   ← READ-ONLY foundation regression tests
@@ -191,8 +191,8 @@ For each sub-atlas, create `Atlas/inversion_<phase>.html` containing:
 5. **Script module**: a single `<script type="module">` block:
    ```js
    // Import all page modules
-   import * as page1 from './inversion_discovery/page1.js';
-   import * as page2 from './inversion_discovery/page2.js';
+   import * as local_pca_dosage from './inversion_discovery/local_pca_dosage.js';
+   import * as candidate_focus from './inversion_discovery/candidate_focus.js';
    // ... etc
    import { makeState, readPersistedSlots } from './shared/state.js';
    // ... other shared
@@ -210,7 +210,7 @@ For each sub-atlas, create `Atlas/inversion_<phase>.html` containing:
        document.querySelectorAll('#tabBar button').forEach(b => b.classList.remove('active'));
        btn.classList.add('active');
        // Dispatch render. Each page exports a renderPage<N>(state) by convention.
-       const renderFn = ({ page1: page1.renderPage1, page2: page2.renderPage2, /* ... */ })[pageId];
+       const renderFn = ({ local_pca_dosage: local_pca_dosage.renderPage1, candidate_focus: candidate_focus.renderPage2, /* ... */ })[pageId];
        if (typeof renderFn === 'function') renderFn(state);
      });
    });
@@ -278,7 +278,7 @@ tar czf /mnt/user-data/outputs/Atlas_FINAL_2026-05-05.tar.gz Atlas/
 These are real but post-merge work:
 
 - **Pixel-perfect parity** with the legacy single-file Atlas. Some interactions (e.g. Shift+click lasso, complex keyboard shortcuts) may behave slightly differently. Document; don't fix in this turn.
-- **The dispatcher** — legacy `Inversion_atlas.html` has scattered tab routing (5 different sites that each toggle `.page.active`). The unified dispatcher you write should handle ~80% of cases; the long tail of "promotions auto-jump to page2" etc. is worth deferring.
+- **The dispatcher** — legacy `Inversion_atlas.html` has scattered tab routing (5 different sites that each toggle `.page.active`). The unified dispatcher you write should handle ~80% of cases; the long tail of "promotions auto-jump to candidate_focus" etc. is worth deferring.
 - **Tab numbers** — legacy tabs are numbered (1, 2, 2b, 3, 4, 5, 5b, 6, 7, 8, 9, 10, 11, 16). The numbers are preserved per page in `data-page="pageN"`. The tab labels (`<span class="num">N</span>`) should be preserved as well. If the numbering looks weird in a particular sub-atlas after filtering, just leave it; Quentin will adjust.
 - **CSS scoping** — all 4 sub-atlases sharing ALL legacy CSS is overkill. Some optimization possible but DEFER.
 - **Window-mounted globals** — page modules expose some `window.*` globals (e.g., `window._csBpJumpToWindow` per BATCH_5_NOTES.md). These are CROSS-PAGE bridges that matter when discovery and comparative both load. For single-sub-atlas HTMLs they're harmless. Document but don't refactor.

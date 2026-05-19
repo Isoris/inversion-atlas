@@ -257,9 +257,9 @@ group('qaClearState');
 }
 
 // =====================================================================
-group('getSampleColor wiring (page1/_state.js)');
+group('getSampleColor wiring (local_pca_dosage/_state.js)');
 {
-  const mod = await import('../atlases/inversion/pages/discovery/page1/_state.js');
+  const mod = await import('../atlases/inversion/pages/discovery/local_pca_dosage/_state.js');
   check('getSampleColor exported',          typeof mod.getSampleColor === 'function');
 }
 

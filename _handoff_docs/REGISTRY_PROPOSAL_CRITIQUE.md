@@ -282,7 +282,7 @@ This is a first-class entity that needs:
    lineage divisions.
 
 This is real architectural work, ~2-3 sessions. Can be done independently
-of the page1 migration that's currently in flight.
+of the local_pca_dosage migration that's currently in flight.
 
 ---
 
@@ -362,7 +362,7 @@ explicitly states:
 > render the result.
 
 The example flow the proposal gives for `renderMendelianPage` is
-precisely the flow `page_review/page11.js` etc. should follow. This
+precisely the flow `page_review/boundary_refinement.js` etc. should follow. This
 is what `mount(root, atlasState, registry)` is for.
 
 **Recommendation:** when `analysis/mendelian_inheritance.js` is
@@ -426,8 +426,8 @@ the right order:
 **Recommended order, prioritised against current project state:**
 
 ```
-1. (already done) Round 2 page1 stub work — DONE.
-2. Round 3 page1 body extraction — ALREADY THE NEXT TASK per HANDOFF.
+1. (already done) Round 2 local_pca_dosage stub work — DONE.
+2. Round 3 local_pca_dosage body extraction — ALREADY THE NEXT TASK per HANDOFF.
    This is in flight. Don't interrupt.
 3. Candidate version schema + toolkit-side data model
    (candidate_version.schema.json + active_version pointer).
@@ -442,7 +442,7 @@ the right order:
 8. Page wiring for the Mendelian review page.
 ```
 
-Items 3-6 are independent of page1 round 3 and can be parallelised.
+Items 3-6 are independent of local_pca_dosage round 3 and can be parallelised.
 
 ---
 
@@ -494,7 +494,7 @@ In priority order:
 ## What this means for current chat sequence
 
 The HANDOFF I just wrote at the end of round 2 says **next chat = round
-3 page1 body extraction**. That hasn't changed. The registry-upgrade
+3 local_pca_dosage body extraction**. That hasn't changed. The registry-upgrade
 proposal is **NOT in the same lane** as the page migration; it's
 parallel work.
 
@@ -505,7 +505,7 @@ the proposal" drift over the migration work.
 
 If both lanes are active, recommended split:
 - **Page migration (this chat sequence)**: continues round 3 →
-  page2 → ... per existing recipe.
+  candidate_focus → ... per existing recipe.
 - **Registry/versioning (a new chat sequence)**: starts with
   `candidate_version.schema.json` design review, separate from page
   work.

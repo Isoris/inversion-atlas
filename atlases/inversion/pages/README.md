@@ -39,12 +39,12 @@ The directory a page lives in does **NOT** always match its
 
 | page | dir | manifest stage |
 |------|-----|---------------|
-| page8 | `pages/discovery/` | `catalogue` |
-| page19 | `pages/discovery/` | `catalogue` |
-| page17 | `pages/catalogue/` | `classification` |
-| page18 | `pages/catalogue/` | `classification` |
-| page_overview | `pages/catalogue/` | `classification` |
-| page5 | `pages/comparative/` | `help` |
+| window_summary_table | `pages/discovery/` | `catalogue` |
+| negative_regions | `pages/discovery/` | `catalogue` |
+| stats_profile | `pages/catalogue/` | `classification` |
+| marker_readiness | `pages/catalogue/` | `classification` |
+| overview | `pages/catalogue/` | `classification` |
+| help | `pages/comparative/` | `help` |
 
 The **stage** is authoritative for the shell's tab grouping.
 
@@ -72,9 +72,9 @@ Each page entry typically has a sibling subdirectory containing the
 page-private sub-modules:
 
 ```
-pages/discovery/page1.html        ← HTML shell
-pages/discovery/page1.js          ← main entry (mount/unmount/applyData)
-pages/discovery/page1/            ← sub-modules
+pages/discovery/local_pca_dosage.html        ← HTML shell
+pages/discovery/local_pca_dosage.js          ← main entry (mount/unmount/applyData)
+pages/discovery/local_pca_dosage/            ← sub-modules
     _state.js                       ← _pageState + setter
     _data.js                        ← schema detection + accessors
     sim_panel.js                    ← per-panel renderers
@@ -100,6 +100,6 @@ sub-modules see the active mount's state via ES module live-binding.
 - 🟡 **stub / empty-state / Phase 1** (renderers TODO or
   partial): ~10 pages
 - 🔵 **thin-loader** (external `window.*` renderer): 3 pages
-  (page6, page7, page_sv_evidence)
+  (popstats, ancestry_per_window, sv_evidence)
 - 🆕 **fresh implementations** (legacy shipped HTML shell only):
-  4 pages (page3, page8, page9, page19)
+  4 pages (catalogue, window_summary_table, confirmed_carousel, negative_regions)

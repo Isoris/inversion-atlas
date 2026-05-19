@@ -299,11 +299,11 @@ export function bindAllPanelsToCandidateMode(atlasState, slot) {
   const inv = atlasState && atlasState.inversion;
   if (!inv || !slot || !slot.render_state) return () => {};
   const unsubs = [];
-  if (inv._page_pca_panel_state) {
-    unsubs.push(bindSamplePanelToSlot(inv._page_pca_panel_state, slot));
+  if (inv._page_pca_scatter_per_window_state) {
+    unsubs.push(bindSamplePanelToSlot(inv._page_pca_scatter_per_window_state, slot));
   }
-  if (inv._page_similarity_panel_state) {
-    unsubs.push(bindSimilarityPanelToSlot(inv._page_similarity_panel_state, slot));
+  if (inv._page_similarity_matrix_state) {
+    unsubs.push(bindSimilarityPanelToSlot(inv._page_similarity_matrix_state, slot));
   }
   if (inv._page_dosage_heatmap_state) {
     unsubs.push(bindDosageHeatmapPanelToSlot(inv._page_dosage_heatmap_state, slot));

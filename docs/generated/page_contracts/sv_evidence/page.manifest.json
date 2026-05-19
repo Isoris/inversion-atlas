@@ -1,0 +1,72 @@
+{
+  "page_id": "sv_evidence",
+  "label": "SV evidence",
+  "page_type": "core_page (thin-loader stub)",
+  "stage": "classification",
+  "owner_atlas": "inversion",
+  "status": "active (thin loader; external module)",
+  "current_path": {
+    "html": "atlases/inversion/pages/review/sv_evidence.html",
+    "js_entry": "atlases/inversion/pages/review/sv_evidence.js",
+    "js_subdir": "atlases/inversion/pages/review/sv_evidence/"
+  },
+  "legacy_source": "legacy/Inversion_atlas.html lines 9329-9331 (HTML shell) + line 54981 (script tag for js/atlas_sv_evidence.js)",
+  "external_renderer": "window.AtlasSVEvidence — an OBJECT with .init / .loadCandidate / .destroy (distinct from popstats+ancestry_per_window single-function renderers); defined in js/atlas_sv_evidence.js",
+
+  "purpose": "Read-only candidate-level view of SV calls clustered around a candidate's boundaries, scored against the karyotype groups. Loads json/sv_genotype_counts/<cid>.json per candidate. Renders 3 stacked panels: SV table (caller/type/chrom/pos/len/support/gt-counts), UpSet plot of caller intersections, dosage heatmap.",
+
+  "required_layers": ["candidate_sv_counts"],
+  "required_slots": ["activeCandidate"],
+  "preloads": ["candidate_sv_counts"],
+  "actually_consumed": "json/sv_genotype_counts/<cid>.json (loaded by AtlasSVEvidence.loadCandidate)",
+  "registry_alignment_note": "Unlike popstats and ancestry_per_window, this page's registry entries MATCH what the page actually does (no mismatch flag needed)",
+
+  "panels": [
+    {"id": "sv_evidence_root", "purpose": "single inner mount slot owned by AtlasSVEvidence"},
+    {"id": "sv_table", "purpose": "caller / type / chrom / pos / len / support / gt-counts"},
+    {"id": "upset_plot", "purpose": "caller intersections"},
+    {"id": "dosage_heatmap", "purpose": "step-6 spec — dosage view"}
+  ],
+
+  "subdir_files": ["_state.js — _pageState + setter"],
+
+  "primitives_used": ["unknown — external AtlasSVEvidence handles rendering"],
+  "adapters_used": [
+    "json/sv_genotype_counts/<cid>.json (precomputed; no live compute endpoint)",
+    "json file from atlases/inversion/engines/producers/sv_evidence/ pipeline (4 Python scripts)"
+  ],
+
+  "lifecycle": {
+    "init": "mod.__pageInitDone guarded — called once on tab activate",
+    "loadCandidate": "mod.__lastCid guarded — refired when candidate id changes",
+    "destroy": "called on unmount via hideSvEvidencePage"
+  },
+
+  "interactions": [
+    {"id": "candidate_change", "type": "auto_dispatch", "purpose": "loadCandidate(cid) on activeCandidate change"}
+  ],
+  "hotkeys": [],
+
+  "computed_preview_outputs": [
+    "SV table per candidate",
+    "UpSet plot of caller intersections",
+    "dosage heatmap"
+  ],
+  "committable_outputs": ["none — read-only"],
+  "commit_policy": "none_by_default",
+
+  "documents": {
+    "page_registry_doc": "pages.registry.json -> pages.sv_evidence._doc",
+    "specs_done": ["specs_done/SPEC_sv_evidence_page.md (authored 2026-05-15 from shipped code)"],
+    "specs_todo": [],
+    "specs_referenced_but_missing": [],
+    "producer_pipeline": "atlases/inversion/engines/producers/sv_evidence/ (4 Python scripts + shared IO module)",
+    "handoffs": ["atlases/inversion/pages/review/BATCH_2_NOTES.md", "_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step19_done.md (third + final review tier-1 thin-loader-stub migration)"],
+    "user_guide": "unknown"
+  },
+
+  "known_issues": [
+    "External module window.AtlasSVEvidence absent → empty-state fallback in #sv_evidence_root (guarded by .__svInitFailed)."
+  ],
+  "confidence": "high"
+}

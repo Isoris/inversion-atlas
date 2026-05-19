@@ -2,9 +2,9 @@
 //
 // Color palettes for the sim_mat heatmap and the diverging Z panel.
 // Pure functions — no state dependency, no DOM dependency, no theme
-// dependency. Hoisted from legacy/Inversion_atlas.html during page1
-// migration round 3 (2026-05-06) so page1 and page12 share a single
-// source of truth (page12 line 613 references the same `simColor`).
+// dependency. Hoisted from legacy/Inversion_atlas.html during local_pca_dosage
+// migration round 3 (2026-05-06) so local_pca_dosage and local_pca_theta_pi share a single
+// source of truth (local_pca_theta_pi line 613 references the same `simColor`).
 //
 // Origin notes:
 //   simColor       — legacy lines 31256-31263. Single-channel viridis-ish

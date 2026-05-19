@@ -110,7 +110,7 @@ empty-state when prerequisites aren't met.
 
 ## §6. The candidate JSON shape
 
-Per `pages/discovery/page1/candidates.js` + the field references
+Per `pages/discovery/local_pca_dosage/candidates.js` + the field references
 across the codebase:
 
 ```
@@ -176,7 +176,7 @@ Per `specs_done/SPEC_registry_v2.md`:
 ## §9. Cluster-emit `classification` layer
 
 **Source**: cluster-side R pipeline (final step). **Consumers**:
-`page4` Tier sub-view (`state.data.classification`).
+`karyotype_tier` Tier sub-view (`state.data.classification`).
 
 Shape:
 
@@ -199,7 +199,7 @@ This is the per-axis classification; the full 14-axis grid lives in
 
 ## §10. Marker layer column contracts
 
-**Source**: cluster-side; per-candidate. **Consumers**: `page10`
+**Source**: cluster-side; per-candidate. **Consumers**: `marker_panels`
 (marker panels).
 
 `marker_panel_summary.json` (per-candidate row):
@@ -234,9 +234,9 @@ loaded):
 ## §11. Dosage / heterozygosity (`dosage_chunks` layer)
 
 **Source**: cluster-side (per-window dosage matrix). **Consumers**:
-`page2` FIG_C08 dosage heatmap, `page_dosage_heatmap`,
-`page_dosage_cluster`, `page1` L3 het-coloring (per
-`specs_done/SPEC_l3_het_dosage_coloring.md`), `page1`
+`candidate_focus` FIG_C08 dosage heatmap, `dosage_heatmap`,
+`dosage_cluster_adaptive_k`, `local_pca_dosage` L3 het-coloring (per
+`specs_done/SPEC_l3_het_dosage_coloring.md`), `local_pca_dosage`
 `linesColorMode='dosage'` and `'het'`.
 
 Shape (per chrom or per candidate):
@@ -259,8 +259,8 @@ sample's dosage falls in the heterozygous range (typically
 ## §12. Cross-species breakpoints (`cs_breakpoints_v1`)
 
 **Source**: `STEP_CS01_extract_breakpoints.py` (cluster-side wfmash
-1-to-1 alignment of Cgar × Cmac). **Consumers**: `page16`,
-indirectly `page16b` + `page17`.
+1-to-1 alignment of Cgar × Cmac). **Consumers**: `cross_species_breakpoints`,
+indirectly `multi_species_cockpit` + `stats_profile`.
 
 See `registries/schemas/cross_species_breakpoint_reuse.schema.json`
 for the JSON shape. Three-cohort discipline: F1 hybrid ≠ 226 pure
@@ -270,7 +270,7 @@ C. gariepinus ≠ wild C. macrocephalus.
 
 The candidate object (per §6) carries optional **completion** +
 **characterization** blocks populated by the cluster-side pipeline
-or by the user via page4:
+or by the user via karyotype_tier:
 
 ```
 candidate.completion = {
@@ -311,7 +311,7 @@ classifier rules (§3.4 of that SPEC). Highlights:
 Reserved for: lineage (§15 — see
 `specs_done/SPEC_distant_band_concordance_fish_trajectory.md`),
 band-trace (§16 — same SPEC), inheritance-group clustering (§17 —
-`shared/inheritance_groups.js`), candidate-list (§18 — page2 +
+`shared/inheritance_groups.js`), candidate-list (§18 — candidate_focus +
 candidate_io.js).
 
 These are computed in the browser, not loaded as files. They cache
@@ -321,10 +321,10 @@ candidateList}`.
 ## §19. 14-axis tier classification
 
 **Source**: cluster-side; ships as `final_classification.json` keyed
-by `candidate_id`. **Consumers**: `page4` Tier sub-view.
+by `candidate_id`. **Consumers**: `karyotype_tier` Tier sub-view.
 
 The 14 axes, grouped into 6 sections (per
-`pages/review/page4/tier_axes.js#TIER_AXES`):
+`pages/review/karyotype_tier/tier_axes.js#TIER_AXES`):
 
 ### Existence (4 axes — independent layers)
 
@@ -370,7 +370,7 @@ The 14 axes, grouped into 6 sections (per
 |------|---------|------------|
 | `confidence_tier` | overall tier from independence layers + group validation | T1 / T2 / T3 / T4 / unknown |
 
-The page4 Tier view renders these as a colour-coded grid. Empty
+The karyotype_tier Tier view renders these as a colour-coded grid. Empty
 state shows the axis schema only — no values — until
 `final_classification.json` ships from cluster-side.
 
@@ -378,15 +378,15 @@ state shows the axis schema only — no values — until
 
 ## §20-§21. Reserved
 
-For arrangement_calls + boundary annotations (referenced in page11
-`boundary_zone` per SPEC_l2_sweep + page1 candidate.boundary_zone).
+For arrangement_calls + boundary annotations (referenced in boundary_refinement
+`boundary_zone` per SPEC_l2_sweep + local_pca_dosage candidate.boundary_zone).
 Both currently `pending` placeholder schemas; will be expanded when
 the boundary refinement output schema stabilizes.
 
 ## §22. Structural scaffold (θπ / GHSL panels)
 
-**Cited by**: `pages/discovery/page12.html:13`,
-`pages.registry.json -> pages.page12._doc`.
+**Cited by**: `pages/discovery/local_pca_theta_pi.html:13`,
+`pages.registry.json -> pages.local_pca_theta_pi._doc`.
 
 The structural scaffold is the empty-state architecture for
 **evidence-axis pages** that ship UI without data:
@@ -399,9 +399,9 @@ The structural scaffold is the empty-state architecture for
   `state.layersPresent`
 
 Pages following this scaffold:
-- **page12** — θπ scanner (chips for `theta_pi_per_window`,
+- **local_pca_theta_pi** — θπ scanner (chips for `theta_pi_per_window`,
   `theta_pi_local_pca`, `theta_pi_envelopes`, `cusum_theta`)
-- **page15** — GHSL scanner (chips for `ghsl_panel`,
+- **local_pca_ghsl** — GHSL scanner (chips for `ghsl_panel`,
   `ghsl_kstripes`, `ghsl_karyotype_runs`, `ghsl_d17_envelopes`,
   `cusum_ghsl`)
 
@@ -465,7 +465,7 @@ For: regime annotation v3.4 (the Stage 5.5 layer per
 ## §29. Reserved
 
 For: cohort_diversity, cohort_sample_froh, ancestry_confound (the
-ancestry-confound calculations consumed by page2's ancestry
+ancestry-confound calculations consumed by candidate_focus's ancestry
 confound panel).
 
 ## §30. Reserved
@@ -498,7 +498,7 @@ by section:
 | `lof_burden.schema.json` | pending | §19 axis `burden_class` |
 | `marker_panel.schema.json` | pending | §10 |
 | `mendelian_test.schema.json` | pending | §17 (inheritance) |
-| `permutation.schema.json` | pending | §13 (page17 evidence) |
+| `permutation.schema.json` | pending | §13 (stats_profile evidence) |
 | `pseudogenisation.schema.json` | pending | §13 |
 | `relatedness.schema.json` | unknown | §23 |
 | `relatedness_ngsrelate.schema.json` | unknown | §23 (Mode B) |
@@ -547,10 +547,10 @@ this doc solves.
 ---
 
 **Authored**: 2026-05-15 to resolve the SCHEMA / SCHEMA_V2.md
-references from `pages.registry.json` page4 _doc + page12 _doc +
-page10 module header + `shared/regimes_registry.js:49` +
+references from `pages.registry.json` karyotype_tier _doc + local_pca_theta_pi _doc +
+marker_panels module header + `shared/regimes_registry.js:49` +
 `shared/scale_stability.js:3, 33, 298`. Also pulls in the 14-axis
-schema from `pages/review/page4/tier_axes.js#TIER_AXES`.
+schema from `pages/review/karyotype_tier/tier_axes.js#TIER_AXES`.
 
 **Future**: as more schemas move from `pending` to `validated`, this
 file accumulates the §N anchors that downstream code can reference.

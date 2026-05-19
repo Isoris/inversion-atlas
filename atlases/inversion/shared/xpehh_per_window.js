@@ -9,7 +9,7 @@
 // (mirrors dxy_per_inversion.js / cross_species.js / karyotype_lineage.js
 // — the existing per-layer convention).
 //
-// Eight exports drive the popstats-page (cartridge page6) XP-EHH track:
+// Eight exports drive the popstats-page (cartridge popstats) XP-EHH track:
 //
 //   isXpehhPerWindowJSON(data) → {ok, reasons}
 //        Schema validator. Caller can show reasons[0] in a status pill.

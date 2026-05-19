@@ -143,7 +143,7 @@ fetch.
 - `localStorage` still persists only `id`. Add `versionId` next to
   it; rehydration still goes through the registry the same way.
 - No new write path needed for v1. Versioning becomes useful once a
-  refinement is computed somewhere (page11 boundaries refinement,
+  refinement is computed somewhere (boundary_refinement boundaries refinement,
   later analysis modules); the act of saving a new version is a
   download-JSON / re-upload step like the existing review-session
   writes, OR uses the `Registry.write` we'll add in SPEC item 4.
