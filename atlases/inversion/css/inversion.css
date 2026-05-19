@@ -5026,8 +5026,23 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
 .pca-cluster-list-body .empty,
 .dh2-legend-body .empty,
 .nested-cand-list-body .empty,
+.nested-intervals-body .empty,
 .dc-per-k-body .empty,
 .tree-panel-legend-body .empty {
+  color: var(--ink-dimmer); font-style: italic;
+}
+
+/* Inner-intervals list under the "Inner intervals" header on the
+   nested-inversion detector page. Sibling shape to .nested-cand-list-body
+   (no h5 of its own; the header lives in .nested-panel-head). Default to
+   empty-state styling so the page reads as "(no hits yet)" until the
+   detectNestedInversion pass populates rows. */
+.nested-intervals-body {
+  font-family: var(--mono); font-size: 11px; color: var(--ink);
+  display: flex; flex-direction: column; gap: 3px;
+}
+.nested-intervals-body:empty::before {
+  content: '— no inner intervals detected —';
   color: var(--ink-dimmer); font-style: italic;
 }
 
@@ -5305,6 +5320,63 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
 .pmsa-selected-fields .empty, .ac-metrics-body .empty,
 .mos-counts-body .empty, .lc-counts-body .empty {
   color: var(--ink-dimmer); font-style: italic;
+}
+
+/* 2026-05-20: L3 adjacent-L2 Cramér's V mini-table on haplotype_regimes
+   (short-range mode). Each row is a pair (L2_i, L2_{i+1}) with a V
+   value rendered as a colored cell + a small merge button. */
+#rgL3PairsTable tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+#rgL3PairsTable tbody tr:hover {
+  background: rgba(255,255,255,0.03);
+}
+#rgL3PairsTable td {
+  padding: 4px 8px;
+  vertical-align: middle;
+}
+.rg-l3-pair-v {
+  display: inline-block;
+  min-width: 36px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-align: center;
+  font-weight: 600;
+}
+.rg-l3-pair-v[data-tier="high"] {
+  background: rgba(60, 192, 138, 0.18);
+  color: #3cc08a;
+  border: 1px solid rgba(60, 192, 138, 0.55);
+}
+.rg-l3-pair-v[data-tier="mid"] {
+  background: rgba(245, 165, 36, 0.18);
+  color: #f5a524;
+  border: 1px solid rgba(245, 165, 36, 0.55);
+}
+.rg-l3-pair-v[data-tier="low"] {
+  background: rgba(224, 85, 92, 0.16);
+  color: #e0555c;
+  border: 1px solid rgba(224, 85, 92, 0.55);
+}
+.rg-l3-pair-v[data-tier="na"] {
+  background: var(--panel-3, #232a36);
+  color: var(--ink-dimmer, #5a6472);
+  border: 1px solid var(--rule, #2a3242);
+}
+.rg-l3-pair-merge {
+  background: var(--panel-3, #232a36);
+  color: var(--ink, #e6edf6);
+  border: 1px solid var(--rule, #2a3242);
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  cursor: pointer;
+}
+.rg-l3-pair-merge:hover {
+  background: var(--accent, #f5a524);
+  color: #0b0e13;
+  border-color: var(--accent, #f5a524);
 }
 
 /* 2026-05-20: CUSUM dual-pane split. Mirrors the L3 "Dual" layout —

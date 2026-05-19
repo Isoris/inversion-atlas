@@ -137,15 +137,21 @@ async function _autoLoadDefaultChunk(root, atlasState) {
   // If a payload is already set (candidate-open path), don't overwrite.
   const dh = inv.dosage_heatmap_state || {};
   if (dh.legacy_chunk || dh.mgl_heatmap_result) return;
+  // 2026-05-20: be permissive about the stash — work even when
+  // local_pca_dosage hasn't mounted yet. We only need a chrom + a
+  // chunk-URL template; the latter has a hard-coded fallback below.
   const stash = inv._local_pca_dosage_state;
-  if (!stash || !stash.data) return;
-  const data = stash.data;
-  const chrom = data.chrom || (atlasState.shared && atlasState.shared.activeChrom);
+  const data = stash && stash.data;
+  const chrom = (data && data.chrom)
+             || (atlasState.shared && atlasState.shared.activeChrom);
   if (!chrom) return;
-  const dc = data.dosage_chunks;
+  const dc = data && data.dosage_chunks;
+  // Prefer the synthetic-bridge URL that local_pca_dosage attaches; fall
+  // back to the canonical /api/dosage/chunk template so this page is
+  // self-sufficient when opened first.
   const template =
        (dc && Array.isArray(dc.chunks) && dc.chunks[0] && (dc.chunks[0].url || dc._endpoint))
-    || null;
+    || '/api/dosage/chunk?chrom=__CHROM__&start=__START__&end=__END__&cap=__CAP__';
   if (!template || template.indexOf('__START__') < 0) return;
   // Pick a default region.
   let startBp = null, endBp = null, sourceLabel = null;
@@ -155,9 +161,9 @@ async function _autoLoadDefaultChunk(root, atlasState) {
     startBp = cand.start_bp; endBp = cand.end_bp;
     sourceLabel = `candidate ${cand.label || cand.id || ''}`.trim();
   }
-  // 2. Focal L2 of the current cursor.
-  if (startBp == null && stash.windowToL2 && stash.cur != null
-      && Array.isArray(data.l2_envelopes)) {
+  // 2. Focal L2 of the current cursor (only when the stash + data are present).
+  if (startBp == null && stash && stash.windowToL2 && stash.cur != null
+      && data && Array.isArray(data.l2_envelopes)) {
     const li = stash.windowToL2[stash.cur | 0];
     if (li >= 0 && data.l2_envelopes[li]) {
       const env = data.l2_envelopes[li];
@@ -168,16 +174,21 @@ async function _autoLoadDefaultChunk(root, atlasState) {
     }
   }
   // 3. First 2 Mb of the chrom — best-effort window-range pull from
-  //    data.windows[0..N].start_bp/end_bp, capped at 2 Mb.
-  if (startBp == null && Array.isArray(data.windows) && data.windows.length > 0) {
+  //    data.windows[0..N].start_bp/end_bp, capped at 2 Mb. Falls back
+  //    to "first 2 Mb starting at bp=1" when no windows array exists.
+  if (startBp == null && data && Array.isArray(data.windows) && data.windows.length > 0) {
     const w0 = data.windows[0];
     const firstBp = Number.isFinite(w0.start_bp) ? w0.start_bp : 1;
     startBp = firstBp;
     endBp   = firstBp + 2_000_000;
     sourceLabel = `${chrom} ${(firstBp / 1e6).toFixed(2)}–${(endBp / 1e6).toFixed(2)} Mb (default)`;
+  } else if (startBp == null) {
+    startBp = 1;
+    endBp   = 2_000_000;
+    sourceLabel = `${chrom} 0.00–2.00 Mb (default)`;
   }
   if (startBp == null || endBp == null) return;
-  const cap = (dc.cap_default | 0) || 1000;
+  const cap = (dc && (dc.cap_default | 0)) || 1000;
   const url = template
     .replace('__CHROM__', encodeURIComponent(chrom))
     .replace('__START__', String(startBp | 0))

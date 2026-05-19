@@ -82,7 +82,7 @@ export async function mount(root, atlasState, registry) {
   // first" empty state.
   if (!pageState.detector_result) {
     try {
-      _autoDetectNested(root, atlasState);
+      await _autoDetectNested(root, atlasState, registry);
       pageState = _buildPageState(atlasState);
       _setActiveState(pageState);
       try { refreshNestedDetector(pageState); }
@@ -101,36 +101,49 @@ export async function mount(root, atlasState, registry) {
 // resulting verdict + per-stratum inner-band candidates + contiguous
 // inner intervals land on inv.nested_detector_state. Silently returns
 // when prerequisites are missing.
-function _autoDetectNested(root, atlasState) {
+async function _autoDetectNested(root, atlasState, registry) {
   const inv = (atlasState && atlasState.inversion) || {};
   const existing = inv.nested_detector_state || {};
   if (existing.detector_result) return;
+  // 2026-05-20: fall back to a fresh registry resolve when the stash
+  // isn't populated, so this page works as a first-mount destination.
   const stash = inv._local_pca_dosage_state;
-  if (!stash || !stash.data || !Array.isArray(stash.data.windows)) {
-    _setLoadingHint(root, 'open local_pca_dosage first so the cohort PCA + focal-L2 K-means are loaded.');
+  let data = (stash && stash.data) || null;
+  if (!data && registry) {
+    const chrom = atlasState.shared && atlasState.shared.activeChrom;
+    if (chrom) {
+      try { data = await registry.resolve('scrubber_main', { chrom }); }
+      catch (e) {
+        console.warn('nested_inversion_detector: scrubber_main resolve threw —', e);
+      }
+    }
+  }
+  if (!data || !Array.isArray(data.windows)) {
+    _setLoadingHint(root, 'no scrubber data on this chromosome.');
     return;
   }
-  const data = stash.data;
   const wins = data.windows;
   const nW = wins.length;
   const nS = data.n_samples | 0;
   if (nW <= 0 || nS <= 0) return;
-  // Pull per-sample karyotype labels from the focal L2's K=3 K-means
-  // (lockedLabels if set; else getL2Cluster at the cursor's L2). The
-  // labels are 0/1/2 — we map them to HOM1/HET/HOM2 by the order the
-  // L2's K-means produced them. The exact identity (which cluster id
-  // is "HOM1") doesn't matter for the detector: we're looking for
-  // 3-band structure INSIDE each stratum, regardless of label.
-  let labels = stash.lockedLabels;
-  if (!labels && Array.isArray(data.l2_envelopes) && stash.windowToL2
-      && Number.isFinite(stash.cur)) {
-    const li = stash.windowToL2[stash.cur | 0];
-    if (li >= 0) {
+  // Pull labels via priority: lockedLabels > stash focal-L2 K-means >
+  // auto-cluster the active window's PC1×PC2 via K-means K=3 (so the
+  // page works even when local_pca_dosage hasn't run yet).
+  let labels = stash && stash.lockedLabels;
+  if (!labels) {
+    const cur = (stash && Number.isFinite(stash.cur)) ? (stash.cur | 0)
+              : Math.floor(nW / 2);
+    const w = wins[Math.max(0, Math.min(nW - 1, cur))];
+    if (w && w.pc1 && w.pc2) {
       try {
-        // Lazy-import to avoid a top-level cycle with local_pca_dosage's
-        // shared per_l2_cluster module.
-        const mod = require && (() => null);   // no-op shim
-      } catch (_) {}
+        const km = await import('../../shared/kmeans.js').catch(() => null);
+        if (km && typeof km.kmeans2D === 'function') {
+          const result = km.kmeans2D(w.pc1, w.pc2, 3);
+          if (result && result.labels) labels = result.labels;
+        }
+      } catch (e) {
+        console.warn('nested_inversion_detector: K-means fallback threw —', e);
+      }
     }
   }
   if (!labels) {

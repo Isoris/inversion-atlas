@@ -104,7 +104,7 @@ export async function mount(root, atlasState, registry) {
   // lam1,lam2} — no compute kernel needed, just adaptation.
   if (!pageState.data || !pageState.data.pca_results) {
     try {
-      _autoBuildPcaPanelState(atlasState);
+      await _autoBuildPcaPanelState(atlasState, registry);
       pageState = _buildPageState(atlasState);
       _setActiveState(pageState);
       try { refreshPcaPanel(pageState); }
@@ -118,17 +118,28 @@ export async function mount(root, atlasState, registry) {
   }
 }
 
-// Build a pca_panel_state envelope from the local_pca_dosage data already
-// loaded on `inv._local_pca_dosage_state.data`. Each window's pc1/pc2/lam1/lam2
-// becomes a pca_results[] entry; per-sample K-means labels at the
-// current cursor's L2 become cluster_assignment.
-function _autoBuildPcaPanelState(atlasState) {
+// Build a pca_panel_state envelope. 2026-05-20: falls back to a fresh
+// registry.resolve('scrubber_main') when the local_pca_dosage stash isn't
+// populated yet — so this page works as a first-mount destination
+// (user opens it directly from the tab bar without visiting local_pca_dosage
+// first).
+async function _autoBuildPcaPanelState(atlasState, registry) {
   const inv = (atlasState && atlasState.inversion) || {};
   const existing = inv.pca_panel_state || {};
   if (existing.pca_results) return;
   const stash = inv._local_pca_dosage_state;
-  if (!stash || !stash.data || !Array.isArray(stash.data.windows)) return;
-  const data = stash.data;
+  let data = (stash && stash.data) || null;
+  if (!data && registry) {
+    const chrom = atlasState.shared && atlasState.shared.activeChrom;
+    if (chrom) {
+      try { data = await registry.resolve('scrubber_main', { chrom }); }
+      catch (e) {
+        console.warn('pca_scatter_per_window: scrubber_main resolve threw —', e);
+        return;
+      }
+    }
+  }
+  if (!data || !Array.isArray(data.windows)) return;
   const wins = data.windows;
   const n = wins.length;
   const pca_results = new Array(n);

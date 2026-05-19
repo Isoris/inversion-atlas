@@ -143,6 +143,69 @@
         </div>
       </div>
 
+      <!-- 2026-05-20: L3 adjacent-pair Cramér's V mini-table. Shown
+           ONLY in short-range mode — surfaces every adjacent (L2_i,
+           L2_{i+1}) pair on the active chromosome with its Cramér's V
+           between Hungarian-aligned K-means labels. High V = the two
+           L2s see the same haplotype structure → candidate merge. A
+           "merge" button per row promotes the joined range as a new
+           candidate via the existing addCandidateToList plumbing. -->
+      <div id="rgL3PairsWrap" style="
+        flex: 0 0 auto;
+        margin: 0 12px 12px 12px;
+        padding: 0;
+        background: var(--panel-2, #181d27);
+        border: 1px solid var(--rule, #2a3242);
+        border-radius: 4px;
+        display: none;
+        flex-direction: column;
+        max-height: 200px;
+        overflow: hidden;
+      ">
+        <div style="
+          flex: 0 0 auto;
+          padding: 6px 10px;
+          border-bottom: 1px solid var(--rule, #2a3242);
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font: 10px ui-monospace, monospace;
+          color: var(--ink-dim, #8895a8);
+        ">
+          <b style="color: var(--ink, #e6edf6);">L3 adjacent-L2 Cramér's V</b>
+          <span style="color: var(--ink-dimmer, #5a6472);">
+            high V = same haplotype structure across the boundary → candidate merge
+          </span>
+          <span style="flex: 1 1 auto"></span>
+          <span id="rgL3PairsCount" style="color: var(--ink-dimmer, #5a6472);"></span>
+        </div>
+        <div style="flex: 1 1 auto; overflow-y: auto;">
+          <table id="rgL3PairsTable" style="
+            width: 100%;
+            border-collapse: collapse;
+            font: 10.5px ui-monospace, monospace;
+            color: var(--ink, #e6edf6);
+          ">
+            <thead>
+              <tr style="
+                background: var(--panel-3, #232a36);
+                color: var(--ink-dim, #8895a8);
+                font-size: 9.5px;
+                text-align: left;
+                position: sticky; top: 0;
+              ">
+                <th style="padding: 4px 8px;">L2 pair</th>
+                <th style="padding: 4px 8px;">span</th>
+                <th style="padding: 4px 8px;">V</th>
+                <th style="padding: 4px 8px;">n samples</th>
+                <th style="padding: 4px 8px;">action</th>
+              </tr>
+            </thead>
+            <tbody id="rgL3PairsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Bottom action bar: catalogue export + status -->
       <div class="rg-actionbar" style="
         flex: 0 0 auto;

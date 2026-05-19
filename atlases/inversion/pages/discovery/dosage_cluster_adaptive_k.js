@@ -56,7 +56,7 @@ export function initDosageClusterToolbar() {
 // =====================================================================
 
 export async function mount(root, atlasState, registry) {
-  const pageState = _buildPageState(atlasState);
+  let pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
 
   try { refreshDosageCluster(pageState); }
@@ -67,6 +67,87 @@ export async function mount(root, atlasState, registry) {
 
   if (atlasState.inversion) {
     atlasState.inversion._page_dosage_cluster_adaptive_k_state = pageState;
+  }
+
+  // 2026-05-20: auto-compute on direct mount. Builds a per-sample
+  // dosage-profile matrix D[sample × window] from the local_pca_dosage
+  // data (PC1 across windows is a reasonable per-sample profile when
+  // the raw dosage matrix isn't directly accessible), then runs
+  // adaptiveKDosageClustering. Falls back to a fresh scrubber_main
+  // resolve when the stash isn't populated.
+  if (!pageState.cluster_result) {
+    try {
+      await _autoComputeDosageClustering(root, atlasState, registry);
+      pageState = _buildPageState(atlasState);
+      _setActiveState(pageState);
+      try { refreshDosageCluster(pageState); }
+      catch (e) { console.warn('dosage_cluster_adaptive_k.mount: post-autocompute refresh threw —', e); }
+      if (atlasState.inversion) {
+        atlasState.inversion._page_dosage_cluster_adaptive_k_state = pageState;
+      }
+    } catch (e) {
+      console.warn('dosage_cluster_adaptive_k.mount: auto-compute failed:', e);
+    }
+  }
+}
+
+async function _autoComputeDosageClustering(root, atlasState, registry) {
+  const inv = (atlasState && atlasState.inversion) || {};
+  const existing = inv.dosage_cluster_state || {};
+  if (existing.cluster_result) return;
+  const stash = inv._local_pca_dosage_state;
+  let data = (stash && stash.data) || null;
+  if (!data && registry) {
+    const chrom = atlasState.shared && atlasState.shared.activeChrom;
+    if (chrom) {
+      try { data = await registry.resolve('scrubber_main', { chrom }); }
+      catch (e) {
+        console.warn('dosage_cluster_adaptive_k: scrubber_main resolve threw —', e);
+      }
+    }
+  }
+  if (!data || !Array.isArray(data.windows)) {
+    _setLoadingHint(root, 'no scrubber data on this chromosome.');
+    return;
+  }
+  const wins = data.windows;
+  const nW = wins.length;
+  const nS = data.n_samples | 0;
+  if (nW <= 0 || nS <= 0) return;
+  // Build D[sample][window] = signed PC1 across windows. Float64Array
+  // row-major n_samples × n_windows for adaptiveKDosageClustering's
+  // expected contract.
+  const D = new Float64Array(nS * nW);
+  for (let i = 0; i < nW; i++) {
+    const w = wins[i];
+    if (!w || !w.pc1) continue;
+    for (let s = 0; s < nS; s++) {
+      D[s * nW + i] = +w.pc1[s] || 0;
+    }
+  }
+  let result = null;
+  try {
+    const mod = await import('../../shared/mgl_dosage_clustering.js').catch(() => null);
+    if (mod && typeof mod.adaptiveKDosageClustering === 'function') {
+      result = mod.adaptiveKDosageClustering(D, nS, nW, {});
+    }
+  } catch (e) {
+    _setLoadingHint(root, `adaptiveKDosageClustering threw: ${e && e.message ? e.message : 'error'}`);
+    return;
+  }
+  if (!result) return;
+  inv.dosage_cluster_state = Object.assign({}, existing, {
+    cluster_result:  result,
+    candidate_label: existing.candidate_label || (data.chrom || null),
+  });
+}
+
+function _setLoadingHint(root, msg) {
+  const el = (root && root.querySelector && root.querySelector('#dosageClusterEmpty'))
+    || (typeof document !== 'undefined' && document.getElementById('dosageClusterEmpty'));
+  if (el) {
+    el.style.display = '';
+    el.textContent = msg;
   }
 }
 

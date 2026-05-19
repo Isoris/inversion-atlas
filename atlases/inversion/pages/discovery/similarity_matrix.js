@@ -118,15 +118,18 @@ async function _autoComputeSimilarity(root, atlasState) {
   const inv = (atlasState && atlasState.inversion) || {};
   const existing = inv.similarity_panel_state || {};
   if (existing.similarity_result) return;
+  // 2026-05-20: tolerate missing stash — fall back to the canonical
+  // /api/dosage/chunk template + shared.activeChrom so this page is
+  // self-sufficient when opened first.
   const stash = inv._local_pca_dosage_state;
-  if (!stash || !stash.data) return;
-  const data = stash.data;
-  const chrom = data.chrom || (atlasState.shared && atlasState.shared.activeChrom);
+  const data = stash && stash.data;
+  const chrom = (data && data.chrom)
+             || (atlasState.shared && atlasState.shared.activeChrom);
   if (!chrom) return;
-  const dc = data.dosage_chunks;
+  const dc = data && data.dosage_chunks;
   const template =
        (dc && Array.isArray(dc.chunks) && dc.chunks[0] && (dc.chunks[0].url || dc._endpoint))
-    || null;
+    || '/api/dosage/chunk?chrom=__CHROM__&start=__START__&end=__END__&cap=__CAP__';
   if (!template || template.indexOf('__START__') < 0) return;
   // Pick a default region (same priority as dosage_heatmap auto-load).
   let startBp = null, endBp = null, sourceLabel = null;
@@ -135,8 +138,8 @@ async function _autoComputeSimilarity(root, atlasState) {
     startBp = cand.start_bp; endBp = cand.end_bp;
     sourceLabel = `candidate ${cand.label || cand.id || ''}`.trim();
   }
-  if (startBp == null && stash.windowToL2 && stash.cur != null
-      && Array.isArray(data.l2_envelopes)) {
+  if (startBp == null && stash && stash.windowToL2 && stash.cur != null
+      && data && Array.isArray(data.l2_envelopes)) {
     const li = stash.windowToL2[stash.cur | 0];
     if (li >= 0 && data.l2_envelopes[li]) {
       const env = data.l2_envelopes[li];
@@ -146,17 +149,19 @@ async function _autoComputeSimilarity(root, atlasState) {
       }
     }
   }
-  if (startBp == null && Array.isArray(data.windows) && data.windows.length > 0) {
+  if (startBp == null && data && Array.isArray(data.windows) && data.windows.length > 0) {
     const w0 = data.windows[0];
     const firstBp = Number.isFinite(w0.start_bp) ? w0.start_bp : 1;
     startBp = firstBp;
     endBp   = firstBp + 2_000_000;
     sourceLabel = `${chrom} ${(firstBp / 1e6).toFixed(2)}–${(endBp / 1e6).toFixed(2)} Mb (default)`;
+  } else if (startBp == null) {
+    startBp = 1;
+    endBp   = 2_000_000;
+    sourceLabel = `${chrom} 0.00–2.00 Mb (default)`;
   }
   if (startBp == null || endBp == null) return;
-  // Bump cap so the per-window slices each have ≥ ~30 markers for a
-  // useful similarity matrix.
-  const cap = Math.max(((dc.cap_default | 0) || 1000), 800);
+  const cap = Math.max(((dc && dc.cap_default | 0) || 1000), 800);
   const url = template
     .replace('__CHROM__', encodeURIComponent(chrom))
     .replace('__START__', String(startBp | 0))

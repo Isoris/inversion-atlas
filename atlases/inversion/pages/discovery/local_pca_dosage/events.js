@@ -71,32 +71,64 @@ export function setCur(state, i) {
   const N = (view && view.n_windows)
          || (view && view.windows && view.windows.length)
          || state.data.n_windows;
-  state.cur = Math.max(0, Math.min((N | 0) - 1, i | 0));
+  const clamped = Math.max(0, Math.min((N | 0) - 1, i | 0));
+  // 2026-05-19 perf: skip the whole 13-panel redraw when cur didn't
+  // actually change. Audit of every setCur(...) caller confirmed none
+  // pass state.cur intentionally as a "force redraw" idiom — they all
+  // supply a navigation target (arrow keys, click-to-jump, scrubber
+  // value, L2 boundary jump, candidate focus). If a future path DOES
+  // need to force a same-cur redraw, it should call the specific draw
+  // functions directly rather than going through setCur.
+  if (clamped === state.cur) return;
+  state.cur = clamped;
   const _scrubEl = document.getElementById('scrubber');
   if (_scrubEl) _scrubEl.value = state.cur;
+
+  // 2026-05-19 perf instrumentation. Opt-in: set `window.__perfDbg = true`
+  // in the dev console to enable. Off by default → zero overhead. Logs
+  // per-call ms in the format `[scrub] setCur(N): total=Xms (drawSim=…
+  // drawZ=… …)`. Knowing which step dominates is the first step toward
+  // fixing it; the user-facing wins below (same-L2 skip for renderL3Panel,
+  // cursor-only path for drawSim) are also gated on this measurement.
+  const _PERF = (typeof window !== 'undefined') && window.__perfDbg === true;
+  const _tAll = _PERF ? performance.now() : 0;
+  const _ts = _PERF ? {} : null;
+  const _time = _PERF
+    ? (key, fn) => { const t = performance.now(); try { fn(); } catch (_) {} _ts[key] = performance.now() - t; }
+    : (_key, fn) => { try { fn(); } catch (_) {} };
+
   // 2026-05-06 round 3 (parity step): bare drawX() / updateWinLabel(state) / etc.
   // calls in legacy assumed `state` was a global. Under the new shell every
   // entry point takes `state` as first arg, so we wrap each in a guarded
   // call. The original try/catch pattern around drawSimMini/drawAnchorStrip
   // is preserved verbatim.
-  try { updateWinLabel(state); } catch (_) {}
-  try { drawSim(state); }       catch (_) {}
-  try { drawZ(state); }         catch (_) {}
-  try { drawTracks(state); }    catch (_) {}
-  try { drawLinesPanel(state); }catch (_) {}
-  try { drawPCA(state); }       catch (_) {}
+  _time('updateWinLabel',   () => updateWinLabel(state));
+  _time('drawSim',          () => drawSim(state));
+  _time('drawZ',            () => drawZ(state));
+  _time('drawTracks',       () => drawTracks(state));
+  _time('drawLinesPanel',   () => drawLinesPanel(state));
+  _time('drawPCA',          () => drawPCA(state));
   // v3.51: keep the minimap's orange crosshair in sync with the scrubber
   if (state.simInMinimap) {
-    try { drawSimMini(state); } catch (_) {}
+    _time('drawSimMini',    () => drawSimMini(state));
   }
   // v3.52: anchor concord strip — orange cursor line follows scrubber
-  try { drawAnchorStrip(state); } catch (_) {}
+  _time('drawAnchorStrip',  () => drawAnchorStrip(state));
   // v3.71: concord V badge (above per-sample-lines header) follows the scrubber
-  try { _updateConcordBadge(state); } catch (_) {}
-  try { updateSidebarInfo(state); } catch (_) {}
-  try { renderZoneBlock(state); }   catch (_) {}
+  _time('concordBadge',     () => _updateConcordBadge(state));
+  _time('updateSidebarInfo',() => updateSidebarInfo(state));
+  _time('renderZoneBlock',  () => renderZoneBlock(state));
   if (typeof renderL3Panel === 'function') {
-    try { renderL3Panel(state); } catch (_) {}
+    _time('renderL3Panel',  () => renderL3Panel(state));
+  }
+
+  if (_PERF) {
+    const total = (performance.now() - _tAll).toFixed(1);
+    const parts = Object.entries(_ts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, v]) => `${k}=${v.toFixed(1)}`)
+      .join(' ');
+    console.log(`[scrub] setCur(${state.cur}): total=${total}ms · ${parts}`);
   }
   // v3.94: live dosage heatmap follows cursor (debounced; no-op when closed)
   if (typeof redrawCursorHeatmap === 'function') {

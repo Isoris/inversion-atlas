@@ -138,6 +138,52 @@ function _renderHeader(state) {
       hoverEl.textContent = 'hover: —';
     }
   }
+  // 2026-05-20 Phase 2: trajectory panel + concordance badge.
+  _refreshTrajectoryAndConcord(state);
+}
+
+// Show/hide the per-sample trajectory row + compute concordance badge.
+// Runs on every header refresh (cheap when nothing to do; the heavy
+// trajectory paint is gated on hoveredSample being valid).
+function _refreshTrajectoryAndConcord(state) {
+  if (typeof document === 'undefined') return;
+  const wrap = document.getElementById('pcaCompTrajectoryWrap');
+  const label = document.getElementById('pcaCompTrajLabel');
+  const badge = document.getElementById('pcaCompConcordBadge');
+  const si = state.hoveredSample;
+  const ss = state.sharedState;
+  if (si < 0 || !ss || !ss.data) {
+    if (wrap) wrap.style.display = 'none';
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+  if (wrap) wrap.style.display = 'flex';
+  if (label && ss.data.samples && ss.data.samples[si]) {
+    const s = ss.data.samples[si];
+    label.textContent = (s.cga || s.ind || `si=${si}`);
+  } else if (label) {
+    label.textContent = `si=${si}`;
+  }
+  try { paintTrajectory(state, si); } catch (e) {
+    console.warn('paintTrajectory:', e);
+  }
+  if (badge) {
+    let cc = null;
+    try { cc = computeConcordance(state, si); } catch (_) {}
+    if (cc && Number.isFinite(cc.frac)) {
+      const pct = Math.round(cc.frac * 100);
+      const col = cc.frac >= 0.9 ? '#3cc08a'
+                : cc.frac >= 0.6 ? '#f5a524'
+                : '#e0555c';
+      badge.style.display = 'inline';
+      badge.style.color = col;
+      badge.style.borderColor = col;
+      badge.textContent = `concord ${pct}% (${cc.agree}/${cc.total}w)`;
+      badge.title = `PC1-sign agreement across all 3 evidence axes for this sample: ${cc.agree} of ${cc.total} valid windows. High = consistent biology across signals; low = layers disagree (recombinant / mosaic).`;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
