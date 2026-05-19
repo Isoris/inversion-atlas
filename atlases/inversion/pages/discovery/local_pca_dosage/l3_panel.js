@@ -18,6 +18,7 @@ import {
   ariFromTable,
   restrictedConcord,
 } from '../../../shared/contingency.js';
+import { clusterL2_UVRotated } from '../../../shared/uv_rotation.js';
 import { computeBandDiagnostics } from './band_diagnostics.js';
 import {
   bandDiagsMiniChipsHtml,
@@ -1324,18 +1325,64 @@ function alignedLabelsTo_atK(focalIdx, neighborIdx, K) {
 // =============================================================================
 // Routes label-fetch + contingency through the appropriate cluster
 // function based on state.l3ReclusterMode. Currently supports:
-//   - kmeans-K3  → compareL2Pair (default state.k=3 path)
-//   - kmeans-K6  → compareL2Pair_atK at K=6
-// UV modes (distance-uv / uv-rotated / uv-denoise / uv-dbscan /
-// uv-dist-rank / uv-dist-fuzzy) need the UV-rotation cache port from
-// legacy 10928-11200 — separate commit. Until then they fall back to
-// kmeans-K3 and the dropdown options are disabled.
+//   - kmeans-K3        → compareL2Pair (default state.k=3 path)
+//   - kmeans-K6        → compareL2Pair_atK at K=6
+//   - distance-uv      → UV-rotated mode (alias of uv-rotated)
+//   - uv-rotated       → clusterL2_UVRotated (shared/uv_rotation.js)
+// UV-denoise / uv-dbscan / uv-dist-rank / uv-dist-fuzzy still need
+// the 4 advanced cluster modes from legacy 11195-11540 ported — that's
+// a separate commit. Until then they fall back to kmeans-K3.
 function compareL2Pair_byMode(leftIdx, rightIdx, mode) {
   if (!mode || mode === 'kmeans-K3') return compareL2Pair(leftIdx, rightIdx);
   if (mode === 'kmeans-K6')          return compareL2Pair_atK(leftIdx, rightIdx, 6);
-  // UV modes not yet ported — fall back so the panel still renders
-  // instead of throwing. The dropdown should already disable these.
+  if (mode === 'distance-uv' || mode === 'uv-rotated') {
+    return _compareL2Pair_UVRotated(leftIdx, rightIdx);
+  }
+  // Remaining UV modes not yet ported — fall back so the panel still renders
+  // instead of throwing. The dropdown disables these.
   return compareL2Pair(leftIdx, rightIdx);
+}
+
+// =============================================================================
+// _compareL2Pair_UVRotated — UV-rotated dispatcher (legacy 11733-1774 fragment)
+// =============================================================================
+// Specialised compare for the uv-rotated mode. Both panes are
+// clustered via clusterL2_UVRotated (3-cluster partition in rotated
+// (u, v) space); Hungarian-aligned contingency at K=3.
+function _compareL2Pair_UVRotated(leftIdx, rightIdx) {
+  const state = _pageState;
+  if (leftIdx == null || rightIdx == null) return null;
+  const cl = clusterL2_UVRotated(state, leftIdx);
+  const cr = clusterL2_UVRotated(state, rightIdx);
+  if (!cl || !cr || !cl.labels || !cr.labels) return null;
+  const K = 3;
+  const llab = cl.fixedKLabels || cl.labels;
+  const rlab = cr.fixedKLabels || cr.labels;
+  const align = alignLabels(llab, rlab, K);
+  let p_value = null;
+  let test_kind = 'chi2_3x3';
+  if (typeof chiSquare === 'function') {
+    const cs = chiSquare(align.table, K);
+    p_value = cs ? cs.p_approx : null;
+  }
+  let verdict;
+  if (!cl.ok || !cr.ok)                       verdict = 'LOW_POWER';
+  else if (align.concord >= state.mergeThr)   verdict = 'MERGE';
+  else                                        verdict = 'SEPARATE';
+  return {
+    leftIdx, rightIdx, K,
+    table: align.table,
+    perm: align.perm,
+    concord: align.concord,
+    p_value,
+    test_kind,
+    verdict,
+    cl_ok: cl.ok, cr_ok: cr.ok,
+    cl_reason: cl.reason, cr_reason: cr.reason,
+    cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
+    cl_usedK: K, cr_usedK: K,
+    reclusterMode: 'uv-rotated',
+  };
 }
 
 // =============================================================================
