@@ -209,9 +209,12 @@ const bar = NAV.renderCandidateNavInline(sR, {
 });
 check('returns a node',                  !!bar);
 check('node.className',                  bar.className === 'cand-nav-inline');
-check('node.style cssText set',          bar.style.cssText.includes('cand-nav-inline') || bar.style.cssText.includes('display: flex'));
+// 2026-05-20: cssText assertion retired — styling is now class-based
+// (rules live under .cand-nav-inline in inversion.css), no inline styles
+// on the bar or its children.
 check('node.innerHTML populated',        bar.innerHTML.length > 0);
 check('innerHTML has tstNavPrev id',     bar.innerHTML.includes('id="tstNavPrev"'));
+check('innerHTML has cnav-btn class',    bar.innerHTML.includes('class="cnav-btn"'));
 
 // Click prev → onNavigate fires with target p
 const prevBtn = bar.querySelector('#tstNavPrev');

@@ -33,7 +33,7 @@
 
 import { _pageState, _setActiveState } from './popstats/_state.js';
 import { renderPopstatsPage } from './popstats/_render.js';
-import { renderCandidateNav } from './popstats/_candidate_nav.js';
+import { renderCandidateNavInline } from '../../shared/candidate_nav.js';
 
 export async function mount(root, atlasState, registry) {
   const chrom = atlasState.shared && atlasState.shared.activeChrom;
@@ -64,25 +64,48 @@ export async function mount(root, atlasState, registry) {
 }
 
 /**
- * Insert the prev/next candidate nav bar at the very top of #popstats.
- * onChange flips activeCandidate via the AtlasState convenience setter
- * AND re-runs mount() so the breakpoint overlay, candidate label, and
- * "candidate N / M" position counter all refresh in one pass.
+ * Insert the prev/next candidate nav bar at the very top of #popstats via the
+ * shared cartridge (shared/candidate_nav.js). The cartridge consumes a
+ * legacy-shape `state` object — we build one from atlasState — and exposes
+ * onNavigate / onClearActive callbacks. Each callback writes back to
+ * atlasState via the convenience setters (so prewarm + sibling listeners stay
+ * in sync) and re-runs mount() so the bar's counter + breakpoint overlay
+ * refresh in one pass.
  */
 function _mountCandidateNav(root, atlasState, registry) {
   const page = (root && root.querySelector) ? root.querySelector('#popstats') : null;
   if (!page) return;
   const old = page.querySelector('.cand-nav-inline');
   if (old) old.remove();
-  const bar = renderCandidateNav({
-    atlasState,
-    idPrefix: 'ps',
-    onChange: () => {
-      mount(root, atlasState, registry).catch(err =>
-        console.warn('popstats: re-mount after candidate change threw —', err));
-    },
+
+  const sh  = atlasState.shared    || {};
+  const inv = atlasState.inversion || {};
+  const legacyState = {
+    candidate:     sh.activeCandidate || null,
+    candidateList: inv.candidateList   || [],
+    candidatePageMode: inv.candidatePageMode || null,
+  };
+
+  const apply = (target) => {
+    if (target && target.chrom && target.chrom !== sh.activeChrom) {
+      if (typeof atlasState.setActiveChrom === 'function') atlasState.setActiveChrom(target.chrom);
+      else atlasState.shared.activeChrom = target.chrom;
+    }
+    if (typeof atlasState.setActiveCandidate === 'function') {
+      atlasState.setActiveCandidate(target);
+    } else {
+      atlasState.shared.activeCandidate = target;
+    }
+    mount(root, atlasState, registry).catch(err =>
+      console.warn('popstats: re-mount after candidate change threw —', err));
+  };
+
+  const bar = renderCandidateNavInline(legacyState, {
+    idPrefix:      'ps',
+    onNavigate:    (_st, target) => apply(target),
+    onClearActive: ()             => apply(null),
   });
-  page.insertBefore(bar, page.firstChild);
+  if (bar) page.insertBefore(bar, page.firstChild);
 }
 
 export async function unmount(root) {

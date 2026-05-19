@@ -477,7 +477,7 @@
     },
     "ancestry_local_q_windows": {
       "tier": "warm",
-      "preload_on": "chrom_change",
+      "preload_on": "explicit",
       "source": "file",
       "path": "data/cohort/ancestry/windows/{chrom}_K{K}.tsv",
       "format": "tsv",
@@ -486,7 +486,7 @@
       "fields": null,
       "provisional": true,
       "owned_by": "population",
-      "_doc": "Long-format ancestry-by-window for one chrom. Pre-aggregated by the pipeline from instant_q outputs. Tier=warm; preload on chrom_change because the local-ancestry scrubber wants this immediately when the user picks a chrom."
+      "_doc": "Long-format ancestry-by-window for one chrom. Pre-aggregated by the pipeline from instant_q outputs. 2026-05-20: switched preload_on from 'chrom_change' to 'explicit' — the path template needs both {chrom} AND {K}, but the prewarm scheduler only fills the canonical chrom/candidate_id/species aliases. The unresolved {K} placeholder threw a templateFill error on every chrom change. Pages that consume this layer must resolve it manually with a {chrom, K} args object."
     },
     "_doc_cross_species_block": "==== Cross-species domain (Mode B raw + Mode A curated) \u2014 see data/cross_species/README.md ====",
     "cross_species_synteny_blocks": {

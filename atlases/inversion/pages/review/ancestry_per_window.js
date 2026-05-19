@@ -74,6 +74,7 @@
 
 
 import { _pageState, _setActiveState } from './ancestry_per_window/_state.js';
+import { renderCandidateNavInline } from '../../shared/candidate_nav.js';
 
 // -----------------------------------------------------------------------------
 // External-file deps
@@ -174,10 +175,52 @@ export async function mount(root, atlasState, registry) {
   const legacyState = _buildLegacyState(atlasState);
   _setActiveState(legacyState);
 
+  _mountCandidateNav(root, atlasState, registry);
+
   try { refreshPage7(legacyState); }
   catch (e) { console.warn('ancestry_per_window.mount: refreshPage7 threw —', e); }
 
   if (atlasState.inversion) atlasState.inversion._page7State = legacyState;
+}
+
+/**
+ * Insert the prev/next candidate nav bar at the very top of
+ * #ancestry_per_window via the shared cartridge. Same shape popstats uses.
+ */
+function _mountCandidateNav(root, atlasState, registry) {
+  const page = (root && root.querySelector) ? root.querySelector('#ancestry_per_window') : null;
+  if (!page) return;
+  const old = page.querySelector('.cand-nav-inline');
+  if (old) old.remove();
+
+  const sh  = atlasState.shared    || {};
+  const inv = atlasState.inversion || {};
+  const navState = {
+    candidate:     sh.activeCandidate || null,
+    candidateList: inv.candidateList   || [],
+    candidatePageMode: inv.candidatePageMode || null,
+  };
+
+  const apply = (target) => {
+    if (target && target.chrom && target.chrom !== sh.activeChrom) {
+      if (typeof atlasState.setActiveChrom === 'function') atlasState.setActiveChrom(target.chrom);
+      else atlasState.shared.activeChrom = target.chrom;
+    }
+    if (typeof atlasState.setActiveCandidate === 'function') {
+      atlasState.setActiveCandidate(target);
+    } else {
+      atlasState.shared.activeCandidate = target;
+    }
+    mount(root, atlasState, registry).catch(err =>
+      console.warn('ancestry_per_window: re-mount after candidate change threw —', err));
+  };
+
+  const bar = renderCandidateNavInline(navState, {
+    idPrefix:      'anc',
+    onNavigate:    (_st, target) => apply(target),
+    onClearActive: ()             => apply(null),
+  });
+  if (bar) page.insertBefore(bar, page.firstChild);
 }
 
 /**

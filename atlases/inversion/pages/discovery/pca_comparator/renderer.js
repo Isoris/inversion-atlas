@@ -783,16 +783,44 @@ function _drawEmpty(ctx, w, h, msg) {
 // Size the canvas backing-store to CSS-pixel × DPR and pre-transform
 // the context so the caller can draw in CSS pixels (no DPR math at
 // every call site). Returns the CSS-pixel dimensions.
+//
+// 2026-05-20: measure the PARENT, not the canvas. Reading
+// `canvas.clientWidth` after a paint creates a positive feedback loop
+// on retina displays: each paint sets `canvas.width = cssW * dpr`,
+// which becomes the canvas's intrinsic `max-content` size, which the
+// CSS Grid container (`pcaCompBody`'s `1fr 1fr 1fr` columns) honors
+// because `min-width: auto` on grid items defaults to max-content.
+// The grid track widens by a fraction of a pixel each frame, the
+// canvas's `width: 100%` follows, clientWidth comes back larger, the
+// backing store grows further on the next paint, and the cycle keeps
+// inflating until the page overflows. Reading the wrapper div's
+// clientWidth (sized by the grid track, NOT by the canvas) breaks the
+// loop — wrapper width is invariant per grid track, so the canvas
+// settles at a fixed size. Also lock canvas.style.width/height to the
+// measured pixel value so the canvas's intrinsic `width` attribute
+// can never leak into ancestor min-content calculations even if a
+// future caller adds a min-width: auto path.
 function _fitCanvas(canvas, ctx) {
   const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
-  const cssW = Math.max(1, (canvas.clientWidth  | 0));
-  const cssH = Math.max(1, (canvas.clientHeight | 0));
+  const parent = canvas.parentNode;
+  const measureW = (parent && parent.clientWidth)  || canvas.clientWidth  || 1;
+  const measureH = (parent && parent.clientHeight) || canvas.clientHeight || 1;
+  const cssW = Math.max(1, measureW | 0);
+  const cssH = Math.max(1, measureH | 0);
   const targetW = Math.max(1, (cssW * dpr) | 0);
   const targetH = Math.max(1, (cssH * dpr) | 0);
   if (canvas.width !== targetW || canvas.height !== targetH) {
     canvas.width  = targetW;
     canvas.height = targetH;
   }
+  // Pin the CSS size to the measured pixel value (idempotent — only
+  // writes the inline style when it would change). Prevents any
+  // remaining grid/flex auto-min-size leak via the canvas's intrinsic
+  // width attribute.
+  const pxW = cssW + 'px';
+  const pxH = cssH + 'px';
+  if (canvas.style.width  !== pxW) canvas.style.width  = pxW;
+  if (canvas.style.height !== pxH) canvas.style.height = pxH;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return { cssW, cssH };
 }

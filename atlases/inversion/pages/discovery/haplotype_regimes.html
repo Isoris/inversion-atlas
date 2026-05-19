@@ -273,6 +273,25 @@
             font: inherit;
             cursor: pointer;
           ">&#9733; promote seed&hellip;</button>
+        <!-- 2026-05-20: auto-merge adjacent Stage 1 seeds via Cramér's V
+             (Mode 1 = insulated_local). Walks every adjacent seed pair,
+             runs a Hungarian-aligned K×K contingency test, groups
+             consecutive MERGE verdicts into chains, then promotes each
+             multi-seed chain as a candidate spanning seeds[start].s_window
+             to seeds[end].e_window. SPEC_cramers_v_seed_merge.md Phase 1
+             deliverable #2 (the UI half — compute is in
+             shared/cramers_v_merge.js). Disabled until a pipeline run
+             produces ≥ 2 seeds. -->
+        <button id="rgAutoMergeBtn" class="rg-tb-btn" disabled
+          title="Walk adjacent Stage 1 seeds, run the Cramér's V contingency test (Hungarian-aligned K-band labels), and auto-promote each consecutive-MERGE chain as a candidate inversion. Insulated_local: never compares non-adjacent seeds. Disabled until 'run pipeline' produces ≥ 2 seeds."
+          style="
+            background: var(--panel-3, #232a36);
+            color: var(--ink, #e6edf6);
+            border: 1px solid var(--rule, #2a3242);
+            padding: 4px 10px;
+            font: inherit;
+            cursor: pointer;
+          ">&#8634; auto-merge V&hellip;</button>
         <span id="rgStatus" style="margin-left: auto; color: var(--ink-dim, #8895a8);">
           idle &middot; pipeline not yet run
         </span>

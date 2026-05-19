@@ -1701,16 +1701,18 @@
              default, kmeans-K6, distance-uv); six modes scaffold-only
              (gmm-3/4/5/6, dbscan, dosage) with tooltips naming what each
              will do. SCHEMA §11.3 documents the mode table. -->
-        <div class="l3-layout" id="l3ReclusterMode" style="margin-left: 12px; flex-direction: column; align-items: flex-start; gap: 0;"
+        <div class="l3-layout" id="l3ReclusterMode" style="margin-left: 12px; flex-direction: row; align-items: center; gap: 6px;"
              title="Re-clustering method for the L3 contingency table. Default kmeans-K3 = current behavior; alternatives let you re-cluster each L2's samples differently before computing concord / Cramér's V / NMI / AMI / ARI to test whether the merge call is robust to the clustering method.">
-          <!-- v4 turn 113 (Ask 2): #l3ReclusterMode flipped to column layout
-               so the merge ↑ / separate ↓ / confirm action row can sit
-               directly UNDER the recluster dropdown — Quentin's request:
-               "its just to show visually like can merge interval, separate
-               or enter to confirm bc now its below at the bottom of the
-               panel its not convenient." Top row keeps the original
-               label-+-select horizontal pairing inside #l3ReclusterTopRow
-               so it reads identically to the previous single-row layout. -->
+          <!-- 2026-05-20: collapsed from column → row. The original v4
+               turn 113 column layout stacked recluster + draft action row
+               + candidate-edit row into 3 vertical rows = a ~80px-thick
+               L3 banner that Quentin called out as unprofessional. Now
+               all three clusters sit inline; the toolbar's natural
+               flex-wrap on .l3-head still wraps each cluster atomically
+               to a new line on narrow viewports, so the merge/sep/confirm
+               row still ends up visually near the recluster dropdown
+               (the original request) without consuming three rows on
+               wider viewports. -->
           <div id="l3ReclusterTopRow" style="display: flex; gap: 2px; align-items: center;">
             <span class="dim" style="font-size: 9px; margin-right: 4px; align-self: center;">recluster:</span>
             <select id="l3ReclusterSel"

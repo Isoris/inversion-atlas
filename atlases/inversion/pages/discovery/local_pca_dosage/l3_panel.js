@@ -545,8 +545,17 @@ export function renderL3Panel(state) {
     if (l2idx == null) {
       h3.innerHTML = `<span class="l3-pane-title">${titlePrefix} <b>—</b></span>${paneToolsHtml}`;
     } else {
-      const env = d.l2_envelopes[l2idx];
-      h3.innerHTML = `<span class="l3-pane-title">${titlePrefix} <b>${shortId(env.candidate_id)}</b> <span class="dim" style="font-weight:400;">${env.n_windows}W · sim ${fmt(env.mean_sim)}</span></span>${paneToolsHtml}`;
+      // 2026-05-19: env may be undefined when switching activeMode
+      // (dosage ↔ θπ ↔ GHSL) and the focal L2 index from the previous
+      // mode is out of range for the new mode's l2_envelopes array.
+      // Defensive fallback to the empty-pane render instead of throwing
+      // a TypeError on env.candidate_id.
+      const env = d.l2_envelopes && d.l2_envelopes[l2idx];
+      if (!env) {
+        h3.innerHTML = `<span class="l3-pane-title">${titlePrefix} <b>—</b> <span class="dim" style="font-weight:400;">(no envelope at idx ${l2idx} in ${state.activeMode || 'current'} mode)</span></span>${paneToolsHtml}`;
+      } else {
+        h3.innerHTML = `<span class="l3-pane-title">${titlePrefix} <b>${shortId(env.candidate_id)}</b> <span class="dim" style="font-weight:400;">${env.n_windows}W · sim ${fmt(env.mean_sim)}</span></span>${paneToolsHtml}`;
+      }
     }
     col.appendChild(h3);
 

@@ -78,6 +78,7 @@ import {
 import { renderL3Panel } from './l3_panel.js';
 import { wireGPanel } from './g_panel.js';
 import { wireLinesSettingsPanel } from './lines_settings_panel.js';
+import { wirePerfHud } from './perf_hud.js';
 import {
   exportKLabelsTSV,
   makeCandidateFromLock,
@@ -131,6 +132,12 @@ export function attachSidebarHandlers(state) {
   // double-fire (modal + legacy inline toggle).
   try { wireLinesSettingsPanel(state); }
   catch (e) { console.warn('[wireLinesSettingsPanel]', e); }
+  // 2026-05-19: perf HUD + Shift+P hotkey. Wires the document-level
+  // keydown listener and restores HUD on/off from localStorage. Off by
+  // default — dev tool, not a user-facing surface. Updates piped from
+  // setCur via window._perfHudUpdate.
+  try { wirePerfHud(state); }
+  catch (e) { console.warn('[wirePerfHud]', e); }
   _wireNewShellControls(state);
   _wireActiveModeBar(state);
   _wireL3Controls(state);
@@ -1407,7 +1414,18 @@ function _wireTrackedSettingsPopup(state) {
   // 2026-05-18: dual open buttons — the fixed-mode aside header
   // hosts #tPanelOpenBtn; the compact-mode panel header hosts
   // #tPanelOpenBtnCompact. Both open the same #tPanelOverlay popup.
-  for (const id of ['tPanelOpenBtn', 'tPanelOpenBtnCompact']) {
+  // 2026-05-19: also wire #pcaCollapseBtn (the top-right arrow on the
+  // PCA toolbar) to open the same popup. Quentin: "the collapse and
+  // expand tracked samples PCA arrow down button should not be a
+  // collapse and expand but rather the settings ... now its 2 arrows
+  // down better have a single one and on the top." pcaCollapseBtn was
+  // removed from _wirePanelCollapseButtons' SPECS array (see comment
+  // there) so it's free to repurpose. We also hide #tPanelOpenBtn (the
+  // duplicate bottom arrow in #pcaTrackedAside) since pcaCollapseBtn is
+  // now the single entry-point. #tPanelOpenBtnCompact stays — compact
+  // mode has its own panel layout where the aside button is the only
+  // affordance.
+  for (const id of ['tPanelOpenBtn', 'tPanelOpenBtnCompact', 'pcaCollapseBtn']) {
     const openBtn = $(id);
     if (!openBtn || openBtn.dataset.wired === '1') continue;
     openBtn.addEventListener('click', (e) => {
@@ -1418,6 +1436,18 @@ function _wireTrackedSettingsPopup(state) {
     });
     openBtn.dataset.wired = '1';
   }
+  // Visual update for the repurposed pcaCollapseBtn: turn the ▼ collapse
+  // arrow into a ⚙ settings affordance + update the title. Done after
+  // the wire so we don't fight any default text from elsewhere.
+  const pcaBtn = $('pcaCollapseBtn');
+  if (pcaBtn) {
+    pcaBtn.textContent = '⚙';
+    pcaBtn.title = 'Tracked-samples settings — trails, sign-align PC1, lasso, '
+                 + 'scree, trail-back, N-tracked. Hotkey: t.';
+  }
+  // Hide the now-redundant bottom arrow in #pcaTrackedAside (fixed mode).
+  const dupBtn = $('tPanelOpenBtn');
+  if (dupBtn) dupBtn.style.display = 'none';
   const closeBtn = $('tPanelClose');
   if (closeBtn && closeBtn.dataset.wired !== '1') {
     closeBtn.addEventListener('click', close);
@@ -1538,7 +1568,13 @@ function _wireTrackedSettingsPopup(state) {
 // grows into the freed space. State is persisted to localStorage.
 function _wirePanelCollapseButtons(state) {
   const SPECS = [
-    { btn: 'pcaCollapseBtn', slot: 'pcaCollapsed', lsKey: 'pca_scrubber_v3.pcacollapsed' },
+    // 2026-05-19: pcaCollapseBtn dropped from this loop — repurposed as
+    // the tracked-samples settings entry-point (opens #tPanelOverlay) by
+    // _wirePcaSettingsButton below. Quentin: "the collapse and expand
+    // tracked samples PCA arrow down button should not be a collapse and
+    // expand but rather the settings ... now its 2 arrows down better
+    // have a single one and on the top." The second arrow (#tPanelOpenBtn
+    // in the aside) is hidden by the same wire to leave one entry point.
     { btn: 'l3CollapseBtn',  slot: 'l3Collapsed',  lsKey: 'pca_scrubber_v3.l3collapsed' },
     { btn: 'zCollapseBtn',   slot: 'zCollapsed',   lsKey: 'pca_scrubber_v3.zcollapsed' },
   ];
@@ -1588,6 +1624,29 @@ function _applyViewMode(state, mode) {
   document.querySelectorAll('#viewModeBar button[data-viewmode]').forEach(b => {
     b.classList.toggle('active', b.dataset.viewmode === mode);
   });
+  // 2026-05-20: push the new zoom scale into stepMode + compareUnit so
+  // arrow-key cursor movement AND the L3 contingency tables operate at
+  // the scale the user just selected. Without this, clicking "L2 zoom"
+  // visually zoomed the Z panel but left arrow keys still stepping
+  // window-by-window and the L3 table cached at its previous scale.
+  //
+  // Mapping:
+  //   genome → win1   (small steps, single-window cursor)
+  //   l1     → win10  (broader scale; no native L1 unit on L3, win10 is closest)
+  //   l2     → l2     (1:1 — arrow keys jump L2 envelopes, L3 table aligned)
+  if (state.stepModeSync !== false) {
+    const stepFor = { genome: 'win1', l1: 'win10', l2: 'l2' }[mode];
+    if (stepFor && stepFor !== state.stepMode) {
+      state.stepMode = stepFor;
+      document.querySelectorAll('#stepModeBar button').forEach(b =>
+        b.classList.toggle('active', b.dataset.step === stepFor));
+      try { localStorage.setItem('pca_scrubber_v3.stepmode', stepFor); } catch (_) {}
+      const info = document.getElementById('stepModeInfo');
+      if (info) info.textContent = _stepModeLabel(state, stepFor);
+      try { _syncStepModeToCompareUnit(state); } catch (_) {}
+      try { _refreshStepSizeBtn(state); } catch (_) {}
+    }
+  }
   // Auto-move sim_mat into the minimap when zooming to L1/L2 — the
   // heatmap shows the WHOLE chromosome so its scale stops matching the
   // zoomed Z panel below it. Move back to the main panel when returning
@@ -1654,6 +1713,12 @@ function _cycleStepSize(state) {
   });
   try { localStorage.setItem('pca_scrubber_v3.stepmode', next); } catch (_) {}
   _refreshStepSizeBtn(state);
+  // 2026-05-20: also push the new step size into the L3 compareUnit so
+  // the contingency table follows the cursor at the same scale. The
+  // #stepModeBar buttons already do this via _syncStepModeToCompareUnit
+  // — the header cycler was missing the call, so cycling Windows(N)
+  // from the header left the L3 table on its prior scale.
+  _syncStepModeToCompareUnit(state);
 }
 
 function _wireViewMode(state) {

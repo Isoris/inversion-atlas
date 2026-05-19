@@ -39,6 +39,7 @@
 import { contextFromState, ClusterCache } from '../../shared/per_l2_cluster.js';
 import { alignLabels } from '../../shared/hungarian.js';
 import { buildContingency, cramersV } from '../../shared/contingency.js';
+import { runCramersVMergeLocal } from '../../shared/cramers_v_merge.js';
 
 // Sample-color resolution is now in shared/sample_color.js. The regimes
 // panels pass their own state to resolveSampleScopeColor, so this
@@ -205,10 +206,11 @@ function _wireCtxCallbacks(state, atlasState) {
 }
 
 function _wireActionBar(root, state, atlasState) {
-  const runBtn     = root.querySelector('#rgRunPipelineBtn');
-  const exportBtn  = root.querySelector('#rgExportCatalogueBtn');
-  const promoteBtn = root.querySelector('#rgPromoteSeedBtn');
-  const statusEl   = root.querySelector('#rgStatus');
+  const runBtn       = root.querySelector('#rgRunPipelineBtn');
+  const exportBtn    = root.querySelector('#rgExportCatalogueBtn');
+  const promoteBtn   = root.querySelector('#rgPromoteSeedBtn');
+  const autoMergeBtn = root.querySelector('#rgAutoMergeBtn');
+  const statusEl     = root.querySelector('#rgStatus');
 
   // 2026-05-20: mode toggle (long-range V-walker vs short-range
   // user-curated candidate list). Restored from localStorage; click
@@ -250,7 +252,17 @@ function _wireActionBar(root, state, atlasState) {
 
   if (runBtn) {
     runBtn.addEventListener('click', async () => {
-      await _runPipeline(root, state);
+      // 2026-05-20: wrap in try/catch so a throw before _runPipeline's
+      // first status update doesn't silently swallow the click. Without
+      // this, the user reported "run pipeline does nothing" — any
+      // throw upstream of the `_setStatus(root, 'running pipeline…')`
+      // line became an unhandled rejection and the status bar stayed
+      // on its prior text.
+      try { await _runPipeline(root, state); }
+      catch (e) {
+        console.error('run-pipeline click failed:', e);
+        _setStatus(root, `run-pipeline failed: ${e && e.message ? e.message : e}`);
+      }
     });
   }
   if (exportBtn) {
@@ -273,6 +285,18 @@ function _wireActionBar(root, state, atlasState) {
       }
     });
   }
+  // 2026-05-20: auto-merge V button — walks adjacent Stage 1 seeds,
+  // groups consecutive MERGE verdicts into chains, and promotes each
+  // multi-seed chain as a candidate. See _runAutoMergeCramersV below.
+  if (autoMergeBtn) {
+    autoMergeBtn.addEventListener('click', async () => {
+      try { await _runAutoMergeCramersV(root, state, atlasState); }
+      catch (e) {
+        console.error('auto-merge V failed:', e);
+        _setStatus(root, `auto-merge V failed: ${e.message}`);
+      }
+    });
+  }
 }
 
 /**
@@ -280,6 +304,20 @@ function _wireActionBar(root, state, atlasState) {
  * initialise the four regimes panels.
  */
 async function _runPipeline(root, state) {
+  // 2026-05-20: status ping at entry so the user can confirm the click
+  // landed even if a precondition fails immediately. Without this, the
+  // user reported "click does nothing" — debugging via the status bar
+  // requires it to update on every click, not only after the first
+  // _setStatus call inside a mode branch.
+  _setStatus(root, 'preparing pipeline run…');
+  if (!state) {
+    _setStatus(root, 'pipeline: state is null — reload the page');
+    return;
+  }
+  if (!state.data) {
+    _setStatus(root, 'pipeline: no chromosome loaded — pick one from the toolbar');
+    return;
+  }
   const ctx = state._regimesCtx;
   if (!ctx) {
     _setStatus(root, 'pipeline ctx not wired — reload the page');
@@ -377,6 +415,18 @@ function _afterPipelineRun(root, state, result, opts) {
     promoteBtn.title = nLoci === 0
       ? 'No seeds discovered on this chromosome — nothing to promote.'
       : `Promote the focal seed (${nLoci} discovered) to a candidate inversion. Arrow keys cycle which seed is focal.`;
+  }
+  // 2026-05-20: auto-merge V button enable state. Needs ≥ 2 Stage 1
+  // seeds since the walker compares adjacent pairs — a single seed has
+  // no neighbour to merge with.
+  const autoMergeBtn = root.querySelector('#rgAutoMergeBtn');
+  if (autoMergeBtn) {
+    const seeds = (result.stage1 && Array.isArray(result.stage1.seeds))
+      ? result.stage1.seeds : [];
+    autoMergeBtn.disabled = seeds.length < 2;
+    autoMergeBtn.title = seeds.length < 2
+      ? 'Need at least 2 Stage 1 seeds for adjacent-pair Cramér\'s V auto-merge.'
+      : `Walk ${seeds.length - 1} adjacent seed pair${seeds.length - 1 === 1 ? '' : 's'}, auto-promote MERGE chains as candidates.`;
   }
   try { _renderSeedsStrip(root, state); }
   catch (e) { console.warn('_renderSeedsStrip:', e); }
@@ -1014,6 +1064,186 @@ async function _promoteFocalSeed(root, state, atlasState) {
 
   _setStatus(root, `promoted locus #${focalIdx} (seed_id=${locus.seed_id}) → candidate ${cand.id}. Opening candidate focus…`);
   try { window.location.hash = '#/inversion/candidate_focus'; } catch (_) {}
+}
+
+/**
+ * Auto-merge V — Mode 1 (insulated_local) driver (2026-05-20).
+ *
+ * SPEC_cramers_v_seed_merge.md Phase 1 deliverable #2 — the UI half of
+ * the auto-promote walker. Compute lives in shared/cramers_v_merge.js.
+ *
+ * What it does:
+ *   1. Pulls the Stage 1 seeds from state._regimesResult (the user must
+ *      have run the pipeline first — button is disabled otherwise).
+ *   2. Calls runCramersVMergeLocal({seeds, getLabels, getK}). The walker
+ *      ONLY compares adjacent seeds (insulated_local — never matches a
+ *      distant-window contingency to pull non-neighbours together).
+ *   3. Groups consecutive MERGE verdicts into chains. A chain of length
+ *      ≥ 2 represents a multi-seed regional inversion candidate. Chains
+ *      of length 1 (no MERGE neighbour) are skipped — those seeds are
+ *      already promotable individually via the ★ promote button.
+ *   4. For each multi-seed chain, builds a candidate spanning
+ *      seeds[start].s_window → seeds[end].e_window with source
+ *      'auto_cramers_v_local', and pushes it through the same
+ *      addCandidateToList + setCandidate plumbing the lock-promote +
+ *      seed-promote paths use. The last chain's candidate becomes
+ *      active (via setCandidate).
+ *   5. Re-renders the seeds strip + L3 pairs table so the new
+ *      candidates appear in the carousel immediately.
+ *
+ * locked_labels for the merged candidate come from the FIRST seed's
+ * per_band_samples — that's the chain's anchor frame, and Hungarian
+ * alignment downstream keeps subsequent seeds in the same K-band space.
+ */
+async function _runAutoMergeCramersV(root, state, atlasState) {
+  const result = state._regimesResult;
+  if (!result || !result.stage1 || !Array.isArray(result.stage1.seeds)) {
+    _setStatus(root, 'no pipeline result — run the pipeline first');
+    return;
+  }
+  const seeds = result.stage1.seeds;
+  if (seeds.length < 2) {
+    _setStatus(root, `auto-merge V: need ≥ 2 seeds, have ${seeds.length}`);
+    return;
+  }
+  const ctx = state._regimesCtx;
+  if (!ctx || typeof ctx.getLabels !== 'function') {
+    _setStatus(root, 'pipeline ctx not wired — reload the page');
+    return;
+  }
+
+  _setStatus(root, `auto-merge V: walking ${seeds.length - 1} adjacent pair${seeds.length - 1 === 1 ? '' : 's'}…`);
+  await new Promise(r => setTimeout(r, 0));
+  const t0 = performance.now();
+
+  let walker;
+  try {
+    walker = runCramersVMergeLocal({
+      seeds,
+      getLabels: ctx.getLabels,
+      getK:      ctx.getK,
+      opts:      { emitSingletons: false },
+    });
+  } catch (e) {
+    console.error('runCramersVMergeLocal threw:', e);
+    _setStatus(root, `auto-merge V failed: ${e.message}`);
+    return;
+  }
+  const ms = (performance.now() - t0).toFixed(0);
+  const sum = walker.summary || {};
+  const multiChains = (walker.chains || []).filter(c => c && c.length > 1);
+  if (multiChains.length === 0) {
+    _setStatus(root,
+      `auto-merge V ran in ${ms}ms · ${sum.n_pairs || 0} pairs · ` +
+      `${sum.n_merge || 0} MERGE · ${sum.n_separate || 0} SEPARATE · ` +
+      `${sum.n_insufficient || 0} INSUFFICIENT · no multi-seed chains to promote`);
+    return;
+  }
+
+  // Promote each multi-seed chain as a candidate. Lazy-import the
+  // candidates module so we don't pull it in at top-level.
+  const candMod = await import('./local_pca_dosage/candidates.js').catch(() => null);
+  if (!candMod || typeof candMod.makeCandidateId !== 'function'
+      || typeof candMod.addCandidateToList !== 'function'
+      || typeof candMod.setCandidate !== 'function') {
+    _setStatus(root, 'local_pca_dosage/candidates.js helpers not available');
+    return;
+  }
+  const data = state.data;
+  const nS = data.n_samples | 0;
+  const inv = (atlasState && atlasState.inversion) || {};
+  const page1State = inv._local_pca_dosage_state || {
+    data, candidate: null, candidateList: [],
+  };
+
+  let lastCand = null;
+  let nPromoted = 0;
+  for (const chain of multiChains) {
+    const seedA = seeds[chain.start_i];
+    const seedB = seeds[chain.end_i];
+    if (!seedA || !seedB) continue;
+    const start_w = seedA.s_window | 0;
+    const end_w   = seedB.e_window | 0;
+    const ref_window = Number.isFinite(seedA.anchor_w) ? seedA.anchor_w | 0
+                     : Math.round((start_w + end_w) / 2);
+    const winS = data.windows && data.windows[start_w];
+    const winE = data.windows && data.windows[end_w];
+    const start_bp = winS && Number.isFinite(winS.start_bp) ? winS.start_bp : null;
+    const end_bp   = winE && Number.isFinite(winE.end_bp)   ? winE.end_bp   : null;
+
+    // locked_labels: take the anchor seed's labels at its anchor_w
+    // (the K-band frame the walker's contingency tests were aligned to).
+    const labelsA = ctx.getLabels(seedA.anchor_w | 0);
+    const K = (typeof ctx.getK === 'function' ? ctx.getK(seedA.anchor_w | 0) : 0)
+           || seedA.K_a || 0;
+    const locked = new Int8Array(nS).fill(-1);
+    if (labelsA && labelsA.length) {
+      for (let s = 0; s < Math.min(nS, labelsA.length); s++) {
+        const k = labelsA[s];
+        if (k >= 0 && k < K) locked[s] = k;
+      }
+    }
+
+    // ref_l2 + l2_indices from windowToL2 over the chain footprint.
+    const wToL2 = state.windowToL2;
+    const ref_l2 = (wToL2 && ref_window >= 0 && ref_window < wToL2.length)
+      ? wToL2[ref_window] : null;
+    const l2_set = new Set();
+    if (wToL2) {
+      for (let w = start_w; w <= end_w; w++) {
+        const li = wToL2[w];
+        if (li >= 0) l2_set.add(li);
+      }
+    }
+    const l2_indices = [...l2_set].sort((a, b) => a - b);
+
+    // Per-pair Cramér V values within the chain (for the notes field).
+    const chainV = [];
+    for (let i = chain.start_i; i < chain.end_i; i++) {
+      const ve = walker.verdicts[i];
+      if (ve && Number.isFinite(ve.v)) chainV.push(ve.v.toFixed(3));
+    }
+    const cand = {
+      source:        'auto_cramers_v_local',
+      chrom:         data.chrom || state.activeChrom,
+      l2_indices,
+      ref_l2:        (ref_l2 != null && ref_l2 >= 0) ? ref_l2 : null,
+      ref_window,
+      K,
+      locked_labels: locked,
+      start_w, end_w,
+      start_bp, end_bp,
+      created_at:    Date.now(),
+      notes: `Auto-merged from Cramér's V walker (Mode 1 insulated_local): ` +
+             `seeds ${chain.start_i}..${chain.end_i} (${chain.length} seeds, ` +
+             `V_chain=[${chainV.join(', ')}]).`,
+      id:            candMod.makeCandidateId(),
+      _from_cramers_v_local: {
+        chain_start_i:  chain.start_i,
+        chain_end_i:    chain.end_i,
+        chain_length:   chain.length,
+        chain_v_values: chainV.map(v => Number(v)),
+        anchor_seed_id: seedA.seed_id,
+      },
+    };
+    try { candMod.addCandidateToList(page1State, cand); nPromoted++; lastCand = cand; }
+    catch (e) { console.warn('addCandidateToList threw for chain:', chain, e); }
+  }
+  if (lastCand) {
+    try { candMod.setCandidate(page1State, lastCand); }
+    catch (e) { console.warn('setCandidate threw:', e); }
+  }
+  inv._local_pca_dosage_state = page1State;
+
+  _setStatus(root,
+    `auto-merge V ran in ${ms}ms · ${sum.n_pairs} pairs · ` +
+    `${sum.n_merge} MERGE · ${sum.n_separate} SEPARATE · ` +
+    `${sum.n_insufficient} INSUFFICIENT · promoted ${nPromoted} ` +
+    `chain${nPromoted === 1 ? '' : 's'} (${multiChains.reduce((a, c) => a + c.length, 0)} seeds → ${nPromoted} candidates)`);
+
+  // Refresh seeds strip + L3 pairs table so the new candidates surface.
+  try { _renderSeedsStrip(root, state); } catch (_) {}
+  try { _renderL3PairsTable(root, state); } catch (_) {}
 }
 
 /**

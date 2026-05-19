@@ -72,40 +72,30 @@ function _modeNoDataNotice(mode, state) {
 // --- drawLinesPanel(state) — legacy lines 34894-35744 ---
 export function drawLinesPanel(state) {
   _setActiveState(state);
-  // 2026-05-19 debug instrumentation: trace silent bail-outs so the
-  // "per-sample lines disappeared" report has actionable signal in the
-  // browser console. Each early return logs a one-line reason with the
-  // pieces of state needed to diagnose. Remove these warns once the
-  // underlying cause is identified.
-  const DBG = '[drawLinesPanel]';
-  if (!state.data) {
-    console.warn(DBG, 'bail: state.data is null/undefined');
-    return;
-  }
+  // 2026-05-19: silent early-returns (transient — fire during mount
+  // transitions when the canvas container briefly isn't in the DOM, or
+  // before buildLinesPanel has constructed the subpanels). The warning
+  // instrumentation that lived here previously identified the root
+  // cause of the "lines panel disappeared" report — see CSS fix at
+  // inversion.css `#linesPanel min-height: 140px` in compact mode.
+  // The diagnostic check below stays as opt-in via window.__perfDbg so
+  // we can re-enable if a regression re-introduces the h=0 case.
+  if (!state.data) return;
   const container = document.getElementById('linesCanvasContainer');
-  if (!container || typeof container.querySelectorAll !== 'function') {
-    console.warn(DBG, 'bail: #linesCanvasContainer missing in DOM');
-    return;
-  }
+  if (!container || typeof container.querySelectorAll !== 'function') return;
   const subs = container.querySelectorAll('.lines-subpanel');
-  if (!subs || subs.length === 0) {
-    console.warn(DBG, 'bail: no .lines-subpanel children — buildLinesPanel did not run or ran with empty state.viewControls.linesYsources. Current value:',
-      state.viewControls && state.viewControls.linesYsources);
-    return;
-  }
-  // One-time visibility diagnostic: log if the lines panel is rendered
-  // with zero pixel area (display:none, height:0, or container hidden).
-  // We render the canvas + log a single warn rather than silently emitting
-  // pixels into a 0-height box. Run this check at most once per state to
-  // avoid log spam.
-  if (state.__linesVisibilityDbg !== 'logged') {
+  if (!subs || subs.length === 0) return;
+  // Opt-in visibility diagnostic (enable via window.__perfDbg = true).
+  // Logs once per state if the panel renders to a zero-height region.
+  if (typeof window !== 'undefined' && window.__perfDbg === true
+      && state.__linesVisibilityDbg !== 'logged') {
     state.__linesVisibilityDbg = 'logged';
     const panel = document.getElementById('linesPanel');
     const pRect = panel ? panel.getBoundingClientRect() : null;
     const cRect = container.getBoundingClientRect();
     const pDisp = panel ? getComputedStyle(panel).display : '(no #linesPanel)';
     if (!pRect || pRect.height < 4 || cRect.height < 4 || pDisp === 'none') {
-      console.warn(DBG, 'visibility: lines panel may be invisible.',
+      console.warn('[drawLinesPanel] visibility: panel may be invisible.',
         '#linesPanel display=', pDisp,
         'h=', pRect ? Math.round(pRect.height) : '?',
         '#linesCanvasContainer h=', Math.round(cRect.height),

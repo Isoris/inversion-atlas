@@ -129,6 +129,45 @@ export function setCur(state, i) {
       .map(([k, v]) => `${k}=${v.toFixed(1)}`)
       .join(' ');
     console.log(`[scrub] setCur(${state.cur}): total=${total}ms · ${parts}`);
+    // 2026-05-19: also stash raw timings on window for offline analysis.
+    // Use `window.__perfSummary()` (defined below in this module's first
+    // call) to get mean/p50/p95 per panel across all logged scrubs.
+    if (!window.__perfScrubLog) window.__perfScrubLog = [];
+    window.__perfScrubLog.push({ cur: state.cur, total: +total, ts: { ..._ts } });
+    if (!window.__perfSummary) {
+      window.__perfSummary = function () {
+        const log = window.__perfScrubLog || [];
+        if (log.length === 0) { console.log('[perf] no scrubs logged yet'); return; }
+        const keys = new Set();
+        for (const row of log) for (const k of Object.keys(row.ts)) keys.add(k);
+        const stats = [];
+        const pct = (arr, p) => arr.slice().sort((a, b) => a - b)[Math.floor(arr.length * p)] || 0;
+        for (const k of [...keys, '_total']) {
+          const vals = log.map(r => k === '_total' ? r.total : (r.ts[k] || 0)).filter(v => v > 0);
+          if (vals.length === 0) continue;
+          const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+          stats.push({
+            panel:    k,
+            n:        vals.length,
+            mean_ms:  +mean.toFixed(1),
+            p50_ms:   +pct(vals, 0.50).toFixed(1),
+            p95_ms:   +pct(vals, 0.95).toFixed(1),
+            max_ms:   +Math.max(...vals).toFixed(1),
+          });
+        }
+        stats.sort((a, b) => b.mean_ms - a.mean_ms);
+        console.table(stats);
+        console.log(`[perf] n_scrubs=${log.length}. Reset with: window.__perfScrubLog = []`);
+        return stats;
+      };
+    }
+    // 2026-05-19: ping the live HUD if it's mounted (perf_hud.js installs
+    // window._perfHudUpdate when the HUD is opened via Shift+P or
+    // restored from localStorage). No-op when the HUD module hasn't
+    // loaded yet, so this stays free in the non-HUD path.
+    if (typeof window._perfHudUpdate === 'function') {
+      try { window._perfHudUpdate(); } catch (_) {}
+    }
   }
   // v3.94: live dosage heatmap follows cursor (debounced; no-op when closed)
   if (typeof redrawCursorHeatmap === 'function') {
