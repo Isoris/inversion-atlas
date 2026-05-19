@@ -26,6 +26,11 @@
 // concern-focused and avoids a module-import cycle through the panels.
 
 import { escapeHtml } from '../../shared/page1_utils.js';
+// Side-effect import: registers window._getMacrostripeColor /
+// _getMacrostripeIdPerSample so getSampleColor in _state.js can
+// resolve the Phase-1 macrostripe palette without a static import
+// cycle.
+import '../../shared/macrostripe.js';
 import { resolve as _registryResolve, getState as _getState } from '../../../../core/atlas_api.js';
 
 import {
@@ -562,6 +567,7 @@ function _buildLegacyState(atlasState) {
     selectionMode: false,         // U key toggles; Shift+drag in selection mode writes to selectionGroup
     selectionGroup: null,         // { ids, source_atlas, source_page, source_window, ts } — see specs_todo/SPEC_cross_atlas_group_transfer.md
     cusumStripOn: false,          // toggle for the Σ CUSUM panel between tracks + lines
+    useMacrostripeColors: false,  // SPEC_macrostripe_microgroup_hierarchy.md Phase 1 — when on AND state.bandingResult is present, color PCA/lines/L3 by macrostripe_id instead of per-window K-means microgroups
     cusumResidual: 'cohort_mean', // 'cohort_mean'|'band_mean'|'zero' — see shared/cusum.js
     cusumOp: 'mean',              // 'mean'|'median' — per-band aggregation
     cusumAxis: 'pc1',             // PC axis to walk; 'pc1' or 'pc2'

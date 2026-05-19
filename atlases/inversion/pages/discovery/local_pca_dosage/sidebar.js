@@ -280,6 +280,26 @@ function _wireNewShellControls(state) {
     regimeBreadthEl.dataset.wired = '1';
   }
 
+  // 2026-05-18: macro / micro coloring toggle (SPEC_macrostripe_
+  // microgroup_hierarchy.md Phase 1). When state.useMacrostripeColors
+  // is true AND state.bandingResult is populated, drawPCA / lines /
+  // L3 read per-sample color from shared/macrostripe.js#getMacrostripeColor.
+  // When false (default) or banding absent, the existing K-means
+  // microgroup coloring path stays in effect.
+  const macroEl = $('linesMacrostripeToggle');
+  if (macroEl && macroEl.dataset.wired !== '1') {
+    macroEl.checked = !!state.useMacrostripeColors;
+    macroEl.addEventListener('change', (e) => {
+      state.useMacrostripeColors = !!e.target.checked;
+      // Repaint chain — same surfaces the K-means microgroup coloring
+      // touched. Wrapped in try/catch so one fail doesn't break the rest.
+      try { drawPCA(state); }        catch (err) { console.warn('[macrostripeToggle] drawPCA:', err); }
+      try { drawLinesPanel(state); } catch (err) { console.warn('[macrostripeToggle] drawLinesPanel:', err); }
+      try { renderL3Panel(state); }  catch (err) { console.warn('[macrostripeToggle] renderL3Panel:', err); }
+    });
+    macroEl.dataset.wired = '1';
+  }
+
   // 2026-05-18: Σ CUSUM panel toggle. Shows the dedicated cusumPanel
   // between #tracksContainer and #linesPanel; the painter
   // (drawCusumPanel) is a sibling repaint of drawLinesPanel so the

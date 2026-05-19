@@ -799,6 +799,20 @@
           <input type="checkbox" id="linesCandBandsToggle" checked />
           <span style="color: var(--ink-dim);">cand bands</span>
         </label>
+        <!-- 2026-05-18: macro / micro coloring toggle (SPEC_macrostripe_
+             microgroup_hierarchy.md Phase 1). When ON, PCA scatter / lines
+             panel / L3 mini-PCA dots color by macrostripe_id (derived from
+             the band-tracking Stage 3 sample sets at the current scrubber
+             window). When OFF (default), today's per-window K-means
+             microgroup coloring stays in effect. Requires state.bandingResult
+             to be populated (run the haplotype_regimes page's pipeline first);
+             otherwise the toggle is a no-op. -->
+        <label id="linesMacrostripeLabel"
+               style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding-left: 6px; border-left: 1px solid var(--rule);"
+               title="Macro / micro coloring (Phase 1). When ON, color PCA scatter + per-sample lines + L3 dots by macrostripe_id (the band-tracking Stage 3 stable-band assignment at the current window). When OFF, color by per-window K-means microgroup (today's behaviour). Requires the banding pipeline to have run on the active chromosome — open the haplotype_regimes page once to populate state.bandingResult.">
+          <input type="checkbox" id="linesMacrostripeToggle" />
+          <span style="color: var(--ink-dim);">macrostripe</span>
+        </label>
         </span><!-- /#linesHeaderMoreGroup -->
         <!-- v3.84: candidate overlay badge. Visible when a candidate is active
              (state.candidate set). Shows "candidate · g0a/g0b/... " inline as
