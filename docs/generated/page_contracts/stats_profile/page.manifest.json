@@ -2,7 +2,7 @@
   "page_id": "stats_profile",
   "label": "stats profile",
   "page_type": "core_page",
-  "stage": "classification (per manifest.json; lives under catalogue/ dir)",
+  "stage": "synthesis",
   "owner_atlas": "inversion",
   "status": "active",
   "current_path": {
@@ -11,47 +11,63 @@
     "js_subdir": "atlases/inversion/pages/catalogue/stats_profile/"
   },
   "legacy_source": "legacy/Inversion_atlas.html lines 28420-29306 (JS body) + 8110-8127 (HTML shell). Public entry: renderStatsProfilePage (legacy: _renderStatsProfilePage line 29146)",
-
   "purpose": "Statistical profile of inversion-associated genomic features. Comparative summary of breakpoint context, genomic composition, functional cargo, population variation, breeding burden. Auto-derives rows from cs_breakpoints + candidate list; overlay stats_profile JSON/TSV for annotated rows (gene density, GO/KEGG, ROH, deleterious burden, F_ST). The 'what is statistically special about inversion regions?' synthesis figure for the manuscript.",
-
-  "required_layers": ["scrubber_main"],
-  "required_slots": ["activeChrom"],
-  "preloads": ["scrubber_main"],
-  "auto_derives_from": ["cs_breakpoints", "candidate list"],
-  "optional_overlay": "stats_profile JSON/TSV (drag-drop for annotated rows)",
-
-  "panels": [
-    {"id": "stats_profile_body", "dom_id": "spBody", "purpose": "comparative summary table"}
+  "required_layers": [
+    "scrubber_main"
   ],
-
-  "subdir_files": ["_state.js — _pageState + setter"],
-
+  "required_slots": [
+    "activeChrom"
+  ],
+  "preloads": [
+    "scrubber_main"
+  ],
+  "auto_derives_from": [
+    "cs_breakpoints",
+    "candidate list"
+  ],
+  "optional_overlay": "stats_profile JSON/TSV (drag-drop for annotated rows)",
+  "panels": [
+    {
+      "id": "stats_profile_body",
+      "dom_id": "spBody",
+      "purpose": "comparative summary table"
+    }
+  ],
+  "subdir_files": [
+    "_state.js \u2014 _pageState + setter"
+  ],
   "primitives_used": [
-    "_csGetSyntenyBlocks (exported from cross_species_breakpoints — runtime cross-page reference; round 5 step 11 made these proper exports)",
+    "_csGetSyntenyBlocks (exported from cross_species_breakpoints \u2014 runtime cross-page reference; round 5 step 11 made these proper exports)",
     "_csPermutationTest (exported from cross_species_breakpoints)"
   ],
   "adapters_used": [],
-
   "interactions": [
-    {"id": "drag_drop_stats_profile", "type": "input"}
+    {
+      "id": "drag_drop_stats_profile",
+      "type": "input"
+    }
   ],
   "hotkeys": [],
-
-  "computed_preview_outputs": ["comparative stats profile table (breakpoint context, genomic composition, functional cargo, population variation, breeding burden)"],
-  "committable_outputs": ["unknown — likely export buttons"],
+  "computed_preview_outputs": [
+    "comparative stats profile table (breakpoint context, genomic composition, functional cargo, population variation, breeding burden)"
+  ],
+  "committable_outputs": [
+    "unknown \u2014 likely export buttons"
+  ],
   "commit_policy": "manual_only",
-
   "documents": {
     "page_registry_doc": "pages.registry.json -> pages.stats_profile._doc",
     "specs_done": [],
     "specs_todo": [],
-    "handoffs": ["atlases/inversion/pages/catalogue/BATCH_4_NOTES.md", "_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step11_done.md (cross-page export promotion)"],
+    "handoffs": [
+      "atlases/inversion/pages/catalogue/BATCH_4_NOTES.md",
+      "_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step11_done.md (cross-page export promotion)"
+    ],
     "user_guide": "unknown"
   },
-
   "known_issues": [
     "Cross-page runtime dependency on cross_species_breakpoints's _csGetSyntenyBlocks + _csPermutationTest (round 5 step 11 made them proper exports; round 11 mention says guards remain as imports promotion target for follow-up).",
-    "stage in manifest.json is 'classification' but file lives under pages/catalogue/ — known directory/stage discrepancy."
+    "stage in manifest.json is 'classification' but file lives under pages/catalogue/ \u2014 known directory/stage discrepancy."
   ],
   "confidence": "high"
 }

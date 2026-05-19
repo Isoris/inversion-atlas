@@ -2,7 +2,7 @@
   "page_id": "overview",
   "label": "overview",
   "page_type": "core_page",
-  "stage": "classification (per manifest.json; lives under catalogue/ dir)",
+  "stage": "synthesis",
   "owner_atlas": "inversion",
   "status": "empty_stub",
   "current_path": {
@@ -11,35 +11,30 @@
     "js_subdir": "atlases/inversion/pages/catalogue/overview/"
   },
   "legacy_source": "legacy/Inversion_atlas.html line 9322 (just `<div id='overview' class='page'></div>`) + tab button at line 5138. Zero render-function references in legacy (verified by grep).",
-
   "purpose": "Synthesis-stage tab declared but EMPTY in legacy. Reserved for future high-level workflow summary, candidate counts per stage, layer-presence checklist. Module exists so the page registry has a non-throwing entry.",
-
   "required_layers": [],
   "required_slots": [],
   "preloads": [],
-
   "panels": [],
-
-  "subdir_files": ["_state.js — _pageState + setter"],
-
+  "subdir_files": [
+    "_state.js \u2014 _pageState + setter"
+  ],
   "primitives_used": [],
   "adapters_used": [],
-
   "interactions": [],
   "hotkeys": [],
-
   "computed_preview_outputs": [],
   "committable_outputs": [],
   "commit_policy": "none_by_default",
-
   "documents": {
     "page_registry_doc": "pages.registry.json -> pages.overview._doc (notes status as 'stub preserved verbatim')",
     "specs_done": [],
     "specs_todo": [],
-    "handoffs": ["_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step8_done.md"],
+    "handoffs": [
+      "_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step8_done.md"
+    ],
     "user_guide": "unknown"
   },
-
   "known_issues": [
     "Empty in both legacy and current repo. Needs design + implementation. Suggested content: workflow summary, candidate counts per stage, layer-presence checklist."
   ],

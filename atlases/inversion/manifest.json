@@ -76,11 +76,11 @@
     {
       "id": "pca_comparator",
       "slug": "pca_comparator",
-      "label": "PCA comparator (dosage · θπ · GHSL)",
+      "label": "PCA comparator (dosage \u00b7 \u03b8\u03c0 \u00b7 GHSL)",
       "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/discovery/pca_comparator.html",
       "module": "atlases/inversion/pages/discovery/pca_comparator.js",
-      "tooltip": "Cross-evidence PCA comparator — Phase 1 (side-by-side). 3 synchronized mini-PCA panels at the active window; hover a dot to track it across all 3 axes. K-band coloring inherits from the anchor's clustering (default: dosage). Read-only inspector."
+      "tooltip": "Cross-evidence PCA comparator \u2014 Phase 1 (side-by-side). 3 synchronized mini-PCA panels at the active window; hover a dot to track it across all 3 axes. K-band coloring inherits from the anchor's clustering (default: dosage). Read-only inspector."
     },
     {
       "id": "karyotype_tier",
@@ -95,7 +95,7 @@
       "id": "popstats",
       "slug": "popstats",
       "label": "popstats",
-      "stage": "classification",
+      "stage": "synthesis",
       "fragment": "atlases/inversion/pages/review/popstats.html",
       "module": "atlases/inversion/pages/review/popstats.js",
       "_was_id": "page6"
@@ -104,7 +104,7 @@
       "id": "ancestry_per_window",
       "slug": "ancestry_per_window",
       "label": "ancestry",
-      "stage": "classification",
+      "stage": "evolution",
       "fragment": "atlases/inversion/pages/review/ancestry_per_window.html",
       "module": "atlases/inversion/pages/review/ancestry_per_window.js",
       "_was_id": "page7"
@@ -113,7 +113,7 @@
       "id": "boundary_refinement",
       "slug": "boundary_refinement",
       "label": "boundaries",
-      "stage": "classification",
+      "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/review/boundary_refinement.html",
       "module": "atlases/inversion/pages/review/boundary_refinement.js",
       "_was_id": "page11"
@@ -122,7 +122,7 @@
       "id": "sv_evidence",
       "slug": "sv_evidence",
       "label": "SV evidence",
-      "stage": "classification",
+      "stage": "discovery_2",
       "fragment": "atlases/inversion/pages/review/sv_evidence.html",
       "module": "atlases/inversion/pages/review/sv_evidence.js",
       "_was_id": "page_sv_evidence"
@@ -131,7 +131,7 @@
       "id": "fish_ancestry_scroller",
       "slug": "fish_ancestry_scroller",
       "label": "ancestry scroller",
-      "stage": "classification",
+      "stage": "evolution",
       "fragment": "atlases/inversion/pages/review/fish_ancestry_scroller.html",
       "module": "atlases/inversion/pages/review/fish_ancestry_scroller.js",
       "tooltip": "Fish Ancestry Scroller \u2014 per-fish ancestry painting across one selected inversion candidate (one chromosome viewport). Three numbered layers (PC1 Band / Ancestry Bricks / Brick summary cohort) + 5-row brick-metrics heatmap + tab strip. Headline metric: mean |\u0394Q| (global vs local). Consumes shared/ancestry_alignment.js (F-based label-switching alignment) + shared/ancestry_bricks.js (per-fish bricks + flags). See specs_todo/SPEC_fish_ancestry_scroller.md for UI layout v2.",
@@ -168,7 +168,7 @@
       "id": "stats_profile",
       "slug": "stats_profile",
       "label": "stats profile",
-      "stage": "classification",
+      "stage": "synthesis",
       "fragment": "atlases/inversion/pages/catalogue/stats_profile.html",
       "module": "atlases/inversion/pages/catalogue/stats_profile.js",
       "_was_id": "page17"
@@ -195,7 +195,7 @@
       "id": "overview",
       "slug": "overview",
       "label": "overview",
-      "stage": "classification",
+      "stage": "synthesis",
       "fragment": "atlases/inversion/pages/catalogue/overview.html",
       "module": "atlases/inversion/pages/catalogue/overview.js",
       "_was_id": "page_overview"
@@ -214,7 +214,7 @@
       "id": "cross_species_breakpoints",
       "slug": "cross_species_breakpoints",
       "label": "cross-species breakpoints",
-      "stage": "comparative",
+      "stage": "evolution",
       "fragment": "atlases/inversion/pages/comparative/cross_species_breakpoints.html",
       "module": "atlases/inversion/pages/comparative/cross_species_breakpoints.js",
       "_was_id": "page16"
@@ -223,7 +223,7 @@
       "id": "multi_species_cockpit",
       "slug": "multi_species_cockpit",
       "label": "multi-species",
-      "stage": "comparative",
+      "stage": "evolution",
       "fragment": "atlases/inversion/pages/comparative/multi_species_cockpit.html",
       "module": "atlases/inversion/pages/comparative/multi_species_cockpit.js",
       "tooltip": "Multi-species comparative atlas page (per HANDOFF_SUPPLEMENT).",
@@ -450,15 +450,15 @@
       "_doc": "Utility / inspector cartridges. Open these to characterise a candidate, debug a layer, or compare evidence axes. Distinct from discovery_2's workflow pages. Pages currently in this stage: tree_panel, fingerprint_track, similarity_matrix, pca_scatter_per_window, dosage_heatmap, nested_inversion_detector, dosage_cluster_adaptive_k (re-staged from discovery_2 on 2026-05-16 per AUDIT_local_pca_merge_vs_rename.md \u00a7Q3). Future additions: page_pca_comparator (per SPEC_local_pca_comparator.md). Atlas-core shell may render this stage as a vertical sidebar rather than horizontal pills \u2014 that's a shell-side change tracked separately."
     },
     {
-      "id": "classification",
-      "label": "classification",
-      "order": 3,
-      "_doc": "Absorbs the legacy 'refinement' + 'classification' + 'synthesis' stages \u2014 the per-candidate karyotype/tier deep-dive, popstats/ancestry tracks, boundary refinement, SV evidence, plus the cohort-level stats profile / marker panel / overview pages that previously lived under 'synthesis'."
-    },
-    {
       "id": "catalogue",
       "label": "catalogue",
-      "order": 4
+      "order": 3
+    },
+    {
+      "id": "classification",
+      "label": "classification",
+      "order": 4,
+      "_doc": "Per-candidate karyotype assignment + marker readiness. Shrunk to 2 pages on 2026-05-18 (see STAGE_AUDIT_2026-05-18.md): ancestry / boundary-refinement / SV-evidence / popstats / stats_profile / overview moved out to evolution / discovery_2 / synthesis. Only karyotype_tier + marker_readiness remain \u2014 the actual per-candidate \"what kind of inversion\" surfaces."
     },
     {
       "id": "evolution",
@@ -467,9 +467,10 @@
       "_doc": "Per-candidate evolution stage: polarize ancestral vs derived arrangement, reconstruct founder-like / MRCA-like consensus, build haplotype networks of INV chromosomes, estimate age + leakage + internal substructure. All cartridges consume the existing mgl_adapter primitives (PCA / dosage / heatmap / nj-tree) plus a small set of evolution-specific helpers (founder_consensus, doubleton_sfs_clusters, haplotype_network, outgroup_synteny, inversion_age, mosaicism_detector)."
     },
     {
-      "id": "comparative",
-      "label": "comparative",
-      "order": 6
+      "id": "synthesis",
+      "label": "synthesis",
+      "order": 6,
+      "_doc": "Cohort-level synthesis surfaces. Project overview, manuscript-ready statistical profile, per-window popstats track stack. Restored 2026-05-18 \u2014 these pages were originally synthesis-stage in legacy but got swept into classification by the slug-migration scripts. See STAGE_AUDIT_2026-05-18.md for the audit trail."
     },
     {
       "id": "help",
