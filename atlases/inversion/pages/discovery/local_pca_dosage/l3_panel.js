@@ -18,7 +18,7 @@ import {
   ariFromTable,
   restrictedConcord,
 } from '../../../shared/contingency.js';
-import { clusterL2_UVRotated } from '../../../shared/uv_rotation.js';
+import { clusterL2_UVRotated, clusterL2_UVDenoise, clusterL2_UVDBSCAN, clusterL2_UVDistRank, clusterL2_UVDistFuzzy } from '../../../shared/uv_rotation.js';
 import { computeBandDiagnostics } from './band_diagnostics.js';
 import {
   bandDiagsMiniChipsHtml,
@@ -1321,39 +1321,46 @@ function alignedLabelsTo_atK(focalIdx, neighborIdx, K) {
 }
 
 // =============================================================================
-// compareL2Pair_byMode — recluster-mode dispatcher (legacy 11733-11774, partial)
+// compareL2Pair_byMode — recluster-mode dispatcher (legacy 11733-11774)
 // =============================================================================
 // Routes label-fetch + contingency through the appropriate cluster
-// function based on state.l3ReclusterMode. Currently supports:
-//   - kmeans-K3        → compareL2Pair (default state.k=3 path)
-//   - kmeans-K6        → compareL2Pair_atK at K=6
-//   - distance-uv      → UV-rotated mode (alias of uv-rotated)
-//   - uv-rotated       → clusterL2_UVRotated (shared/uv_rotation.js)
-// UV-denoise / uv-dbscan / uv-dist-rank / uv-dist-fuzzy still need
-// the 4 advanced cluster modes from legacy 11195-11540 ported — that's
-// a separate commit. Until then they fall back to kmeans-K3.
+// function based on state.l3ReclusterMode. Supported modes:
+//   - kmeans-K3       → compareL2Pair (default state.k=3 path)
+//   - kmeans-K6       → compareL2Pair_atK at K=6
+//   - distance-uv     → UV-rotated mode (alias of uv-rotated)
+//   - uv-rotated      → clusterL2_UVRotated   (shared/uv_rotation.js)
+//   - uv-denoise      → clusterL2_UVDenoise   (DBSCAN pre-filter)
+//   - uv-dbscan       → clusterL2_UVDBSCAN    (within-stripe DBSCAN)
+//   - uv-dist-rank    → clusterL2_UVDistRank  (tercile-to-Het remap)
+//   - uv-dist-fuzzy   → clusterL2_UVDistFuzzy (soft tie-break < 0.45)
 function compareL2Pair_byMode(leftIdx, rightIdx, mode) {
   if (!mode || mode === 'kmeans-K3') return compareL2Pair(leftIdx, rightIdx);
   if (mode === 'kmeans-K6')          return compareL2Pair_atK(leftIdx, rightIdx, 6);
-  if (mode === 'distance-uv' || mode === 'uv-rotated') {
-    return _compareL2Pair_UVRotated(leftIdx, rightIdx);
-  }
-  // Remaining UV modes not yet ported — fall back so the panel still renders
-  // instead of throwing. The dropdown disables these.
+  const UV_DISPATCH = {
+    'distance-uv':   clusterL2_UVRotated,
+    'uv-rotated':    clusterL2_UVRotated,
+    'uv-denoise':    clusterL2_UVDenoise,
+    'uv-dbscan':     clusterL2_UVDBSCAN,
+    'uv-dist-rank':  clusterL2_UVDistRank,
+    'uv-dist-fuzzy': clusterL2_UVDistFuzzy,
+  };
+  const fn = UV_DISPATCH[mode];
+  if (fn) return _compareL2Pair_UV(leftIdx, rightIdx, mode, fn);
+  // Unknown mode → fall back so the panel still renders.
   return compareL2Pair(leftIdx, rightIdx);
 }
 
 // =============================================================================
-// _compareL2Pair_UVRotated — UV-rotated dispatcher (legacy 11733-1774 fragment)
+// _compareL2Pair_UV — shared compare for every UV mode. Each mode
+// supplies its own L2-cluster function (clusterL2_UV*); we run it on
+// both panes, Hungarian-align, contingency, verdict.
+// Legacy: compareL2Pair_byMode tail (11738-11774).
 // =============================================================================
-// Specialised compare for the uv-rotated mode. Both panes are
-// clustered via clusterL2_UVRotated (3-cluster partition in rotated
-// (u, v) space); Hungarian-aligned contingency at K=3.
-function _compareL2Pair_UVRotated(leftIdx, rightIdx) {
+function _compareL2Pair_UV(leftIdx, rightIdx, mode, clusterFn) {
   const state = _pageState;
   if (leftIdx == null || rightIdx == null) return null;
-  const cl = clusterL2_UVRotated(state, leftIdx);
-  const cr = clusterL2_UVRotated(state, rightIdx);
+  const cl = clusterFn(state, leftIdx);
+  const cr = clusterFn(state, rightIdx);
   if (!cl || !cr || !cl.labels || !cr.labels) return null;
   const K = 3;
   const llab = cl.fixedKLabels || cl.labels;
@@ -1381,7 +1388,7 @@ function _compareL2Pair_UVRotated(leftIdx, rightIdx) {
     cl_reason: cl.reason, cr_reason: cr.reason,
     cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
     cl_usedK: K, cr_usedK: K,
-    reclusterMode: 'uv-rotated',
+    reclusterMode: mode,
   };
 }
 

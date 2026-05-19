@@ -9,6 +9,16 @@ import {
   clusterFromRotation_UVRotated,
   clusterL2_UVRotated,
   clusterSlab_UVRotated,
+  dbscan,
+  kDistAutoEps,
+  clusterFromRotation_UVDenoise,
+  clusterFromRotation_UVDBSCAN,
+  clusterFromRotation_UVDistRank,
+  clusterFromRotation_UVDistFuzzy,
+  clusterL2_UVDenoise,
+  clusterL2_UVDBSCAN,
+  clusterL2_UVDistRank,
+  clusterL2_UVDistFuzzy,
 } from '../atlases/inversion/shared/uv_rotation.js';
 
 let pass = 0, fail = 0;
@@ -332,6 +342,77 @@ group('clusterL2_UVRotated end-to-end');
   check('cluster labels length = nS',      cl.labels && cl.labels.length === nS);
   check('cluster n_per_group sums to nS',
         cl.n_per_group && cl.n_per_group.reduce((a, b) => a + b, 0) === nS);
+}
+
+// =====================================================================
+// DBSCAN primitive.
+// =====================================================================
+group('dbscan + kDistAutoEps');
+{
+  // 2 clusters of 6 + 2 noise points in 1D
+  const data = new Float64Array([0, 0.1, 0.05, 0.2, 0.15, 0.08,    // cluster A
+                                 5.0, 5.1, 5.05, 5.2, 5.15, 5.08,   // cluster B
+                                 20, 100]);                          // 2 noise
+  const eps = 0.5;
+  const minPts = 3;
+  const labels = dbscan(data, eps, minPts);
+  check('dbscan returns Int32Array of length N',
+        labels instanceof Int32Array && labels.length === data.length);
+  check('first 6 form 1 cluster',          labels[0] > 0 && labels[5] > 0
+        && labels[0] === labels[1] && labels[0] === labels[5]);
+  check('next 6 form another cluster',     labels[6] > 0 && labels[11] > 0
+        && labels[6] === labels[7] && labels[6] === labels[11]);
+  check('clusters are different',          labels[0] !== labels[6]);
+  check('noise points = 0',                labels[12] === 0 && labels[13] === 0);
+
+  // kDistAutoEps returns finite positive number on clean data
+  const auto = kDistAutoEps(data, 5);
+  check('kDistAutoEps returns finite > 0', Number.isFinite(auto) && auto > 0);
+  // Degenerate (1 point) → NaN
+  check('kDistAutoEps([single]) → NaN',     Number.isNaN(kDistAutoEps(new Float64Array([1]), 3)));
+}
+
+// =====================================================================
+// 4 advanced UV cluster modes end-to-end on the same synthetic fixture.
+// =====================================================================
+group('clusterL2_UV{Denoise,DBSCAN,DistRank,DistFuzzy} end-to-end');
+{
+  const nS = 18;
+  const pc1 = new Float64Array(nS);
+  const pc2 = new Float64Array(nS);
+  for (let g = 0; g < 3; g++) {
+    for (let i = 0; i < 6; i++) {
+      const idx = g * 6 + i;
+      pc1[idx] = (g - 1) + (i - 3) * 0.01;
+      pc2[idx] =  (i - 3) * 0.01;
+    }
+  }
+  const state = {
+    data: {
+      n_samples: nS,
+      n_windows: 4,
+      chrom: 'LG_TEST',
+      windows: Array.from({ length: 4 }, () => ({ pc1, pc2 })),
+      l2_envelopes: [{ _s0: 0, _e0: 3 }],
+      samples: null,
+    },
+    flipPC1: false, pc1Sign: null, minNGroup: 3,
+  };
+  for (const [name, fn] of [
+    ['uv-denoise',    clusterL2_UVDenoise],
+    ['uv-dbscan',     clusterL2_UVDBSCAN],
+    ['uv-dist-rank',  clusterL2_UVDistRank],
+    ['uv-dist-fuzzy', clusterL2_UVDistFuzzy],
+  ]) {
+    const cl = fn(state, 0);
+    check(`${name}: returns ok=true`,
+          cl && cl.ok === true,
+          cl && cl.reason);
+    check(`${name}: usedK = 3`,            cl && cl.usedK === 3);
+    check(`${name}: labels length = nS`,   cl && cl.labels && cl.labels.length === nS);
+    check(`${name}: n_per_group sums to nS`,
+          cl && cl.n_per_group && cl.n_per_group.reduce((a, b) => a + b, 0) === nS);
+  }
 }
 
 // =====================================================================
