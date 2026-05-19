@@ -204,3 +204,110 @@ export function computeHetRateForSlab(state, startW, endW, opts) {
   return computeHetRateForRange(state, start_bp, end_bp,
     Object.assign({}, opts, { cacheKey }));
 }
+
+// =====================================================================
+// Per-sample MEAN dosage across a bp range (2026-05-18 — Group D
+// completion). Mirrors computeHetRateForRange but sums dosage VALUES
+// (0/1/2) instead of HET indicators. Used by the lines-panel 'dosage'
+// color mode and any future per-sample dosage summary.
+// =====================================================================
+function _ensureDosageMeanCache(state) {
+  if (!state.__dosageMeanCache || !(state.__dosageMeanCache instanceof Map)) {
+    state.__dosageMeanCache = new Map();
+  }
+  return state.__dosageMeanCache;
+}
+
+export function invalidateDosageMeanCache(state) {
+  if (state && state.__dosageMeanCache instanceof Map) {
+    state.__dosageMeanCache.clear();
+  }
+}
+
+/**
+ * Per-sample mean dosage across markers whose pos_bp falls in
+ * [startBp, endBp]. Returns Float32Array of length n_samples; NaN
+ * where no non-missing call was observed for that sample.
+ *
+ * Same chunk-projection semantics as computeHetRateForRange:
+ * chunk.samples → cohort-index lookup via state.data.samples[*].id /
+ * cga / ind / sample.
+ *
+ * @param {Object} state
+ * @param {number} startBp
+ * @param {number} endBp
+ * @param {{getCachedChunk?:Function, cacheKey?:string|number}} opts
+ * @returns {Float32Array}
+ */
+export function computeDosageMeanForRange(state, startBp, endBp, opts) {
+  const o = opts || {};
+  const nS = (state && state.data && state.data.n_samples) || 0;
+  const cache = state ? _ensureDosageMeanCache(state) : null;
+  const cacheKey = o.cacheKey != null ? o.cacheKey : null;
+  if (cacheKey != null && cache && cache.has(cacheKey)) return cache.get(cacheKey);
+
+  const out = _emptyNaN(nS);
+  if (!Number.isFinite(startBp) || !Number.isFinite(endBp) || endBp < startBp) {
+    if (cacheKey != null && cache) cache.set(cacheKey, out);
+    return out;
+  }
+
+  const getCachedChunk = o.getCachedChunk;
+  const chunk = (typeof getCachedChunk === 'function')
+    ? getCachedChunk(startBp, endBp) : null;
+  if (!chunk || !Array.isArray(chunk.markers) || !Array.isArray(chunk.dosage)
+      || !Array.isArray(chunk.samples)) {
+    if (cacheKey != null && cache) cache.set(cacheKey, out);
+    return out;
+  }
+
+  // chunk-sample-id → cohort-index lookup
+  const cohortSamples = (state && state.data && state.data.samples) || [];
+  const idToCohort = new Map();
+  for (let ci = 0; ci < cohortSamples.length; ci++) {
+    const s = cohortSamples[ci];
+    const id = (s && (s.id || s.cga || s.ind || s.sample)) || ('S' + ci);
+    idToCohort.set(id, ci);
+  }
+
+  // Filter markers to bp span
+  const inRange = [];
+  for (let mi = 0; mi < chunk.markers.length; mi++) {
+    const m = chunk.markers[mi];
+    if (!m || !Number.isFinite(m.pos_bp)) continue;
+    if (m.pos_bp < startBp || m.pos_bp > endBp) continue;
+    inRange.push(mi);
+  }
+  if (inRange.length === 0) {
+    if (cacheKey != null && cache) cache.set(cacheKey, out);
+    return out;
+  }
+
+  // Sum dosage + count non-NA per chunk-sample
+  const nChunkS = chunk.samples.length;
+  const sumDos = new Float64Array(nChunkS);
+  const nNonNa = new Int32Array(nChunkS);
+  for (const mi of inRange) {
+    const row = chunk.dosage[mi];
+    if (!row) continue;
+    for (let ci = 0; ci < nChunkS; ci++) {
+      const v = row[ci];
+      if (v == null || !Number.isFinite(v) || v < 0) continue;
+      sumDos[ci] += v;
+      nNonNa[ci]++;
+    }
+  }
+
+  // Project to cohort space
+  for (let ci = 0; ci < nChunkS; ci++) {
+    const cohortIdx = idToCohort.has(chunk.samples[ci])
+      ? idToCohort.get(chunk.samples[ci]) : -1;
+    if (cohortIdx < 0 || cohortIdx >= nS) continue;
+    out[cohortIdx] = (nNonNa[ci] === 0)
+      ? NaN
+      : sumDos[ci] / nNonNa[ci];
+  }
+
+  if (cacheKey != null && cache) cache.set(cacheKey, out);
+  return out;
+}

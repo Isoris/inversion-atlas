@@ -110,8 +110,10 @@ function applyMainGrid(state) {
   const simInMini  = document.body && document.body.dataset.simInMinimap === '1';
   const simEl      = main.querySelector('#simPanel');
   const linesEl    = main.querySelector('#linesPanel');
+  const cusumEl    = main.querySelector('#cusumPanel');
   const simVisible = simEl && !simInMini && getComputedStyle(simEl).display !== 'none';
   const linesVisible = linesEl && getComputedStyle(linesEl).display !== 'none';
+  const cusumVisible = cusumEl && getComputedStyle(cusumEl).display !== 'none';
 
   const rows = ['40px'];                                         // ctrlBar
   // Sim panel: ALWAYS emit a row so DOM-order grid placement keeps every
@@ -126,6 +128,10 @@ function applyMainGrid(state) {
     : '0px');
   rows.push(`${zH}px`);                                          // zPanel
   rows.push('auto');                                             // tracksContainer
+  // CUSUM panel (2026-05-18): same 0px-when-hidden trick as sim + lines.
+  // 70px when shown gives ~50px of plot room above + below the 0-baseline
+  // for K=3 trajectories without crowding adjacent panels.
+  rows.push(cusumVisible ? '70px' : '0px');                      // cusumPanel
   // Same reasoning for lines: keep the row, collapse to 0px when hidden,
   // so pcaPanel + l3Panel claim the rest of the column.
   rows.push(linesVisible

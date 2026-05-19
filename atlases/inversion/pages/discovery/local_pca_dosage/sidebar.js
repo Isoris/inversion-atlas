@@ -76,6 +76,7 @@ import {
   renderTrackedList,
 } from './pca_panel.js';
 import { renderL3Panel } from './l3_panel.js';
+import { wireGPanel } from './g_panel.js';
 import {
   exportKLabelsTSV,
   makeCandidateFromLock,
@@ -279,6 +280,81 @@ function _wireNewShellControls(state) {
     regimeBreadthEl.dataset.wired = '1';
   }
 
+  // 2026-05-18: macro / micro coloring toggle (SPEC_macrostripe_
+  // microgroup_hierarchy.md Phase 1). When state.useMacrostripeColors
+  // is true AND state.bandingResult is populated, drawPCA / lines /
+  // L3 read per-sample color from shared/macrostripe.js#getMacrostripeColor.
+  // When false (default) or banding absent, the existing K-means
+  // microgroup coloring path stays in effect.
+  const macroEl = $('linesMacrostripeToggle');
+  if (macroEl && macroEl.dataset.wired !== '1') {
+    macroEl.checked = !!state.useMacrostripeColors;
+    macroEl.addEventListener('change', (e) => {
+      state.useMacrostripeColors = !!e.target.checked;
+      // Repaint chain — same surfaces the K-means microgroup coloring
+      // touched. Wrapped in try/catch so one fail doesn't break the rest.
+      try { drawPCA(state); }        catch (err) { console.warn('[macrostripeToggle] drawPCA:', err); }
+      try { drawLinesPanel(state); } catch (err) { console.warn('[macrostripeToggle] drawLinesPanel:', err); }
+      try { renderL3Panel(state); }  catch (err) { console.warn('[macrostripeToggle] renderL3Panel:', err); }
+    });
+    macroEl.dataset.wired = '1';
+  }
+
+  // 2026-05-18: Σ CUSUM panel toggle. Shows the dedicated cusumPanel
+  // between #tracksContainer and #linesPanel; the painter
+  // (drawCusumPanel) is a sibling repaint of drawLinesPanel so the
+  // existing draw chain picks it up. Grid row toggles between 0px
+  // and 70px via applyMainGrid (panel_resize.js).
+  const cusumEl = $('linesCusumToggle');
+  if (cusumEl && cusumEl.dataset.wired !== '1') {
+    cusumEl.checked = !!state.cusumStripOn;
+    cusumEl.addEventListener('change', (e) => {
+      state.cusumStripOn = !!e.target.checked;
+      // applyMainGrid reads getComputedStyle on #cusumPanel — set the
+      // display flag here BEFORE the grid recalc so it picks up the
+      // new state. drawCusumPanel will sync display too on next paint.
+      const pan = document.getElementById('cusumPanel');
+      if (pan) pan.style.display = state.cusumStripOn ? '' : 'none';
+      try { applyMainGrid(state); } catch (err) {
+        console.warn('[linesCusumToggle] applyMainGrid:', err);
+      }
+      try { drawLinesPanel(state); } catch (err) {
+        console.warn('[linesCusumToggle] drawLinesPanel:', err);
+      }
+    });
+    cusumEl.dataset.wired = '1';
+  }
+
+  // ===========================================================================
+  // Lines-panel header "▾ more" disclosure (2026-05-18). The
+  // #linesYsourceBar held ~10 inline secondary toggles (SNP-dens,
+  // trans-rate, regime, lineage, band-trace cluster, cand-bands,
+  // Σ-cusum) that wrapped to 2-3 rows and crowded the header. The
+  // markup now wraps these in #linesHeaderMoreGroup (hidden by
+  // default); the #linesHeaderMoreToggle button flips visibility
+  // and persists the choice. User feedback (chat 2026-05-18): "in
+  // the per sample lines the settings are still too many they
+  // should be put under some toggle tab".
+  const moreBtn = $('linesHeaderMoreToggle');
+  const moreGroup = $('linesHeaderMoreGroup');
+  if (moreBtn && moreGroup && moreBtn.dataset.wired !== '1') {
+    let on = false;
+    try { on = localStorage.getItem('inversion_atlas.linesHeaderMoreOn') === '1'; }
+    catch (_) {}
+    const apply = () => {
+      moreGroup.style.display = on ? 'inline-flex' : 'none';
+      moreBtn.textContent = on ? '▴ less' : '▾ more';
+    };
+    apply();
+    moreBtn.addEventListener('click', () => {
+      on = !on;
+      try { localStorage.setItem('inversion_atlas.linesHeaderMoreOn', on ? '1' : '0'); }
+      catch (_) {}
+      apply();
+    });
+    moreBtn.dataset.wired = '1';
+  }
+
   // ===========================================================================
   // Lines-panel band-trace buttons (WIRE_AUDIT Group A — were never wired).
   // ===========================================================================
@@ -312,6 +388,31 @@ function _wireNewShellControls(state) {
   // overlay renders in pca_panel.js drawPCA when the mode is set.
   // ===========================================================================
   _wireClusterLabelHotkey(state);
+
+  // ===========================================================================
+  // U hotkey — toggle selection mode (Group G stage 1 from WIRE_AUDIT
+  // + specs_todo/SPEC_cross_atlas_group_transfer.md). Boolean
+  // state.selectionMode; Shift+drag on PCA scatter writes to
+  // state.selectionGroup when this is true.
+  // ===========================================================================
+  _wireSelectionModeHotkey(state);
+
+  // ===========================================================================
+  // G hotkey + #gPanelOpenBtn click — open the unified-groups modal.
+  // User feedback (chat 2026-05-18): "when I push G nothing happens".
+  // Phase 0: hotkey + button + 3-tab scaffold; tab bodies are
+  // placeholders pointing at the SPEC. Full per-tab ports land later.
+  // ===========================================================================
+  try { wireGPanel(state); } catch (e) { console.warn('[wireGPanel]', e); }
+
+  // ===========================================================================
+  // Tracked-samples compact panel collapse arrow — user-reported wire
+  // gap (chat 2026-05-18): "the arrow down of settings in tracked
+  // samples PCA it does nothing on page 1". The compact panel's head
+  // has a ▼/▶ arrow that was supposed to toggle the body display
+  // but no JS wired it.
+  // ===========================================================================
+  _wireCompactTrackedCollapse(state);
 
   // ===========================================================================
   // First-use attention pulses (v4 turn 80 — never wired in modular tree).
@@ -412,6 +513,91 @@ function _wireClusterLabelHotkey(state) {
       try { drawPCA(state); } catch (_) {}
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// U hotkey — toggle selection mode. Sets state.selectionMode boolean and
+// stamps body[data-selection-mode] so CSS can change cursor / show hint.
+// On entry, clears any stale state.selectionGroup so the new drag starts
+// fresh. Hotkey is one-document-wide; gated to fire only when local_pca_dosage
+// is the active page and the focus is not in a text input.
+// ---------------------------------------------------------------------------
+function _wireSelectionModeHotkey(state) {
+  if (typeof document === 'undefined') return;
+  const sync = () => {
+    if (document.body && document.body.dataset) {
+      document.body.dataset.selectionMode = state.selectionMode ? '1' : '0';
+    }
+  };
+  sync();
+  if (document._selectionModeHotkeyWired) return;
+  document._selectionModeHotkeyWired = true;
+  document.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    const pageEl = document.getElementById('local_pca_dosage');
+    if (!pageEl || !pageEl.classList.contains('active')) return;
+    if ((e.key === 'u' || e.key === 'U')
+        && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      state.selectionMode = !state.selectionMode;
+      if (state.selectionMode) {
+        // Fresh drag — clear any stale selection from a prior session.
+        state.selectionGroup = null;
+      }
+      sync();
+      try { drawPCA(state); } catch (_) {}
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tracked-samples compact panel collapse arrow. The head + arrow live
+// in #trackedSamplesPanelCompactHead / #trackedSamplesPanelCompactArrow;
+// the CSS already supports body[data-tracked-compact-collapsed="1"]
+// (inversion.css L733) but no JS was setting the attribute. Restore
+// from localStorage on mount; flip on click. Idempotent.
+// ---------------------------------------------------------------------------
+const _TRACKED_COMPACT_LS_KEY = 'inversion_atlas.trackedCompactCollapsed';
+
+function _wireCompactTrackedCollapse(state) {
+  if (typeof document === 'undefined') return;
+  const head = document.getElementById('trackedSamplesPanelCompactHead');
+  const arrow = document.getElementById('trackedSamplesPanelCompactArrow');
+  const body = document.getElementById('trackedSamplesPanelCompactBody');
+  if (!head || !body) return;
+
+  // Restore persisted state on first wire.
+  let collapsed = false;
+  try { collapsed = localStorage.getItem(_TRACKED_COMPACT_LS_KEY) === '1'; }
+  catch (_) {}
+
+  const apply = () => {
+    body.style.display = collapsed ? 'none' : '';
+    if (arrow) arrow.textContent = collapsed ? '▶' : '▼';
+    // The CSS rule body[data-tracked-compact-collapsed="1"] hides the
+    // panel's grid row entirely so the adjacent PCA + lines grow into
+    // the freed space.
+    if (document.body && document.body.dataset) {
+      document.body.dataset.trackedCompactCollapsed = collapsed ? '1' : '0';
+    }
+  };
+  apply();
+
+  if (head.dataset.wired === '1') return;
+  head.addEventListener('click', () => {
+    collapsed = !collapsed;
+    try { localStorage.setItem(_TRACKED_COMPACT_LS_KEY, collapsed ? '1' : '0'); }
+    catch (_) {}
+    apply();
+    // Repaint adjacent panels since the freed/claimed space changes
+    // their bounds — same chain the ResizeObserver uses.
+    requestAnimationFrame(() => {
+      try { drawPCA(state); }        catch (_) {}
+      try { drawLinesPanel(state); } catch (_) {}
+    });
+  });
+  head.dataset.wired = '1';
 }
 
 // Target buttons by ID. Picked from legacy turn-80 comment (inversion.css L135).
@@ -906,12 +1092,25 @@ function _wireTrackedAside(state) {
     });
     autoPickAside.dataset.wired = '1';
   }
-  const clearPicksAside = $('clearPicksAside');
-  if (clearPicksAside && clearPicksAside.dataset.wired !== '1') {
-    clearPicksAside.addEventListener('click', () => {
-      try { clearPicks(state); } catch (_) {}
-    });
-    clearPicksAside.dataset.wired = '1';
+  // 2026-05-18 — Auto-pick + Clear button mirrors for the COMPACT
+  // tracked-samples panel. Previously only the fixed-mode aside copies
+  // were wired; in compact mode (now the default), clicking Clear or
+  // Auto-pick on the compact panel did nothing. User-reported chat
+  // 2026-05-18: "in the settings or anywhere when we push the 'remove
+  // the group' button or clear tracked samples. nothing happens."
+  const compactClicks = [
+    { id: 'clearPicksAside',       fn: () => clearPicks(state) },
+    { id: 'clearPicksCompact',     fn: () => clearPicks(state) },
+    { id: 'clearPicksCompact2',    fn: () => clearPicks(state) },
+    { id: 'autoPickRadialAside',   fn: () => _autoPickRadialBridge(state, state.trackedN) },
+    { id: 'autoPickRadialCompact', fn: () => _autoPickRadialBridge(state, state.trackedN) },
+    { id: 'autoPickRadialCompact2',fn: () => _autoPickRadialBridge(state, state.trackedN) },
+  ];
+  for (const { id, fn } of compactClicks) {
+    const btn = $(id);
+    if (!btn || btn.dataset.wired === '1') continue;
+    btn.addEventListener('click', () => { try { fn(); } catch (_) {} });
+    btn.dataset.wired = '1';
   }
 }
 
@@ -935,9 +1134,16 @@ function _wireTrackedSettingsPopup(state) {
     state.tPanelOpen = false;
   };
 
-  const openBtn = $('tPanelOpenBtn');
-  if (openBtn && openBtn.dataset.wired !== '1') {
-    openBtn.addEventListener('click', () => {
+  // 2026-05-18: dual open buttons — the fixed-mode aside header
+  // hosts #tPanelOpenBtn; the compact-mode panel header hosts
+  // #tPanelOpenBtnCompact. Both open the same #tPanelOverlay popup.
+  for (const id of ['tPanelOpenBtn', 'tPanelOpenBtnCompact']) {
+    const openBtn = $(id);
+    if (!openBtn || openBtn.dataset.wired === '1') continue;
+    openBtn.addEventListener('click', (e) => {
+      // The compact-panel head also has a click handler (collapse arrow);
+      // stop propagation so opening the popup doesn't collapse the body.
+      if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
       state.tPanelOpen ? close() : open();
     });
     openBtn.dataset.wired = '1';
@@ -1910,12 +2116,21 @@ function _wireTrackedSamples(state) {
 // =============================================================================
 
 function _wireManualGroups(state) {
-  // --- #manualGroupsList delegation — legacy lines 56626-56664 ---
-  // Wires click (pin/delete), blur (rename), keydown (enter/escape) on the
-  // sidebar list. The helpers (toggleManualGroupScope, removeManualGroup,
-  // renameManualGroup) live in ./manual_groups.js.
-  const list = $('manualGroupsList');
-  if (list) {
+  // --- manual-groups click/blur/keydown delegation ---
+  // 2026-05-18: dual-write mirror parity. renderManualGroupsList fills
+  // THREE containers (#manualGroupsList sidebar, #manualGroupsListCompact
+  // compact panel, #manualGroupsListPopup G-panel manual tab). Only the
+  // sidebar had its event delegation wired — so in compact mode (now
+  // the default) and in the G-panel modal, clicking ✕ to delete a
+  // group did nothing. User-reported chat 2026-05-18: "when we push
+  // the 'remove the group' button ... nothing happens".
+  //
+  // Each container gets the SAME set of handlers; idempotent via
+  // dataset.wired.
+  const listIds = ['manualGroupsList', 'manualGroupsListCompact', 'manualGroupsListPopup'];
+  for (const id of listIds) {
+    const list = $(id);
+    if (!list || list.dataset.wired === '1') continue;
     list.addEventListener('click', (e) => {
       const t = e.target;
       if (!t || !t.dataset || !t.dataset.mgid) return;
@@ -1954,6 +2169,7 @@ function _wireManualGroups(state) {
         t.blur();
       }
     });
+    list.dataset.wired = '1';
   }
 
   // --- #mgAddBtn click — legacy lines 56584-56587 ---
@@ -2102,6 +2318,65 @@ function _wireJump(state) {
       }
     });
   });
+
+  // --- #l3CompareUnit button click (2026-05-18 wire gap fix) ---
+  // The L3 toolbar's L2/1w/5w/10w/Nw buttons had a sync hook from the
+  // sidebar's #stepModeBar (_syncStepModeToCompareUnit) but no click
+  // handler of their own — clicking L2/1w/5w/10w/Nw did nothing.
+  // User-reported chat 2026-05-18: "the L2 1w 5w 10w and Nw buttons
+  // don't work. when we click nothing happens."
+  document.querySelectorAll('#l3CompareUnit button[data-l3unit]').forEach(btn => {
+    if (btn.dataset.wired === '1') return;
+    btn.addEventListener('click', () => {
+      const want = btn.dataset.l3unit;
+      if (!want) return;
+      document.querySelectorAll('#l3CompareUnit button[data-l3unit]').forEach(b =>
+        b.classList.toggle('active', b.dataset.l3unit === want));
+      state.compareUnit = want;
+      try { localStorage.setItem('pca_scrubber_v3.compareunit', want); } catch (_) {}
+      // Reverse-sync to #stepModeBar so the sidebar shows the same
+      // resolution when stepModeSync is on.
+      if (state.stepModeSync) {
+        const mapToStep = { L2: 'l2', win1: 'win1', win5: 'win5', win10: 'win10', winN: 'winN' };
+        const newStep = mapToStep[want];
+        if (newStep && newStep !== state.stepMode) {
+          state.stepMode = newStep;
+          document.querySelectorAll('#stepModeBar button').forEach(b =>
+            b.classList.toggle('active', b.dataset.step === newStep));
+          try { localStorage.setItem('pca_scrubber_v3.stepmode', newStep); } catch (_) {}
+          const info = document.getElementById('stepModeInfo');
+          if (info) info.textContent = _stepModeLabel(state, newStep);
+          if (typeof _refreshStepSizeBtn === 'function') {
+            try { _refreshStepSizeBtn(); } catch (_) {}
+          }
+        }
+      }
+      try { renderL3Panel(state); } catch (e) {
+        console.warn('[l3CompareUnit] renderL3Panel:', e);
+      }
+    });
+    btn.dataset.wired = '1';
+  });
+  // The matching N-value input next to the Nw button.
+  const l3UnitN = $('l3CompareUnitN');
+  if (l3UnitN && l3UnitN.dataset.wired !== '1') {
+    l3UnitN.addEventListener('input', (e) => {
+      const v = parseInt(e.target.value, 10);
+      if (!Number.isFinite(v) || v < 1) return;
+      state.compareUnitN = v;
+      try { localStorage.setItem('pca_scrubber_v3.compareunitn', String(v)); } catch (_) {}
+      // Mirror to sidebar stepModeN when sync is on.
+      if (state.stepModeSync) {
+        state.stepModeN = v;
+        const sin = document.getElementById('stepModeNInput');
+        if (sin) sin.value = String(v);
+      }
+      if (state.compareUnit === 'winN') {
+        try { renderL3Panel(state); } catch (_) {}
+      }
+    });
+    l3UnitN.dataset.wired = '1';
+  }
 
   // --- #stepModeBar button click — legacy lines 66323-66341 ---
   document.querySelectorAll('#stepModeBar button').forEach(btn => {

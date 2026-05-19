@@ -27,6 +27,26 @@ import { jumpL1, jumpL2, setCur } from './events.js';
 export function attachHotkeys(state) {
   _setActiveState(state);
 
+  // 2026-05-18 — release focus from <select> after the user picks an
+  // option. Without this, the SELECT retains keyboard focus and any
+  // subsequent ←/→ keypress cycles its options instead of stepping
+  // windows. User reported: "in the per sample lines settings ... it
+  // captures the cursor so when we go left and right on keyboard to
+  // move in genomic coordinates ... it browses the list instead".
+  // The main arrow handler below already bails on SELECT focus to
+  // avoid double-firing — this listener returns focus to the body so
+  // the next keypress is no longer consumed by the SELECT.
+  // Idempotent via document._selectBlurAfterChangeWired.
+  if (typeof document !== 'undefined' && !document._selectBlurAfterChangeWired) {
+    document._selectBlurAfterChangeWired = true;
+    document.addEventListener('change', (e) => {
+      const t = e.target;
+      if (t && t.tagName === 'SELECT' && typeof t.blur === 'function') {
+        t.blur();
+      }
+    });
+  }
+
   // Global ←/→ / n / p / f / b / c / Space handler. Mirrors legacy 70203.
   // Note: legacy used `window.addEventListener('keydown', ...)` here but
   // also stuck other keydown handlers on `document`. The new shell wants

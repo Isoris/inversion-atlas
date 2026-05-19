@@ -303,9 +303,338 @@ export function clusterSlab_UVRotated(state, s, e) {
   return clusterFromRotation_UVRotated(state, getOrComputeUVRotationSlab(state, s, e));
 }
 
+// =====================================================================
+// DBSCAN primitive — pure JS, O(N²) naive (fine for N=226).
+// Legacy: _dbscan (11094-11148). Mirrors STEP22's R dbscan::dbscan
+// call-site. `points` is either Float64Array (1D) or
+// { dim:D, data:Float64Array of length N*D, n:N } for D-dimensional.
+// Returns: Int32Array of cluster labels in [0, n_clusters], where
+// 0 = NOISE (R convention).
+// =====================================================================
+export function dbscan(pointsObj, eps, minPts) {
+  const isFlat = ArrayBuffer.isView(pointsObj);
+  const dim = isFlat ? 1 : pointsObj.dim;
+  const data = isFlat ? pointsObj : pointsObj.data;
+  const n = isFlat ? pointsObj.length : pointsObj.n;
+  const eps2 = eps * eps;
+
+  function dist2(i, j) {
+    if (dim === 1) {
+      const d = data[i] - data[j];
+      return d * d;
+    }
+    let s = 0;
+    for (let k = 0; k < dim; k++) {
+      const d = data[i * dim + k] - data[j * dim + k];
+      s += d * d;
+    }
+    return s;
+  }
+  function neighbors(i) {
+    const out = [];
+    for (let j = 0; j < n; j++) {
+      if (i !== j && dist2(i, j) <= eps2) out.push(j);
+    }
+    return out;
+  }
+
+  const labels = new Int32Array(n);   // 0 = unvisited; -1 = noise; ≥1 = cluster
+  let cid = 0;
+  for (let i = 0; i < n; i++) {
+    if (labels[i] !== 0) continue;
+    const nb = neighbors(i);
+    if (nb.length < minPts - 1) {
+      labels[i] = -1;
+      continue;
+    }
+    cid++;
+    labels[i] = cid;
+    const queue = nb.slice();
+    while (queue.length > 0) {
+      const j = queue.shift();
+      if (labels[j] === -1) labels[j] = cid;
+      if (labels[j] !== 0) continue;
+      labels[j] = cid;
+      const nb2 = neighbors(j);
+      if (nb2.length >= minPts - 1) {
+        for (const k of nb2) if (labels[k] === 0) queue.push(k);
+      }
+    }
+  }
+  // R dbscan convention: 0 = noise
+  for (let i = 0; i < n; i++) if (labels[i] === -1) labels[i] = 0;
+  return labels;
+}
+
+// k-distance auto-eps (STEP22): eps = median(k-NN distance) × 0.8.
+// Legacy: _kDistAutoEps (11153-11188). Returns NaN if data is degenerate.
+export function kDistAutoEps(pointsObj, k) {
+  const isFlat = ArrayBuffer.isView(pointsObj);
+  const dim = isFlat ? 1 : pointsObj.dim;
+  const data = isFlat ? pointsObj : pointsObj.data;
+  const n = isFlat ? pointsObj.length : pointsObj.n;
+  if (n < 2) return NaN;
+  const k_actual = Math.min(k, n - 1);
+  const knnDists = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const d2s = new Float64Array(n - 1);
+    let p = 0;
+    for (let j = 0; j < n; j++) {
+      if (i === j) continue;
+      let s = 0;
+      if (dim === 1) {
+        const d = data[i] - data[j]; s = d * d;
+      } else {
+        for (let kk = 0; kk < dim; kk++) {
+          const d = data[i * dim + kk] - data[j * dim + kk];
+          s += d * d;
+        }
+      }
+      d2s[p++] = s;
+    }
+    const sorted = Array.from(d2s).sort((a, b) => a - b);
+    knnDists[i] = Math.sqrt(sorted[k_actual - 1]);
+  }
+  const finite = Array.from(knnDists).filter(v => isFinite(v));
+  if (finite.length === 0) return NaN;
+  finite.sort((a, b) => a - b);
+  const median = finite.length % 2 === 1
+    ? finite[(finite.length - 1) >> 1]
+    : 0.5 * (finite[finite.length / 2 - 1] + finite[finite.length / 2]);
+  return median * 0.8;
+}
+
+// =====================================================================
+// uv-denoise — DBSCAN pre-filter + K-means3 on survivors.
+// Legacy: _clusterFromRotation_UVDenoise (11220-11281).
+// =====================================================================
+export function clusterFromRotation_UVDenoise(state, rot) {
+  if (!rot || !rot.ok) return { ok: false, reason: rot ? rot.reason : 'NO_ROT' };
+  const nS = rot.us.length;
+
+  const pts = new Float64Array(nS * 2);
+  for (let i = 0; i < nS; i++) { pts[i * 2] = rot.us[i]; pts[i * 2 + 1] = rot.vs[i]; }
+  const ptsObj = { dim: 2, data: pts, n: nS };
+
+  const eps = kDistAutoEps(ptsObj, 5);
+  if (!isFinite(eps) || eps <= 0) {
+    const result = kmeans2D(rot.us, rot.vs, 3);
+    return wrapKmeansResultAsCluster(state, result, 3, 'UVDenoise-fallback-no-eps');
+  }
+  const minPts = Math.max(3, Math.floor(nS * 0.08));
+  const dbLabels = dbscan(ptsObj, eps, minPts);
+
+  const nonNoiseIdx = [];
+  for (let i = 0; i < nS; i++) if (dbLabels[i] !== 0) nonNoiseIdx.push(i);
+  if (nonNoiseIdx.length < 9) {
+    const result = kmeans2D(rot.us, rot.vs, 3);
+    return wrapKmeansResultAsCluster(state, result, 3, 'UVDenoise-fallback-too-few-survivors');
+  }
+  const sub_us = new Float64Array(nonNoiseIdx.length);
+  const sub_vs = new Float64Array(nonNoiseIdx.length);
+  for (let i = 0; i < nonNoiseIdx.length; i++) {
+    sub_us[i] = rot.us[nonNoiseIdx[i]];
+    sub_vs[i] = rot.vs[nonNoiseIdx[i]];
+  }
+  const k3sub = kmeans2D(sub_us, sub_vs, 3);
+
+  const labels = new Int8Array(nS);
+  const npg = new Array(3).fill(0);
+  for (let i = 0; i < nonNoiseIdx.length; i++) {
+    const idx = nonNoiseIdx[i];
+    labels[idx] = k3sub.labels[i];
+    npg[k3sub.labels[i]]++;
+  }
+  for (let i = 0; i < nS; i++) {
+    if (dbLabels[i] === 0) {
+      // Noise — assign to nearest centroid in (u, v).
+      let best = 0, bd = Infinity;
+      for (let j = 0; j < 3; j++) {
+        const dux = rot.us[i] - k3sub.cx[j], dvy = rot.vs[i] - k3sub.cy[j];
+        const dd = dux * dux + dvy * dvy;
+        if (dd < bd) { bd = dd; best = j; }
+      }
+      labels[i] = best;
+      npg[best]++;
+    }
+  }
+  return wrapKmeansResultAsCluster(state, { labels, n_per_group: npg }, 3, null);
+}
+
+export function clusterL2_UVDenoise(state, l2idx) {
+  return clusterFromRotation_UVDenoise(state, getOrComputeUVRotation(state, l2idx));
+}
+export function clusterSlab_UVDenoise(state, s, e) {
+  return clusterFromRotation_UVDenoise(state, getOrComputeUVRotationSlab(state, s, e));
+}
+
+// =====================================================================
+// uv-dbscan — K-means3 first, then DBSCAN within each stripe on v values.
+// Legacy: _clusterFromRotation_UVDBSCAN (11316-11383).
+// Samples in the dominant subcluster keep the stripe label; samples in
+// minority subclusters or noise get reassigned to the 2nd-closest
+// stripe — visible as off-diagonal mass in the contingency.
+// =====================================================================
+export function clusterFromRotation_UVDBSCAN(state, rot) {
+  if (!rot || !rot.ok) return { ok: false, reason: rot ? rot.reason : 'NO_ROT' };
+  const nS = rot.us.length;
+  const k3uv = kmeans2D(rot.us, rot.vs, 3);
+  if (!k3uv || !k3uv.labels) return { ok: false, reason: 'KMEANS_FAILED' };
+
+  const labels = new Int8Array(nS);
+  const npg = [0, 0, 0];
+  for (let g = 0; g < 3; g++) {
+    const idx = [];
+    for (let i = 0; i < nS; i++) if (k3uv.labels[i] === g) idx.push(i);
+    const ng = idx.length;
+    if (ng < 3) {
+      for (const i of idx) { labels[i] = g; npg[g]++; }
+      continue;
+    }
+    const v_vals = new Float64Array(ng);
+    for (let i = 0; i < ng; i++) v_vals[i] = rot.vs[idx[i]];
+
+    const eps = kDistAutoEps(v_vals, Math.min(5, ng - 1));
+    if (!isFinite(eps) || eps <= 0) {
+      for (const i of idx) { labels[i] = g; npg[g]++; }
+      continue;
+    }
+    const minPts = Math.max(3, Math.floor(ng * 0.08));
+    const dbLabels = dbscan(v_vals, eps, minPts);
+
+    const counts = new Map();
+    for (let i = 0; i < ng; i++) {
+      if (dbLabels[i] === 0) continue;
+      counts.set(dbLabels[i], (counts.get(dbLabels[i]) || 0) + 1);
+    }
+    let domSub = -1, domCount = 0;
+    counts.forEach((cnt, sub) => { if (cnt > domCount) { domCount = cnt; domSub = sub; } });
+
+    for (let i = 0; i < ng; i++) {
+      const orig_i = idx[i];
+      if (dbLabels[i] === domSub) {
+        labels[orig_i] = g;
+        npg[g]++;
+      } else {
+        // Alternative-best stripe (second-closest centroid in u,v).
+        let bestAlt = (g + 1) % 3, bd = Infinity;
+        for (let j = 0; j < 3; j++) {
+          if (j === g) continue;
+          const dux = rot.us[orig_i] - k3uv.cx[j], dvy = rot.vs[orig_i] - k3uv.cy[j];
+          const dd = dux * dux + dvy * dvy;
+          if (dd < bd) { bd = dd; bestAlt = j; }
+        }
+        labels[orig_i] = bestAlt;
+        npg[bestAlt]++;
+      }
+    }
+  }
+  return wrapKmeansResultAsCluster(state, { labels, n_per_group: npg }, 3, null);
+}
+
+export function clusterL2_UVDBSCAN(state, l2idx) {
+  return clusterFromRotation_UVDBSCAN(state, getOrComputeUVRotation(state, l2idx));
+}
+export function clusterSlab_UVDBSCAN(state, s, e) {
+  return clusterFromRotation_UVDBSCAN(state, getOrComputeUVRotationSlab(state, s, e));
+}
+
+// =====================================================================
+// uv-dist-rank — distance-to-Het ranked into terciles per stripe.
+// Closest tercile of each Hom stripe → relabeled as Het (1). Reveals
+// drift toward Het in the contingency.
+// Legacy: _clusterFromRotation_UVDistRank (11423-11460).
+// =====================================================================
+export function clusterFromRotation_UVDistRank(state, rot) {
+  if (!rot || !rot.ok) return { ok: false, reason: rot ? rot.reason : 'NO_ROT' };
+  const nS = rot.us.length;
+  const k3uv = kmeans2D(rot.us, rot.vs, 3);
+  if (!k3uv || !k3uv.labels) return { ok: false, reason: 'KMEANS_FAILED' };
+
+  const distToHet = new Float64Array(nS);
+  for (let i = 0; i < nS; i++) {
+    const du = rot.us[i] - rot.het_u, dv = rot.vs[i] - rot.het_v;
+    distToHet[i] = Math.sqrt(du * du + dv * dv);
+  }
+
+  const labels = new Int8Array(nS);
+  const npg = [0, 0, 0];
+  for (let g = 0; g < 3; g++) {
+    const idx = [];
+    for (let i = 0; i < nS; i++) if (k3uv.labels[i] === g) idx.push(i);
+    if (g === 1) {
+      for (const i of idx) { labels[i] = 1; npg[1]++; }
+      continue;
+    }
+    if (idx.length === 0) continue;
+    idx.sort((a, b) => distToHet[a] - distToHet[b]);
+    const tercile = Math.floor(idx.length / 3);
+    for (let i = 0; i < tercile; i++) { labels[idx[i]] = 1; npg[1]++; }
+    for (let i = tercile; i < idx.length; i++) { labels[idx[i]] = g; npg[g]++; }
+  }
+  return wrapKmeansResultAsCluster(state, { labels, n_per_group: npg }, 3, null);
+}
+
+export function clusterL2_UVDistRank(state, l2idx) {
+  return clusterFromRotation_UVDistRank(state, getOrComputeUVRotation(state, l2idx));
+}
+export function clusterSlab_UVDistRank(state, s, e) {
+  return clusterFromRotation_UVDistRank(state, getOrComputeUVRotationSlab(state, s, e));
+}
+
+// =====================================================================
+// uv-dist-fuzzy — soft inverse-distance weights; tie-break < 0.45 →
+// reassign to second-best. Reveals K-means-ambiguous samples in the
+// contingency. Legacy: _clusterFromRotation_UVDistFuzzy (11495-11533).
+// =====================================================================
+export function clusterFromRotation_UVDistFuzzy(state, rot) {
+  if (!rot || !rot.ok) return { ok: false, reason: rot ? rot.reason : 'NO_ROT' };
+  const nS = rot.us.length;
+  const eps_inv = 1e-9;
+  const cx = [rot.hom1_u, rot.het_u, rot.hom2_u];
+  const cy = [rot.hom1_v, rot.het_v, rot.hom2_v];
+
+  const labels = new Int8Array(nS);
+  const npg = [0, 0, 0];
+  for (let i = 0; i < nS; i++) {
+    const dists = [0, 0, 0];
+    let invSum = 0;
+    for (let j = 0; j < 3; j++) {
+      const du = rot.us[i] - cx[j], dv = rot.vs[i] - cy[j];
+      dists[j] = Math.sqrt(du * du + dv * dv);
+      invSum += 1 / (dists[j] + eps_inv);
+    }
+    const w = [
+      (1 / (dists[0] + eps_inv)) / invSum,
+      (1 / (dists[1] + eps_inv)) / invSum,
+      (1 / (dists[2] + eps_inv)) / invSum,
+    ];
+    let best = 0;
+    if (w[1] > w[best]) best = 1;
+    if (w[2] > w[best]) best = 2;
+    if (w[best] < 0.45) {
+      let second = (best + 1) % 3;
+      if (w[(best + 2) % 3] > w[second]) second = (best + 2) % 3;
+      best = second;
+    }
+    labels[i] = best;
+    npg[best]++;
+  }
+  return wrapKmeansResultAsCluster(state, { labels, n_per_group: npg }, 3, null);
+}
+
+export function clusterL2_UVDistFuzzy(state, l2idx) {
+  return clusterFromRotation_UVDistFuzzy(state, getOrComputeUVRotation(state, l2idx));
+}
+export function clusterSlab_UVDistFuzzy(state, s, e) {
+  return clusterFromRotation_UVDistFuzzy(state, getOrComputeUVRotationSlab(state, s, e));
+}
+
 if (typeof window !== 'undefined') {
   window._aggregateWindowRangeForUV   = aggregateWindowRangeForUV;
   window._computeUVRotationCore       = computeUVRotationCore;
   window._wrapKmeansResultAsCluster   = (result, K, reasonOverride) =>
     wrapKmeansResultAsCluster(window.state, result, K, reasonOverride);
+  window._dbscan                      = dbscan;
+  window._kDistAutoEps                = kDistAutoEps;
 }

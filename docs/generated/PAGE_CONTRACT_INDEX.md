@@ -53,14 +53,14 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | catalogue | confirmed_carousel | confirmed carousel | active (fresh) | high | [page.manifest.json](page_contracts/confirmed_carousel/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/confirmed_carousel/PAGE_CONTRACT.md) |
 | catalogue | marker_panels | marker panels | active | high | [page.manifest.json](page_contracts/marker_panels/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/marker_panels/PAGE_CONTRACT.md) |
 | catalogue | annotation_cockpit | annotation cockpit | active | high | [page.manifest.json](page_contracts/annotation_cockpit/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/annotation_cockpit/PAGE_CONTRACT.md) |
-| classification | stats_profile | stats profile | active | high | [page.manifest.json](page_contracts/stats_profile/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/stats_profile/PAGE_CONTRACT.md) |
+| synthesis | stats_profile | stats profile | active | high | [page.manifest.json](page_contracts/stats_profile/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/stats_profile/PAGE_CONTRACT.md) |
 | classification | marker_readiness | marker readiness panel | active | high | [page.manifest.json](page_contracts/marker_readiness/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/marker_readiness/PAGE_CONTRACT.md) |
-| classification | overview | overview | empty stub | high | [page.manifest.json](page_contracts/overview/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/overview/PAGE_CONTRACT.md) |
+| synthesis | overview | overview | empty stub | high | [page.manifest.json](page_contracts/overview/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/overview/PAGE_CONTRACT.md) |
 | classification | karyotype_tier | karyotype / tier | active | high | [page.manifest.json](page_contracts/karyotype_tier/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/karyotype_tier/PAGE_CONTRACT.md) |
-| classification | popstats | popstats | active (thin loader) | high | [page.manifest.json](page_contracts/popstats/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/popstats/PAGE_CONTRACT.md) |
-| classification | ancestry_per_window | ancestry | active (thin loader) | high | [page.manifest.json](page_contracts/ancestry_per_window/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/ancestry_per_window/PAGE_CONTRACT.md) |
-| classification | boundary_refinement | boundaries | active | high | [page.manifest.json](page_contracts/boundary_refinement/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/boundary_refinement/PAGE_CONTRACT.md) |
-| classification | sv_evidence | SV evidence | active (thin loader) | high | [page.manifest.json](page_contracts/sv_evidence/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/sv_evidence/PAGE_CONTRACT.md) |
+| synthesis | popstats | popstats | active (thin loader) | high | [page.manifest.json](page_contracts/popstats/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/popstats/PAGE_CONTRACT.md) |
+| evolution | ancestry_per_window | ancestry | active (thin loader) | high | [page.manifest.json](page_contracts/ancestry_per_window/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/ancestry_per_window/PAGE_CONTRACT.md) |
+| discovery_2 | boundary_refinement | boundaries | active | high | [page.manifest.json](page_contracts/boundary_refinement/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/boundary_refinement/PAGE_CONTRACT.md) |
+| discovery_2 | sv_evidence | SV evidence | active (thin loader) | high | [page.manifest.json](page_contracts/sv_evidence/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/sv_evidence/PAGE_CONTRACT.md) |
 | evolution | polarize_msa_stacked | polarize · MSA | active | high | [page.manifest.json](page_contracts/polarize_msa_stacked/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/polarize_msa_stacked/PAGE_CONTRACT.md) |
 | evolution | haplotype_network | haplotype network | active | high | [page.manifest.json](page_contracts/haplotype_network/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/haplotype_network/PAGE_CONTRACT.md) |
 | evolution | polarize_synteny_vote | polarize · synteny | active | medium | [page.manifest.json](page_contracts/polarize_synteny_vote/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/polarize_synteny_vote/PAGE_CONTRACT.md) |
@@ -70,10 +70,10 @@ canonical SPECs (`specs_done/` + `specs_todo/`).
 | evolution | layer_cleaning | layer cleaning | active | high | [page.manifest.json](page_contracts/layer_cleaning/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/layer_cleaning/PAGE_CONTRACT.md) |
 | evolution | event_tree_relative_ordering | event tree | active | medium | [page.manifest.json](page_contracts/event_tree_relative_ordering/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/event_tree_relative_ordering/PAGE_CONTRACT.md) |
 | evolution | archaeology_synthesis_card | archaeology card | active | high | [page.manifest.json](page_contracts/archaeology_synthesis_card/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/archaeology_synthesis_card/PAGE_CONTRACT.md) |
-| comparative | cross_species_breakpoints | cross-species breakpoints | active | high | [page.manifest.json](page_contracts/cross_species_breakpoints/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/cross_species_breakpoints/PAGE_CONTRACT.md) |
-| comparative | multi_species_cockpit | multi-species cockpit | active | high | [page.manifest.json](page_contracts/multi_species_cockpit/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/multi_species_cockpit/PAGE_CONTRACT.md) |
+| evolution | cross_species_breakpoints | cross-species breakpoints | active | high | [page.manifest.json](page_contracts/cross_species_breakpoints/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/cross_species_breakpoints/PAGE_CONTRACT.md) |
+| evolution | multi_species_cockpit | multi-species cockpit | active | high | [page.manifest.json](page_contracts/multi_species_cockpit/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/multi_species_cockpit/PAGE_CONTRACT.md) |
 | help | help | help | active (static) | high | [page.manifest.json](page_contracts/help/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/help/PAGE_CONTRACT.md) |
-| classification | fish_ancestry_scroller | Fish Ancestry Scroller | active (registered 2026-05-15) | high | [page.manifest.json](page_contracts/fish_ancestry_scroller/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/fish_ancestry_scroller/PAGE_CONTRACT.md) |
+| evolution | fish_ancestry_scroller | Fish Ancestry Scroller | active (registered 2026-05-15) | high | [page.manifest.json](page_contracts/fish_ancestry_scroller/page.manifest.json) · [PAGE_CONTRACT.md](page_contracts/fish_ancestry_scroller/PAGE_CONTRACT.md) |
 
 **Progress**: 38 / 38 pages contracted. ✅ **Complete first pass.**
 All 38 pages registered in `manifest.json` + `pages.registry.json`

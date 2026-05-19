@@ -26,6 +26,11 @@
 // concern-focused and avoids a module-import cycle through the panels.
 
 import { escapeHtml } from '../../shared/page1_utils.js';
+// Side-effect import: registers window._getMacrostripeColor /
+// _getMacrostripeIdPerSample so getSampleColor in _state.js can
+// resolve the Phase-1 macrostripe palette without a static import
+// cycle.
+import '../../shared/macrostripe.js';
 import { resolve as _registryResolve, getState as _getState } from '../../../../core/atlas_api.js';
 
 import {
@@ -358,12 +363,18 @@ export async function mount(root, atlasState, registry) {
   // Legacy CSS rules for main#local_pca_dosage grid layout are gated on
   // body[data-layout-mode]. Without this attribute the PCA / lines / L3
   // grid rows collapse and the canvases get 0px height. Restore the
-  // persisted mode if it exists AND we trust the new shell with it; for
-  // now we force 'fixed' on every mount to match legacy default and
-  // because free/compact have layout quirks we haven't fully reproduced.
-  document.body.dataset.layoutMode = 'fixed';
-  legacyState.layoutMode = 'fixed';
-  try { localStorage.setItem('pca_scrubber_v3.layoutmode', 'fixed'); } catch (_) {}
+  // persisted mode if it exists; default to 'compact' (the user
+  // explicitly asked for this on 2026-05-18 — fewer scrolls + 2×2 grid
+  // shows everything at once). 'free' and 'fixed' still selectable via
+  // the layoutModeBtn cycler.
+  let restoredMode = 'compact';
+  try {
+    const v = localStorage.getItem('pca_scrubber_v3.layoutmode');
+    if (v === 'fixed' || v === 'free' || v === 'compact') restoredMode = v;
+  } catch (_) {}
+  document.body.dataset.layoutMode = restoredMode;
+  legacyState.layoutMode = restoredMode;
+  try { localStorage.setItem('pca_scrubber_v3.layoutmode', restoredMode); } catch (_) {}
 
   // Resolve the precomp data layer for the active chromosome.
   const chrom = atlasState.shared.activeChrom;
@@ -386,9 +397,35 @@ export async function mount(root, atlasState, registry) {
     return;
   }
 
+  // 2026-05-18 — preserve cursor + tracked-samples across tab switches.
+  // The unmount path keeps the stash alive (see unmount comment); on
+  // re-mount, if the saved stash points at the SAME chromosome the
+  // user is now viewing, replay its scrubber position + tracked list
+  // onto the fresh legacyState BEFORE applyData (which would
+  // otherwise reset cur to 0 — see local_pca_dosage.js:192). This is
+  // what makes the cursor "stick" when the user tabs to
+  // candidate_focus / pca_comparator / haplotype_regimes and back.
+  const priorStash = atlasState.inversion._local_pca_dosage_state;
+  let restoredCur = null;
+  let restoredTracked = null;
+  if (priorStash && priorStash.data && priorStash.data.chrom === chrom) {
+    if (Number.isFinite(priorStash.cur)) restoredCur = priorStash.cur | 0;
+    if (Array.isArray(priorStash.tracked)) restoredTracked = priorStash.tracked.slice();
+  }
+
   // Apply data through the legacy entry point. This populates state.data,
   // state.tracks, state.windows, etc. — everything the draw functions need.
   applyData(legacyState, data);
+
+  // Re-apply the preserved cursor / tracked-samples now that applyData's
+  // defaults have been written.
+  if (restoredCur != null && Number.isFinite(restoredCur)) {
+    const nW = (legacyState.data && legacyState.data.n_windows) | 0;
+    legacyState.cur = Math.max(0, Math.min(nW - 1, restoredCur));
+  }
+  if (restoredTracked && restoredTracked.length) {
+    legacyState.tracked = restoredTracked;
+  }
 
   // Replay any enrichments the user dropped in a prior session. Async,
   // fire-and-forget; matching enrichments merge onto state.data and
@@ -476,9 +513,14 @@ export async function mount(root, atlasState, registry) {
     }
   } catch (_) {}
 
-  // Stash the legacy state on the atlas bucket for inter-function access
-  // during this mount lifetime. The unmount path clears it.
-  atlasState.inversion._page1State = legacyState;
+  // Stash the legacy state on the atlas bucket so it survives
+  // unmount/mount across tab switches. pca_comparator + future
+  // sibling pages read `inv._local_pca_dosage_state` to follow this
+  // page's cursor + tracked-samples set; the `_page1State` alias is
+  // retained for the legacy unmount cleanup path. 2026-05-18: the
+  // stash now SURVIVES unmount (was deleted, see unmount comment).
+  atlasState.inversion._local_pca_dosage_state = legacyState;
+  atlasState.inversion._page1State = legacyState;   // legacy alias
 }
 
 /**
@@ -502,9 +544,16 @@ export async function unmount(root) {
     try { legacyState._hotkeyDetach(); } catch (_) {}
     legacyState._hotkeyDetach = null;
   }
-  if (state && state.inversion) {
-    delete state.inversion._page1State;
-  }
+  // 2026-05-18 — DON'T delete the stash on unmount. The stash carries
+  // state.cur (scrubber position) + state.tracked across tab
+  // switches; deleting it forced the next mount to start at cur=0
+  // every time the user tabbed back from candidate_focus /
+  // pca_comparator / haplotype_regimes (user-reported: "make sure
+  // the cursor is correctly reassigned for all panels when we switch
+  // discovery mode"). The mount path below now checks the stash and
+  // restores cur+tracked when the same chrom is reloaded.
+  // The playTimer + hotkey listeners ARE detached above because
+  // they're per-mount DOM bindings; only the data + cursor stays.
 }
 
 // --- Helpers ---
@@ -545,6 +594,13 @@ function _buildLegacyState(atlasState) {
     silScoreOn: 'pc1',
     tPanelOpen: false,
     pcaClusterLabelMode: null,    // 'none'|'g_index'|'h_system'|'h_pair' — cycle with N
+    selectionMode: false,         // U key toggles; Shift+drag in selection mode writes to selectionGroup
+    selectionGroup: null,         // { ids, source_atlas, source_page, source_window, ts } — see specs_todo/SPEC_cross_atlas_group_transfer.md
+    cusumStripOn: false,          // toggle for the Σ CUSUM panel between tracks + lines
+    useMacrostripeColors: false,  // SPEC_macrostripe_microgroup_hierarchy.md Phase 1 — when on AND state.bandingResult is present, color PCA/lines/L3 by macrostripe_id instead of per-window K-means microgroups
+    cusumResidual: 'cohort_mean', // 'cohort_mean'|'band_mean'|'zero' — see shared/cusum.js
+    cusumOp: 'mean',              // 'mean'|'median' — per-band aggregation
+    cusumAxis: 'pc1',             // PC axis to walk; 'pc1' or 'pc2'
 
     mergeThr: 0.85,
     alpha: 0.05,

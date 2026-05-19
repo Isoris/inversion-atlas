@@ -185,6 +185,23 @@ export function getSampleColor(si, mode, groupLabels) {
   const state = _pageState;
   mode = mode || state.colorMode || 'cluster';
   if (mode === 'cluster') {
+    // 2026-05-18: Phase 1 of SPEC_macrostripe_microgroup_hierarchy.md.
+    // When state.useMacrostripeColors is on AND state.bandingResult is
+    // populated for the current chrom, override the per-window K-means
+    // microgroup color with the per-sample macrostripe color (derived
+    // from band-tracking Stage 3 sample sets). When OFF or banding not
+    // run, fall through to today's K-means microgroup palette.
+    if (state && state.useMacrostripeColors && state.bandingResult) {
+      try {
+        // Lazy-import to keep the _state module's static graph thin —
+        // shared/macrostripe.js pulls in band_tracking/locus_construction
+        // which has its own dependency chain.
+        const ms = (typeof window !== 'undefined' && window._getMacrostripeColor)
+          ? window._getMacrostripeColor(state, si)
+          : null;
+        if (ms) return ms;
+      } catch (_) { /* fail-soft → drop to K-means below */ }
+    }
     if (groupLabels && groupLabels[si] != null && groupLabels[si] >= 0) {
       return ['#4fa3ff', '#b8b8b8', '#f5a524', '#3cc08a', '#e0555c'][groupLabels[si]] || '#888';
     }

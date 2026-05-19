@@ -2,7 +2,7 @@
   "page_id": "multi_species_cockpit",
   "label": "multi-species classification cockpit",
   "page_type": "core_page",
-  "stage": "comparative",
+  "stage": "evolution",
   "owner_atlas": "inversion",
   "status": "active",
   "current_path": {
@@ -11,12 +11,18 @@
     "js_subdir": "atlases/inversion/pages/comparative/multi_species_cockpit/"
   },
   "legacy_source": "legacy/Inversion_atlas.html lines 26026-28366 (full multi-species cockpit body) + 26016-26024 (dotplot_mashmap_v1 prelude constants)",
-
-  "purpose": "Multi-species classification cockpit. Place each Cgar↔Cmac breakpoint on the catfish phylogeny; click a species in the tree to see how its homologous region compares (chromosome context, orientation, boundary status). Auto-suggests architecture class (A-F) from the lineage distribution.",
-
-  "required_layers": ["synteny_multispecies", "cs_breakpoints", "te_fragility", "phylo_tree"],
+  "purpose": "Multi-species classification cockpit. Place each Cgar\u2194Cmac breakpoint on the catfish phylogeny; click a species in the tree to see how its homologous region compares (chromosome context, orientation, boundary status). Auto-suggests architecture class (A-F) from the lineage distribution.",
+  "required_layers": [
+    "synteny_multispecies",
+    "cs_breakpoints",
+    "te_fragility",
+    "phylo_tree"
+  ],
   "required_slots": [],
-  "preloads": ["synteny_multispecies", "cs_breakpoints"],
+  "preloads": [
+    "synteny_multispecies",
+    "cs_breakpoints"
+  ],
   "owns_json_layers": [
     "dotplot_mashmap_v1",
     "synteny_multispecies_v1",
@@ -26,31 +32,60 @@
     "karyotype_lineage_v1"
   ],
   "reads_from_page16": "state.crossSpecies (active breakpoint catalogue from cs_breakpoints_v1)",
-
   "panels": [
-    {"id": "msActiveHeader", "purpose": "active-breakpoint ribbon"},
-    {"id": "msBody", "purpose": "three-column layout"},
-    {"id": "msTree", "purpose": "left: phylo tree SVG"},
-    {"id": "msCenter", "purpose": "center: classification + lineage table"},
-    {"id": "msDetail", "purpose": "right: per-species detail"}
+    {
+      "id": "msActiveHeader",
+      "purpose": "active-breakpoint ribbon"
+    },
+    {
+      "id": "msBody",
+      "purpose": "three-column layout"
+    },
+    {
+      "id": "msTree",
+      "purpose": "left: phylo tree SVG"
+    },
+    {
+      "id": "msCenter",
+      "purpose": "center: classification + lineage table"
+    },
+    {
+      "id": "msDetail",
+      "purpose": "right: per-species detail"
+    }
   ],
-
   "default_reference_tree": "9-species: Tros, Smer, Tfulv, Ipun, Hwyc, Phyp, Capus, Cfus, Cmac, Cgar (shown when no phylo_tree_v1 layer is loaded)",
-
   "persistence": "user classifications -> localStorage as inversion_atlas.classifications.v1; per-layer caches as inversion_atlas.<layer>.v1",
-
-  "subdir_files": ["_state.js — _pageState + setter"],
-
+  "subdir_files": [
+    "_state.js \u2014 _pageState + setter"
+  ],
   "primitives_used": [],
   "adapters_used": [],
-
   "interactions": [
-    {"id": "click_species_in_tree", "type": "click", "purpose": "show homologous region comparison"},
-    {"id": "architecture_class_picker", "type": "view_control", "values": ["A", "B", "C", "D", "E", "F"]},
-    {"id": "drag_drop_layers", "type": "input", "purpose": "load the 6 JSON layers"}
+    {
+      "id": "click_species_in_tree",
+      "type": "click",
+      "purpose": "show homologous region comparison"
+    },
+    {
+      "id": "architecture_class_picker",
+      "type": "view_control",
+      "values": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F"
+      ]
+    },
+    {
+      "id": "drag_drop_layers",
+      "type": "input",
+      "purpose": "load the 6 JSON layers"
+    }
   ],
   "hotkeys": [],
-
   "computed_preview_outputs": [
     "active breakpoint placement on phylogeny",
     "per-species homologous-region detail",
@@ -61,18 +96,19 @@
     "per-breakpoint architecture classification (localStorage)"
   ],
   "commit_policy": "manual_only",
-
   "documents": {
     "page_registry_doc": "pages.registry.json -> pages.multi_species_cockpit._doc",
     "specs_done": [],
     "specs_todo": [],
-    "handoffs": ["atlases/inversion/pages/comparative/BATCH_5_NOTES.md", "_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step20_done.md (AST-shim — 39/64 helpers got shim; 77 explicit ES exports added)"],
+    "handoffs": [
+      "atlases/inversion/pages/comparative/BATCH_5_NOTES.md",
+      "_handoff_docs/HANDOFF_2026-05-07_chat36_round5_step20_done.md (AST-shim \u2014 39/64 helpers got shim; 77 explicit ES exports added)"
+    ],
     "user_guide": "unknown"
   },
-
   "known_issues": [
-    "Owns 6 JSON layers — heaviest layer load of any page after local_pca_dosage.",
-    "Cross-page read from cross_species_breakpoints (state.crossSpecies) — fragile coupling; if cross_species_breakpoints hasn't been mounted on the same chromosome, behaviour is empty-state."
+    "Owns 6 JSON layers \u2014 heaviest layer load of any page after local_pca_dosage.",
+    "Cross-page read from cross_species_breakpoints (state.crossSpecies) \u2014 fragile coupling; if cross_species_breakpoints hasn't been mounted on the same chromosome, behaviour is empty-state."
   ],
   "confidence": "high"
 }

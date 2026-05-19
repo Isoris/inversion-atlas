@@ -18,7 +18,7 @@ import {
   ariFromTable,
   restrictedConcord,
 } from '../../../shared/contingency.js';
-import { clusterL2_UVRotated } from '../../../shared/uv_rotation.js';
+import { clusterL2_UVRotated, clusterL2_UVDenoise, clusterL2_UVDBSCAN, clusterL2_UVDistRank, clusterL2_UVDistFuzzy } from '../../../shared/uv_rotation.js';
 import { computeBandDiagnostics } from './band_diagnostics.js';
 import {
   bandDiagsMiniChipsHtml,
@@ -259,6 +259,71 @@ export function renderL3Panel(state) {
     return;
   }
   metaEl.innerHTML = `K=${state.k} · fit=${state.aggMethod} · score=${state.silScoreOn || 'pc1'} · merge τ=${state.mergeThr.toFixed(2)} · α=${state.alpha.toFixed(3)} · min n/grp=${state.minNGroup}`;
+
+  // 2026-05-18: Phase 1 polish — macrostripe composition chip row.
+  // When macrostripe coloring is active AND banding has run, append
+  // a per-stripe summary listing the K-means microgroup composition
+  // of each macrostripe. Helps the user see at a glance "stripe A
+  // has 60 fish split into 3 microgroups of 22/22/16" etc.
+  if (state.useMacrostripeColors && state.bandingResult
+      && typeof window !== 'undefined' && window._getMacrostripeIdPerSample) {
+    try {
+      const macIds = window._getMacrostripeIdPerSample(state);
+      if (macIds && macIds.length) {
+        const cl = getL2Cluster(state, curL2);
+        const microLabels = cl && (cl.fixedKLabels || cl.labels);
+        const K_micro = (state.k | 0) || 3;
+        // Build per-macrostripe member sets + microgroup counts.
+        const buckets = new Map();   // macId → Map<microId, count>
+        for (let si = 0; si < macIds.length; si++) {
+          const mac = macIds[si];
+          if (mac < 0) continue;
+          const micro = microLabels ? microLabels[si] : -1;
+          if (!buckets.has(mac)) buckets.set(mac, new Map());
+          const inner = buckets.get(mac);
+          inner.set(micro, (inner.get(micro) || 0) + 1);
+        }
+        if (buckets.size > 0) {
+          const palette = ['#4fa3ff', '#b8b8b8', '#f5a524', '#3cc08a', '#e0555c'];
+          let chips = '<div style="font-size: 10px; color: var(--ink-dim); '
+                    + 'padding: 2px 10px 0; line-height: 1.5;" '
+                    + 'title="Each macrostripe (long-range haplotype regime) and '
+                    + 'its K-means microgroup composition at this window.">'
+                    + '<span style="color: var(--ink-dimmer); margin-right: 6px;">'
+                    + 'macrostripes:</span>';
+          const macList = Array.from(buckets.keys()).sort((a, b) => a - b);
+          for (const mac of macList) {
+            const inner = buckets.get(mac);
+            const total = Array.from(inner.values()).reduce((a, b) => a + b, 0);
+            const macCol = palette[mac] || '#888';
+            chips += `<span style="display: inline-flex; align-items: center; `
+                  +  `gap: 4px; margin-right: 10px;">`
+                  +  `<span style="display: inline-block; width: 9px; height: 9px; `
+                  +    `border-radius: 50%; background: ${macCol};"></span>`
+                  +  `<b style="color: var(--ink);">macrostripe ${mac}</b> `
+                  +  `<span style="color: var(--ink-dim);">n=${total}</span>`;
+            // Microgroup composition — small swatches.
+            const micros = Array.from(inner.entries())
+              .filter(([k]) => k >= 0)
+              .sort((a, b) => b[1] - a[1]);
+            if (micros.length > 0) {
+              chips += ` <span style="color: var(--ink-dimmer);">→</span> `;
+              for (const [microId, n] of micros) {
+                const microCol = palette[microId] || '#888';
+                chips += `<span style="display: inline-block; width: 6px; height: 6px; `
+                      +    `border-radius: 50%; background: ${microCol}; `
+                      +    `margin-right: 2px;"></span>`
+                      +  `<span style="color: var(--ink-dim);">μ${microId} (${n})</span> `;
+              }
+            }
+            chips += `</span>`;
+          }
+          chips += '</div>';
+          metaEl.innerHTML += chips;
+        }
+      }
+    } catch (err) { console.warn('[macrostripe chip row]', err); }
+  }
 
   // ---- DUAL LAYOUT: two pinned L2 envelopes + middle comparison column ----
   if (layoutKey === 'dual' && state.secondaryL2 != null) {
@@ -1321,39 +1386,46 @@ function alignedLabelsTo_atK(focalIdx, neighborIdx, K) {
 }
 
 // =============================================================================
-// compareL2Pair_byMode — recluster-mode dispatcher (legacy 11733-11774, partial)
+// compareL2Pair_byMode — recluster-mode dispatcher (legacy 11733-11774)
 // =============================================================================
 // Routes label-fetch + contingency through the appropriate cluster
-// function based on state.l3ReclusterMode. Currently supports:
-//   - kmeans-K3        → compareL2Pair (default state.k=3 path)
-//   - kmeans-K6        → compareL2Pair_atK at K=6
-//   - distance-uv      → UV-rotated mode (alias of uv-rotated)
-//   - uv-rotated       → clusterL2_UVRotated (shared/uv_rotation.js)
-// UV-denoise / uv-dbscan / uv-dist-rank / uv-dist-fuzzy still need
-// the 4 advanced cluster modes from legacy 11195-11540 ported — that's
-// a separate commit. Until then they fall back to kmeans-K3.
+// function based on state.l3ReclusterMode. Supported modes:
+//   - kmeans-K3       → compareL2Pair (default state.k=3 path)
+//   - kmeans-K6       → compareL2Pair_atK at K=6
+//   - distance-uv     → UV-rotated mode (alias of uv-rotated)
+//   - uv-rotated      → clusterL2_UVRotated   (shared/uv_rotation.js)
+//   - uv-denoise      → clusterL2_UVDenoise   (DBSCAN pre-filter)
+//   - uv-dbscan       → clusterL2_UVDBSCAN    (within-stripe DBSCAN)
+//   - uv-dist-rank    → clusterL2_UVDistRank  (tercile-to-Het remap)
+//   - uv-dist-fuzzy   → clusterL2_UVDistFuzzy (soft tie-break < 0.45)
 function compareL2Pair_byMode(leftIdx, rightIdx, mode) {
   if (!mode || mode === 'kmeans-K3') return compareL2Pair(leftIdx, rightIdx);
   if (mode === 'kmeans-K6')          return compareL2Pair_atK(leftIdx, rightIdx, 6);
-  if (mode === 'distance-uv' || mode === 'uv-rotated') {
-    return _compareL2Pair_UVRotated(leftIdx, rightIdx);
-  }
-  // Remaining UV modes not yet ported — fall back so the panel still renders
-  // instead of throwing. The dropdown disables these.
+  const UV_DISPATCH = {
+    'distance-uv':   clusterL2_UVRotated,
+    'uv-rotated':    clusterL2_UVRotated,
+    'uv-denoise':    clusterL2_UVDenoise,
+    'uv-dbscan':     clusterL2_UVDBSCAN,
+    'uv-dist-rank':  clusterL2_UVDistRank,
+    'uv-dist-fuzzy': clusterL2_UVDistFuzzy,
+  };
+  const fn = UV_DISPATCH[mode];
+  if (fn) return _compareL2Pair_UV(leftIdx, rightIdx, mode, fn);
+  // Unknown mode → fall back so the panel still renders.
   return compareL2Pair(leftIdx, rightIdx);
 }
 
 // =============================================================================
-// _compareL2Pair_UVRotated — UV-rotated dispatcher (legacy 11733-1774 fragment)
+// _compareL2Pair_UV — shared compare for every UV mode. Each mode
+// supplies its own L2-cluster function (clusterL2_UV*); we run it on
+// both panes, Hungarian-align, contingency, verdict.
+// Legacy: compareL2Pair_byMode tail (11738-11774).
 // =============================================================================
-// Specialised compare for the uv-rotated mode. Both panes are
-// clustered via clusterL2_UVRotated (3-cluster partition in rotated
-// (u, v) space); Hungarian-aligned contingency at K=3.
-function _compareL2Pair_UVRotated(leftIdx, rightIdx) {
+function _compareL2Pair_UV(leftIdx, rightIdx, mode, clusterFn) {
   const state = _pageState;
   if (leftIdx == null || rightIdx == null) return null;
-  const cl = clusterL2_UVRotated(state, leftIdx);
-  const cr = clusterL2_UVRotated(state, rightIdx);
+  const cl = clusterFn(state, leftIdx);
+  const cr = clusterFn(state, rightIdx);
   if (!cl || !cr || !cl.labels || !cr.labels) return null;
   const K = 3;
   const llab = cl.fixedKLabels || cl.labels;
@@ -1381,7 +1453,7 @@ function _compareL2Pair_UVRotated(leftIdx, rightIdx) {
     cl_reason: cl.reason, cr_reason: cr.reason,
     cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
     cl_usedK: K, cr_usedK: K,
-    reclusterMode: 'uv-rotated',
+    reclusterMode: mode,
   };
 }
 
@@ -1912,6 +1984,72 @@ function focalContentHtml(cl, env, l2idx, options) {
       }
       mgHtml += `</div>`;
       html += mgHtml;
+    }
+  }
+
+  return html;
+}
+
+// =============================================================================
+// slabFocalContentHtml — 2026-05-18, ports the slab-flavoured focal content.
+// =============================================================================
+// User feedback: "in L3 contingency table at least manage that the GHSL and
+// Theta pi and het and ROH must be retrieved for each panel or resolution."
+//
+// Slab mode (renderL3PanelSlab) called slabFocalContentHtml without ever
+// defining it — same Type-B ReferenceError pattern as compareL2Pair_atK
+// before commit c7a7ba5. Focal pane content was silently blank.
+//
+// Now: reuses the L2-mode helpers (_invariantMetaInlineHtml +
+// _kSpecificMetaInlineHtml) so the layout matches. Builds a synthetic env
+// from the slab's bp range and feeds it to computeBandDiagnostics so the
+// GHSL / θπ / het / ROH chips render in slab mode too.
+function slabFocalContentHtml(cl, range, K) {
+  const state = _pageState;
+  if (!cl || !cl.labels) return '<div class="dim">no cluster</div>';
+  const d = state && state.data;
+  if (!d || !range || range.length !== 2) return '<div class="dim">no slab</div>';
+  const [s, e] = range;
+  let html = '';
+
+  // Slab header chip — slab range in windows + bp.
+  const wins = e - s + 1;
+  const w0 = d.windows && d.windows[s];
+  const wE = d.windows && d.windows[e];
+  const startBp = w0 && (w0.start_bp != null ? w0.start_bp : w0.center_bp);
+  const endBp   = wE && (wE.end_bp   != null ? wE.end_bp   : wE.center_bp);
+  const mbSpan = (Number.isFinite(startBp) && Number.isFinite(endBp))
+    ? ((endBp - startBp) / 1e6).toFixed(3) + ' Mb'
+    : '— Mb';
+  html += '<div class="ct-meta-inline" style="font-size: 9.5px; line-height: 1.2; ' +
+          'padding: 2px 10px; margin: 0; color: var(--ink-dim);">' +
+            '<span class="meta-chip">' +
+              `slab w ${s + 1}…${e + 1} <span style="color:var(--ink-dimmer);">(${wins}w · ${mbSpan})</span>` +
+            '</span>' +
+          '</div>';
+
+  // K-dependent chips (per-group counts + center PC1). Same helper as L2 mode.
+  html += _kSpecificMetaInlineHtml(cl, null);
+
+  // Power line.
+  html += `<div class="ct-row"><span class="lbl">power</span><span class="val">` +
+          `${cl.ok ? 'OK' : (cl.reason || 'WEAK')}</span></div>`;
+
+  // 2026-05-18 — Band diagnostics (GHSL / θπ / het / ROH / F_ROH) for the
+  // slab. Build a synthetic L2-shaped env so computeBandDiagnostics can
+  // filter panel columns by bp. The diagnostics functions are stateless
+  // re: env semantics — they just need start_bp/end_bp.
+  if (Number.isFinite(startBp) && Number.isFinite(endBp)) {
+    const synthEnv = { start_bp: startBp, end_bp: endBp };
+    try {
+      const _diag = computeBandDiagnostics(state, cl, synthEnv, null);
+      if (_diag) {
+        cl.__bandDiagnostics = _diag;
+        html += bandDiagsMiniChipsHtml(state, _diag, K, null);
+        html += bandDiagsPanelHtml(_diag, K);
+      }
+    } catch (err) {
+      console.warn('[slabFocalContentHtml] computeBandDiagnostics:', err);
     }
   }
 

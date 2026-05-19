@@ -526,6 +526,26 @@
 
     <div id="tracksContainer"></div>
 
+    <!-- 2026-05-18: CUSUM panel (Phase 1 of the per-sample CUSUM
+         feature, see shared/cusum.js). Hidden by default; toggled via
+         the "Σ cusum" checkbox on the lines-panel header. Paints K
+         per-karyotype band trajectories across the chromosome bp axis.
+         Default settings: residual='cohort_mean', op='mean', axis='pc1'.
+         Override via console: state.cusumResidual / state.cusumOp /
+         state.cusumAxis. -->
+    <div class="panel" id="cusumPanel" style="display: none; position: relative;
+         border-bottom: 1px solid var(--rule); overflow: hidden;">
+      <canvas id="cusumCanvas" style="display: block; width: 100%; height: 100%;
+              background: #0b0e13; cursor: crosshair;"></canvas>
+      <div id="cusumPanelLabel" style="position: absolute; top: 3px; left: 8px;
+           font-size: 10px; color: var(--ink-dim); pointer-events: none;
+           font-family: ui-monospace, monospace; font-weight: 600;
+           text-shadow: 0 0 4px rgba(0,0,0,0.85);">
+        Σ CUSUM <span style="color: var(--ink-dimmer); font-weight: normal;
+        ">(cohort-mean residual · per-band mean)</span>
+      </div>
+    </div>
+
     <!-- v3.70: tracked-samples panel for compact mode. Hidden in fixed/free
          modes (sidebar wins). In compact mode this fills the left column lower
          half with a mirror of the sidebar's tracked-samples controls — same
@@ -613,11 +633,19 @@
                      was considered but the per-segment refactor on the hot path
                      is large; the shade mode achieves the same diagnostic goal
                      without touching the line stroke path. -->
-        <!-- 2026-05-18 redesign: dropped the "off" button per user request.
-             strip and shade are mutually-exclusive toggles. Click an inactive
-             button → activate (other goes inactive). Click the active one →
-             deactivate (both off). state.linesSnpDensityMode ∈
-             {null, 'strip', 'shade'}. -->
+        <!-- 2026-05-18: collapsible "more controls" group. User reported the
+             lines header has too many inline toggles — wrap the secondary
+             ones (SNP-dens, trans-rate, regime, lineage, band-trace cluster,
+             cand-bands, Σ-cusum) in a span that hides by default and toggles
+             via the "▾ more" button at the end of the bar. The main controls
+             (color mode + lasso) stay always-visible. -->
+        <button id="linesHeaderMoreToggle"
+                title="Show/hide the secondary line-panel controls (SNP-density, trans-rate, regime, lineage, band-trace, cand-bands, Σ-cusum). Hidden by default; preference persists per-user."
+                style="background: var(--panel-2); border: 1px solid var(--rule);
+                       color: var(--ink-dim); border-radius: 3px;
+                       padding: 1px 8px; font-family: var(--mono); font-size: 10px;
+                       cursor: pointer;">▾ more</button>
+        <span id="linesHeaderMoreGroup" style="display: none; gap: 6px; align-items: center; flex-wrap: wrap;">
         <span id="linesSnpDensityBar"
               style="display: flex; gap: 0; align-items: center; padding-left: 6px;
                      border-left: 1px solid var(--rule);"
@@ -747,6 +775,17 @@
                 title="Open the linkage table popover. For the current fish-set (state.bandTraceFishSet from 🔍 trace), shows per-confirmed-candidate purity: which band of each candidate the fish-set falls into, what fraction, and how many fish. Click 🔍 trace first to populate the fish-set. Useful for asking 'these fish co-segregate at I3 — do they ALSO co-segregate at I7 / I12 / etc?'">
           🔗 linkage
         </button>
+        <!-- 2026-05-18: CUSUM panel toggle. Renders a dedicated panel
+             between tracks + lines, showing K=3 per-karyotype band
+             trajectories (cumulative drift from cohort mean) across
+             the chromosome. Default OFF. Per-sample CUSUM + per-band
+             aggregator from shared/cusum.js. -->
+        <label id="linesCusumLabel"
+               style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding-left: 6px; border-left: 1px solid var(--rule);"
+               title="Σ CUSUM panel — per-karyotype band trajectories of cumulative drift from cohort mean across the chromosome. K bold lines (one per band), colored by K-cluster, on a dark backdrop with a 0-baseline rule. Renders into a dedicated panel between the tracks and the per-sample lines so the lines plot stays uncluttered. Override the residual / op via console: state.cusumResidual = 'cohort_mean'|'band_mean'|'zero', state.cusumOp = 'mean'|'median'.">
+          <input type="checkbox" id="linesCusumToggle" />
+          <span style="color: var(--ink-dim);">Σ cusum</span>
+        </label>
         <!-- turn 141 Slice 1: candidate-band highlights. Default ON.
              Each confirmed candidate on the current chrom paints a faint
              full-height vertical band over its [start_bp, end_bp] span,
@@ -760,6 +799,21 @@
           <input type="checkbox" id="linesCandBandsToggle" checked />
           <span style="color: var(--ink-dim);">cand bands</span>
         </label>
+        <!-- 2026-05-18: macro / micro coloring toggle (SPEC_macrostripe_
+             microgroup_hierarchy.md Phase 1). When ON, PCA scatter / lines
+             panel / L3 mini-PCA dots color by macrostripe_id (derived from
+             the band-tracking Stage 3 sample sets at the current scrubber
+             window). When OFF (default), today's per-window K-means
+             microgroup coloring stays in effect. Requires state.bandingResult
+             to be populated (run the haplotype_regimes page's pipeline first);
+             otherwise the toggle is a no-op. -->
+        <label id="linesMacrostripeLabel"
+               style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding-left: 6px; border-left: 1px solid var(--rule);"
+               title="Macro / micro coloring (Phase 1). When ON, color PCA scatter + per-sample lines + L3 dots by macrostripe_id (the band-tracking Stage 3 stable-band assignment at the current window). When OFF, color by per-window K-means microgroup (today's behaviour). Requires the banding pipeline to have run on the active chromosome — open the haplotype_regimes page once to populate state.bandingResult.">
+          <input type="checkbox" id="linesMacrostripeToggle" />
+          <span style="color: var(--ink-dim);">macrostripe</span>
+        </label>
+        </span><!-- /#linesHeaderMoreGroup -->
         <!-- v3.84: candidate overlay badge. Visible when a candidate is active
              (state.candidate set). Shows "candidate · g0a/g0b/... " inline as
              a legend for the amber band + ⚠ markers on the PC1 sub-panel.
@@ -1184,11 +1238,24 @@
                   cursor: pointer; user-select: none;"
            title="Click to collapse / expand the tracked samples controls">
         <span>tracked samples</span>
-        <!-- v3.99 turn 4: collapse arrow. Toggles
-             #trackedSamplesPanelCompactBody display between block and none.
-             Default expanded; persisted in localStorage. -->
-        <span id="trackedSamplesPanelCompactArrow"
-              style="font-size: 9px; color: var(--ink-dim);">▼</span>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <!-- 2026-05-18 — settings popup toggle (parity with the fixed-mode
+               aside's tPanelOpenBtn). Opens the same #tPanelOverlay; secondary
+               controls (trails / sign-align PC1 / lasso / scree / trail-back
+               / N tracked) live there. Mirrors the existing T-panel hotkey. -->
+          <button id="tPanelOpenBtnCompact"
+                  title="Tracked-samples settings (t)"
+                  style="background: transparent; border: 1px solid var(--rule);
+                         color: var(--ink-dim); border-radius: 3px;
+                         padding: 0 5px; font-family: var(--mono); font-size: 9.5px;
+                         cursor: pointer; line-height: 14px;"
+                  onclick="event.stopPropagation();">▾</button>
+          <!-- v3.99 turn 4: collapse arrow. Toggles
+               #trackedSamplesPanelCompactBody display between block and none.
+               Default expanded; persisted in localStorage. -->
+          <span id="trackedSamplesPanelCompactArrow"
+                style="font-size: 9px; color: var(--ink-dim);">▼</span>
+        </div>
       </div>
       <!-- v3.78: tightened spacing for the narrow column in compact mode.
            Rows use 4px gap, 4px 8px padding; text 10.5px; band buttons wrap to
@@ -1198,41 +1265,33 @@
            section. All IDs use `Compact` suffix; `_syncTrackedCompactUI` and
            `renderTrackedList` mirror state from the sidebar. -->
       <div id="trackedSamplesPanelCompactBody"
-           style="padding: 4px 8px; display: flex; flex-direction: column; gap: 4px;
-                  overflow-y: auto;">
-        <!-- v4 turn 128d: ported the fixed-mode settings layout to compact —
-             previously compact had only [trails][sign-align PC1] + a 4-band
-             grid with no K-cycle, no lasso, no scree. The new layout matches
-             the in-pcaPanel fixed-mode aside one-for-one:
-               Row A: trails | sign-align PC1 | lasso | scree
-               Lasso confirm/clear bar (hidden until lasso selection exists)
-               Row B: trail back slider
-               Row C: N tracked slider
-               Row D: K(N) cycle button + "all" + 6 K-colored band buttons
-               Row E: Auto-pick + Clear (dark)
-             Compact-suffix IDs delegate to the fixed-mode handlers via
-             _wireCompactCheckboxMirror (added below in the script section).
-             The K-band buttons use data-k-band so _syncTrackedCompactUI's
-             color-and-enable loop picks them up automatically. -->
-        <div style="display: flex; gap: 6px; align-items: center; font-size: 10.5px; flex-wrap: wrap;">
-          <label style="display: flex; align-items: center; gap: 2px; cursor: pointer;">
-            <input type="checkbox" id="trailOnCompact" style="margin: 0;" /> trails
-          </label>
-          <label style="display: flex; align-items: center; gap: 2px; cursor: pointer;">
-            <input type="checkbox" id="flipPC1Compact" style="margin: 0;" /> sign-align PC1
-          </label>
-          <label id="pcaLassoLabelCompact"
-                 style="display: flex; align-items: center; gap: 2px; cursor: pointer;
-                        padding-left: 4px; border-left: 1px solid var(--rule);"
-                 title="Lasso mode: drag a rectangle on the PCA scatter to select samples by their PC1/PC2 position. Tracked highlights are suppressed while ON.">
-            <input type="checkbox" id="pcaLassoToggleCompact" style="margin: 0;" /> lasso
-          </label>
-          <label id="screeToggleLabelCompact"
-                 style="display: flex; align-items: center; gap: 2px; cursor: pointer;
-                        padding-left: 4px; border-left: 1px solid var(--rule);"
-                 title="Scree inset: top-k local-PCA eigenvalues for the current window. Steep bar drop = clean inversion structure; flat bars = noisy/unstable window.">
-            <input type="checkbox" id="screeToggleCompact" style="margin: 0;" /> scree
-          </label>
+           style="padding: 4px 8px; display: flex; flex-direction: column; gap: 4px;">
+        <!-- 2026-05-18 — compact-mode body slimmed to MAIN controls only.
+             Secondary controls (trails / sign-align PC1 / lasso / scree /
+             trail-back / N tracked) moved to the shared #tPanelOverlay popup
+             that fixed mode also uses; toggle via the ▾ button in the
+             panel head above. Mirror groups in sidebar.js
+             (flipMirrors / trailMirrors / lassoMirrors / screeMirrors)
+             keep state in lockstep regardless of which surface the user
+             interacts with — popup or aside. Kept inline below:
+               · K(N) cycle + 6 K-colored band buttons (Row D)
+               · Auto-pick + Clear (Row E)
+               · Lasso confirm/clear bar (transient — hidden until needed)
+               · The tracked sample chip list below this body.
+             User feedback (chat 2026-05-18): "I like to see everything
+             instant if possible." → no inline duplication, no scroll. -->
+        <!-- Hidden remnants of the legacy *Compact checkbox IDs. Kept in
+             the DOM (display:none) so the mirror wires in sidebar.js have
+             a no-op target during the transition — removes any chance of
+             a ReferenceError from a stale mirror loop. Safe to delete in a
+             follow-up commit once the popup is verified in production. -->
+        <div style="display: none;">
+          <input type="checkbox" id="trailOnCompact" />
+          <input type="checkbox" id="flipPC1Compact" />
+          <input type="checkbox" id="pcaLassoToggleCompact" />
+          <input type="checkbox" id="screeToggleCompact" />
+          <input type="range" id="trailNCompactDeprecated"   min="0" max="80" value="15" />
+          <input type="range" id="trackedNCompactDeprecated" min="0" max="30" value="10" />
         </div>
         <!-- Lasso confirm/clear bar — hidden until selection exists. The
              fixed-mode lasso handler pcaLassoSetBadge() updates display
@@ -1258,18 +1317,9 @@
                          padding: 1px 8px; font-family: var(--mono); font-size: 10px;
                          cursor: pointer;">Clear</button>
         </div>
-        <div style="display: flex; gap: 4px; align-items: center; font-size: 10.5px;">
-          <span style="color: var(--ink-dim); flex: 0 0 56px;">trail back</span>
-          <input type="range" id="trailNCompact" min="0" max="80" value="15" step="1"
-                 style="flex: 1 1 auto; min-width: 0;" />
-          <span class="val" id="trailNValCompact" style="flex: 0 0 22px; text-align: right;">15</span>
-        </div>
-        <div style="display: flex; gap: 4px; align-items: center; font-size: 10.5px;">
-          <span style="color: var(--ink-dim); flex: 0 0 56px;">N tracked</span>
-          <input type="range" id="trackedNCompact" min="0" max="30" step="1" value="10"
-                 style="flex: 1 1 auto; min-width: 0;" />
-          <span class="val" id="trackedNValCompact" style="flex: 0 0 22px; text-align: right;">10</span>
-        </div>
+        <!-- 2026-05-18: trail-back + N-tracked sliders moved to #tPanelOverlay
+             popup. The compact body now jumps from the (hidden) input
+             remnants above straight to the K-cycle + band-pick row below. -->
         <!-- K(N) cycle button + 6 K-colored band buttons. data-k-band="0..5"
              matches the existing fixed-mode buttons so _syncTrackedCompactUI
              auto-colors and auto-enables them based on state.k. The "all"
@@ -1610,10 +1660,10 @@
               <option value="kmeans-K3" title="K-means with K=3 on PC1/PC2 (default — current behavior)">kmeans-K3</option>
               <option value="kmeans-K6" title="K-means with K=6 on PC1/PC2 — sub-resolves the three K=3 bands into nested haplotype-level clusters; useful when K=3 over-merges nested substructure">kmeans-K6</option>
               <option value="distance-uv" title="Rotate (PC1, PC2) so the Hom1↔Hom2 axis is horizontal (u-axis), with Het anchored near u≈0. Then K-means2D in rotated (u, v) space. The v-axis carries real biological information — samples that deviate perpendicular signal recombinants, rare alleles, second overlying inversions, or gene-conversion tracts.">uv-rotated (distance-uv)</option>
-              <option value="uv-denoise" disabled title="[pending UV-rotation port] Rotated (u, v) + DBSCAN pre-filter. Identifies noise samples first; then K-means3 on survivors only.">uv-denoise (pending)</option>
-              <option value="uv-dbscan" disabled title="[pending UV-rotation port] Rotated (u, v) + K-means3 → DBSCAN within each stripe.">uv-dbscan (pending)</option>
-              <option value="uv-dist-rank" disabled title="[pending UV-rotation port] Rotated (u, v) + closest tercile of each Hom stripe to the Het centroid gets relabeled as Het. Reveals drift toward Het.">uv-dist-rank (pending)</option>
-              <option value="uv-dist-fuzzy" disabled title="[pending UV-rotation port] Rotated (u, v) + soft inverse-distance weights to all three centroids; reassign on tie-break.">uv-dist-fuzzy (pending)</option>
+              <option value="uv-denoise" title="Rotated (u, v) + DBSCAN as pre-filter. DBSCAN identifies noise samples first (auto-eps = median k-NN × 0.8, minPts = max(3, ⌊N·0.08⌋)); then K-means3 runs on survivors only. Noise samples get assigned to the nearest centroid for the final contingency. Useful when family outliers or rare admixed samples drag K-means centroids; this mode filters them out of the centroid computation but still places them in the contingency.">uv-denoise</option>
+              <option value="uv-dbscan" title="Rotated (u, v) + K-means3 → DBSCAN within each stripe. Mirrors STEP22_candidate_subclustering.R within-stripe DBSCAN on v values. Samples in the dominant subcluster keep the stripe label; samples in minority subclusters or noise get reassigned to the second-closest stripe — visible as off-diagonal contingency mass when DBSCAN finds internal structure that K-means hard-assignment hides.">uv-dbscan</option>
+              <option value="uv-dist-rank" title="Rotated (u, v) + K-means3 → within each Hom stripe, the closest tercile to the Het centroid gets relabeled as Het. Reveals samples that DRIFT toward Het (recombinants, admixture, intermediate states) by moving them into the Het cell of the contingency. Het stripe samples stay as Het.">uv-dist-rank</option>
+              <option value="uv-dist-fuzzy" title="Rotated (u, v) + soft inverse-distance weights to all three centroids. Hard label = argmax(weights), but if the max weight < 0.45 (sample is within ~10% of being equidistant from two centroids), reassign to the second-best centroid. Reveals contingency cells where K-means hard assignment was forced on truly ambiguous samples.">uv-dist-fuzzy</option>
               <option value="gmm-3" disabled title="[v4.x planned] Gaussian Mixture Model with K=3, diagonal covariance EM. Better for elongated or overlapping bands than K-means hard assignment. Implementation: ~80 lines of JS EM, in design.">gmm-3 (planned)</option>
               <option value="gmm-4" disabled title="[v4.x planned] Gaussian Mixture Model with K=4. Resolves cases where one of the K=3 bands has internal structure.">gmm-4 (planned)</option>
               <option value="gmm-5" disabled title="[v4.x planned] Gaussian Mixture Model with K=5.">gmm-5 (planned)</option>

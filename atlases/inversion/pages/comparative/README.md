@@ -1,33 +1,30 @@
-# `pages/comparative/` — comparative-stage pages
+# `pages/comparative/` — disk dir; manifest stage is `evolution` or `help`
 
-This directory hosts pages for the **comparative** workflow stage —
-cross-species inversion analysis between *C. gariepinus* (Cgar)
-and *C. macrocephalus* (Cmac), plus phylogenetic placement across
-catfish lineages. Also hosts the static `help` page (help) because
-of historical grouping.
+This directory hosts cross-species comparison pages + the static help
+page. The `comparative` manifest stage was dropped on 2026-05-18
+(per `_handoff_docs/STAGE_AUDIT_2026-05-18.md`) — the two
+cross-species pages moved to `evolution` (cross-species rearrangement
+IS evolution); `help` stayed in its own one-page stage. The disk
+dir name is kept for historical grouping; same dir/stage divergence
+pattern as `pages/review/` after the same re-org.
 
-## What comparative is for
+## What each page does
 
-> "We have a set of inversions in C. gariepinus. Now we want to
-> know: does this inversion exist as a polymorphism in Cmac too?
-> Is it lineage-restricted? Where does the breakpoint sit on the
-> catfish phylogeny?"
+> "We have a set of inversions in *C. gariepinus*. Now we want to
+> know: does this inversion exist as a polymorphism in Cmac too? Is
+> it lineage-restricted? Where does the breakpoint sit on the catfish
+> phylogeny?"
 
-The comparative stage answers that.
+That's evolution work — phylogenetic placement of breakpoints + cross-
+species homology. Hence the manifest re-stage.
 
 ## Pages in this directory
 
-### Stage `comparative`
-
-| page | label | summary |
-|------|-------|---------|
-| `cross_species_breakpoints` | cross-species breakpoints | Cgar × Cmac wfmash 1-to-1 alignment (`cs_breakpoints_v1` schema); 6-panel dashboard — toolbar, catalogue, focus card, synteny, dotplot, focal-vs-bg permutation test |
-| `multi_species_cockpit` | multi-species cockpit | place each Cgar↔Cmac breakpoint on the catfish phylogeny; click species → homologous-region detail; auto-suggests architecture class A-F from lineage distribution; owns 6 JSON layers |
-
-### Stage `help`
-
-| page | label | summary |
-|------|-------|---------|
+| page | manifest stage | label | summary |
+|------|----------------|-------|---------|
+| `cross_species_breakpoints` | evolution | cross-species breakpoints | Cgar × Cmac wfmash 1-to-1 alignment (`cs_breakpoints_v1` schema); 6-panel dashboard — toolbar, catalogue, focus card, synteny, dotplot, focal-vs-bg permutation test |
+| `multi_species_cockpit` | evolution | multi-species cockpit | place each Cgar↔Cmac breakpoint on the catfish phylogeny; click species → homologous-region detail; auto-suggests architecture class A-F from lineage distribution; owns 6 JSON layers |
+| `help` | help | help | static help / quick-reference page |
 | `help` | help | static quick-reference / help page (~1158 LOC HTML); `renderPage5()` is a no-op; PAGE5_META carries tab metadata |
 
 ## Three-cohort discipline (CRITICAL)
