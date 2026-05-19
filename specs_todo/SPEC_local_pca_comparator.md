@@ -1,6 +1,14 @@
 # SPEC — Local PCA Comparator (cross-evidence view)
 
-**Status**: design exploration, 2026-05-15. Not yet implemented.
+**Status**: Phase 1 (side-by-side) shipped 2026-05-18.
+Phases 2 + 3 still proposed. See
+`docs/generated/page_contracts/pca_comparator/` for the shipped
+contract; full design exploration below remains the source of truth
+for Phases 2 + 3.
+
+**Implemented in**: `atlases/inversion/pages/discovery/pca_comparator.{html,js}`
++ `pca_comparator/{_state,renderer}.js` (page registered as
+`pca_comparator` in `manifest.json` + `pages.registry.json`).
 **User question**: "how could we try to have some sort of overlay of
 the 3 pcas at once so we can compare ? or have them side by side ?
 (for local PCA | local PCA theta pi | local PCA GHSL)"

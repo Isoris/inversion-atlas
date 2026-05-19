@@ -56,7 +56,8 @@ HANDOFF_5 / 6 / 7 / 8 / 10 SPECs).
 | page | label | summary |
 |------|-------|---------|
 | `candidate_focus` | candidate focus | per-candidate deep-dive (~15 sub-panels); reads `state.candidate` |
-| `page22` | haplotype regimes | wires the v3.4 banding pipeline (Stage 1-4) into the atlas-core shell; has end-user docs at `specs_done/_bundles/HOW_TO_USE_haplotype_regimes.md` |
+| `haplotype_regimes` | haplotype regimes | wires the v3.4 banding pipeline (Stage 1-4) into the atlas-core shell; has end-user docs at `specs_done/_bundles/HOW_TO_USE_haplotype_regimes.md` |
+| `pca_comparator` | PCA comparator (dosage · θπ · GHSL) | side-by-side mini-PCA of all 3 evidence axes at the active window; shared cursor + hover; K-band coloring from the anchor (default dosage). Phase 1 per `specs_todo/SPEC_local_pca_comparator.md`. |
 
 ### Stage `tooling` — utility / inspector cartridges (re-staged 2026-05-16)
 

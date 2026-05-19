@@ -347,6 +347,20 @@
         "scrubber_main"
       ]
     },
+    "pca_comparator": {
+      "_label": "PCA comparator (dosage \u00b7 \u03b8\u03c0 \u00b7 GHSL)",
+      "_doc": "Cross-evidence PCA comparator \u2014 Phase 1 (side-by-side) per specs_todo/SPEC_local_pca_comparator.md. Three synchronized mini-PCA panels at the active window (state.cur), one per evidence axis: dosage (state.data.windows[w].pc1/pc2 \u2014 always available), \u03b8\u03c0 (state.data.theta_pi_local_pca \u2014 optional layer), GHSL (state.data.ghsl_panel.local_pca \u2014 optional layer). Each panel uses its native coordinate system (no Procrustes rotation in Phase 1 \u2014 see SPEC \u00a7Phase 3 for why). K-band coloring inherits from the anchor's K-means (default: dosage); each sample keeps its anchor band color across all 3 panels so the question 'is this fish consistently in band g0 across all 3 axes?' is answered by color + position agreement. Hover sample \u2192 highlights in all 3 panels via state.hoveredSample. \u2190/\u2192 (Shift = 20-step) scrubs the shared window cursor across all 3 simultaneously. Read-only inspector \u2014 writes nothing; does not own data, reads from the inversion cartridge's shared atlasState.inversion._local_pca_dosage_state.",
+      "requires_layers": [
+        "scrubber_main"
+      ],
+      "requires_slots": [
+        "activeChrom"
+      ],
+      "requires_operations": [],
+      "preloads": [
+        "scrubber_main"
+      ]
+    },
     "tree_panel": {
       "_label": "tree panel",
       "_doc": "Inversion-core sample tree (Neighbour-Joining on dosage distances) with cluster colouring and ARI-vs-clusters badge. Cartridge implementation of HANDOFF_5 (specs_todo/mgl_adapter/HANDOFF_5_tree.md). Phase 1 scope: single sample-tree canvas built browser-side via NJ on distance matrices (no IQ-TREE round-trip), leaves coloured by candidate-mode cluster labels, hover/click linkage with the panel's selection store, ARI badge of tree clades at K=cluster_count vs cluster labels. Deferred (Phase 2+): band-tree (Path A) side-by-side, bootstrap support on internal nodes, het-mode controls (iupac/hom_only/n/random \u2014 only matters for IQ-TREE Path B), cross-panel hover linkage with PCA/heatmap. Input contract: atlasState.inversion.tree_panel_state = { tree: mgl_nj_tree.buildNjTree output, leaf_cluster_labels: Array<number|string>, leaf_colors_by_cluster: Array<string>, candidate_label?: string } \u2014 producer not yet wired. Subdir: _state.js, renderer.js (canvas tree painter), selection.js (hover/click selection store).",

@@ -1,0 +1,93 @@
+  <div id="pca_comparator" class="page">
+
+    <header id="pcaCompHeader" class="pca-comp-header"
+            style="display: flex; align-items: center; justify-content: space-between;
+                   padding: 6px 14px; border-bottom: 1px solid var(--rule);
+                   font-family: var(--mono); font-size: 11px;">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <span style="font-size: 13px; font-weight: 600;">Cross-evidence PCA comparator</span>
+        <span id="pcaCompWindowLabel" style="color: var(--ink-dim);">window —</span>
+        <span id="pcaCompMbLabel" style="color: var(--ink-dim);"></span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <label style="display: flex; align-items: center; gap: 4px; color: var(--ink-dim);"
+               title="Anchor for the K-color palette. Each sample keeps its anchor band color across all 3 panels so you can see at a glance where it lands in each evidence axis. Default = dosage (the primary scanner).">
+          anchor:
+          <select id="pcaCompAnchor"
+                  style="background: var(--panel-2); color: var(--ink);
+                         border: 1px solid var(--rule); border-radius: 3px;
+                         padding: 2px 6px; font-family: var(--mono); font-size: 10.5px;">
+            <option value="dosage" selected>dosage</option>
+            <option value="theta_pi">θπ</option>
+            <option value="ghsl">GHSL</option>
+          </select>
+        </label>
+        <span id="pcaCompHoveredSample" style="color: var(--ink-dim); min-width: 80px;
+               font-family: var(--mono); font-size: 10.5px;">hover: —</span>
+      </div>
+    </header>
+
+    <div id="pcaCompBody"
+         style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+                padding: 8px 14px;">
+
+      <div class="pca-comp-cell"
+           style="display: flex; flex-direction: column;
+                  border: 1px solid var(--rule); border-radius: 4px;
+                  background: var(--panel); overflow: hidden;">
+        <div class="pca-comp-cell-head"
+             style="padding: 4px 8px; border-bottom: 1px solid var(--rule);
+                    font-family: var(--mono); font-size: 10px; color: var(--ink-dim);
+                    display: flex; justify-content: space-between; align-items: center;">
+          <span><b>dosage</b></span>
+          <span id="pcaCompStatusDosage" style="font-size: 9.5px;">—</span>
+        </div>
+        <div style="position: relative; flex: 1 1 auto; min-height: 220px;">
+          <canvas id="pcaCompCanvasDosage" style="width: 100%; height: 100%;
+                  background: #0b0e13; cursor: crosshair;"></canvas>
+        </div>
+      </div>
+
+      <div class="pca-comp-cell"
+           style="display: flex; flex-direction: column;
+                  border: 1px solid var(--rule); border-radius: 4px;
+                  background: var(--panel); overflow: hidden;">
+        <div class="pca-comp-cell-head"
+             style="padding: 4px 8px; border-bottom: 1px solid var(--rule);
+                    font-family: var(--mono); font-size: 10px; color: var(--ink-dim);
+                    display: flex; justify-content: space-between; align-items: center;">
+          <span><b>θπ</b></span>
+          <span id="pcaCompStatusThetaPi" style="font-size: 9.5px;">—</span>
+        </div>
+        <div style="position: relative; flex: 1 1 auto; min-height: 220px;">
+          <canvas id="pcaCompCanvasThetaPi" style="width: 100%; height: 100%;
+                  background: #0b0e13; cursor: crosshair;"></canvas>
+        </div>
+      </div>
+
+      <div class="pca-comp-cell"
+           style="display: flex; flex-direction: column;
+                  border: 1px solid var(--rule); border-radius: 4px;
+                  background: var(--panel); overflow: hidden;">
+        <div class="pca-comp-cell-head"
+             style="padding: 4px 8px; border-bottom: 1px solid var(--rule);
+                    font-family: var(--mono); font-size: 10px; color: var(--ink-dim);
+                    display: flex; justify-content: space-between; align-items: center;">
+          <span><b>GHSL</b></span>
+          <span id="pcaCompStatusGhsl" style="font-size: 9.5px;">—</span>
+        </div>
+        <div style="position: relative; flex: 1 1 auto; min-height: 220px;">
+          <canvas id="pcaCompCanvasGhsl" style="width: 100%; height: 100%;
+                  background: #0b0e13; cursor: crosshair;"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <footer id="pcaCompFooter"
+            style="padding: 6px 14px; border-top: 1px solid var(--rule);
+                   font-family: var(--mono); font-size: 10px; color: var(--ink-dim);">
+      ←/→ scrub window across all 3 panels · hover a dot to track it across panels ·
+      Phase 1 (side-by-side). Read-only inspector — see
+      <code>specs_todo/SPEC_local_pca_comparator.md</code>.
+    </footer>
+  </div>

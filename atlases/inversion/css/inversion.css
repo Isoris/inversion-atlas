@@ -4402,7 +4402,8 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
 .page#pca_scatter_per_window.active,
 .page#dosage_heatmap.active,
 .page#nested_inversion_detector.active,
-.page#dosage_cluster_adaptive_k.active {
+.page#dosage_cluster_adaptive_k.active,
+.page#pca_comparator.active {
   display: flex;
   flex-direction: column;
   height: 100%;

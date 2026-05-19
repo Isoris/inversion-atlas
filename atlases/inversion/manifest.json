@@ -70,6 +70,15 @@
       "tooltip": "Long-range haplotype regimes (Stage 4 bruteforce projection). Run runBandingPipeline on the active chromosome and explore where each seed-band voter lands across target windows. Export the result as a regime catalogue JSON."
     },
     {
+      "id": "pca_comparator",
+      "slug": "pca_comparator",
+      "label": "PCA comparator (dosage · θπ · GHSL)",
+      "stage": "discovery_2",
+      "fragment": "atlases/inversion/pages/discovery/pca_comparator.html",
+      "module": "atlases/inversion/pages/discovery/pca_comparator.js",
+      "tooltip": "Cross-evidence PCA comparator — Phase 1 (side-by-side). 3 synchronized mini-PCA panels at the active window; hover a dot to track it across all 3 axes. K-band coloring inherits from the anchor's clustering (default: dosage). Read-only inspector."
+    },
+    {
       "id": "karyotype_tier",
       "slug": "karyotype_tier",
       "label": "karyotype / tier",
