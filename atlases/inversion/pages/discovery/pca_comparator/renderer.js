@@ -238,6 +238,204 @@ function _getPointsFromLoadings(lp, cur, axisLabel) {
   return { xs: w.pc1, ys: w.pc2, xLabel: `PC1 (${axisLabel})`, yLabel: `PC2 (${axisLabel})` };
 }
 
+// ---------------------------------------------------------------------------
+// Per-sample lines panel — one polyline per sample showing PC1 (or PC2)
+// across all windows for the anchor layer. Lets the user see where the
+// active cursor sits in the chromosome-wide signal and click anywhere on
+// the strip to jump the cursor there. Read-only otherwise.
+//
+// `axis` is 'pc1' or 'pc2'.
+// ---------------------------------------------------------------------------
+const _lastLinesRect = { x: 0, y: 0, w: 0, h: 0, mbMin: 0, mbMax: 0, nWin: 0 };
+
+export function paintLines(state, axis) {
+  if (typeof document === 'undefined') return;
+  const canvas = document.getElementById('pcaCompLinesCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const { cssW: w, cssH: h } = _fitCanvas(canvas, ctx);
+  ctx.clearRect(0, 0, w, h);
+
+  const ss = state.sharedState;
+  if (!ss || !ss.data) {
+    _drawEmpty(ctx, w, h, 'no chromosome loaded');
+    return;
+  }
+  const d = ss.data;
+  const nWin = (Array.isArray(d.windows) && d.windows.length) || (d.n_windows | 0);
+  if (!nWin) { _drawEmpty(ctx, w, h, 'no windows'); return; }
+
+  const anchor = state.anchor || 'dosage';
+  const axKey = (axis === 'pc2') ? 'pc2' : 'pc1';
+  // Series shape: [nWin] each containing length-nS Float arrays.
+  const series = _getPerWindowSeries(d, anchor, axKey);
+  if (!series || !series.byWin) {
+    _drawEmpty(ctx, w, h, series && series.reason ? series.reason : 'no per-sample series');
+    return;
+  }
+
+  const pad = { l: 36, r: 8, t: 8, b: 18 };
+  const plotW = Math.max(1, w - pad.l - pad.r);
+  const plotH = Math.max(1, h - pad.t - pad.b);
+
+  // X is centre_mb if available, else window index.
+  const mbs = [];
+  let haveMb = true;
+  for (let i = 0; i < nWin; i++) {
+    const w0 = d.windows && d.windows[i];
+    const mb = w0 && Number.isFinite(w0.center_mb) ? +w0.center_mb : NaN;
+    if (!Number.isFinite(mb)) haveMb = false;
+    mbs.push(mb);
+  }
+  let mbMin = 0, mbMax = nWin - 1;
+  if (haveMb) {
+    mbMin = mbs[0]; mbMax = mbs[nWin - 1];
+    if (mbMax <= mbMin) mbMax = mbMin + 1;
+  }
+  const toX = (i) => {
+    if (haveMb) return pad.l + ((mbs[i] - mbMin) / (mbMax - mbMin)) * plotW;
+    return pad.l + (i / Math.max(1, nWin - 1)) * plotW;
+  };
+
+  // Compute robust y range across visible samples + windows.
+  let yMin = +Infinity, yMax = -Infinity;
+  for (let i = 0; i < nWin; i++) {
+    const v = series.byWin[i];
+    if (!v) continue;
+    for (let s = 0; s < v.length; s++) {
+      const y = v[s];
+      if (!Number.isFinite(y)) continue;
+      if (y < yMin) yMin = y;
+      if (y > yMax) yMax = y;
+    }
+  }
+  if (!Number.isFinite(yMin) || !Number.isFinite(yMax) || yMax === yMin) {
+    yMin = -1; yMax = 1;
+  }
+  const yPad = (yMax - yMin) * 0.05;
+  yMin -= yPad; yMax += yPad;
+  const toY = (y) => pad.t + (1 - (y - yMin) / (yMax - yMin)) * plotH;
+
+  // Background plot area + axis ticks (light).
+  ctx.fillStyle = 'rgba(255,255,255,0.02)';
+  ctx.fillRect(pad.l, pad.t, plotW, plotH);
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad.l, pad.t + plotH + 0.5);
+  ctx.lineTo(pad.l + plotW, pad.t + plotH + 0.5);
+  ctx.stroke();
+
+  // Per-sample lines.
+  const nS = (series.nSamples | 0);
+  ctx.lineWidth = 0.8;
+  ctx.globalAlpha = 0.55;
+  for (let s = 0; s < nS; s++) {
+    ctx.beginPath();
+    let started = false;
+    for (let i = 0; i < nWin; i++) {
+      const v = series.byWin[i];
+      if (!v) { started = false; continue; }
+      const y = v[s];
+      if (!Number.isFinite(y)) { started = false; continue; }
+      const xx = toX(i), yy = toY(y);
+      if (!started) { ctx.moveTo(xx, yy); started = true; }
+      else ctx.lineTo(xx, yy);
+    }
+    ctx.strokeStyle = (state.hoveredSample === s) ? '#f5a524' : 'rgba(160,200,235,0.6)';
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // Cursor.
+  const cur = Math.max(0, Math.min(nWin - 1, ss.cur | 0));
+  const xCur = toX(cur);
+  ctx.strokeStyle = '#f5a524';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(xCur + 0.5, pad.t);
+  ctx.lineTo(xCur + 0.5, pad.t + plotH);
+  ctx.stroke();
+
+  // Axis labels.
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${anchor} ${axKey.toUpperCase()}`, pad.l + 4, pad.t + 2);
+  if (haveMb) {
+    ctx.textAlign = 'left';
+    ctx.fillText(`${mbMin.toFixed(2)} Mb`, pad.l, pad.t + plotH + 4);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${mbMax.toFixed(2)} Mb`, pad.l + plotW, pad.t + plotH + 4);
+  }
+
+  _lastLinesRect.x = pad.l;
+  _lastLinesRect.y = pad.t;
+  _lastLinesRect.w = plotW;
+  _lastLinesRect.h = plotH;
+  _lastLinesRect.mbMin = haveMb ? mbMin : 0;
+  _lastLinesRect.mbMax = haveMb ? mbMax : (nWin - 1);
+  _lastLinesRect.nWin = nWin;
+  _lastLinesRect.haveMb = haveMb;
+}
+
+// Click-to-scrub: translate an x pixel coordinate inside the lines canvas
+// into the corresponding window index. Returns -1 if outside the plot box.
+export function windowAtLinesX(px) {
+  const r = _lastLinesRect;
+  if (!r || !r.w) return -1;
+  if (px < r.x || px > r.x + r.w) return -1;
+  const frac = (px - r.x) / r.w;
+  return Math.max(0, Math.min(r.nWin - 1, Math.round(frac * (r.nWin - 1))));
+}
+
+// Build per-window arrays of length n_samples for the chosen anchor + axis.
+function _getPerWindowSeries(d, anchor, axKey) {
+  const nWin = (Array.isArray(d.windows) && d.windows.length) || (d.n_windows | 0);
+  if (!nWin) return null;
+  if (anchor === 'dosage') {
+    const byWin = new Array(nWin);
+    let nSamples = 0;
+    for (let i = 0; i < nWin; i++) {
+      const w = d.windows[i];
+      const v = w && w[axKey];
+      byWin[i] = (v && v.length) ? v : null;
+      if (v && v.length > nSamples) nSamples = v.length;
+    }
+    if (!nSamples) return { reason: 'dosage: no per-sample PC on windows' };
+    return { byWin, nSamples };
+  }
+  if (anchor === 'theta_pi') {
+    const lp = d.theta_pi_local_pca;
+    if (!lp || !lp.pc_loadings_aligned) return { reason: 'θπ: pc_loadings_aligned absent' };
+    return _seriesFromLoadings(lp.pc_loadings_aligned, axKey, nWin, 'θπ');
+  }
+  if (anchor === 'ghsl') {
+    const lp = d.ghsl_local_pca || (d.ghsl_panel && d.ghsl_panel.local_pca);
+    if (!lp || !lp.pc_loadings_aligned) return { reason: 'GHSL: pc_loadings_aligned absent' };
+    return _seriesFromLoadings(lp.pc_loadings_aligned, axKey, nWin, 'GHSL');
+  }
+  return null;
+}
+
+function _seriesFromLoadings(loadings, axKey, nWin, label) {
+  if (!Array.isArray(loadings) || loadings.length < 1) return { reason: `${label}: pc_loadings_aligned empty` };
+  const pcIdx = (axKey === 'pc2') ? 1 : 0;
+  const pcSeries = loadings[pcIdx];
+  if (!Array.isArray(pcSeries)) return { reason: `${label}: PC${pcIdx + 1} series not array` };
+  const byWin = new Array(nWin);
+  let nSamples = 0;
+  for (let i = 0; i < nWin; i++) {
+    const v = pcSeries[i];
+    byWin[i] = (v && v.length) ? v : null;
+    if (v && v.length > nSamples) nSamples = v.length;
+  }
+  if (!nSamples) return { reason: `${label}: no per-sample values in PC${pcIdx + 1}` };
+  return { byWin, nSamples };
+}
+
 // Resolve K-band labels from the anchor source.
 function _resolveAnchorLabels(state) {
   const ss = state.sharedState;
