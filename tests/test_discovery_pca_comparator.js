@@ -32,6 +32,12 @@ const renderer = await import('../atlases/inversion/pages/discovery/pca_comparat
 check('renderer exports paintPanel',       typeof renderer.paintPanel       === 'function');
 check('renderer exports findSampleAtPixel', typeof renderer.findSampleAtPixel === 'function');
 
+const heatmap = await import('../atlases/inversion/pages/discovery/pca_comparator/heatmap.js');
+check('heatmap exports paintHeatmap',     typeof heatmap.paintHeatmap   === 'function');
+check('heatmap exports findCellAtPixel',  typeof heatmap.findCellAtPixel === 'function');
+check('heatmap findCellAtPixel on cold cache → null',
+      heatmap.findCellAtPixel(10, 10) === null);
+
 // =====================================================================
 group('mount / unmount headless tolerance');
 {

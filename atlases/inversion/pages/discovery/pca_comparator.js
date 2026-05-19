@@ -26,6 +26,10 @@ import {
   paintPanel,
   findSampleAtPixel,
 } from './pca_comparator/renderer.js';
+import {
+  paintHeatmap,
+  findCellAtPixel,
+} from './pca_comparator/heatmap.js';
 
 export async function mount(root, atlasState, registry) {
   const pageState = _buildPageState(atlasState);
@@ -38,6 +42,9 @@ export async function mount(root, atlasState, registry) {
   }
   try { _wireCanvasHover(pageState); } catch (e) {
     console.warn('pca_comparator.mount: hover wiring threw —', e);
+  }
+  try { _wireHeatmap(pageState); } catch (e) {
+    console.warn('pca_comparator.mount: heatmap wiring threw —', e);
   }
   try { refresh(pageState); } catch (e) {
     console.warn('pca_comparator.mount: refresh threw —', e);
@@ -140,6 +147,7 @@ function _paintAll(state) {
   paintPanel(state, 'dosage');
   paintPanel(state, 'theta_pi');
   paintPanel(state, 'ghsl');
+  paintHeatmap(state);
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +201,53 @@ function _wireHotkeys(state) {
 // Canvas hover wiring — track which sample is hovered in any panel
 // and re-paint all 3 so the highlight follows across.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Heatmap wiring — click a column to scrub the shared window cursor
+// (which the 3 PCAs above then follow); hover a row to highlight the
+// sample across the 3 PCAs (same hoveredSample mechanism as the dots).
+// ---------------------------------------------------------------------------
+function _wireHeatmap(state) {
+  if (typeof document === 'undefined') return;
+  const canvas = document.getElementById('pcaCompHeatmapCanvas');
+  if (!canvas) return;
+  const onMove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const cell = findCellAtPixel(e.clientX - rect.left, e.clientY - rect.top);
+    const si = cell ? cell.si : -1;
+    if (si !== state.hoveredSample) {
+      state.hoveredSample = si;
+      _renderHeader(state);
+      _paintAll(state);
+    }
+  };
+  const onLeave = () => {
+    if (state.hoveredSample !== -1) {
+      state.hoveredSample = -1;
+      _renderHeader(state);
+      _paintAll(state);
+    }
+  };
+  const onClick = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const cell = findCellAtPixel(e.clientX - rect.left, e.clientY - rect.top);
+    if (!cell) return;
+    const ss = state.sharedState;
+    if (!ss || !ss.data) return;
+    const nWin = ss.data.n_windows | 0;
+    if (nWin <= 0) return;
+    ss.cur = Math.max(0, Math.min(nWin - 1, cell.w | 0));
+    refresh(state);
+  };
+  canvas.addEventListener('mousemove', onMove);
+  canvas.addEventListener('mouseleave', onLeave);
+  canvas.addEventListener('click', onClick);
+  state._teardownFns.push(() => {
+    canvas.removeEventListener('mousemove', onMove);
+    canvas.removeEventListener('mouseleave', onLeave);
+    canvas.removeEventListener('click', onClick);
+  });
+}
+
 function _wireCanvasHover(state) {
   if (typeof document === 'undefined') return;
   for (const layer of ['dosage', 'theta_pi', 'ghsl']) {
