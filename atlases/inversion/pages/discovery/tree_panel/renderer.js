@@ -60,8 +60,14 @@ export function paintTree(canvas, layout, opts) {
   const o = opts || {};
   if (!canvas || !canvas.getContext) return { leaf_hit_regions: [] };
   const ctx = canvas.getContext('2d');
-  const W = canvas.width || 1000;
-  const H = canvas.height || 400;
+  // 2026-05-20: honor CSS-px dims when the caller has set up a DPR
+  // transform. canvas.__cssW / __cssH are stashed by _fitTreeCanvas
+  // (tree_panel.js) — without this we'd draw to backing-store px on
+  // top of an already-DPR-scaled transform, rendering everything at
+  // dpr² scale. Fallback to canvas.width / canvas.height for callers
+  // that don't pre-fit the canvas.
+  const W = Number.isFinite(canvas.__cssW) ? canvas.__cssW : (canvas.width  || 1000);
+  const H = Number.isFinite(canvas.__cssH) ? canvas.__cssH : (canvas.height || 400);
   if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, W, H);
   if (!layout || layout.nodes.length === 0) return { leaf_hit_regions: [] };
 

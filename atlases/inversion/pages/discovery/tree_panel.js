@@ -217,19 +217,11 @@ function _fitTreeCanvas(canvas) {
     canvas.height = targetH;
   }
   const ctx = canvas.getContext('2d');
-  // setTransform so the renderer draws in CSS px. paintTree reads
-  // canvas.width / canvas.height for its scale calc — temporarily
-  // override those reads by stashing CSS dims on the canvas itself
-  // via a custom property; the renderer falls back to canvas.width
-  // when this property is absent. (Cheaper than rewriting paintTree.)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // Stash CSS dims so paintTree can use them via canvas.__cssW/H
-  // if it's updated to consult them; for now we restore the canvas
-  // width/height to CSS values WITHIN paintTree's view by setting
-  // backing-store after setTransform. Actually simpler: paintTree
-  // uses canvas.width directly, so re-assign canvas.width temporarily
-  // to CSS px so paintTree's coords are in CSS px. We restore the
-  // backing-store size right after the paint call below.
+  // Stash CSS dims so paintTree can read them via canvas.__cssW/H
+  // instead of the backing-store canvas.width/.height.
+  canvas.__cssW = cssW;
+  canvas.__cssH = cssH;
   return { dpr, cssW, cssH, ctx };
 }
 
