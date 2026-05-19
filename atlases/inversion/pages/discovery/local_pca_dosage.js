@@ -514,6 +514,7 @@ function _buildLegacyState(atlasState) {
     aggMethod: 'mean_pc1',
     silScoreOn: 'pc1',
     tPanelOpen: false,
+    pcaClusterLabelMode: null,    // 'none'|'g_index'|'h_system'|'h_pair' — cycle with N
 
     mergeThr: 0.85,
     alpha: 0.05,

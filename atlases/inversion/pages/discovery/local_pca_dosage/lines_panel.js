@@ -35,14 +35,19 @@ export function drawLinesPanel(state) {
   const subs = container.querySelectorAll('.lines-subpanel');
   if (!subs || subs.length === 0) return;
 
-  // 2026-05-18: keep the band-trace pick dropdown in sync with the focal
-  // candidate. The full rebuild fires only when the candidate ID changes
-  // (one-shot per scrub), so the cost is amortized to ~free.
+  // 2026-05-18: keep candidate-dependent UI bits in sync with the focal
+  // candidate. The rebuilds fire only when the candidate ID changes
+  // (one-shot per scrub), so the cost is amortized to ~free. Hooks:
+  //   - band-trace pick dropdown (per-band fish counts)
+  //   - 📊 dosage heatmap button (enabled/disabled per candidate)
   const curCandId = state.candidate ? state.candidate.id : null;
   if (state._lastBandTracePickCandId !== curCandId) {
     state._lastBandTracePickCandId = curCandId;
     if (typeof window !== 'undefined' && window._updateBandTracePickOptions) {
       try { window._updateBandTracePickOptions(); } catch (_) {}
+    }
+    if (typeof window !== 'undefined' && window._syncDosageHeatmapBtnEnabled) {
+      try { window._syncDosageHeatmapBtnEnabled(); } catch (_) {}
     }
   }
 

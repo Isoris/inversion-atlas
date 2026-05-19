@@ -220,6 +220,8 @@ export function candidateHeaderHtml(c) {
       <div class="cand-actions">
         <button id="candidateJumpBtn">↩ jump to reference window in diagnostic</button>
         <button id="candidateLockBtn">🔒 apply candidate's bands as color lock</button>
+        <button id="candidateDosageHeatmapBtn"
+                title="Open the dosage heatmap page for this candidate (sample × marker dosage matrix with K=3 group track + polarity stripe + role-pair sidecar). Page shows an empty state when no dosage payload is loaded — drag-drop the candidate's mgl_heatmap_json or dosage_chunk JSON to populate.">📊 dosage heatmap</button>
         <button id="candidateListToggleBtn">${isInCandidateList(c.id) ? '☆ remove from saved list' : '★ add to saved list'}</button>
         <button id="candidateClearBtn" class="danger">✕ clear candidate</button>
       </div>

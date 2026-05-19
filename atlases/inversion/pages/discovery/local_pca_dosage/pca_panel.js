@@ -18,7 +18,7 @@ import { escapeHtml, fitCanvas, themeColor, withAlpha } from '../../../shared/pa
 import { contextFromState, sampleSpreadL2 } from '../../../shared/per_l2_cluster.js';
 
 import { _pageState, _setActiveState, _vColor, getSampleColor, trackedColor } from './_state.js';
-import { allSampleIdx, availablePCs, getL2Cluster, getPC, getPCRender, setPcaXY, setViewControlsLinked } from './_data.js';
+import { allSampleIdx, availablePCs, getL2Cluster, getPC, getPCRender, groupColor, setPcaXY, setViewControlsLinked } from './_data.js';
 import { buildLinesPanel, buildLinesPanelCheckboxes } from './lines_panel.js';
 import { drawLinesPanel } from './lines_panel.js';
 import { renderL3Panel } from './l3_panel.js';
@@ -453,10 +453,84 @@ export function drawPCA(state) {
     ctx.fillStyle = col;
     ctx.fillText(name, x + 9, y + 4);
   }
+  // 2026-05-18: cluster-label notation overlay (Group H from WIRE_AUDIT).
+  // Render group labels at K-cluster centroids when state.pcaClusterLabelMode
+  // is set (cycle via N hotkey, see _wireClusterLabelHotkey in sidebar.js).
+  // Centroids are computed from sample screen-space positions in the current
+  // frame — agnostic to fit dimension (works for kmeans1D + kmeans2D).
+  if (state.pcaClusterLabelMode && state.pcaClusterLabelMode !== 'none'
+      && groupLabels && _pcaScreenXY) {
+    _drawClusterLabelOverlay(ctx, state, groupLabels, _pcaScreenXY, d.n_samples);
+  }
   // turn 120: refresh the scree inset on every PCA draw. Cheap (pure SVG
   // string write to an absolutely-positioned div, no canvas, no layout).
   // The renderer handles the off/on toggle and the empty-state internally.
   try { _refreshScreeInset(); } catch (e) { /* fail-soft */ }
+}
+
+// ---------------------------------------------------------------------------
+// _drawClusterLabelOverlay — Group H from WIRE_AUDIT_page1.md (2026-05-18).
+// Paints group labels at K-cluster centroids on the PCA scatter. Modes:
+//   'g_index'   — 'g0', 'g1', 'g2'
+//   'h_system'  — 'HOMO_1', 'HET', 'HOMO_2' for K=3; falls back to 'gN' for K!=3
+//   'h_pair'    — 'H1/H1', 'H1/H2', 'H2/H2' for K=3; H-pair table at higher K
+// Centroids are mean (x,y) of sample positions per cluster — works for
+// kmeans1D and kmeans2D fits identically (we don't need cl.centers).
+// ---------------------------------------------------------------------------
+const _H_SYSTEM_LABELS_K3 = ['HOMO_1', 'HET', 'HOMO_2'];
+const _H_PAIR_LABELS = {
+  3: ['H1/H1', 'H1/H2', 'H2/H2'],
+  4: ['H1/H1', 'H1/H2', 'H2/H2', 'H1/H3'],
+  5: ['H1/H1', 'H1/H2', 'H2/H2', 'H1/H3', 'H3/H3'],
+  6: ['H1/H1', 'H1/H2', 'H2/H2', 'H1/H3', 'H2/H3', 'H3/H3'],
+};
+
+function _clusterLabelText(mode, k, K) {
+  if (mode === 'g_index') return `g${k}`;
+  if (mode === 'h_system') {
+    if (K === 3 && k >= 0 && k < 3) return _H_SYSTEM_LABELS_K3[k];
+    return `g${k}`;   // fallback
+  }
+  if (mode === 'h_pair') {
+    const pal = _H_PAIR_LABELS[K];
+    if (pal && k >= 0 && k < pal.length) return pal[k];
+    return `g${k}`;
+  }
+  return null;
+}
+
+function _drawClusterLabelOverlay(ctx, state, groupLabels, screenXY, nS) {
+  const K = state.k || 3;
+  const xSum = new Float64Array(K);
+  const ySum = new Float64Array(K);
+  const cnt  = new Int32Array(K);
+  for (let si = 0; si < nS; si++) {
+    const k = groupLabels[si];
+    if (k == null || k < 0 || k >= K) continue;
+    const x = screenXY[si * 2], y = screenXY[si * 2 + 1];
+    if (!isFinite(x) || !isFinite(y)) continue;
+    xSum[k] += x;
+    ySum[k] += y;
+    cnt[k]++;
+  }
+  ctx.save();
+  ctx.font = 'bold 12px ui-monospace, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 3;
+  for (let k = 0; k < K; k++) {
+    if (cnt[k] === 0) continue;
+    const cx = xSum[k] / cnt[k];
+    const cy = ySum[k] / cnt[k];
+    const text = _clusterLabelText(state.pcaClusterLabelMode, k, K);
+    if (!text) continue;
+    // Halo (stroke against bg) then fill in the cluster's color.
+    ctx.strokeStyle = 'rgba(14,17,22,0.92)';
+    ctx.strokeText(text, cx, cy);
+    ctx.fillStyle = groupColor(k) || '#fff';
+    ctx.fillText(text, cx, cy);
+  }
+  ctx.restore();
 }
 
 // --- drawAnchorStrip(state) — legacy lines 36147-36256 ---

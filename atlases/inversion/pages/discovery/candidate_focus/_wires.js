@@ -50,6 +50,29 @@ export function wireCandidateButtons(c, profile) {
     if (page1El) page1El.classList.add('active');
     requestAnimationFrame(() => { drawPCA(); renderL3Panel(); });
   });
+  // 📊 dosage heatmap — switch to the dosage_heatmap page with this
+  // candidate's label set. The dosage_heatmap page reads
+  // `atlasState.inversion.dosage_heatmap_state` for its rich payload
+  // (mgl_heatmap_result or legacy_chunk); we set the candidate_label so
+  // the header reflects the active candidate even when no dosage
+  // payload is loaded (empty state shows context instead of "—").
+  const dhBtn = document.getElementById('candidateDosageHeatmapBtn');
+  if (dhBtn) dhBtn.addEventListener('click', () => {
+    if (typeof window !== 'undefined' && window.atlasState) {
+      const inv = window.atlasState.inversion || (window.atlasState.inversion = {});
+      const prev = inv.dosage_heatmap_state || {};
+      inv.dosage_heatmap_state = Object.assign({}, prev, {
+        candidate_label: c.label || c.id || null,
+      });
+    }
+    document.querySelectorAll('#tabBar button').forEach(b => b.classList.remove('active'));
+    const dhTab = document.querySelector('#tabBar button[data-page="dosage_heatmap"]');
+    if (dhTab) dhTab.classList.add('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const dhPage = document.getElementById('dosage_heatmap');
+    if (dhPage) dhPage.classList.add('active');
+  });
+
   const clearBtn = document.getElementById('candidateClearBtn');
   if (clearBtn) clearBtn.addEventListener('click', () => {
     // turn 128: page 2 ✕ button now mirrors page 4 (karyotype/tier) red ✕.

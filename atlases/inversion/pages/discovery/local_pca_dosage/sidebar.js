@@ -307,12 +307,59 @@ function _wireNewShellControls(state) {
   _refreshBandPickAsideColors(state);
 
   // ===========================================================================
+  // N hotkey — cycle the PCA cluster-label notation overlay (Group H
+  // from WIRE_AUDIT). State slot is state.pcaClusterLabelMode; the
+  // overlay renders in pca_panel.js drawPCA when the mode is set.
+  // ===========================================================================
+  _wireClusterLabelHotkey(state);
+
+  // ===========================================================================
   // First-use attention pulses (v4 turn 80 — never wired in modular tree).
   // CSS classes `.attention-pulse` + `.attention-pulse-fade` already exist
   // in inversion.css (lines 143-172). Apply pulse to the key onboarding
   // buttons until first click; persist dismissal in localStorage.
   // ===========================================================================
   _initAttentionPulses();
+}
+
+// ---------------------------------------------------------------------------
+// N hotkey — cycle the PCA cluster-label notation overlay.
+//   default (off) → g_index → h_system → h_pair → off
+// Persists state.pcaClusterLabelMode to localStorage so the choice
+// survives reload. Hotkey is gated to not fire in INPUT/TEXTAREA/SELECT.
+// ---------------------------------------------------------------------------
+const _CLUSTER_LABEL_MODES = [null, 'g_index', 'h_system', 'h_pair'];
+const _CLUSTER_LABEL_LS_KEY = 'inversion_atlas.pcaClusterLabelMode';
+
+function _wireClusterLabelHotkey(state) {
+  if (typeof document === 'undefined') return;
+  // Restore from localStorage on first wire.
+  if (state.pcaClusterLabelMode === undefined || state.pcaClusterLabelMode == null) {
+    try {
+      const v = localStorage.getItem(_CLUSTER_LABEL_LS_KEY);
+      if (v && _CLUSTER_LABEL_MODES.includes(v)) state.pcaClusterLabelMode = v;
+    } catch (_) {}
+  }
+  if (document._clusterLabelHotkeyWired) return;
+  document._clusterLabelHotkeyWired = true;
+  document.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    // Only fire when local_pca_dosage is the active page.
+    const pageEl = document.getElementById('local_pca_dosage');
+    if (!pageEl || !pageEl.classList.contains('active')) return;
+    if ((e.key === 'n' || e.key === 'N')
+        && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      const cur = state.pcaClusterLabelMode || null;
+      const idx = _CLUSTER_LABEL_MODES.indexOf(cur);
+      const next = _CLUSTER_LABEL_MODES[(idx + 1) % _CLUSTER_LABEL_MODES.length];
+      state.pcaClusterLabelMode = next;
+      try { localStorage.setItem(_CLUSTER_LABEL_LS_KEY, next == null ? '' : next); }
+      catch (_) {}
+      try { drawPCA(state); } catch (_) {}
+    }
+  });
 }
 
 // Target buttons by ID. Picked from legacy turn-80 comment (inversion.css L135).
@@ -1662,6 +1709,42 @@ function _wireDisplay(state) {
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(_setCand);
       else _setCand();
     });
+  }
+
+  // --- #openDosageHeatmapBtn click (2026-05-18) ---
+  // Quick jump from local_pca_dosage to the dosage_heatmap page for the
+  // active candidate. The dosage_heatmap page reads its rich payload
+  // from atlasState.inversion.dosage_heatmap_state — we stash the
+  // candidate label so the page header reflects context even when no
+  // dosage payload is loaded (empty state shows the candidate).
+  const dhBtn = $('openDosageHeatmapBtn');
+  if (dhBtn) {
+    const _syncDhBtnEnabled = () => { dhBtn.disabled = !state.candidate; };
+    _syncDhBtnEnabled();
+    dhBtn.addEventListener('click', () => {
+      const cand = state.candidate;
+      if (!cand) {
+        alert('Focus a candidate first (promote one above, or pick from the saved list).');
+        return;
+      }
+      if (typeof window !== 'undefined' && window.atlasState) {
+        const inv = window.atlasState.inversion || (window.atlasState.inversion = {});
+        const prev = inv.dosage_heatmap_state || {};
+        inv.dosage_heatmap_state = Object.assign({}, prev, {
+          candidate_label: cand.label || cand.id || null,
+        });
+      }
+      document.querySelectorAll('#tabBar button').forEach(b => b.classList.remove('active'));
+      const dhTab = document.querySelector('#tabBar button[data-page="dosage_heatmap"]');
+      if (dhTab) dhTab.classList.add('active');
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const dhPage = document.getElementById('dosage_heatmap');
+      if (dhPage) dhPage.classList.add('active');
+    });
+    // Expose so other code paths (promoteCandidate, candidate-list
+    // selection) can re-sync the disabled state when state.candidate
+    // changes. Idempotent.
+    if (typeof window !== 'undefined') window._syncDosageHeatmapBtnEnabled = _syncDhBtnEnabled;
   }
 
   // --- #exportKLabelsBtn click — legacy lines 66189-66209 ---
