@@ -27,15 +27,15 @@ fully shipped: move to `specs_done/` with an `Implemented in:` block.
 
 | SPEC | shipped half | pending half | net status |
 |------|--------------|--------------|-----------|
-| `SPEC_arrangement_color_mode_and_arrangement_calls_v1.md` | `shared/arrangement_calls.js` (decoder, palette, per-sample voting, JSON validator); `shared/sample_color.js` arrangement mode dispatcher | `arrangement_calls_v1.json` producer (atlas-side runner OR LANTA-side step — §6) | **PARTIAL — producer pending** |
-| `SPEC_busco_4d_age_brackets.md` | `shared/busco_4d_age.js` (3 frozen μ values, dxy→age_my, block builder, JSON validator, formatters) | `STEP_C01f_e_emit_busco_4d_age.py` (LANTA Python producer; spec defines it but does not exist yet) | **PARTIAL — producer pending** |
-| `SPEC_busco_anchors_v1.md` | `shared/busco_anchors.js` (6 exports: schema validator, indexing, density / window helpers) | page-16 ribbon-plot ticks integration; page-14 architecture-class auto-suggest integration | **PARTIAL — page integration pending** |
+| ~~`SPEC_arrangement_color_mode_and_arrangement_calls_v1.md`~~ | atlas-side: `shared/arrangement_calls.js` (decoder, palette, per-sample voting, JSON validator); `shared/sample_color.js` arrangement mode dispatcher | producer (`arrangement_calls_v1.json` emitter) — tracked in the archived SPEC | **ARCHIVED 2026-05-20** — moved to `specs_done/`; atlas-side surface complete |
+| ~~`SPEC_busco_4d_age_brackets.md`~~ | atlas-side: `shared/busco_4d_age.js` (3 frozen μ values, dxy→age_my, block builder, JSON validator, formatters) | LANTA producer (`STEP_C01f_e_emit_busco_4d_age.py`) + Row-C UI consumer — both tracked in the archived SPEC | **ARCHIVED 2026-05-20** — moved to `specs_done/`; atlas-side compute surface complete |
+| ~~`SPEC_busco_anchors_v1.md`~~ | atlas-side: `shared/busco_anchors.js` (validator, indexing, density / depletion / synteny / architecture-class helpers) | page-16 ribbon-plot ticks + page-14 architecture-class auto-suggest integrations — tracked in the archived SPEC | **ARCHIVED 2026-05-20** — moved to `specs_done/`; atlas-side compute surface complete |
 | `SPEC_copy_origin_painting.md` | none | full implementation — explicitly SPEC ONLY per its own status line ("awaiting audit before implementation"). Stage 5.6 of the v3.4 pipeline. | **SPEC ONLY** |
 | `SPEC_fish_ancestry_scroller.md` | `pages/review/fish_ancestry_scroller/` (4-module subdir + entry .js/.html) + `shared/ancestry_alignment.js` + `shared/ancestry_bricks.js` | manifest.json registration (page exists on disk but shell can't mount it); cluster-side `instant_q` (Engine B) per-RF producer integration | **PARTIAL — unregistered + producer pending** |
 | `SPEC_functional_burden_per_candidate_v1.md` | `shared/functional_burden.js` + `shared/wilcoxon.js` + `shared/contingency.js` (primitives all ship) | per-candidate overlay panel + producer schema | **PARTIAL — UI + producer pending** |
 | `SPEC_inversion_age_atlas_surface_AMENDMENT.md` | parent SPEC authored 2026-05-20 at `specs_done/SPEC_inversion_age_atlas_surface.md` (per-candidate four-bar age_divergence surface + compute primitives ship); various age-class JS pieces ship (`shared/age_model_suggester.js`, `shared/busco_4d_age.js`, `shared/mgl_inversion_divergence.js`) | the AMENDMENT's prescribed row layout (Page-3 Rows A/B/C/D + Page-5 "rel age" column + JSON loaders for `inversion_age_v1.json` / `region_popstats_v1.json`) — most slices still deferred (see parent SPEC §3 for per-slice status) | **AMENDMENT — most slices deferred** |
 | `SPEC_inversion_divergence_network_v1.md` | `shared/divergence_network.js` (overlay primitive ships) | per-candidate overlay panel wiring; cluster-side dxy-by-arrangement producer | **PARTIAL — UI + producer pending** |
-| `SPEC_mendelian_inheritance_para_vs_peri_v1.md` | `analysis/mendelian.js` + `analysis/mendelian_inheritance.js` (3-state Mendelian verdict — base) + `shared/contingency.js` (fisher2x2 + chiSquare) + `shared/haplotype_vocab.js` | v1 extension (paracentric-vs-pericentric cohort comparison + per-candidate goodness-of-fit) — extends the base verdict | **PARTIAL — v1 extension pending** |
+| ~~`SPEC_mendelian_inheritance_para_vs_peri_v1.md`~~ | full v1: `shared/mendelian_family_test.js` (Stage-1 per-family) + `shared/mendelian_para_vs_peri.js` (Stage-2 cohort 2×2) + `shared/mendelian_segregation.js` + 3 downstream consumers + 5 tests | none — all v1 slices ship | **ARCHIVED 2026-05-20** — moved to `specs_done/`; no deferred slices |
 | `SPEC_msmc_per_founder_background.md` | none — depends on `pca_comparator/heatmap.js`'s per-(sample × window) band labels (shipped) for the regime-sharing matrix input | full implementation — explicitly SPEC ONLY per its own status line ("awaiting audit before implementation"). New page `founder_background_panel` + 7 producer JSON schemas + neutral-region mask + MSMC2 + diversity-validation runs (cluster-side). | **SPEC ONLY** |
 | `SPEC_page1_candidate_mode_ui.md` | `shared/candidate_mode.js` (Parallel Candidate Registry — turn 88) + local_pca_dosage candidate-mode infrastructure | HANDOFF-2 detailed mode (16 PCA JSONs + 4 heatmap JSONs per candidate); local_pca_dosage detailed-mode UI is not wired | **PARTIAL — detailed mode pending** |
 | `SPEC_regime_annotation_v34.md` | none | full annotation layer (Stage 5.5) — explicitly SPEC ONLY per its own status line ("awaiting audit before implementation") | **SPEC ONLY** |
@@ -47,11 +47,12 @@ fully shipped: move to `specs_done/` with an `Implemented in:` block.
 ### Net audit summary
 
 - **3 SPEC ONLY** (explicit in their status lines): `SPEC_copy_origin_painting`, `SPEC_regime_annotation_v34`, `SPEC_msmc_per_founder_background`
-- **10 PARTIAL** (some half ships, some half pending) — these are
+- **6 PARTIAL** (some half ships, some half pending) — these are
   the priority for full-stack shipping
 - **1 AMENDMENT to a parent at `specs_done/`** (`SPEC_inversion_age_atlas_surface_AMENDMENT`) — most prescribed slices still deferred per the parent SPEC's §3 status matrix; AMENDMENT stays in `specs_todo/` until those slices land
 - **1 SUPERSEDED** (`SPEC_registry_v1`)
 - **1 HALF SHIPPED** (`SPEC_registry_write_and_page_isolation`)
+- **4 ARCHIVED 2026-05-20 to `specs_done/`** (atlas-side surface complete, producer / page-integration follow-ups tracked inside the archived SPECs): `SPEC_arrangement_color_mode_and_arrangement_calls_v1`, `SPEC_busco_4d_age_brackets`, `SPEC_busco_anchors_v1`, `SPEC_mendelian_inheritance_para_vs_peri_v1`
 
 ### Decision when a SPEC reaches "fully shipped"
 

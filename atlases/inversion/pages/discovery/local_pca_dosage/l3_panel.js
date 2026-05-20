@@ -306,15 +306,22 @@ export function renderL3Panel(state) {
   // the carousel shows three different SCALES (fine / medium / coarse) on
   // the same focal window, with cross-scale fuse/split detection.
   if (state.l3Mode === 'scale_stability') {
-    return renderL3PanelScaleStability();
+    return renderL3PanelScaleStability(state);
   }
 
   // v3.45: slab mode short-circuits the L2-based path. compareUnit ≠ 'L2'
   // means each pane represents a slab of W windows, not an L2 envelope.
   // Sub-step A: render only the focal slab pane; neighbor panes show
   // a placeholder (sub-step B will wire them).
+  // 2026-05-20: was `renderL3PanelSlab()` — missing `state` arg. The
+  // helper signatures both take `state` explicitly; calling without it
+  // throws on `state.data`, the throw bubbles to the click handler's
+  // catch, and the previous render (the L2-mode "scroll into an L2
+  // envelope" fallback) stays on screen. User-reported: "in L3
+  // contingency tables its not working for per window navigation … it
+  // should work for every scale". Same bug for renderL3PanelScaleStability().
   if (state.compareUnit && state.compareUnit !== 'L2') {
-    return renderL3PanelSlab();
+    return renderL3PanelSlab(state);
   }
 
   // v3.99 turn 7 perf: short-circuit when nothing that affects pane content
