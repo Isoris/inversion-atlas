@@ -729,8 +729,8 @@ function _renderSourceOverlap(state) {
   // — we show whichever is non-zero. Two candidates can map 1:N so they
   // can differ; the audit read is "at least N regions from A intersect B").
   const pairLabels = [
-    [0, 1, 'L2 ∩ Vloc'],
-    [0, 2, 'L2 ∩ Vmac'],
+    [0, 1, 'L3p ∩ Vloc'],
+    [0, 2, 'L3p ∩ Vmac'],
     [1, 2, 'Vloc ∩ Vmac'],
   ];
   for (const [ai, bi, lbl] of pairLabels) {
