@@ -66,6 +66,51 @@
         <div id="rgSeedsStripList" style="display: inline-flex; gap: 4px; align-items: center;"></div>
       </div>
 
+      <!-- 2026-05-20: refined long-range regime blocs (Cluster 3 output).
+           Visible only when the view toggle is set to 'regimes'. One row
+           per refined regime from haplotype_regime.refineRegimesFromIntervals,
+           showing bp span + member intervals + HOM/HET core sizes +
+           cross-regime topology chain id. Populated by
+           _renderRegimesSummary() in haplotype_regimes.js. -->
+      <div id="rgRegimesWrap" style="
+        flex: 0 0 auto;
+        margin: 0 12px 8px 12px;
+        padding: 4px 6px;
+        background: var(--panel-2, #181d27);
+        border: 1px solid var(--rule, #2a3242);
+        border-radius: 4px;
+        display: none;
+        flex-direction: column;
+        gap: 4px;
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        max-height: 180px;
+        overflow-y: auto;
+      ">
+        <div style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 2px 4px;
+          color: var(--ink-dimmer, #5a6472);
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+        ">
+          <span>long-range regimes</span>
+          <span id="rgRegimesCount" style="font-weight: 600; text-transform: none;"></span>
+          <span style="margin-left: auto; font-weight: 400; text-transform: none; color: var(--ink-dim, #8895a8);"
+                title="Refined regimes from haplotype_regime.refineRegimesFromIntervals + regime_topology cross-regime chains. Each row is one regime; columns are: id, bp span, n_intervals, HOM_A / HOM_B / HET core sizes, chain id (if part of a cross-regime CHAINED chain).">columns: id / chrom / bp span / n_intervals / hom_a / hom_b / het / chain</span>
+        </div>
+        <table id="rgRegimesTable" style="
+          width: 100%;
+          border-collapse: collapse;
+          font-family: ui-monospace, monospace;
+          font-size: 10px;
+        ">
+          <tbody id="rgRegimesBody"></tbody>
+        </table>
+      </div>
+
       <!-- 2x2 panel grid -->
       <div class="regimes-grid" style="
         flex: 1 1 0;
@@ -236,6 +281,25 @@
                   title="Stage 1 V-walker: anchor sweep + Cramér's V boundary detection across the whole chromosome.">long-range</button>
           <button type="button" data-rg-mode="short"
                   title="User-curated candidates from local_pca_dosage (lock-promote / L3-draft confirms). No automatic discovery — review what you already drafted.">short-range</button>
+          <button type="button" data-rg-mode="het"
+                  title="Het-skeleton: per-window K-means → het_detect_candidate_band → het_track_skeleton → hom_anchor_to_het → cramers_v_merge. No band_quality gate, no V-walker. Matches the band_tracking/index.js Layer 1 order.">het-skeleton</button>
+        </span>
+        <!-- View toggle: independent of seed source. Switches the
+             below-the-fold section between the per-seed strip
+             (seeds view) and the refined long-range regime blocs
+             (regimes view). The 4 canvases above stay the same in
+             both views. -->
+        <span id="rgViewBar" title="What to show below the 4 panels."
+              style="display: inline-flex; align-items: center; gap: 2px;
+                     background: var(--panel-2, #181d27);
+                     border: 1px solid var(--rule, #2a3242);
+                     border-radius: 3px; padding: 1px 2px;
+                     font: 10px ui-monospace, monospace;">
+          <span style="color: var(--ink-dimmer, #5a6472); padding: 0 6px 0 4px;">view:</span>
+          <button type="button" data-rg-view="seeds" class="active"
+                  title="Show the per-seed strip (raw seeds + their anchor band-quality).">seeds</button>
+          <button type="button" data-rg-view="regimes"
+                  title="Show the refined long-range regime blocs from Cluster 3 (haplotype_regime.refineRegimesFromIntervals + regime_topology cross-regime chains).">long-range regimes</button>
         </span>
         <button id="rgExportCatalogueBtn" class="rg-tb-btn" disabled
           title="Serialize the in-memory pipeline result to a regime catalogue JSON. Disabled until the pipeline has run."

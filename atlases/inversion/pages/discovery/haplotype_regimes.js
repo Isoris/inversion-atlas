@@ -39,7 +39,63 @@
 import { contextFromState, ClusterCache } from '../../shared/per_l2_cluster.js';
 import { alignLabels } from '../../shared/hungarian.js';
 import { buildContingency, cramersV } from '../../shared/contingency.js';
-import { runCramersVMergeLocal } from '../../shared/cramers_v_merge.js';
+import { runCramersVMergeLocal, computeAdjacentSeedMerges } from '../../shared/cramers_v_merge.js';
+
+// Per-window K-means primitive (Cluster 1 Path B + foundation for all paths).
+// The band_tracking/index.js header is explicit: per-window K-means via
+// getLabels/getK callbacks, NEVER L2-broadcast. The previous wiring routed
+// through clusterL2 which returned the same labels for every window in an
+// L2 envelope — useless for the contingency walker because adjacent
+// windows inside the same L2 trivially shared labels.
+import { kmeans1D, adaptiveK1D } from '../../shared/kmeans.js';
+
+// band_quality scorer — silhouette + size-balance + eig-ratio per window.
+// Data producers don't ship band_quality; we derive it once per chromosome
+// load against the per-window K-means labels. Without this, the V-walker's
+// anchor gate (min_anchor_band_quality = 0.50) rejects every window → 0
+// seeds detected in 20-50 ms.
+// (BAND_QUALITY_DEFAULTS already imported above for the legacy band_quality
+// wiring commit; not re-imported here.)
+
+// Cluster 1 Path B (het-skeleton) — find HET bands per window, walk the
+// skeleton, define bp intervals, HOM anchors per skeleton, fuse adjacent
+// intervals via Cramér's V merge.
+import {
+  het_detect_candidate_band,
+  het_track_skeleton,
+  het_define_interval,
+  HET_DEFAULTS,
+} from '../../shared/band_tracking/het.js';
+import { hom_anchor_to_het, HOM_DEFAULTS }
+  from '../../shared/band_tracking/hom.js';
+
+// Cluster 2 (voting orchestrator). Mode 1 (V-walker) already does this
+// inside runBandingPipeline; Modes 2 + 3 call it explicitly.
+import {
+  runBreadthVoting,
+  buildVotersFromSeedLoci,
+  buildTargetsFromStage3Loci,
+  BREADTH_VOTING_DEFAULTS,
+} from '../../shared/band_tracking/breadth_voting.js';
+
+// Cluster 3 (post-voting on this page).
+import {
+  refineRegimesFromIntervals,
+  intervalSampleCore,
+} from '../../shared/band_tracking/haplotype_regime.js';
+import {
+  buildRegimeTopologyGraph,
+  findChromosomeRegimeChains,
+  serializeRegimesToJson,
+} from '../../shared/band_tracking/regime_topology.js';
+import {
+  mergePerChromosomeRegimes,
+  crossChromosomeRegimeLinks,
+} from '../../shared/band_tracking/genome_scale.js';
+import { annotateRegimePositions }
+  from '../../shared/regime_annotation/positional.js';
+import { annotateRegimeStructures }
+  from '../../shared/regime_annotation/structure.js';
 
 // Sample-color resolution is now in shared/sample_color.js. The regimes
 // panels pass their own state to resolveSampleScopeColor, so this
@@ -49,6 +105,14 @@ import { runCramersVMergeLocal } from '../../shared/cramers_v_merge.js';
 // Pipeline core (audited v3.4)
 import { runBandingPipeline, BANDING_PIPELINE_DEFAULTS }
   from '../../shared/band_tracking/banding_pipeline.js';
+
+// band_quality scorer — computes silhouette + size-balance + eig-ratio
+// per window. Data producers do NOT ship band_quality on window objects;
+// without this the chain walk + seed discovery see 0 for every window
+// and the pipeline exits in 20-50 ms with "0 seeds detected". See
+// STAGE_B_v3_NOTES §2 + PIPELINE_WIRING_NOTES §1.
+import { bandQualityForWindow, BAND_QUALITY_DEFAULTS }
+  from '../../shared/band_tracking/band_quality.js';
 
 // Catalogue serializer
 import { buildCatalogue, computeKnobHash }
@@ -133,12 +197,86 @@ function _buildLegacyState(atlasState) {
  */
 function _wireCtxCallbacks(state, atlasState) {
   const data = state.data;
-
-  // Build window→L2 index. (Mirrors what _data.js buildIndexes does for
-  // local_pca_dosage; we replicate here so this page works without local_pca_dosage having mounted.)
   const N = data.n_windows;
+
+  // ---------------------------------------------------------------------
+  // Clustering knobs (per state, shared with downstream consumers).
+  // ---------------------------------------------------------------------
+  state.k            = state.k            != null ? state.k            : 3;
+  state.aggMethod    = state.aggMethod    || 'mean_pc1';
+  state.kMode        = state.kMode        || 'adaptive';
+  state.kRange       = state.kRange       || [2, 6];
+  state.silThreshold = state.silThreshold != null ? state.silThreshold : 0.5;
+  state.minNGroup    = state.minNGroup    != null ? state.minNGroup    : 5;
+  state.minNWin      = state.minNWin      != null ? state.minNWin      : 5;
+
+  // ---------------------------------------------------------------------
+  // PER-WINDOW K-means cache (the load-bearing change).
+  //
+  // The band_tracking/index.js header is explicit:
+  //   "per-window K-means labels via getLabels/getK callbacks,
+  //    NEVER L2-broadcast — same per-window upgrade noted in
+  //    anchor_signals.js header"
+  //
+  // Previously we routed through per_l2_cluster.clusterL2 which returned
+  // the same labels for every window inside one L2 envelope → adjacent-
+  // window contingencies were trivially 1.0 → V-walker found nothing.
+  // Now: kmeans1D (or adaptiveK1D) per window directly from
+  // data.windows[w].pc1. ~226 samples × ~10k windows × adaptive K=2-6 is
+  // ~1-2 seconds total on real data.
+  // ---------------------------------------------------------------------
+  const perWinLabels = new Array(N);
+  const perWinK      = new Int8Array(N);
+  const kRangeLo = (state.kRange && state.kRange[0]) || 2;
+  const kRangeHi = (state.kRange && state.kRange[1]) || 6;
+  const useAdaptiveK = state.kMode === 'adaptive';
+  const fixedK = state.k;
+  let perWinComputed = 0;
+  let perWinSkipped  = 0;
+  for (let w = 0; w < N; w++) {
+    const win = data.windows && data.windows[w];
+    if (!win || !win.pc1 || win.pc1.length === 0) {
+      perWinLabels[w] = null;
+      perWinK[w] = 0;
+      perWinSkipped++;
+      continue;
+    }
+    let labels, K;
+    if (useAdaptiveK) {
+      const ak = adaptiveK1D(win.pc1, kRangeLo, kRangeHi,
+                             state.silThreshold, state.minNGroup);
+      if (ak != null) {
+        labels = ak.labels;
+        K = ak.k;
+      } else {
+        const fit = kmeans1D(win.pc1, kRangeLo);
+        labels = fit.labels;
+        K = kRangeLo;
+      }
+    } else {
+      const fit = kmeans1D(win.pc1, fixedK);
+      labels = fit.labels;
+      K = fixedK;
+    }
+    perWinLabels[w] = labels;
+    perWinK[w] = K;
+    perWinComputed++;
+  }
+  state._regimesPerWinLabels = perWinLabels;
+  state._regimesPerWinK      = perWinK;
+  state._regimesPerWinProvenance = {
+    n_windows:  N,
+    n_computed: perWinComputed,
+    n_skipped:  perWinSkipped,
+  };
+
+  // ---------------------------------------------------------------------
+  // L2-cluster cache: KEPT for backwards compat with the L3 pairs table
+  // (_renderL3PairsTable / _computePairRow read it). The PIPELINE no
+  // longer routes through it.
+  // ---------------------------------------------------------------------
   const windowToL2 = new Int32Array(N).fill(-1);
-  if (Array.isArray(data.l2_envelopes)) {
+  if (Array.isArray(data.l2_envelopes) && data.l2_envelopes.length > 0) {
     data.l2_envelopes.forEach((env, i) => {
       const s0 = env.start_w - 1, e0 = env.end_w - 1;
       env._s0 = env._s0 != null ? env._s0 : s0;
@@ -149,53 +287,93 @@ function _wireCtxCallbacks(state, atlasState) {
     });
   }
   state.windowToL2 = windowToL2;
-
-  // Build a clusterL2 ctx. contextFromState reads clustering knobs from
-  // `state` directly; set Quentin's defaults on state before the call
-  // (k=3, adaptive, mergeThr 0.85, minNGroup 5, minNWin 5).
-  state.k            = state.k            != null ? state.k            : 3;
-  state.aggMethod    = state.aggMethod    || 'mean_pc1';
-  state.kMode        = state.kMode        || 'adaptive';
-  state.kRange       = state.kRange       || [2, 6];
-  state.silThreshold = state.silThreshold != null ? state.silThreshold : 0.5;
-  state.minNGroup    = state.minNGroup    != null ? state.minNGroup    : 5;
-  state.minNWin      = state.minNWin      != null ? state.minNWin      : 5;
   const clCtx = contextFromState(state);
   const clCache = new ClusterCache();
   state._regimesClusterCache = clCache;
   state._regimesClusterCtx   = clCtx;
 
-  // Per-window callbacks for the pipeline.
-  const labelsForWindow = (w) => {
-    const li = windowToL2[w];
-    if (li < 0) return null;
-    const cl = clCache.getOrCompute(clCtx, li);
-    if (!cl || !cl.ok || !cl.labels) return null;
-    // clusterL2 returns Int32Array; pipeline accepts any array-like.
-    return cl.labels;
-  };
-  const KForWindow = (w) => {
-    const li = windowToL2[w];
-    if (li < 0) return 1;
-    const cl = clCache.getOrCompute(clCtx, li);
-    return (cl && cl.ok && cl.usedK) ? cl.usedK : 1;
-  };
-  const bandQualityForWindow = (w) => {
+  // ---------------------------------------------------------------------
+  // Per-window getLabels / getK callbacks — read from the per-window
+  // K-means cache, NOT the L2 cluster cache.
+  // ---------------------------------------------------------------------
+  const labelsForWindow = (w) => (w >= 0 && w < N) ? perWinLabels[w] : null;
+  const KForWindow      = (w) => (w >= 0 && w < N) ? (perWinK[w] | 0) : 0;
+
+  // ---------------------------------------------------------------------
+  // band_quality cache — computed against PER-WINDOW labels (not
+  // L2-broadcast). Producer-shipped band_quality on the window still
+  // wins when present.
+  // ---------------------------------------------------------------------
+  const bqCache = new Float32Array(N);
+  let bqProducerCount = 0;
+  let bqComputedCount = 0;
+  let bqZeroCount     = 0;
+  for (let w = 0; w < N; w++) {
     const win = data.windows && data.windows[w];
-    if (!win) return 0;
-    return win.band_quality != null ? win.band_quality
-         : win.bq != null           ? win.bq
-         : 0;
+    if (!win) { bqCache[w] = 0; bqZeroCount++; continue; }
+    const shipped = (win.band_quality != null) ? win.band_quality
+                  : (win.bq           != null) ? win.bq
+                  : null;
+    if (shipped != null && Number.isFinite(+shipped)) {
+      bqCache[w] = +shipped;
+      bqProducerCount++;
+      continue;
+    }
+    const labels = perWinLabels[w];
+    const K      = perWinK[w] | 0;
+    if (!labels || K < 2 || !win.pc1) { bqCache[w] = 0; bqZeroCount++; continue; }
+    const r = bandQualityForWindow({
+      pc1:    win.pc1,
+      labels,
+      K,
+      eig1:   Number.isFinite(win.lam1) ? win.lam1 : 0,
+      eig2:   Number.isFinite(win.lam2) ? win.lam2 : 0,
+    });
+    bqCache[w] = Number.isFinite(r.band_quality) ? r.band_quality : 0;
+    bqComputedCount++;
+  }
+  state._regimesBandQualityCache = bqCache;
+  state._regimesBandQualityProvenance = {
+    n_windows:    N,
+    n_from_producer: bqProducerCount,
+    n_computed:   bqComputedCount,
+    n_zero:       bqZeroCount,
   };
 
+  const bandQualityForWindow_cb = (w) =>
+    (w >= 0 && w < N) ? (bqCache[w] || 0) : 0;
+
+  // ---------------------------------------------------------------------
+  // bp accessor — needed by het_define_interval. Returns center_bp when
+  // available, falling back to mid-window if only start_bp/end_bp are
+  // shipped, else null.
+  // ---------------------------------------------------------------------
+  const getBpFor = (w) => {
+    const win = data.windows && data.windows[w];
+    if (!win) return null;
+    if (Number.isFinite(win.center_bp)) return win.center_bp;
+    if (Number.isFinite(win.center_mb)) return win.center_mb * 1e6;
+    if (Number.isFinite(win.start_bp) && Number.isFinite(win.end_bp)) {
+      return (win.start_bp + win.end_bp) / 2;
+    }
+    return null;
+  };
+  state._regimesGetBpFor = getBpFor;
+
+  // ---------------------------------------------------------------------
+  // Pipeline ctx. getL2Idx stubbed to 0 per STAGE_B_v3_NOTES §2 — the
+  // chain walk's L2-hard-stop branch is unreachable in classifier mode
+  // anyway; this just makes that explicit.
+  // ---------------------------------------------------------------------
   state._regimesCtx = {
     chromosomes: [{ s_window: 0, e_window: N - 1, name: state.activeChrom }],
     getLabels:      labelsForWindow,
     getK:           KForWindow,
-    getBandQuality: bandQualityForWindow,
-    getL2Idx:       (w) => windowToL2[w],
+    getBandQuality: bandQualityForWindow_cb,
+    getL2Idx:       (_w) => 0,
     isWindowValid:  (w) => KForWindow(w) >= 2,
     n_samples:      data.n_samples,
+    getBpFor,
   };
 
   // PC1 accessor for the regimes_pc1_panel.
@@ -212,15 +390,22 @@ function _wireActionBar(root, state, atlasState) {
   const autoMergeBtn = root.querySelector('#rgAutoMergeBtn');
   const statusEl     = root.querySelector('#rgStatus');
 
-  // 2026-05-20: mode toggle (long-range V-walker vs short-range
-  // user-curated candidate list). Restored from localStorage; click
-  // updates state._regimesMode and changes the run-pipeline button's
-  // tooltip so the user knows what'll run.
+  // Mode toggle. Three modes:
+  //   'long'  — V-walker (runBandingPipeline Stages 1-4)
+  //   'short' — curated candidates from local_pca_dosage
+  //   'het'   — het-skeleton (het.js → hom.js → cramers_v_merge), 2026-05-20
   state._regimesMode = state._regimesMode || 'long';
   try {
     const saved = localStorage.getItem('haplotype_regimes.mode');
-    if (saved === 'short' || saved === 'long') state._regimesMode = saved;
+    if (saved === 'short' || saved === 'long' || saved === 'het') {
+      state._regimesMode = saved;
+    }
   } catch (_) {}
+  const runBtnTooltip = (mode) => {
+    if (mode === 'short') return "Build seeds from the local_pca_dosage candidate list (no auto-discovery — review what you've drafted).";
+    if (mode === 'het')   return "Het-skeleton mode: per-window K-means → het_detect_candidate_band → het_track_skeleton → hom_anchor_to_het → cramers_v_merge. Then breadth voting + refineRegimesFromIntervals.";
+    return "V-walker (Stage 1 + Stage 2 + Stage 3 + Stage 4) across the whole chromosome.";
+  };
   const modeBar = root.querySelector('#rgModeBar');
   if (modeBar) {
     modeBar.querySelectorAll('button[data-rg-mode]').forEach(b => {
@@ -231,24 +416,44 @@ function _wireActionBar(root, state, atlasState) {
         modeBar.querySelectorAll('button[data-rg-mode]').forEach(b2 => {
           b2.classList.toggle('active', b2 === b);
         });
-        if (runBtn) {
-          runBtn.title = state._regimesMode === 'short'
-            ? "Build seeds from the local_pca_dosage candidate list (no auto-discovery — review what you've drafted)."
-            : "Run the V-walker Stage 1 + Stage 3 locus construction across the whole chromosome.";
-        }
-        // 2026-05-20: toggle the L3 adjacent-pair table visibility
-        // immediately. If a pipeline run is already cached, the table
-        // re-paints; if not, the table just collapses.
+        if (runBtn) runBtn.title = runBtnTooltip(state._regimesMode);
         try { _renderL3PairsTable(root, state); }
         catch (e) { console.warn('_renderL3PairsTable on mode toggle:', e); }
       });
     });
-    if (runBtn) {
-      runBtn.title = state._regimesMode === 'short'
-        ? "Build seeds from the local_pca_dosage candidate list (no auto-discovery — review what you've drafted)."
-        : "Run the V-walker Stage 1 + Stage 3 locus construction across the whole chromosome.";
-    }
+    if (runBtn) runBtn.title = runBtnTooltip(state._regimesMode);
   }
+
+  // View toggle (independent of mode/seed-source). Switches the
+  // below-the-fold section between the seeds strip and the
+  // long-range regimes summary table. The 4 canvases stay the
+  // same in both views.
+  state._regimesView = state._regimesView || 'seeds';
+  try {
+    const savedView = localStorage.getItem('haplotype_regimes.view');
+    if (savedView === 'seeds' || savedView === 'regimes') {
+      state._regimesView = savedView;
+    }
+  } catch (_) {}
+  const viewBar = root.querySelector('#rgViewBar');
+  if (viewBar) {
+    viewBar.querySelectorAll('button[data-rg-view]').forEach(b => {
+      b.classList.toggle('active', b.dataset.rgView === state._regimesView);
+      b.addEventListener('click', () => {
+        state._regimesView = b.dataset.rgView;
+        try { localStorage.setItem('haplotype_regimes.view', state._regimesView); } catch (_) {}
+        viewBar.querySelectorAll('button[data-rg-view]').forEach(b2 => {
+          b2.classList.toggle('active', b2 === b);
+        });
+        try { _applyViewToggle(root, state); }
+        catch (e) { console.warn('_applyViewToggle:', e); }
+      });
+    });
+  }
+  // Initial visibility: hide regimes wrap until a pipeline run populates
+  // it; the seeds strip starts hidden too and shows on pipeline run.
+  try { _applyViewToggle(root, state); }
+  catch (e) { console.warn('_applyViewToggle init:', e); }
 
   if (runBtn) {
     runBtn.addEventListener('click', async () => {
@@ -323,9 +528,34 @@ async function _runPipeline(root, state) {
     _setStatus(root, 'pipeline ctx not wired — reload the page');
     return;
   }
-  // 2026-05-20: dispatch on mode. Short-range builds seeds from the
-  // local_pca_dosage candidate list (no V-walker). Long-range = the
-  // original V-walker pipeline.
+  // Dispatch on mode. Long = V-walker; Short = curated candidates;
+  // Het = het-skeleton (per-window K-means → het → hom → cramers_v_merge).
+  if (state._regimesMode === 'het') {
+    _setStatus(root, 'building het-skeleton seeds…');
+    await new Promise(r => setTimeout(r, 0));
+    const t0 = performance.now();
+    let result = null;
+    try { result = _buildHetSkeletonResult(state); }
+    catch (e) {
+      console.error('het-skeleton build threw:', e);
+      _setStatus(root, `het-skeleton failed: ${e.message}`);
+      return;
+    }
+    const ms = (performance.now() - t0).toFixed(0);
+    if (!result || !result.stage3 || result.stage3.loci.length === 0) {
+      _setStatus(root,
+        `het-skeleton: 0 intervals on this chrom. Check console for ` +
+        `per-window K-means + HET-detection diagnostics.`);
+      return;
+    }
+    // Cluster 2 + Cluster 3 tail.
+    try { _runPostSeedingTail(root, state, result, 'het', ms); }
+    catch (e) {
+      console.error('post-seeding tail (het) threw:', e);
+      _setStatus(root, `post-seeding failed: ${e.message}`);
+    }
+    return;
+  }
   if (state._regimesMode === 'short') {
     _setStatus(root, 'building short-range seeds from candidate list…');
     await new Promise(r => setTimeout(r, 0));
@@ -343,12 +573,12 @@ async function _runPipeline(root, state) {
         `short-range: 0 candidates on this chrom. Promote candidates in local_pca_dosage first (lock colors → ★ promote).`);
       return;
     }
-    _setStatus(root,
-      `short-range ran in ${ms}ms · ` +
-      `${result.stage3.loci.length} candidate${result.stage3.loci.length === 1 ? '' : 's'} as seeds`);
-    state._regimesResult = result;
-    state._regimesOpts   = {};
-    _afterPipelineRun(root, state, result);
+    state._regimesOpts = {};
+    try { _runPostSeedingTail(root, state, result, 'short', ms); }
+    catch (e) {
+      console.error('post-seeding tail (short) threw:', e);
+      _setStatus(root, `post-seeding failed: ${e.message}`);
+    }
     return;
   }
   _setStatus(root, 'running pipeline…');
@@ -356,9 +586,27 @@ async function _runPipeline(root, state) {
   // so the status update paints.
   await new Promise(r => setTimeout(r, 0));
 
+  // Pre-flight diagnostic: dump band_quality distribution + a sample of
+  // the first 10 values to the console. If every getBandQuality returns
+  // 0 the chain walk + seed discovery exit instantly with 0 seeds; this
+  // log lets the user (and us, when reading their console screenshot)
+  // see exactly why.
+  const bqStats = _bandQualityStats(state);
+  console.log('[haplotype_regimes] band_quality stats:', bqStats);
+
+  // Adaptive seed-discovery threshold. Default is 0.50; if fewer than
+  // 5 windows pass that, lower it in steps until we have something to
+  // work with. STAGE_B_v3_NOTES §2: "If band_quality is computed
+  // correctly but every window is below the 0.4 default, lower the
+  // threshold rather than rejecting the windows."
+  const minAnchorBQ = _autoCalibrateAnchorBQ(bqStats);
+
   const opts = {
     stage4_scope: 'seeds_only',
     skip_stage4: false,
+    seed_discovery: Object.assign({}, BANDING_PIPELINE_DEFAULTS.seed_discovery, {
+      min_anchor_band_quality: minAnchorBQ,
+    }),
   };
 
   let result;
@@ -374,16 +622,31 @@ async function _runPipeline(root, state) {
 
   state._regimesResult = result;
   state._regimesOpts   = opts;
+  state._regimesBQStats = bqStats;
 
   const summary = result.summary || {};
-  _setStatus(root,
-    `pipeline ran in ${ms}ms · ` +
-    `${summary.n_seeds_after_plateau || 0} seeds · ` +
-    `${summary.n_loci || 0} loci · ` +
-    `${summary.n_targets || 0} targets · ` +
-    `${summary.n_stability_upgraded || 0} COHERENT_SPLIT promotions`);
-
-  _afterPipelineRun(root, state, result, opts);
+  // Surface band_quality diagnostics in the status bar when 0 seeds —
+  // otherwise the user has no way to tell whether the pipeline is
+  // broken or the calibration is wrong.
+  const nSeeds = summary.n_seeds_after_plateau || 0;
+  if (nSeeds === 0) {
+    _setStatus(root,
+      `pipeline ran in ${ms}ms · 0 seeds · ` +
+      `BQ: ${bqStats.n_pass_default}/${bqStats.n_windows} passed default 0.50 ` +
+      `(threshold used: ${minAnchorBQ.toFixed(2)}) · ` +
+      `BQ provenance: ${bqStats.provenance.n_computed} computed, ` +
+      `${bqStats.provenance.n_from_producer} producer-shipped, ` +
+      `${bqStats.provenance.n_zero} zero. See console for details.`);
+    return;
+  }
+  // Seeds exist — chain through Cluster 3 (refineRegimesFromIntervals +
+  // regime_topology + genome_scale aggregation + annotations + serialise).
+  state._regimesOpts = opts;
+  try { _runPostSeedingTail(root, state, result, 'long', ms); }
+  catch (e) {
+    console.error('post-seeding tail (long) threw:', e);
+    _setStatus(root, `post-seeding failed: ${e.message}`);
+  }
 }
 
 // 2026-05-20: shared post-pipeline render path. Both the long-range
@@ -1361,4 +1624,641 @@ function _downloadJson(filename, obj) {
 function _setStatus(root, msg) {
   const el = root.querySelector('#rgStatus');
   if (el) el.textContent = msg;
+}
+
+// ---------------------------------------------------------------------------
+// band_quality diagnostics — surfaces the cache distribution so when
+// the pipeline returns 0 seeds the user can see immediately whether
+// it's because BQ wasn't computed (producer didn't ship it AND we
+// couldn't derive it) or because every window's BQ is below the seed
+// gate's 0.50 default.
+// ---------------------------------------------------------------------------
+function _bandQualityStats(state) {
+  const bq = state._regimesBandQualityCache || new Float32Array(0);
+  const prov = state._regimesBandQualityProvenance || {};
+  let nNonZero = 0, nPass50 = 0, nPass40 = 0, nPass30 = 0;
+  let sum = 0, max = -Infinity;
+  for (let i = 0; i < bq.length; i++) {
+    const v = bq[i];
+    if (!Number.isFinite(v)) continue;
+    if (v > 0)    nNonZero++;
+    if (v >= 0.3) nPass30++;
+    if (v >= 0.4) nPass40++;
+    if (v >= 0.5) nPass50++;
+    sum += v;
+    if (v > max) max = v;
+  }
+  const first10 = [];
+  for (let i = 0; i < Math.min(10, bq.length); i++) {
+    first10.push(+bq[i].toFixed(3));
+  }
+  return {
+    n_windows:        bq.length,
+    n_nonzero:        nNonZero,
+    n_pass_default:   nPass50,        // 0.50 = seed_discovery default
+    n_pass_chain:     nPass40,        // 0.40 = chain-walk default
+    n_pass_low:       nPass30,        // 0.30 = low fallback
+    mean:             bq.length > 0 ? +(sum / bq.length).toFixed(3) : 0,
+    max:              Number.isFinite(max) ? +max.toFixed(3) : 0,
+    first_10:         first10,
+    provenance:       prov,
+    l2_synthesized:   !!state._regimesL2Synthesized,
+  };
+}
+
+// Adaptive seed-discovery threshold. If the default 0.50 catches at
+// least 5 windows, use it. Otherwise step down to 0.40, then 0.30, then
+// 0.20. Below 0.20 we stop — at that point the data is too noisy for
+// the seed-discovery walker to produce meaningful seeds, and the right
+// answer is "no inversions detectable on this chromosome".
+function _autoCalibrateAnchorBQ(stats) {
+  if (!stats || !stats.n_windows) return 0.50;
+  if (stats.n_pass_default >= 5) return 0.50;
+  if (stats.n_pass_chain   >= 5) return 0.40;
+  if (stats.n_pass_low     >= 5) return 0.30;
+  // Last resort — pick anything above ~zero. This lets the walker
+  // attempt seeds; if nothing real is in the data it'll still return 0
+  // seeds, but at least we tried.
+  return Math.max(0.20, Math.min(0.30, stats.max * 0.5));
+}
+
+// ---------------------------------------------------------------------------
+// Mode 3 — het-skeleton seed builder (Cluster 1 Path B).
+//
+// Per-window K-means (already cached on state) → het_detect_candidate_band
+// → het_track_skeleton (forward+backward via Jaccard) → het_define_interval
+// → hom_anchor_to_het per skeleton → computeAdjacentSeedMerges to fuse
+// adjacent intervals into multi-skeleton seeds. Produces the same
+// {stage1, stage3, summary} shape that _buildShortRangeResult emits so the
+// downstream Cluster 2 + Cluster 3 tail is identical across modes.
+//
+// Implementation notes:
+//   - Anchor windows are picked by walking every window once and asking
+//     het_detect_candidate_band whether the per-window K-means has a
+//     plausible HET band (intermediate PC1, sufficient size). When yes,
+//     try to extend a skeleton from that anchor.
+//   - To avoid building hundreds of overlapping skeletons we dedupe:
+//     once a window participates in a skeleton, skip it as a future
+//     anchor (the skeleton already covers it).
+//   - Output: each surviving skeleton (after the adjacent-V merge pass)
+//     becomes one seed + one locus, with per_band_samples populated.
+// ---------------------------------------------------------------------------
+function _buildHetSkeletonResult(state) {
+  if (!state || !state.data) return null;
+  const data = state.data;
+  const ctx  = state._regimesCtx;
+  if (!ctx) {
+    console.warn('[het-skeleton] _regimesCtx not wired');
+    return null;
+  }
+  const N = data.n_windows | 0;
+  const nSamples = data.n_samples | 0;
+  const getLabels = ctx.getLabels;
+  const getK      = ctx.getK;
+  const getBpFor  = ctx.getBpFor;
+  const getPc1    = state._regimesGetPC1;
+
+  if (typeof getLabels !== 'function' || typeof getPc1 !== 'function') {
+    console.warn('[het-skeleton] missing required callbacks');
+    return null;
+  }
+
+  // Walk windows, find anchor windows with a candidate HET band, and
+  // extend a skeleton from each. Dedupe by tracking covered windows.
+  const covered = new Uint8Array(N);
+  const skeletons = [];
+  let nAnchorsTried = 0;
+  let nSkeletonsAccepted = 0;
+  let nNoHetBand = 0;
+  let nTooShort = 0;
+  for (let w = 0; w < N; w++) {
+    if (covered[w]) continue;
+    const labels = getLabels(w);
+    const K = getK(w);
+    const pc1 = getPc1(w);
+    if (!labels || !pc1 || K < 2) continue;
+    nAnchorsTried++;
+    const het = het_detect_candidate_band(labels, pc1, K);
+    if (!het || !het.ok) { nNoHetBand++; continue; }
+    let sk;
+    try {
+      sk = het_track_skeleton({
+        getLabels,
+        getPc1,
+        getK,
+        getBpFor,
+        chr_s_window: 0,
+        chr_e_window: N - 1,
+      }, w);
+    } catch (e) {
+      console.warn('[het-skeleton] track_skeleton threw at w=' + w, e);
+      continue;
+    }
+    if (!sk || !sk.ok || !sk.windows || sk.windows.length < (HET_DEFAULTS.min_skeleton_windows || 3)) {
+      nTooShort++;
+      continue;
+    }
+    // Mark covered
+    for (const ww of sk.windows) covered[ww.w | 0] = 1;
+    // bp interval
+    let interval = null;
+    try { interval = het_define_interval(sk, getBpFor); }
+    catch (e) { console.warn('[het-skeleton] define_interval threw', e); }
+    // HOM anchors
+    let homAnchor = null;
+    try {
+      homAnchor = hom_anchor_to_het({
+        skeleton: sk,
+        getLabels,
+        getPc1,
+        getK,
+      });
+    } catch (e) {
+      console.warn('[het-skeleton] hom_anchor threw', e);
+    }
+    skeletons.push({
+      anchor_w: w,
+      skeleton: sk,
+      interval,
+      hom_anchor: homAnchor,
+      het_seed_k: het.k_het,
+    });
+    nSkeletonsAccepted++;
+  }
+
+  console.log('[het-skeleton] anchor sweep:', {
+    n_windows: N,
+    n_anchors_tried: nAnchorsTried,
+    n_no_het_band: nNoHetBand,
+    n_too_short: nTooShort,
+    n_skeletons_accepted: nSkeletonsAccepted,
+  });
+
+  if (skeletons.length === 0) {
+    return {
+      stage1: { seeds: [], per_chrom_summary: [] },
+      stage2: null,
+      stage3: { loci: [] },
+      stage4: null,
+      summary: {
+        n_seeds_after_plateau: 0,
+        n_loci: 0,
+        n_targets: 0,
+        n_stability_upgraded: 0,
+      },
+      _het_skeletons: skeletons,
+    };
+  }
+
+  // Build seed-shaped objects so cramers_v_merge can compare adjacent
+  // skeletons by their anchor labels.
+  const skSeeds = skeletons.map((sk, i) => ({
+    seed_id: i,
+    anchor_w: sk.anchor_w,
+    s_window: sk.skeleton.s_window,
+    e_window: sk.skeleton.e_window,
+    K: getK(sk.anchor_w),
+    anchor_band_quality: 1.0,
+  }));
+  skSeeds.sort((a, b) => a.s_window - b.s_window);
+  // Re-index after sort.
+  skSeeds.forEach((s, i) => { s.seed_id = i; });
+
+  // Adjacent-skeleton Cramér's V merge — fuse consecutive MERGE verdicts.
+  let mergeResult = null;
+  try {
+    mergeResult = runCramersVMergeLocal({
+      seeds: skSeeds,
+      getLabels,
+      getK,
+      opts: { emitSingletons: true },
+    });
+  } catch (e) {
+    console.warn('[het-skeleton] cramers_v_merge threw', e);
+  }
+  const chains = (mergeResult && Array.isArray(mergeResult.chains)) ? mergeResult.chains
+                : skSeeds.map((s, i) => ({ start_i: i, end_i: i, length: 1 }));
+
+  // Each chain becomes one seed + one locus. per_band_samples come from
+  // the skeleton's anchor window's K-means labels (the canonical band
+  // identity for the skeleton; per-window labels may permute within the
+  // skeleton but the anchor's frame is the agreed reference).
+  const finalSeeds = [];
+  const finalLoci  = [];
+  for (let ci = 0; ci < chains.length; ci++) {
+    const ch = chains[ci];
+    const startSeed = skSeeds[ch.start_i];
+    const endSeed   = skSeeds[ch.end_i];
+    const anchor_w  = startSeed.anchor_w;
+    const labelsA   = getLabels(anchor_w);
+    const K         = getK(anchor_w);
+    const per_band_samples = [];
+    const per_band_size    = new Array(K).fill(0);
+    for (let b = 0; b < K; b++) per_band_samples.push(new Set());
+    if (labelsA) {
+      const lim = Math.min(nSamples, labelsA.length | 0);
+      for (let si = 0; si < lim; si++) {
+        const b = labelsA[si] | 0;
+        if (b >= 0 && b < K) {
+          per_band_samples[b].add(si);
+          per_band_size[b]++;
+        }
+      }
+    }
+    const sk = skeletons[ch.start_i];
+    finalSeeds.push({
+      seed_id:               ci,
+      chromosome_idx:        0,
+      anchor_w,
+      anchor_band_quality:   1.0,
+      K_a:                   K,
+      anchor_labels:         labelsA,
+      n_tracked:             nSamples,
+      s_window:              startSeed.s_window,
+      e_window:              endSeed.e_window,
+      n_windows:             endSeed.e_window - startSeed.s_window + 1,
+      classifications:       null,
+      classifications_s_window: startSeed.s_window,
+      v_track:               null,
+      h_off_track:           null,
+      track_s_window:        startSeed.s_window,
+      track_e_window:        endSeed.e_window,
+      hit_left_edge:         false,
+      hit_right_edge:        false,
+      // Het-skeleton metadata for downstream interval building.
+      _het_interval:         sk.interval || null,
+      _het_skeleton:         sk.skeleton,
+      _het_hom_anchor:       sk.hom_anchor,
+      _het_het_band_k:       sk.het_seed_k,
+    });
+    finalLoci.push({
+      seed_id:                ci,
+      chromosome_idx:         0,
+      s_window:               startSeed.s_window,
+      e_window:               endSeed.e_window,
+      K,
+      chain:                  { s: startSeed.s_window, e: endSeed.e_window, K },
+      per_band_samples,
+      per_band_size,
+      per_band_first_size:    per_band_size.slice(),
+      n_samples_dropped:      0,
+      band_set_aggregation:   'het_skeleton',
+      n_unreliable_skipped:   0,
+      min_internal_jaccard:   1.0,
+      stage2_verdict:         null,
+      stage2_linkage_group:   null,
+      _het_interval:          sk.interval || null,
+      _het_hom_anchor:        sk.hom_anchor,
+      _het_het_band_k:        sk.het_seed_k,
+    });
+  }
+  return {
+    stage1: { seeds: finalSeeds, per_chrom_summary: [{ chr: 0, n_seeds: finalSeeds.length }] },
+    stage2: null,
+    stage3: { loci: finalLoci },
+    stage4: null,
+    summary: {
+      n_seeds_after_plateau: finalSeeds.length,
+      n_loci:                finalLoci.length,
+      n_targets:             0,
+      n_stability_upgraded:  0,
+      n_anchors_tried:       nAnchorsTried,
+      n_skeletons_raw:       nSkeletonsAccepted,
+      n_chains:              chains.length,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Cluster 2 + Cluster 3 tail — runs after Cluster 1 (any of the three
+// modes) produces seeds + loci. Mode 1 (V-walker) already ran Cluster 2
+// inside runBandingPipeline; Modes 2 (short-range curated) and 3 (het-
+// skeleton) call breadth_voting explicitly here.
+//
+// Cluster 3 steps (on this page, ends at the catalogue serialiser):
+//   - refineRegimesFromIntervals (haplotype_regime — arrangement identity)
+//   - buildRegimeTopologyGraph + findChromosomeRegimeChains (regime_topology)
+//   - mergePerChromosomeRegimes + crossChromosomeRegimeLinks (genome_scale —
+//     on-page subset only)
+//   - annotateRegimePositions + annotateRegimeStructures (regime_annotation)
+//   - serializeRegimesToJson (the cross-page boundary; Cluster 4 consumes
+//     this JSON on the relatedness-atlas page, NOT here)
+//
+// Mendelian / pedigree / linkage / dyad (Cluster 4) is NOT called here —
+// that's the relatedness atlas page's job.
+// ---------------------------------------------------------------------------
+function _runPostSeedingTail(root, state, result, modeLabel, msSoFar) {
+  const ctx = state._regimesCtx;
+  if (!ctx) return;
+  const data = state.data;
+  const timing = {};
+
+  // Cluster 2 — breadth voting (only for modes that didn't already do it).
+  // Mode 1 (V-walker) already ran runStage4 inside runBandingPipeline.
+  const modeNeedsExplicitVoting = (modeLabel === 'short' || modeLabel === 'het');
+  let stage4 = result.stage4 || null;
+  if (modeNeedsExplicitVoting && result.stage3 && result.stage3.loci.length > 0) {
+    const t0 = performance.now();
+    try {
+      const voters  = buildVotersFromSeedLoci(result.stage1.seeds, result.stage3.loci);
+      const targets = buildTargetsFromStage3Loci(result.stage3.loci, ctx.getLabels, ctx.getK);
+      stage4 = runBreadthVoting({
+        voters,
+        targets,
+        getLabels: ctx.getLabels,
+        getK:      ctx.getK,
+      }, {});
+      result.stage4 = stage4;
+      result.summary = result.summary || {};
+      result.summary.n_targets = stage4 && stage4.summary
+        ? (stage4.summary.n_targets | 0) : 0;
+    } catch (e) {
+      console.warn('[post-seeding] breadth_voting threw —', e);
+    }
+    timing.breadth_voting_ms = (performance.now() - t0).toFixed(0);
+  }
+
+  // Cluster 3 — convert loci into intervals (with HOM cores) for the
+  // haplotype_regime refinement step.
+  const intervals = [];
+  for (const locus of (result.stage3 && result.stage3.loci) || []) {
+    const iv = _locusToInterval(locus, data, ctx);
+    if (iv) intervals.push(iv);
+  }
+  let refined = null;
+  if (intervals.length >= 1) {
+    const t0 = performance.now();
+    try {
+      refined = refineRegimesFromIntervals(intervals, {});
+    } catch (e) {
+      console.warn('[post-seeding] refineRegimesFromIntervals threw —', e);
+    }
+    timing.refine_regimes_ms = (performance.now() - t0).toFixed(0);
+  }
+
+  // Cross-regime topology.
+  let topology = null;
+  if (refined && Array.isArray(refined.regimes) && refined.regimes.length >= 1) {
+    const t0 = performance.now();
+    try {
+      const graph = buildRegimeTopologyGraph(refined.regimes, {});
+      const chains = findChromosomeRegimeChains(graph, refined.regimes);
+      topology = { graph, chains };
+    } catch (e) {
+      console.warn('[post-seeding] regime_topology threw —', e);
+    }
+    timing.regime_topology_ms = (performance.now() - t0).toFixed(0);
+  }
+
+  // Genome-scale aggregation (single-chrom on this page; the cross-chrom
+  // hub is reachable when the page later batches multiple chromosomes).
+  let genomeWide = null;
+  if (refined && Array.isArray(refined.regimes)) {
+    const t0 = performance.now();
+    try {
+      const perChromMap = new Map();
+      perChromMap.set(state.activeChrom || 0, refined);
+      const merged = mergePerChromosomeRegimes(perChromMap);
+      const crossChromLinks = crossChromosomeRegimeLinks(merged, {});
+      genomeWide = { merged, crossChromLinks };
+    } catch (e) {
+      console.warn('[post-seeding] genome_scale aggregation threw —', e);
+    }
+    timing.genome_scale_ms = (performance.now() - t0).toFixed(0);
+  }
+
+  // Annotation passes. Positional needs chrom_meta — skip if not shipped
+  // on data; structural needs per-regime structure_meta which we can
+  // synthesise from each regime's macro-band count + the locus's K.
+  let annotations = { positional: null, structural: null };
+  if (refined && Array.isArray(refined.regimes)) {
+    const t0 = performance.now();
+    const chromMeta = (data.chrom_meta) || (data.chromosomes && data.chromosomes[0])
+                      || { length_bp: null };
+    if (chromMeta && Number.isFinite(chromMeta.length_bp)) {
+      try {
+        annotations.positional = annotateRegimePositions(refined.regimes, chromMeta, {});
+      } catch (e) { console.warn('[post-seeding] positional annotation threw —', e); }
+    }
+    const structureMetaForRegime = (reg) => ({
+      consensus_partition_M: reg.n_intervals,
+      band_count:            reg.K || 3,
+      regime_sharpness:      null,
+      internal_nesting:      reg.has_nested === true,
+      transition_width_bp:   null,
+    });
+    try {
+      annotations.structural = annotateRegimeStructures(
+        refined.regimes,
+        refined.regimes.map(structureMetaForRegime),
+        {});
+    } catch (e) { console.warn('[post-seeding] structural annotation threw —', e); }
+    timing.annotate_ms = (performance.now() - t0).toFixed(0);
+  }
+
+  // Cross-page payload (the catalogue triple is generated on demand by
+  // the export button; here we just stash the serialisable view).
+  let serialisedRegimes = null;
+  if (refined) {
+    try { serialisedRegimes = serializeRegimesToJson(refined, {
+      chrom: state.activeChrom,
+    }); }
+    catch (e) { console.warn('[post-seeding] serialize regimes threw —', e); }
+  }
+
+  // Stash for inspection + export.
+  state._regimesResult = result;
+  state._regimesPostSeeding = {
+    mode:        modeLabel,
+    intervals,
+    refined,
+    topology,
+    genomeWide,
+    annotations,
+    serialisedRegimes,
+    timing,
+  };
+
+  // Status bar.
+  const nSeeds  = (result.stage1 && result.stage1.seeds) ? result.stage1.seeds.length : 0;
+  const nLoci   = (result.stage3 && result.stage3.loci)  ? result.stage3.loci.length  : 0;
+  const nRegimes = refined && refined.regimes ? refined.regimes.length : 0;
+  const nChains  = topology && topology.chains ? topology.chains.length : 0;
+  const timingStr = Object.entries(timing).map(([k, v]) => `${k}=${v}`).join(' · ');
+  _setStatus(root,
+    `${modeLabel} mode ran in ${msSoFar}ms · ` +
+    `${nSeeds} seeds · ${nLoci} loci · ${nRegimes} regimes · ${nChains} chains` +
+    (timingStr ? ` · ${timingStr}` : ''));
+
+  console.log('[post-seeding] cluster 2+3 summary:', {
+    mode: modeLabel,
+    n_seeds: nSeeds,
+    n_loci: nLoci,
+    n_regimes: nRegimes,
+    n_chains: nChains,
+    timing,
+    annotations: {
+      positional: annotations.positional ? annotations.positional.length : 0,
+      structural: annotations.structural ? annotations.structural.length : 0,
+    },
+  });
+
+  // Drive the existing panel render.
+  try { _afterPipelineRun(root, state, result, {}); }
+  catch (e) { console.warn('[post-seeding] _afterPipelineRun threw —', e); }
+
+  // Populate the long-range regimes summary table + apply the
+  // current view toggle so the right section is visible.
+  try { _renderRegimesSummary(root, state); }
+  catch (e) { console.warn('[post-seeding] _renderRegimesSummary threw —', e); }
+  try { _applyViewToggle(root, state); }
+  catch (e) { console.warn('[post-seeding] _applyViewToggle threw —', e); }
+}
+
+// Convert a stage3 locus into the interval shape refineRegimesFromIntervals
+// expects: {hom_a, hom_b, het, start_bp, end_bp, id}. For het-skeleton
+// loci, take HOM cores from the per-skeleton hom_anchor + the skeleton's
+// het core. For V-walker / curated loci, fall back to the kmeans-ordered
+// per_band_samples convention (band 0 = HOM_A, last band = HOM_B,
+// middle = HET — matches kmeans1D's "label 0 = lowest center" guarantee).
+function _locusToInterval(locus, data, ctx) {
+  if (!locus) return null;
+  const id = `chr${locus.chromosome_idx | 0}_w${locus.s_window}_${locus.e_window}`;
+  // bp coords
+  let start_bp = null, end_bp = null;
+  if (locus._het_interval && Number.isFinite(locus._het_interval.start_bp)) {
+    start_bp = locus._het_interval.start_bp;
+    end_bp   = locus._het_interval.end_bp;
+  } else if (ctx && typeof ctx.getBpFor === 'function') {
+    const a = ctx.getBpFor(locus.s_window);
+    const b = ctx.getBpFor(locus.e_window);
+    if (Number.isFinite(a) && Number.isFinite(b)) {
+      start_bp = a; end_bp = b;
+    }
+  }
+  // sample cores
+  let hom_a = null, hom_b = null, het = null;
+  if (locus._het_hom_anchor && locus._het_hom_anchor.ok) {
+    hom_a = locus._het_hom_anchor.hom_a_consensus instanceof Set
+          ? locus._het_hom_anchor.hom_a_consensus
+          : new Set(locus._het_hom_anchor.hom_a_consensus || []);
+    hom_b = locus._het_hom_anchor.hom_b_consensus instanceof Set
+          ? locus._het_hom_anchor.hom_b_consensus
+          : new Set(locus._het_hom_anchor.hom_b_consensus || []);
+    const hk = locus._het_het_band_k | 0;
+    if (locus.per_band_samples && locus.per_band_samples[hk]) {
+      het = locus.per_band_samples[hk] instanceof Set
+          ? locus.per_band_samples[hk]
+          : new Set(locus.per_band_samples[hk]);
+    }
+  }
+  // Fallback for non-het-mode loci.
+  if ((!hom_a || !hom_b || !het) && locus.per_band_samples && locus.per_band_samples.length >= 2) {
+    const K = locus.per_band_samples.length;
+    const lo = locus.per_band_samples[0];
+    const hi = locus.per_band_samples[K - 1];
+    const mid = K >= 3 ? locus.per_band_samples[Math.floor(K / 2)] : new Set();
+    hom_a = hom_a || (lo instanceof Set ? lo : new Set(lo));
+    hom_b = hom_b || (hi instanceof Set ? hi : new Set(hi));
+    het   = het   || (mid instanceof Set ? mid : new Set(mid));
+  }
+  if (!hom_a || !hom_b || !het) return null;
+  return { id, start_bp, end_bp, hom_a, hom_b, het };
+}
+
+// ---------------------------------------------------------------------------
+// View toggle (Cluster 3 surface — seeds-view vs long-range-regimes-view).
+//
+// Independent of the mode (seed source) toggle. The 4 canvases above
+// stay identical in both views. The toggle only switches what's
+// rendered below the canvas grid:
+//   seeds view   — show the seeds strip (one chip per Stage 1 seed)
+//   regimes view — show the long-range regime blocs table (one row
+//                  per refined regime from Cluster 3)
+// ---------------------------------------------------------------------------
+function _applyViewToggle(root, state) {
+  if (!root || typeof document === 'undefined') return;
+  const seedsWrap   = root.querySelector('#rgSeedsStripWrap');
+  const regimesWrap = root.querySelector('#rgRegimesWrap');
+  const view = state._regimesView || 'seeds';
+  const haveResult = !!(state && state._regimesResult);
+  const havePost   = !!(state && state._regimesPostSeeding);
+  if (seedsWrap) {
+    // Show the seeds strip only when we have a result AND the view is
+    // seeds. Until a run produces seeds, the strip stays hidden in
+    // both views.
+    seedsWrap.style.display = (view === 'seeds' && haveResult) ? 'flex' : 'none';
+  }
+  if (regimesWrap) {
+    // Show regimes only when in regimes view AND a post-seeding tail
+    // ran (i.e. we have refined regimes to display).
+    regimesWrap.style.display = (view === 'regimes' && havePost) ? 'flex' : 'none';
+  }
+}
+
+function _renderRegimesSummary(root, state) {
+  if (!root || typeof document === 'undefined') return;
+  const tbody = root.querySelector('#rgRegimesBody');
+  const countEl = root.querySelector('#rgRegimesCount');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  const post = state && state._regimesPostSeeding;
+  const refined = post && post.refined;
+  const regimes = refined && Array.isArray(refined.regimes) ? refined.regimes : [];
+  if (regimes.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="8" style="padding: 6px 10px; color: var(--ink-dimmer, #5a6472);">' +
+      'No refined regimes yet. Run the pipeline.' +
+      '</td></tr>';
+    if (countEl) countEl.textContent = '';
+    return;
+  }
+  // Map regime → chain_id (when topology produced multi-regime chains).
+  const chainOf = new Map();
+  const chains = (post.topology && Array.isArray(post.topology.chains))
+                 ? post.topology.chains : [];
+  chains.forEach((ch, ci) => {
+    if (!ch || !Array.isArray(ch)) return;
+    for (const uid of ch) chainOf.set(String(uid), ci);
+  });
+  for (let i = 0; i < regimes.length; i++) {
+    const r = regimes[i];
+    const id = r.regime_id != null ? r.regime_id : (r.regime_uid != null ? r.regime_uid : ('reg_' + i));
+    const chrom = r.chrom_idx != null
+      ? `chr${r.chrom_idx}`
+      : (state.activeChrom || '—');
+    const bpStart = Number.isFinite(r.start_bp) ? (r.start_bp / 1e6).toFixed(2) + ' Mb' : '—';
+    const bpEnd   = Number.isFinite(r.end_bp)   ? (r.end_bp   / 1e6).toFixed(2) + ' Mb' : '—';
+    const nIv     = r.n_intervals != null ? r.n_intervals
+                  : (r.member_interval_ids ? r.member_interval_ids.length : 0);
+    const sizeOf = (s) => {
+      if (s == null) return 0;
+      if (s instanceof Set) return s.size;
+      if (Array.isArray(s)) return s.length;
+      return 0;
+    };
+    const nHomA = sizeOf(r.hom_a_intersect || r.hom_a);
+    const nHomB = sizeOf(r.hom_b_intersect || r.hom_b);
+    const nHet  = sizeOf(r.het_union || r.het);
+    const chainKey = String(r.regime_uid != null ? r.regime_uid : id);
+    const chainId  = chainOf.has(chainKey) ? `chain ${chainOf.get(chainKey)}` : '—';
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--rule, #2a3242)';
+    tr.innerHTML =
+      `<td style="padding: 3px 6px; color: var(--ink, #e6edf6); font-weight: 600;">${_esc(String(id))}</td>` +
+      `<td style="padding: 3px 6px; color: var(--ink-dim, #8895a8);">${_esc(String(chrom))}</td>` +
+      `<td style="padding: 3px 6px; color: var(--ink-dim, #8895a8);">${bpStart} – ${bpEnd}</td>` +
+      `<td style="padding: 3px 6px; color: var(--ink-dim, #8895a8);">${nIv}</td>` +
+      `<td style="padding: 3px 6px; color: #5fb3ff;">${nHomA}</td>` +
+      `<td style="padding: 3px 6px; color: #c7d3e4;">${nHet}</td>` +
+      `<td style="padding: 3px 6px; color: #e07b7b;">${nHomB}</td>` +
+      `<td style="padding: 3px 6px; color: var(--ink-dimmer, #5a6472);">${_esc(chainId)}</td>`;
+    tbody.appendChild(tr);
+  }
+  if (countEl) {
+    const nReg = regimes.length;
+    const nCh  = chains.length;
+    countEl.textContent = `${nReg} regime${nReg === 1 ? '' : 's'}` +
+                          (nCh > 0 ? ` · ${nCh} chain${nCh === 1 ? '' : 's'}` : '');
+  }
 }

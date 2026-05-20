@@ -115,6 +115,30 @@
       </div>
     </div>
 
+    <div id="pcaCompHeatmapWrap"
+         style="padding: 0 14px 8px 14px;">
+      <div class="pca-comp-cell"
+           style="display: flex; flex-direction: column;
+                  border: 1px solid var(--rule); border-radius: 4px;
+                  background: var(--panel); overflow: hidden;">
+        <div class="pca-comp-cell-head"
+             style="padding: 4px 8px; border-bottom: 1px solid var(--rule);
+                    font-family: var(--mono); font-size: 10px; color: var(--ink-dim);
+                    display: flex; justify-content: space-between; align-items: center;"
+             title="Band-persistence heatmap. Rows = samples sorted by dosage band at the current window. Columns = windows along the chromosome. Solid horizontal blocks = stable regime cores. Vertical transitions across many rows = breakpoint zones. Single deviant cells = microstripes (recombinants, conversion tracts, mosaicism).">
+          <span><b>band persistence</b>
+            <span style="color: var(--ink-dim); font-weight: 400;">
+              · genome × samples · dosage K-band</span>
+          </span>
+          <span id="pcaCompHeatmapHint" style="font-size: 9.5px;">click a column to scrub · hover a row to track</span>
+        </div>
+        <div style="position: relative; height: 180px;">
+          <canvas id="pcaCompHeatmapCanvas" style="width: 100%; height: 100%;
+                  background: #0b0e13; cursor: crosshair;"></canvas>
+        </div>
+      </div>
+    </div>
+
     <div id="pcaCompLinesWrap" class="pca-comp-lines"
          style="margin: 4px 14px 0; border: 1px solid var(--rule); border-radius: 4px;
                 background: var(--panel); overflow: hidden;
@@ -169,6 +193,7 @@
             style="padding: 6px 14px; border-top: 1px solid var(--rule);
                    font-family: var(--mono); font-size: 10px; color: var(--ink-dim);">
       ←/→ scrub window across all 3 panels · hover a dot to track it across panels ·
+      heatmap below: regime cores, boundaries, microstripes · click a heatmap column to jump ·
       Phase 1 (side-by-side). Read-only inspector — see
       <code>specs_todo/SPEC_local_pca_comparator.md</code>.
     </footer>

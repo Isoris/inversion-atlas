@@ -36,6 +36,7 @@ fully shipped: move to `specs_done/` with an `Implemented in:` block.
 | `SPEC_inversion_age_atlas_surface_AMENDMENT.md` | various age-class JS pieces ship (`shared/age_model_suggester.js`, `shared/busco_4d_age.js`) | the **parent** `SPEC_inversion_age_atlas_surface.md` is missing from disk (referenced from this amendment + age_divergence but never authored) | **AMENDMENT — parent missing** |
 | `SPEC_inversion_divergence_network_v1.md` | `shared/divergence_network.js` (overlay primitive ships) | per-candidate overlay panel wiring; cluster-side dxy-by-arrangement producer | **PARTIAL — UI + producer pending** |
 | `SPEC_mendelian_inheritance_para_vs_peri_v1.md` | `analysis/mendelian.js` + `analysis/mendelian_inheritance.js` (3-state Mendelian verdict — base) + `shared/contingency.js` (fisher2x2 + chiSquare) + `shared/haplotype_vocab.js` | v1 extension (paracentric-vs-pericentric cohort comparison + per-candidate goodness-of-fit) — extends the base verdict | **PARTIAL — v1 extension pending** |
+| `SPEC_msmc_per_founder_background.md` | none — depends on `pca_comparator/heatmap.js`'s per-(sample × window) band labels (shipped) for the regime-sharing matrix input | full implementation — explicitly SPEC ONLY per its own status line ("awaiting audit before implementation"). New page `founder_background_panel` + 7 producer JSON schemas + neutral-region mask + MSMC2 + diversity-validation runs (cluster-side). | **SPEC ONLY** |
 | `SPEC_page1_candidate_mode_ui.md` | `shared/candidate_mode.js` (Parallel Candidate Registry — turn 88) + local_pca_dosage candidate-mode infrastructure | HANDOFF-2 detailed mode (16 PCA JSONs + 4 heatmap JSONs per candidate); local_pca_dosage detailed-mode UI is not wired | **PARTIAL — detailed mode pending** |
 | `SPEC_regime_annotation_v34.md` | none | full annotation layer (Stage 5.5) — explicitly SPEC ONLY per its own status line ("awaiting audit before implementation") | **SPEC ONLY** |
 | `SPEC_registry_v1.md` | n/a — superseded | use `specs_done/SPEC_registry_v2.md` | **SUPERSEDED** |
@@ -45,7 +46,7 @@ fully shipped: move to `specs_done/` with an `Implemented in:` block.
 
 ### Net audit summary
 
-- **2 SPEC ONLY** (explicit in their status lines): `SPEC_copy_origin_painting`, `SPEC_regime_annotation_v34`
+- **3 SPEC ONLY** (explicit in their status lines): `SPEC_copy_origin_painting`, `SPEC_regime_annotation_v34`, `SPEC_msmc_per_founder_background`
 - **10 PARTIAL** (some half ships, some half pending) — these are
   the priority for full-stack shipping
 - **1 AMENDMENT to a missing parent** (`SPEC_inversion_age_atlas_surface_AMENDMENT`)
