@@ -32,6 +32,7 @@ import { escapeHtml } from '../../shared/page1_utils.js';
 // cycle.
 import '../../shared/macrostripe.js';
 import { resolve as _registryResolve, getState as _getState } from '../../../../core/atlas_api.js';
+import { renderModeBBadge } from '../../../../core/mode_b_badge.js';
 
 import {
   _setActiveState,
@@ -495,6 +496,33 @@ export async function mount(root, atlasState, registry) {
       }
     }
     data.ghsl_view = ghslData;
+  }
+
+  // Mode-B freshness badge — surfaces which discovery axes are loaded
+  // for this chrom. Non-blocking: `data` is already in hand (we'd have
+  // bailed at line ~419 otherwise), so this is just a render call. The
+  // probe shape ({ ok: true, n, sample_keys }) is mocked from the already-
+  // resolved `data` to reuse renderModeBBadge's verdict path.
+  try {
+    const nWindows = Array.isArray(data && data.windows) ? data.windows.length : 0;
+    const nSamples = Array.isArray(data && data.samples) ? data.samples.length : 0;
+    const axesLoaded = ['z-blocks'];
+    if (tpData)   axesLoaded.push('θπ');
+    if (ghslData) axesLoaded.push('GHSL');
+    renderModeBBadge('lpdModeBBadge',
+      { ok: true, n: nWindows, sample_keys: ['chrom', 'windows', 'samples'], rows: data.windows || [], payload: data },
+      {
+        label:    'discovery axes',
+        layerKey: 'scrubber_main',
+        context:  chrom,
+        compare:  () => ({
+          pass: nWindows > 0 && nSamples > 0,
+          summary: `${nWindows} windows · ${nSamples} samples · ` +
+                   `axes: ${axesLoaded.join(' + ')}`,
+        }),
+      });
+  } catch (e) {
+    console.warn('local_pca_dosage.mount: Mode-B badge render threw —', e);
   }
 
   // 2026-05-18 — preserve cursor + tracked-samples across tab switches.

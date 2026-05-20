@@ -1150,6 +1150,61 @@ html[data-theme="light"] .cli-subband[data-verdict="CROSS_CUTTING"] { color: #b9
 #fishInspectPopover .fip-val .ambig {
   color: #e0555c; font-weight: 600;
 }
+/* ===== Annotation cockpit (annotation_cockpit) =====================
+   2026-05-20: extracted from inline styles. The previous markup had
+   hardcoded dark-mode hex (#1c2231 / #161b28 / #a8b1c4) that ignored the
+   theme switch — light mode rendered as black canvas + black panels. */
+#annotation_cockpit { overflow: auto; height: 100%; box-sizing: border-box; }
+#annotation_cockpit .ac-header {
+  padding: 6px 14px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--rule);
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  font-family: var(--mono); font-size: 11px;
+}
+#annotation_cockpit .ac-title  { color: var(--ink); }
+#annotation_cockpit .ac-cursor { color: var(--ink); }
+#annotation_cockpit .ac-cohort { color: var(--ink-dimmer); }
+#annotation_cockpit .ac-help {
+  margin-left: auto;
+  color: var(--ink-dimmer); font-size: 10px; letter-spacing: 0.02em;
+}
+#annotation_cockpit .ac-empty {
+  padding: 40px; text-align: center;
+  color: var(--ink-dim);
+}
+#annotation_cockpit .ac-empty-title {
+  font-size: 14px; margin-bottom: 14px; color: var(--ink);
+}
+#annotation_cockpit .ac-empty-body {
+  font-size: 12px; line-height: 1.7;
+  max-width: 540px; margin: 0 auto;
+}
+#annotation_cockpit .ac-body { padding: 10px 14px; }
+#annotation_cockpit .ac-canvas {
+  display: block;
+  width: 100%; max-width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--rule); border-radius: 2px;
+  cursor: crosshair; outline: none;
+}
+#annotation_cockpit .ac-canvas:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+#annotation_cockpit .ac-footer {
+  margin-top: 10px;
+  display: flex; gap: 12px; align-items: flex-start;
+}
+#annotation_cockpit .ac-info-card {
+  flex: 1; min-width: 0;
+  padding: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--rule); border-radius: 2px;
+  font-family: var(--mono); font-size: 11px; color: var(--ink);
+  line-height: 1.5;
+}
+
 /* v3.90: marker page (page 10) — diagnostic PCR panel cards.
    One .mp-card per candidate panel; cards stack vertically with 16 px gap.
    Tier badge color-coded by confidence (HIGH green / MEDIUM yellow / LOW red).
@@ -1635,6 +1690,54 @@ html[data-theme="light"] .cli-subband[data-verdict="CROSS_CUTTING"] { color: #b9
 #candidate_focus .verdict-badge.noisy_region { background: var(--bad); color: #fff; }
 #candidate_focus .verdict-badge.na, #candidate_focus .verdict-badge.undetermined {
                         background: var(--panel-3); color: var(--ink-dim); }
+/* 2026-05-20 (SPEC_cramers_v_seed_merge.md Phase 1 deliverable #3):
+   candidate-provenance source chips. Each `cand.source` tag gets a
+   semantic colour:
+     - manual paths (l2_single, l2_merge, lock_promote)    = neutral panel-3
+     - V-walker seed-promote (manual from regimes page)    = teal
+     - L3 adjacent-pair Cramér merge (manual from regimes) = teal
+     - auto: L2-sweep (inheritance auto-promote)           = amber accent
+     - auto: Cramér V local (insulated_local)              = violet
+     - auto: Cramér V macrostripe (post_long_range)        = magenta
+   The two auto-V variants are visually distinct so the user can audit
+   "which mode caught which candidate" at a glance — the same audit
+   the SPEC's Phase 2 "compare modes" deliverable will surface in a
+   Venn view. .src-chip is the base; suffixes set the colour. */
+.src-chip {
+  display: inline-block; padding: 1px 7px; margin-left: 6px;
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  letter-spacing: 0.03em; border-radius: 3px;
+  background: var(--panel-3); color: var(--ink);
+  border: 1px solid var(--rule); vertical-align: middle;
+  white-space: nowrap;
+}
+.src-chip-l2_single,
+.src-chip-l2_merge,
+.src-chip-lock_promote {
+  background: var(--panel-3); color: var(--ink-dim);
+  border-color: var(--rule);
+}
+.src-chip-seed_promote,
+.src-chip-l3_pair_merge {
+  background: rgba(72, 200, 200, 0.18);
+  color: rgba(180, 240, 240, 0.95);
+  border-color: rgba(72, 200, 200, 0.55);
+}
+.src-chip-auto_l2_sweep {
+  background: rgba(245, 165, 36, 0.20);
+  color: rgba(255, 220, 150, 0.95);
+  border-color: rgba(245, 165, 36, 0.55);
+}
+.src-chip-auto_cramers_v_local {
+  background: rgba(155, 110, 245, 0.22);
+  color: rgba(225, 205, 255, 0.95);
+  border-color: rgba(155, 110, 245, 0.55);
+}
+.src-chip-auto_cramers_v_macrostripe {
+  background: rgba(225, 90, 200, 0.20);
+  color: rgba(255, 200, 240, 0.95);
+  border-color: rgba(225, 90, 200, 0.55);
+}
 /* v4 turn 9: ancestry-confound panel */
 #candidate_focus .anc-confound-grid { display: grid; grid-template-columns: 1fr 1fr 1fr;
                         gap: 12px; margin: 8px 0 14px; }
@@ -4027,6 +4130,25 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
   display: block; width: 100%; min-height: 110px;
   background: var(--panel);
 }
+#fish_ancestry_scroller .anc-scroll-status-legend {
+  display: flex; flex-wrap: wrap; gap: 14px;
+  padding: 4px 10px;
+  border-top: 1px solid var(--rule);
+  background: var(--panel-2);
+  font-family: var(--mono); font-size: 10px;
+  color: var(--ink-dim);
+}
+#fish_ancestry_scroller .anc-status-item {
+  display: inline-flex; align-items: center; gap: 4px;
+  white-space: nowrap;
+}
+#fish_ancestry_scroller .anc-status-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px;
+  color: var(--ink); font-size: 11px;
+  background: var(--panel); border: 1px solid var(--rule);
+  border-radius: 2px;
+}
 
 #fish_ancestry_scroller .anc-scroll-right {
   display: flex; flex-direction: column; gap: 12px;
@@ -5139,6 +5261,26 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
   white-space: nowrap;
 }
 
+/* ▶ Compute button on dosage-cluster page (opt-in trigger for the
+   3–8 s adaptiveKDosageClustering run). Accent-coloured so users
+   can find it; greys out + shows ⏳ while computing. */
+.dc-compute-btn {
+  background: var(--accent); color: #0e1116;
+  border: 1px solid var(--accent); border-radius: 3px;
+  padding: 3px 12px;
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dc-compute-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.dc-compute-btn:disabled {
+  background: var(--panel-2); color: var(--ink-dim);
+  border-color: var(--rule);
+  cursor: wait;
+}
+
 /* ---- Tree-panel legend swatch ---- */
 .tree-legend-swatch {
   display: inline-block; width: 10px; height: 10px;
@@ -5706,6 +5848,59 @@ body:not([data-l3-layout="dual"]) #cusumPanel #cusumPaneRight {
   font-weight: 600;
 }
 
+/* 2026-05-20: haplotype_regimes view-bar buttons (seeds / long-range
+   regimes). Mirror the rgModeBar styling so the two pill groups in the
+   action bar look consistent. Previously these buttons had no CSS at
+   all and rendered as browser-default white buttons — user-reported
+   "the styling CSS is not finished and not professional for most buttons". */
+#rgViewBar button[data-rg-view] {
+  background: transparent;
+  color: var(--ink-dim);
+  border: 0;
+  border-radius: 2px;
+  padding: 2px 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 80ms ease, color 80ms ease;
+}
+#rgViewBar button[data-rg-view]:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--ink);
+}
+#rgViewBar button[data-rg-view].active {
+  background: var(--accent);
+  color: #0b0e13;
+  font-weight: 600;
+}
+
+/* 2026-05-20: haplotype_regimes toolbar buttons (.rg-tb-btn). Run
+   pipeline / promote / auto-merge / export catalogue all carry this
+   class — but no CSS rule existed, so each button leaned on inline
+   `style=""` for chrome. Inline styles couldn't add :hover / :disabled
+   states or guarantee `white-space: nowrap` (long labels wrapped on
+   narrow viewports → 2-line buttons in the action bar). This rule
+   provides proper dark-theme chrome + nowrap + hover/disabled states.
+   Inline styles still cascade-win for the static properties they set
+   (background/color/border/padding) — the rule's job is to add what
+   inline can't: state-dependent styling and layout-safety properties. */
+.rg-tb-btn {
+  white-space: nowrap;
+  flex: 0 0 auto;
+  transition: background 80ms ease, border-color 80ms ease;
+}
+.rg-tb-btn:hover:not(:disabled) {
+  background: var(--panel) !important;
+  border-color: var(--ink-dim) !important;
+}
+.rg-tb-btn:active:not(:disabled) {
+  background: var(--panel-2) !important;
+}
+.rg-tb-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* 2026-05-20: scatter-axes header refresh. The legacy bar (inline-styled
    in the HTML) was cramped — 9.5 px dropdowns, no visual grouping,
    `link with lines panel` collided with the axis pickers. Quentin's
@@ -5783,6 +5978,38 @@ body:not([data-l3-layout="dual"]) #cusumPanel #cusumPaneRight {
   color: var(--ink-dimmer);
   font-size: 10px;
   font-style: italic;
+}
+/* 2026-05-20: per-sample ramp-color buttons in the scatter axes header.
+   Sit between the linked-views toggle and the avail-note / collapse
+   button. Active state uses --accent matching the toggle look. */
+.pca-axis-bar .pca-axis-ramp {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.pca-axis-bar .pca-axis-ramp button {
+  background: var(--panel-2);
+  color: var(--ink-dim);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 2px 9px;
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 100ms ease, border-color 100ms ease, background 100ms ease;
+}
+.pca-axis-bar .pca-axis-ramp button:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+.pca-axis-bar .pca-axis-ramp button.active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+.pca-axis-bar .pca-axis-ramp button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .pca-axis-bar .pca-axis-collapse {
   background: var(--panel-2);

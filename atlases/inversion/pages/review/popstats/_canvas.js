@@ -209,6 +209,144 @@ export function drawLine(ctx, toX, pad, plotW, plotH, data, trackDef) {
   ctx.fillText(yMin.toFixed(2), pad.l - 4, pad.t + plotH);
 }
 
+/**
+ * Resolve a stable color for a multi-line series. Karyotype-aware: name
+ * patterns like 'HOM1' / 'H1/H1' / 'H2/H2' / 'HET' get the canonical
+ * Std/Het/Inv palette. Names like 'Hobs' / 'Hexp' get their own pair.
+ * Anything else falls back to a 6-color index palette.
+ */
+const _PALETTE = ['#3074C8', '#2BAA50', '#D04545', '#A060B8', '#D8A030', '#3DB5C0'];
+const _NAMED_COLORS = {
+  // Karyotype groups (both legacy + H-system labels)
+  hom1: '#3074C8', 'h1/h1': '#3074C8', std: '#3074C8',
+  het:  '#D8A030', 'h1/h2': '#D8A030',
+  hom2: '#D04545', 'h2/h2': '#D04545', inv: '#D04545',
+  // Heterozygosity pair
+  hobs: '#2BAA50', hexp: '#A060B8',
+  // Multi-scale Δ12
+  '1x': '#3074C8', '5x': '#D8A030', '10x': '#D04545',
+};
+export function colorForSeries(name, idx) {
+  if (typeof name === 'string') {
+    const k = name.toLowerCase().trim();
+    if (_NAMED_COLORS[k]) return _NAMED_COLORS[k];
+    // Try suffix match: 'theta_pi_HOM1' → 'hom1'
+    for (const key of Object.keys(_NAMED_COLORS)) {
+      if (k.endsWith('_' + key) || k.endsWith(' ' + key)) return _NAMED_COLORS[key];
+    }
+  }
+  return _PALETTE[(idx | 0) % _PALETTE.length];
+}
+
+/**
+ * Multi-line curves renderer. Accepts {mb, series: [{name, color?, values, dashed?}], refLine?, yMin?, yMax?}.
+ * Renders each series as a halo + colored core stroke; ignores nulls (segments break).
+ * A small legend strip with swatches + names paints at the top-left of the plot.
+ */
+export function drawMultiline(ctx, toX, pad, plotW, plotH, data, trackDef) {
+  if (!data || !Array.isArray(data.mb) || !Array.isArray(data.series)) return;
+  const mb = data.mb;
+  const series = data.series.filter(s =>
+    s && Array.isArray(s.values) && s.values.length === mb.length);
+  if (series.length === 0) return;
+
+  let yMin = Infinity, yMax = -Infinity;
+  if (isFinite(data.yMin) && isFinite(data.yMax)) {
+    yMin = data.yMin; yMax = data.yMax;
+  } else {
+    for (const s of series) {
+      for (const v of s.values) {
+        if (v == null || !isFinite(v)) continue;
+        if (v < yMin) yMin = v;
+        if (v > yMax) yMax = v;
+      }
+    }
+  }
+  if (!isFinite(yMin) || !isFinite(yMax)) return;
+  if (yMin === yMax) { yMin -= 0.5; yMax += 0.5; }
+  const toY = (v) => pad.t + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+
+  if (isFinite(data.refLine)) {
+    ctx.save();
+    ctx.strokeStyle = '#c0504d';
+    ctx.lineWidth = 0.6;
+    ctx.setLineDash([4, 3]);
+    const yr = toY(data.refLine);
+    ctx.beginPath();
+    ctx.moveTo(pad.l, yr); ctx.lineTo(pad.l + plotW, yr);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  for (let si = 0; si < series.length; si++) {
+    const s = series[si];
+    const color = s.color || colorForSeries(s.name, si);
+    const alpha = (typeof s.alpha === 'number') ? s.alpha : 1.0;
+    // Halo
+    ctx.save();
+    ctx.globalAlpha = 0.65 * alpha;
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    _strokeSeriesSegments(ctx, mb, s.values, toX, toY);
+    ctx.restore();
+    // Core
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = 0.7;
+    ctx.strokeStyle = color;
+    if (s.dashed) ctx.setLineDash([4, 3]);
+    _strokeSeriesSegments(ctx, mb, s.values, toX, toY);
+    ctx.restore();
+  }
+
+  _drawSeriesLegend(ctx, pad, plotW, series);
+
+  // Y range ticks
+  ctx.fillStyle = themeColor('dim');
+  ctx.font = '8px ui-monospace, monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText(yMax.toFixed(2), pad.l - 4, pad.t + 8);
+  ctx.fillText(yMin.toFixed(2), pad.l - 4, pad.t + plotH);
+}
+
+function _strokeSeriesSegments(ctx, mb, values, toX, toY) {
+  ctx.beginPath();
+  let first = true;
+  for (let i = 0; i < mb.length; i++) {
+    const v = values[i];
+    if (v == null || !isFinite(v)) { first = true; continue; }
+    const x = toX(mb[i]), y = toY(v);
+    if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
+  }
+  ctx.stroke();
+}
+
+function _drawSeriesLegend(ctx, pad, plotW, series) {
+  ctx.save();
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.textBaseline = 'middle';
+  let x = pad.l + 6;
+  const y = pad.t + 8;
+  for (let si = 0; si < series.length; si++) {
+    const s = series[si];
+    const color = s.color || colorForSeries(s.name, si);
+    // swatch
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y - 4, 8, 8);
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(x + 0.5, y - 3.5, 7, 7);
+    x += 11;
+    // label
+    ctx.fillStyle = themeColor('ink');
+    ctx.textAlign = 'left';
+    ctx.fillText(s.name || `s${si + 1}`, x, y);
+    x += ctx.measureText(s.name || `s${si + 1}`).width + 10;
+    if (x > pad.l + plotW - 30) break;
+  }
+  ctx.restore();
+}
+
 export function drawEdgeLabels(ctx, pad, plotW, plotH, trackDef) {
   if (trackDef.edgeTop) {
     ctx.fillStyle = themeColor('dim');

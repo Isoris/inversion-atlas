@@ -6,6 +6,12 @@
         <span id="dosageClusterCandidateLabel" class="dc-meta">—</span>
       </div>
       <div class="dc-controls">
+        <button id="dosageClusterComputeBtn"
+                class="dc-compute-btn"
+                title="Run adaptive-K dosage clustering on the current chromosome (3–8 s, blocks UI; result is cached per session).">
+          ▶ Compute
+        </button>
+        <span class="dc-sep"></span>
         <span id="dosageClusterVerdictBadge"
               class="dc-verdict-badge"
               title="Verdict per HANDOFF_8">—</span>
@@ -18,8 +24,9 @@
       <div class="dc-curves-wrap">
         <canvas id="dosageClusterCurvesCanvas" class="dc-curves-canvas"></canvas>
         <div id="dosageClusterEmpty" class="dc-empty" style="display:none;">
-          No clustering result loaded. Run adaptiveKDosageClustering on
-          a per-window dosage-profile matrix first.
+          No clustering result loaded yet. Click <b>▶ Compute</b> above
+          to run adaptive-K dosage clustering on the current chromosome
+          (3–8 s, blocks UI; cached per session afterwards).
         </div>
       </div>
       <aside class="dc-right">

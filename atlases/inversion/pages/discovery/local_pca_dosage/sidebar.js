@@ -174,6 +174,62 @@ function _wireL3Controls(state) {
     const saved = localStorage.getItem('pca_scrubber_v3.l3ReclusterMode');
     if (saved) state.l3ReclusterMode = saved;
   } catch (_) {}
+  // 2026-05-20: restore step/compare/sync slots so the L3↔sidebar
+  // pair stays where the user left it after a reload. The localStorage
+  // WRITE side was already wired (stepmode / compareunit /
+  // stepmodesync), but no READ existed — meaning every reload reset to
+  // the in-code defaults (`stepMode: 'l2'`, undefined compareUnit,
+  // stepModeSync: true). The UI buttons were updated on click but the
+  // state slots didn't survive reload, so the visible toolbar diverged
+  // from the actual state in subsequent sessions.
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.stepmode');
+    if (saved && (saved in _STEP_MODE_LABELS)) state.stepMode = saved;
+  } catch (_) {}
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.compareunit');
+    if (saved) state.compareUnit = saved;
+  } catch (_) {}
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.compareunitn');
+    const n = saved != null ? parseInt(saved, 10) : NaN;
+    if (Number.isFinite(n) && n >= 1) state.compareUnitN = n;
+  } catch (_) {}
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.stepmodesync');
+    if (saved === '0') state.stepModeSync = false;
+    else if (saved === '1') state.stepModeSync = true;
+  } catch (_) {}
+  // Visual mirror — the #stepModeBar HTML defaults to L2 active and
+  // #l3CompareUnit defaults to L2 active. After restoring the slots
+  // above, sync the active class so the toolbar reflects the actual
+  // state.* values. The change-event handlers further down wire the
+  // forward sync (click → state); this block does the inverse
+  // (state → DOM) after pageload.
+  try {
+    const stepBar = document.getElementById('stepModeBar');
+    if (stepBar && state.stepMode) {
+      stepBar.querySelectorAll('button[data-step]').forEach(b => {
+        b.classList.toggle('active', b.dataset.step === state.stepMode);
+      });
+    }
+    const compareBar = document.getElementById('l3CompareUnit');
+    if (compareBar && state.compareUnit) {
+      compareBar.querySelectorAll('button[data-l3unit]').forEach(b => {
+        b.classList.toggle('active', b.dataset.l3unit === state.compareUnit);
+      });
+    }
+    const cuInput = document.getElementById('l3CompareUnitN');
+    if (cuInput && Number.isFinite(state.compareUnitN)) {
+      cuInput.value = String(state.compareUnitN);
+    }
+    const sin = document.getElementById('stepModeNInput');
+    if (sin && Number.isFinite(state.stepModeN)) {
+      sin.value = String(state.stepModeN);
+    }
+    const syncCb = document.getElementById('stepModeSync');
+    if (syncCb) syncCb.checked = !!state.stepModeSync;
+  } catch (_) {}
 
   // Helper for click-bar wiring with idempotency + active-class mirror +
   // optional persist key.
@@ -247,6 +303,27 @@ function _wireL3Controls(state) {
       try { localStorage.setItem('pca_scrubber_v3.l3HetColoring', e.target.checked ? '1' : '0'); }
       catch (_) {}
       repaint();
+    });
+  }
+
+  // L3 ⋯ more disclosure (#l3MoreToggleBtn) — toggles
+  // `.l3-more-collapsed` on #l3Panel. CSS hides `.l3-more-item` children
+  // when collapsed. Persisted to localStorage so the user's choice
+  // survives reloads. Default = collapsed (toolbar stays compact).
+  const l3MoreBtn = document.getElementById('l3MoreToggleBtn');
+  const l3Panel = document.getElementById('l3Panel');
+  if (l3MoreBtn && l3Panel && l3MoreBtn.dataset.l3Wired !== '1') {
+    l3MoreBtn.dataset.l3Wired = '1';
+    let expanded = false;
+    try {
+      expanded = localStorage.getItem('pca_scrubber_v3.l3MoreExpanded') === '1';
+    } catch (_) {}
+    l3Panel.classList.toggle('l3-more-collapsed', !expanded);
+    l3MoreBtn.addEventListener('click', () => {
+      const nowExpanded = l3Panel.classList.contains('l3-more-collapsed');
+      l3Panel.classList.toggle('l3-more-collapsed', !nowExpanded);
+      try { localStorage.setItem('pca_scrubber_v3.l3MoreExpanded', nowExpanded ? '1' : '0'); }
+      catch (_) {}
     });
   }
 }
@@ -463,11 +540,24 @@ function _wireNewShellControls(state) {
   // L3 read per-sample color from shared/macrostripe.js#getMacrostripeColor.
   // When false (default) or banding absent, the existing K-means
   // microgroup coloring path stays in effect.
+  //
+  // 2026-05-20: restore persisted choice from localStorage so the
+  // toggle survives reload. Write side added in the change handler
+  // below. SPEC nominally wants default ON, but the toggle is a no-op
+  // without bandingResult so we keep code-default OFF and let the
+  // user opt in (which then persists).
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.useMacrostripeColors');
+    if (saved === '1') state.useMacrostripeColors = true;
+    else if (saved === '0') state.useMacrostripeColors = false;
+  } catch (_) {}
   const macroEl = $('linesMacrostripeToggle');
   if (macroEl && macroEl.dataset.wired !== '1') {
     macroEl.checked = !!state.useMacrostripeColors;
     macroEl.addEventListener('change', (e) => {
       state.useMacrostripeColors = !!e.target.checked;
+      try { localStorage.setItem('pca_scrubber_v3.useMacrostripeColors',
+                                  state.useMacrostripeColors ? '1' : '0'); } catch (_) {}
       // Repaint chain — same surfaces the K-means microgroup coloring
       // touched. Wrapped in try/catch so one fail doesn't break the rest.
       try { drawPCA(state); }        catch (err) { console.warn('[macrostripeToggle] drawPCA:', err); }
@@ -740,8 +830,14 @@ function _wireSelectionModeHotkey(state) {
   document.addEventListener('keydown', (e) => {
     const tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    // 2026-05-20: gate by element-exists rather than `.classList.contains('active')`.
+    // The atlas-core router swaps `#app-root.innerHTML` per page and
+    // NEVER sets `.active` — checking for the class made this hotkey
+    // never fire (verified via memory `router_no_active_class.md`).
+    // The shell's mount/unmount manages this listener's lifetime, so
+    // checking the page element exists in the DOM is sufficient.
     const pageEl = document.getElementById('local_pca_dosage');
-    if (!pageEl || !pageEl.classList.contains('active')) return;
+    if (!pageEl) return;
     if ((e.key === 'u' || e.key === 'U')
         && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
       e.preventDefault();
@@ -2144,6 +2240,12 @@ function _wireDisplay(state) {
     document.querySelectorAll('#colorModeBarCompact button').forEach(b => {
       b.classList.toggle('active', b.dataset.modeCompact === newMode);
     });
+    // 2026-05-20: third surface — per-sample ramp buttons in the scatter
+    // axes header (#pcaAxisColorRamp). They expose continuous-ramp modes
+    // (het / theta_pi / ghsl) that the cluster-only sidebar bar doesn't.
+    document.querySelectorAll('#pcaAxisColorRamp button').forEach(b => {
+      b.classList.toggle('active', b.dataset.modeRamp === newMode);
+    });
     // v4 turn 86: show/hide Q-ancestry sub-controls when mode toggles
     // to/from q_ancestry. Refresh the K dropdown options from the
     // registered set each time the panel is shown.
@@ -2188,6 +2290,24 @@ function _wireDisplay(state) {
       const mode = btn.dataset.modeCompact;
       if (!mode) return;
       applyColorMode(mode);
+    });
+    btn.dataset.wired = '1';
+  });
+
+  // --- #pcaAxisColorRamp button click (2026-05-20) ---
+  // Third surface: continuous-ramp color modes (het / theta_pi / ghsl)
+  // exposed as buttons in the scatter axes header, next to the link
+  // checkbox. Clicking an already-active ramp button reverts to
+  // 'cluster' so a single click toggles the override on/off.
+  document.querySelectorAll('#pcaAxisColorRamp button').forEach(btn => {
+    if (btn.dataset.wired === '1') return;
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      const mode = btn.dataset.modeRamp;
+      if (!mode) return;
+      // Toggle: if this ramp mode is already active, revert to cluster.
+      const next = (state.colorMode === mode) ? 'cluster' : mode;
+      applyColorMode(next);
     });
     btn.dataset.wired = '1';
   });

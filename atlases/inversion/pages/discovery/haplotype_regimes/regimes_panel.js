@@ -445,38 +445,83 @@ export function _dosageClassColour(cls, alpha) {
  * @returns void
  */
 export function drawRegimesPanel(state) {
-  if (!state || !state.regimesPanel) return;
+  // 2026-05-19 debug instrumentation. The 4 panels were rendering as
+  // empty/black even when state.regimesPanel.stage3_loci was populated;
+  // every early-return below now logs WHY so the user-pasted console
+  // pinpoints the failure path. Drop the warns once the cause is fixed
+  // (see prior pattern in drawLinesPanel).
+  const DBG = '[drawRegimesPanel]';
+  if (!state || !state.regimesPanel) {
+    console.warn(DBG, 'bail: state.regimesPanel is null');
+    return;
+  }
   const rp = state.regimesPanel;
   const container = document.getElementById('regimesCanvasContainer');
-  if (!container || typeof container.querySelector !== 'function') return;
+  if (!container || typeof container.querySelector !== 'function') {
+    console.warn(DBG, 'bail: #regimesCanvasContainer missing in DOM');
+    return;
+  }
   const sub = container.querySelector('.regimes-subpanel');
-  if (!sub) return;
+  if (!sub) {
+    console.warn(DBG, 'bail: no .regimes-subpanel child — buildRegimesPanel did not run or early-returned.',
+      'stage3_loci.length=', (rp.stage3_loci && rp.stage3_loci.length) || 0);
+    return;
+  }
   const cv = sub.querySelector('canvas');
-  if (!cv) return;
+  if (!cv) {
+    console.warn(DBG, 'bail: no <canvas> inside .regimes-subpanel');
+    return;
+  }
   const { ctx, w, h } = fitCanvas(cv);
   ctx.clearRect(0, 0, w, h);
+  // One-time visibility check: if the canvas is rendering to a zero-area
+  // box, log so the user knows it's a layout problem (parent grid row
+  // collapsed) not a data problem.
+  if (state.__regimesVisibilityDbg !== 'logged') {
+    state.__regimesVisibilityDbg = 'logged';
+    const panel = document.getElementById('regimesPanel');
+    const pRect = panel ? panel.getBoundingClientRect() : null;
+    if (!pRect || pRect.height < 4 || w < 4 || h < 4) {
+      console.warn(DBG, 'visibility: panel may be invisible.',
+        '#regimesPanel h=', pRect ? Math.round(pRect.height) : '?',
+        'canvas w/h=', w, h,
+        'parent display=', panel ? getComputedStyle(panel).display : '?');
+    }
+  }
 
   // Geometry
   const padTop_strip = 18;       // pattern-class strip height
   const pad = { l: 44, r: 16, t: 6 + padTop_strip, b: 16 };
   const plotW = w - pad.l - pad.r;
   const plotH = h - pad.t - pad.b;
-  if (plotW <= 0 || plotH <= 0) return;
+  if (plotW <= 0 || plotH <= 0) {
+    console.warn(DBG, 'bail: zero plot area. w=', w, 'h=', h,
+      'plotW=', plotW, 'plotH=', plotH);
+    return;
+  }
 
   // Resolve focal voter and ensure track is built
   const locus = rp.stage3_loci[rp.focal.seed_index];
   if (!locus) {
+    console.warn(DBG, 'bail: no locus at stage3_loci[' + rp.focal.seed_index + '].',
+      'stage3_loci.length=', (rp.stage3_loci && rp.stage3_loci.length) || 0);
     _drawEmptyMessage(ctx, w, h, '(no seed selected)');
     return;
   }
   const voter = buildFocalVoter(locus, rp.focal.band_mask);
   if (voter.n === 0) {
+    console.warn(DBG, 'bail: voter empty for seed', rp.focal.seed_index,
+      'band_mask=', rp.focal.band_mask, 'label=', voter.label);
     _drawEmptyMessage(ctx, w, h, `(seed ${rp.focal.seed_index} ${voter.label} is empty)`);
     return;
   }
   ensureRegimesTrack(state);
   const track = rp.track;
   if (!track) {
+    console.warn(DBG, 'bail: ensureRegimesTrack did not populate rp.track.',
+      'ctx_callbacks=', Object.keys(rp.ctx_callbacks || {}),
+      'has getLabels?', !!(rp.ctx_callbacks && rp.ctx_callbacks.getLabels),
+      'has getK?',      !!(rp.ctx_callbacks && rp.ctx_callbacks.getK));
     _drawEmptyMessage(ctx, w, h, '(track not built)');
     return;
   }
@@ -484,7 +529,11 @@ export function drawRegimesPanel(state) {
   // Build x-axis: flat window order across all chromosomes
   const windowList = rp.windowList || buildGenomeWindowList(rp.chromosomes);
   const nGrid = windowList.length;
-  if (nGrid < 2) return;
+  if (nGrid < 2) {
+    console.warn(DBG, 'bail: window list too short. nGrid=', nGrid,
+      'chromosomes=', (rp.chromosomes && rp.chromosomes.length) || 0);
+    return;
+  }
 
   const max_K = Math.max(track.max_K, 2);   // avoid div by 0 in y-norm
   const yLanes = max_K;          // visual lanes 0..max_K-1

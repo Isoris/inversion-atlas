@@ -73,6 +73,13 @@ export const CAT_COLUMNS = Object.freeze([
   Object.freeze({ key: 'span_kb',    label: 'span kb',    kind: 'float2', simple: true,  align: 'right' }),
   Object.freeze({ key: 'K',          label: 'K',          kind: 'int',    simple: true,  align: 'right' }),
   Object.freeze({ key: 'verdict',    label: 'verdict',    kind: 'string', simple: true,  align: 'left'  }),
+  // 2026-05-20 (SPEC_cramers_v_seed_merge.md Phase 1 deliverable #4):
+  // surface `source` so the TSV/MD/JSON export can distinguish
+  // user-curated drafts (lock_promote, seed_promote, l3_pair_merge)
+  // from auto-promoted candidates (auto_l2_sweep, auto_cramers_v_local,
+  // auto_cramers_v_macrostripe). `simple: false` keeps it out of the
+  // default narrow-table view but it's always included in exports.
+  Object.freeze({ key: 'source',     label: 'source',     kind: 'string', simple: false, align: 'left'  }),
   Object.freeze({ key: 'diamond',    label: 'Diamond',    kind: 'diamond',simple: true,  align: 'center' }),
   Object.freeze({ key: 'n_windows',  label: 'n windows',  kind: 'int',    simple: false, align: 'right' }),
   Object.freeze({ key: 'n_samples',  label: 'n samples',  kind: 'int',    simple: true,  align: 'right' }),
@@ -124,6 +131,11 @@ export function buildCatalogueRows(state) {
       span_kb:    span_bp != null ? span_bp / 1000 : null,
       K:          Number.isFinite(r.K) ? r.K : null,
       verdict:    typeof r.verdict === 'string' ? r.verdict : '',
+      // 2026-05-20: candidate provenance. L2-envelope rows (the
+      // default catalogueRows source) don't carry `source`; auto-
+      // promoted + manually-promoted candidates do. Empty string for
+      // L2-envelope rows keeps the column well-formed in the TSV.
+      source:     typeof r.source === 'string' ? r.source : '',
       n_windows:  Number.isFinite(r.n_windows) ? r.n_windows : null,
       n_samples:  Number.isFinite(r.n_samples) ? r.n_samples : null,
       silhouette: Number.isFinite(r.silhouette) ? r.silhouette : null,
@@ -334,6 +346,29 @@ export function renderCatBodyHtml(rows, disp, selection, favorites, diamondMode)
           + _diamondCellHtml(r, diamondMode || 'loose') + '</td>');
         continue;
       }
+      // 2026-05-20: render the `source` column as a coloured chip
+      // matching candidate_focus's .src-chip-* classes. Same visual
+      // treatment as the candidate-focus header so a user can scan
+      // the catalogue and instantly see which candidates came from
+      // L2-sweep vs Cramér V local vs Cramér V macrostripe vs the
+      // manual draft paths. Falls back to a plain "—" for rows with
+      // no source (L2-envelope rows that aren't candidates).
+      if (col.key === 'source') {
+        const raw = r[col.key];
+        if (!raw) {
+          out.push('<td style="text-align: ' + col.align + ';">' +
+                   '<span style="color: var(--ink-dimmer);">—</span></td>');
+          continue;
+        }
+        const chipClass = 'src-chip src-chip-' +
+          String(raw).replace(/[^a-z0-9_]/g, '_');
+        out.push(
+          '<td style="text-align: ' + col.align + ';">' +
+          '<span class="' + chipClass + '">' + _escape(raw) + '</span>' +
+          '</td>'
+        );
+        continue;
+      }
       const raw = r[col.key];
       const formatted = _formatCell(raw, col.kind);
       out.push(
@@ -476,6 +511,13 @@ export function promoteRowsToCandidates(rows, candidateList) {
       end_bp:      Number.isFinite(r.end_bp)   ? r.end_bp   : null,
       K:           Number.isFinite(r.K) ? r.K : null,
       verdict:     typeof r.verdict === 'string' ? r.verdict : '',
+      // 2026-05-20: preserve provenance when an existing row already
+      // had a `source` tag (auto-promoted rows surface in the catalogue
+      // via inv.catalogueRows). Falls back to the canonical
+      // 'catalogue_promote' source for rows that don't carry one —
+      // matches the existing 'promoted_from: catalogue' breadcrumb.
+      source:      typeof r.source === 'string' && r.source
+                     ? r.source : 'catalogue_promote',
       provisional: true,
       confirmed:   false,
       promoted_from: 'catalogue',

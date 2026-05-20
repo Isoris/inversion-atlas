@@ -61,6 +61,16 @@
             <span class="anc-scroll-tagline">ΔQ · Heterozygosity · Entropy · Confidence · Dosage concordance</span>
           </header>
           <canvas id="ancScrollMetricsCanvas" class="anc-scroll-metrics-canvas"></canvas>
+          <!-- Status-icon legend strip — spec §"Brick metrics — five stacked heatmap rows".
+               Renders only when `Show warnings` is on; the bricks layer paints these
+               icons on the right edge of flagged bricks. -->
+          <footer id="ancScrollStatusLegend" class="anc-scroll-status-legend">
+            <span class="anc-status-item"><span class="anc-status-icon">▲</span> Low confidence</span>
+            <span class="anc-status-item"><span class="anc-status-icon">▢</span> High ΔQ</span>
+            <span class="anc-status-item"><span class="anc-status-icon">▢</span> High het.</span>
+            <span class="anc-status-item"><span class="anc-status-icon">⚠</span> Regime discordant</span>
+            <span class="anc-status-item"><span class="anc-status-icon">⊗</span> Dosage discordant</span>
+          </footer>
         </section>
 
         <!-- Layer 3 — Brick summary (cohort view). -->

@@ -154,6 +154,20 @@ export function candidateNavHtml(c) {
         next  ›
       </button>
       <div style="flex: 1;"></div>
+      <!-- 2026-05-20 (SPEC_haplotype_burden_coloring.md Phase 1 deliverable #3):
+           per-candidate group-label export. Emits a TSV joining
+           sample_id × macrostripe_id × microgroup_id × stability_score
+           so downstream R / pandas can test burden differences between
+           trajectory-defined haplotype groups. Per the SPEC's stated
+           weekly goal — "make sure the atlas can export the group labels
+           cleanly. That is enough." — burden columns ship in Phase 2. -->
+      <button id="candExportGroupLabelsBtn"
+              title="Export per-sample group labels (sample_id × macrostripe_id × microgroup_id × stability_score) for this candidate as a TSV. Columns the producer hasn't computed yet are left blank."
+              style="background: var(--panel); border: 1px solid var(--rule); color: var(--ink-dim);
+                     border-radius: 3px; padding: 6px 10px; font-family: var(--mono);
+                     font-size: 11.5px; cursor: pointer;">
+        📊 export group labels
+      </button>
       <button id="candConfirmedToggle" title="Mark this candidate as confirmed (visible on the confirmed tab)"
               style="background: ${confirmed ? 'var(--good)' : 'var(--panel)'};
                      color: ${confirmed ? '#0e1116' : 'var(--ink-dim)'};
@@ -174,11 +188,25 @@ export function candidateHeaderHtml(c) {
   // l2_indices access for candidates that don't carry it (e.g. test fixtures
   // or candidates promoted from external sources without a merge history).
   const nL2 = (c.l2_indices && c.l2_indices.length) || 0;
-  const sourceLabel = {
-    'l2_single':    'single L2 (from catalogue)',
-    'l2_merge':     `${nL2} L2s merged (from catalogue L1 view)`,
-    'lock_promote': 'locked colors on diagnostic page',
-  }[c.source] || c.source;
+  // 2026-05-20: extended source label map. Each `source` tag emits a
+  // short human-readable phrase + a coloured chip via .src-chip-* CSS
+  // classes (see inversion.css). The chip lets the user tell at a
+  // glance whether a candidate came from a manual draft, the L2-sweep
+  // auto-promoter, the V-walker seed-promote, the L3-pair merge, or
+  // the Cramér's V auto-merge (per SPEC_cramers_v_seed_merge.md
+  // Phase 1 deliverable #3).
+  const sourceLabelMap = {
+    'l2_single':                  'single L2 (from catalogue)',
+    'l2_merge':                   `${nL2} L2s merged (from catalogue L1 view)`,
+    'lock_promote':               'locked colors on diagnostic page',
+    'seed_promote':               'V-walker seed → promote',
+    'l3_pair_merge':              'L3 adjacent-pair Cramér merge',
+    'auto_l2_sweep':              'auto: L2-sweep (inheritance)',
+    'auto_cramers_v_local':       'auto: Cramér V · insulated_local',
+    'auto_cramers_v_macrostripe': 'auto: Cramér V · post_long_range',
+  };
+  const sourceLabel = sourceLabelMap[c.source] || c.source;
+  const sourceChipClass = `src-chip src-chip-${(c.source || 'unknown').replace(/[^a-z0-9_]/g, '_')}`;
   const refEnv = state.data && state.data.l2_envelopes
     ? state.data.l2_envelopes[c.ref_l2] : null;
   const refId = refEnv ? (refEnv.candidate_id || `L2_${c.ref_l2}`) : `L2_${c.ref_l2}`;
@@ -210,7 +238,7 @@ export function candidateHeaderHtml(c) {
         <span style="font-size:13px;color:var(--ink-dim);font-weight:400;">(${span_mb.toFixed(2)} Mb span, ${c.end_w - c.start_w + 1} windows)</span>
       </h3>
       <div class="cand-meta-row">
-        <div><span>source:</span>${sourceLabel}</div>
+        <div><span>source:</span><span class="${sourceChipClass}" title="Candidate provenance — where this candidate was created.">${sourceLabel}</span></div>
         <div><span>L2 indices:</span>[${(c.l2_indices || []).join(', ')}]</div>
         <div><span>reference L2:</span>${refId} (idx ${c.ref_l2})</div>
         <div><span>reference window:</span>${c.ref_window}</div>
@@ -515,11 +543,21 @@ export function candidateSummaryHtml(c, profile, bands) {
     : 'n/a';
   // Source
   const nL2src = (c.l2_indices && c.l2_indices.length) || 0;
-  const sourceLabel = {
-    'l2_single':    'single L2',
-    'l2_merge':     `${nL2src} L2s merged`,
-    'lock_promote': 'locked colors',
-  }[c.source] || c.source;
+  // 2026-05-20: extended short labels — keep concise for the summary
+  // grid where horizontal space is tight. See candidateHeaderHtml for
+  // the long-form labels + colour chip rationale.
+  const sourceLabelShortMap = {
+    'l2_single':                  'single L2',
+    'l2_merge':                   `${nL2src} L2s merged`,
+    'lock_promote':               'locked colors',
+    'seed_promote':               'V-walker seed',
+    'l3_pair_merge':              'L3-pair merge',
+    'auto_l2_sweep':              'auto · L2-sweep',
+    'auto_cramers_v_local':       'auto · V local',
+    'auto_cramers_v_macrostripe': 'auto · V macrostripe',
+  };
+  const sourceLabel = sourceLabelShortMap[c.source] || c.source;
+  const sourceChipClassShort = `src-chip src-chip-${(c.source || 'unknown').replace(/[^a-z0-9_]/g, '_')}`;
 
   return `
     <div class="cand-section">
@@ -552,7 +590,7 @@ export function candidateSummaryHtml(c, profile, bands) {
         </div>
         <div class="sum-cell">
           <div class="sum-label">source</div>
-          <div class="sum-value">${sourceLabel}</div>
+          <div class="sum-value"><span class="${sourceChipClassShort}" title="Candidate provenance — see header for the long-form description.">${sourceLabel}</span></div>
         </div>
       </div>
       <div style="font-family:var(--mono);font-size:10px;color:var(--ink-dimmer);margin-top:12px;line-height:1.5;">

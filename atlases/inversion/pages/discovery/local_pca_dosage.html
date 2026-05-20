@@ -395,6 +395,19 @@
 
   <div id="pagesArea" style="overflow: hidden;">
   <main id="local_pca_dosage" class="page active">
+    <!-- Mode-B freshness badge (2026-05-20). Populated by local_pca_dosage.js
+         after applyData runs; surfaces what the registry resolved for the
+         active chrom (windows, samples) + which of the 3 discovery axes
+         are loaded today. Fail-soft per core/mode_b_badge.js. -->
+    <div id="lpdModeBBadge" class="data-source-badge" style="
+         font-size: 12px; color: var(--ink-dim);
+         margin: 4px 8px;
+         padding: 4px 8px;
+         background: var(--panel-2);
+         border-left: 3px solid var(--rule);
+         border-radius: 2px;
+         line-height: 1.4;
+         min-height: 1em;"></div>
     <div id="ctrlBar">
       <button class="play" id="playBtn">▶ Play</button>
       <input type="range" id="scrubber" min="0" max="0" value="0" step="1" disabled />
@@ -938,6 +951,23 @@
           <input type="checkbox" id="viewControlsLinked" />
           <span>link with lines panel</span>
         </label>
+        <!-- 2026-05-20: per-sample ramp-color buttons. Each maps state.colorMode
+             onto one of the continuous ramp modes (het / theta_pi / ghsl)
+             registered in pca_panel.js's _PCA_RAMP_MODES set. Clicking an
+             already-active button reverts to the default cluster mode.
+             Distinct data-mode-ramp attribute keeps the sync-loop separate
+             from the sidebar (#colorModeBar / data-mode) and compact
+             (#colorModeBarCompact / data-mode-compact) bars. -->
+        <span class="pca-axis-sep" aria-hidden="true"></span>
+        <span id="pcaAxisColorRamp" class="pca-axis-ramp"
+              title="Color samples by a per-sample ramp value (yellow → purple). Click an active button to revert to cluster colors.">
+          <button data-mode-ramp="het" type="button"
+                  title="Color each sample by its regional dosage-derived heterozygosity at this locus. Bright yellow = high het (likely Het carrier); dark purple = low het (likely Homo carrier).">het (dosage)</button>
+          <button data-mode-ramp="ghsl" type="button"
+                  title="Color each sample by its per-sample GHSL value (haplotype-divergence signal) at this locus. Greys out until the GHSL precomp ships per-sample values.">GHSL</button>
+          <button data-mode-ramp="theta_pi" type="button"
+                  title="Color each sample by its per-sample θπ value (diversity) at this locus. Greys out until the θπ precomp ships per-sample values.">θπ</button>
+        </span>
         <span id="pcaAxisAvailNote" class="pca-axis-avail"></span>
         <button id="pcaCollapseBtn" class="pca-axis-collapse"
                 title="Collapse / expand the PCA panel — drag the L3 panel up to take its space">▼</button>
@@ -1478,27 +1508,15 @@
           <button id="exportKLabelsBtnCompact"></button>
         </div>
 
-        <!-- v4 turn 73c: color-mode picker. Same five buttons as sidebar. -->
-        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;">
-          <div style="font-size: 10px; color: var(--ink-dim); margin-bottom: 3px;">color samples by</div>
-          <div class="color-mode-row" id="colorModeBarCompact"
-               style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px;">
-            <button data-mode-compact="cluster" class="active"
-                    style="font-size: 9.5px; padding: 2px 4px;">cluster</button>
-            <button data-mode-compact="family"
-                    style="font-size: 9.5px; padding: 2px 4px;">family</button>
-            <button data-mode-compact="ancestry"
-                    style="font-size: 9.5px; padding: 2px 4px;">ancestry</button>
-            <button data-mode-compact="manual"
-                    title="Manually-curated groups (set in 'Manual groups' below)"
-                    style="font-size: 9.5px; padding: 2px 4px;">manual</button>
-            <button data-mode-compact="residual"
-                    title="v4 turn 83 — Diagnostic mode. Recolors PCA + L3 strip by per-fish residual_z from band centroid. Cool blue = clean homozygote; red = suspicious carrier (≥2.5σ)."
-                    style="font-size: 9.5px; padding: 2px 4px;">⚡ residual</button>
-            <button data-mode-compact="none"
-                    style="font-size: 9.5px; padding: 2px 4px;">none</button>
-          </div>
-        </div>
+        <!-- 2026-05-20: color-mode picker relocated to #tPanelOverlay
+             (the ▾ tracked-samples settings popup) per Quentin's
+             feedback that the inline panel below the PCA was
+             vertically scrolling and felt unprofessional. The picker
+             is a setting (chooses how samples are coloured) rather
+             than a main action — fits the popup's "settings" framing.
+             Inline buttons removed; the same IDs + data-mode-compact
+             attributes live in the popup body below so existing
+             handlers in sidebar.js still bind. -->
 
         <!-- v4 turn 73c: tracked-sample list. Renderer dual-writes from
              renderTrackedList → both #trackedList (sidebar) and #trackedListCompact. -->

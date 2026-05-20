@@ -19,7 +19,7 @@
 import {
   fitCanvas, themeColor,
   drawFrame, drawBreakpoints, drawCrosshair, drawEdgeLabels,
-  drawIdeogram, drawSimCollapse, drawLine,
+  drawIdeogram, drawSimCollapse, drawLine, drawMultiline,
 } from './_canvas.js';
 import { loadView, saveView, categoryOf, isVisible, toggle } from './_view.js';
 import { collectTracks } from './_tracks.js';
@@ -163,7 +163,19 @@ function _drawAll(stack, tracks, view, data, bps, cur) {
     } else if (typeof t.getData === 'function') {
       const td = t.getData(data);
       if (td) {
-        drawLine(ctx, toX, pad, plotW, plotH, td, t);
+        // Dispatch by actual data shape. The track-def `renderer` field is
+        // only a HINT; the data wins. A chip declared `renderer: 'multiline'`
+        // that gets single-series data still renders as a clean line; a chip
+        // declared `renderer: 'line'` that gets multi-series data renders
+        // multiple curves. Avoids the silent-blank-canvas case where the
+        // renderer + data shape disagree.
+        const isMulti = Array.isArray(td.series) && td.series.length > 0;
+        const isSingle = Array.isArray(td.values);
+        if (isMulti) {
+          drawMultiline(ctx, toX, pad, plotW, plotH, td, t);
+        } else if (isSingle) {
+          drawLine(ctx, toX, pad, plotW, plotH, td, t);
+        }
         attachTooltip(cv, {
           trackDef: t, data: td,
           padL: pad.l, padR: pad.r,

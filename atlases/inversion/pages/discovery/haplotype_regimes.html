@@ -36,6 +36,84 @@
         </div>
       </div>
 
+      <!-- 2026-05-20: "what to do next" interpretation drawer. Hidden
+           until the pipeline has run and produced at least one seed
+           (toggled visible by _renderSeedsStrip in haplotype_regimes.js
+           when seeds.length > 0). Quentin's feedback: "we have some
+           results but like idk what to do" — this drawer answers that
+           by mapping discovered artifacts (seeds / loci / regimes) to
+           concrete next actions (inspect / promote / merge / export). -->
+      <details id="rgInterpretDrawer" style="
+        flex: 0 0 auto;
+        margin: 0 12px 8px 12px;
+        padding: 0;
+        background: var(--panel-2, #181d27);
+        border: 1px solid var(--rule, #2a3242);
+        border-radius: 4px;
+        display: none;
+        font-family: ui-monospace, monospace;
+        font-size: 10.5px;
+        color: var(--ink, #e6edf6);
+      " open>
+        <summary style="
+          padding: 6px 10px;
+          cursor: pointer;
+          color: var(--ink-dim, #8895a8);
+          letter-spacing: 0.04em;
+          text-transform: uppercase;
+          font-size: 10px;
+          user-select: none;
+        ">▾ how to read these results — what to do next</summary>
+        <div style="padding: 4px 12px 10px 12px; line-height: 1.5;">
+          <div style="margin-bottom: 6px;">
+            <b style="color: var(--accent, #f5a524);">Each chip in the seeds strip below</b>
+            is one <b>Stage&nbsp;1 seed</b> the pipeline discovered — a
+            window range where the K-band labels shift consistently
+            enough to suggest a haplotype regime boundary. Use
+            <code>←</code>/<code>→</code> or click a chip to set the
+            <b>focal&nbsp;seed</b>; the 4 panels below repaint to show
+            how that seed's voter projects across the chromosome.
+          </div>
+          <div style="margin-bottom: 6px;">
+            <b style="color: var(--accent, #f5a524);">Top-left panel (chrom · target-band lanes):</b>
+            for the focal seed's voter (a chosen subset of bands), where does each
+            target window classify? Solid bands = clean projection;
+            scattered = noisy. <b style="color: var(--accent, #f5a524);">Bottom-left
+            (chrom · PC1 lines):</b> the raw per-sample PC1 with the
+            voter samples highlighted in gold. Genome-scope panels
+            (right column) only appear after <i>Show genome view</i> +
+            <i>Compute genome view</i>.
+          </div>
+          <div style="margin-bottom: 4px;">
+            <b style="color: var(--accent, #f5a524);">Action menu:</b>
+          </div>
+          <ul style="margin: 0 0 0 18px; padding: 0;">
+            <li><b>★ promote seed</b> — turn the focal seed into a
+              tracked candidate inversion (appears in local_pca_dosage's
+              candidate carousel and is persisted to localStorage).</li>
+            <li><b>↻ auto-merge V</b> — walk every adjacent seed pair
+              and auto-promote consecutive-MERGE chains as candidates
+              (Cramér's V on Hungarian-aligned labels).</li>
+            <li><b>↻ auto-merge V<sub style="font-size:8px;">macro</sub></b> — same,
+              but bounded WITHIN each Stage&nbsp;3 macrostripe so the
+              walker never crosses locus boundaries.</li>
+            <li><b>export catalogue…</b> — serialize the in-memory
+              pipeline result (seeds + loci + regimes + topology) to
+              a regime-catalogue JSON for archival / downstream tools.</li>
+            <li><b>switch view → long-range regimes</b> — replace the
+              seeds strip with the refined regime blocs (Cluster&nbsp;3
+              output) when you want the consolidated picture instead of
+              raw seed-by-seed inspection.</li>
+          </ul>
+          <div style="margin-top: 8px; color: var(--ink-dim, #8895a8); font-size: 9.5px;">
+            Don't see anything useful? Try a different <b>seed mode</b>
+            (long-range / short-range / het-skeleton) in the top-left
+            pill group, then click <b>run pipeline</b> again. Each mode
+            uses a different seed-discovery strategy.
+          </div>
+        </div>
+      </details>
+
       <!-- 2026-05-20: seeds inspector strip. Horizontal scrollable chip
            list — one chip per Stage 1 seed produced by the pipeline.
            Click a chip to set focal_seed_index + repaint the 4 panels.
@@ -356,6 +434,27 @@
             font: inherit;
             cursor: pointer;
           ">&#8634; auto-merge V&hellip;</button>
+        <!-- 2026-05-20: Mode 2 (post_long_range) — same Cramér's V
+             adjacent-pair test, but bounded WITHIN each Stage 3
+             macrostripe so the walker never compares seeds across
+             loci. Long-range Stage 2 voting has already established
+             macrostripe identity; this mode does the finer-grained
+             "where does the macrostripe START and STOP" boundary
+             refinement. SPEC_cramers_v_seed_merge.md Phase 1
+             deliverable #2 (Mode 2 UI half). Compute lives in
+             shared/cramers_v_merge.js#runCramersVMergeMacrostripe.
+             Disabled until a pipeline run produces ≥ 1 macrostripe
+             that contains ≥ 2 seeds. -->
+        <button id="rgAutoMergeMacroBtn" class="rg-tb-btn" disabled
+          title="Walk adjacent Stage 1 seeds WITHIN each Stage 3 macrostripe, run the Cramér's V contingency test, and auto-promote each consecutive-MERGE chain as a candidate. Macrostripe-bounded: never crosses locus boundaries. Disabled until 'run pipeline' produces ≥ 1 macrostripe with ≥ 2 seeds inside."
+          style="
+            background: var(--panel-3, #232a36);
+            color: var(--ink, #e6edf6);
+            border: 1px solid var(--rule, #2a3242);
+            padding: 4px 10px;
+            font: inherit;
+            cursor: pointer;
+          ">&#8634; auto-merge V<sub style="font-size: 8px;">macro</sub>&hellip;</button>
         <span id="rgStatus" style="margin-left: auto; color: var(--ink-dim, #8895a8);">
           idle &middot; pipeline not yet run
         </span>

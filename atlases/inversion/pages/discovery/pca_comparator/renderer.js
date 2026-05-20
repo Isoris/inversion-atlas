@@ -802,25 +802,49 @@ function _drawEmpty(ctx, w, h, msg) {
 // future caller adds a min-width: auto path.
 function _fitCanvas(canvas, ctx) {
   const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
-  const parent = canvas.parentNode;
-  const measureW = (parent && parent.clientWidth)  || canvas.clientWidth  || 1;
-  const measureH = (parent && parent.clientHeight) || canvas.clientHeight || 1;
-  const cssW = Math.max(1, measureW | 0);
-  const cssH = Math.max(1, measureH | 0);
+  // 2026-05-19 fix for the "panels grow on every event" runaway:
+  //
+  // The 3 PCA panels are laid out as `.pca-comp-cell { display: flex;
+  // flex-direction: column }` with a `flex: 1 1 auto; min-height: 220px`
+  // wrapper around each <canvas style="width:100%; height:100%">. The
+  // earlier version of this function ALSO wrote
+  //   canvas.style.width  = '<measureW>px'
+  //   canvas.style.height = '<measureH>px'
+  // which CLOBBERED the HTML's `height: 100%` with an intrinsic pixel
+  // height. That gave the canvas a non-zero `min-content` height, which
+  // the wrapper's `flex-basis: auto` resolved to. The wrapper then
+  // flex-grew by N px (rounding / dpr quantization), the row auto-grew
+  // to fit, and the NEXT event measured a larger parent — feedback loop,
+  // panels enlarged on every mousemove / arrow keypress.
+  //
+  // The fix: leave the CSS box alone. fitCanvas's only legitimate job
+  // is to keep the BITMAP dimensions (canvas.width / canvas.height
+  // attributes) in sync with the CSS-driven display size at the device
+  // pixel ratio. The HTML's inline `width:100%; height:100%` + a
+  // bounded wrapper height drive the actual layout. The bitmap update
+  // never feeds back into layout (it changes drawing buffer size, not
+  // the element's box).
+  //
+  // Use getBoundingClientRect() of the CANVAS so we read the actual
+  // rendered size (CSS-resolved) rather than the parent's content box.
+  // Falls back to parent.clientWidth/clientHeight only when the canvas
+  // has no rect (detached / display:none).
+  const rect = canvas.getBoundingClientRect();
+  let cssW = Math.max(1, Math.round(rect.width));
+  let cssH = Math.max(1, Math.round(rect.height));
+  if (cssW < 2 || cssH < 2) {
+    const parent = canvas.parentNode;
+    cssW = Math.max(1, (parent && parent.clientWidth)  || canvas.clientWidth  || 1);
+    cssH = Math.max(1, (parent && parent.clientHeight) || canvas.clientHeight || 1);
+  }
   const targetW = Math.max(1, (cssW * dpr) | 0);
   const targetH = Math.max(1, (cssH * dpr) | 0);
   if (canvas.width !== targetW || canvas.height !== targetH) {
     canvas.width  = targetW;
     canvas.height = targetH;
   }
-  // Pin the CSS size to the measured pixel value (idempotent — only
-  // writes the inline style when it would change). Prevents any
-  // remaining grid/flex auto-min-size leak via the canvas's intrinsic
-  // width attribute.
-  const pxW = cssW + 'px';
-  const pxH = cssH + 'px';
-  if (canvas.style.width  !== pxW) canvas.style.width  = pxW;
-  if (canvas.style.height !== pxH) canvas.style.height = pxH;
+  // INTENTIONALLY no canvas.style.width / canvas.style.height writes.
+  // See above comment for why.
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return { cssW, cssH };
 }

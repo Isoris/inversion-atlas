@@ -33,6 +33,13 @@ import {
   IGC_MIN_BANDS_FOR_CLUSTERING,
 } from '../../../shared/inheritance_groups.js';
 import { inheritanceCacheKey } from './inheritance.js';
+// 2026-05-20 (SPEC_macrostripe_microgroup_hierarchy.md Phase 2): the
+// L2-sweep auto-promote pipeline should accept on macrostripe purity
+// instead of per-window K-means purity when band-tracking has produced
+// a chrom-wide assignment. Falls back to today's K-means gate when
+// state.bandingResult isn't populated yet (e.g. user hasn't visited
+// haplotype_regimes on this chrom).
+import { getMacrostripeIdsAtWindow } from '../../../shared/macrostripe.js';
 
 // =====================================================================
 // Constants (legacy lines 41749-41755)
@@ -260,18 +267,51 @@ export function runL2SweepInheritance(state, opts) {
     id: it.id, K: it.K, seq_num: it.seq_num,
     start_bp: it.start_bp, end_bp: it.end_bp,
   }));
-  result.l2_meta = sortedMeta.map((m, i) => ({
-    l2idx: m.l2idx,
-    item_idx: i,
-    item_id: sortedItems[i].id,
-    seq_num: sortedItems[i].seq_num,
-    start_bp: m.env.start_bp,
-    end_bp: m.env.end_bp,
-    n_bands: m.n_bands,
-    n_per_group: Array.isArray(m.cluster.n_per_group)
-                  ? m.cluster.n_per_group.slice() : null,
-    silhouette: silhouetteForL2FixedK(state, m.l2idx, m.cluster),
-  }));
+  result.l2_meta = sortedMeta.map((m, i) => {
+    // 2026-05-20: per-L2 macrostripe-id counts at the L2's anchor
+    // window. Used by the SMALL_BAND gate (gate 4) as the preferred
+    // input when bandingResult is populated — SPEC_macrostripe_
+    // microgroup_hierarchy.md Phase 2 ("Same gates, different label
+    // source"). Falls back to null when banding hasn't run; gate
+    // logic in autoPromoteFromSweep handles the fallback.
+    let n_per_macrostripe = null;
+    try {
+      if (state && state.bandingResult) {
+        const env = m.env;
+        const aw = Number.isFinite(env._s0)
+          ? Math.floor((env._s0 + (Number.isFinite(env._e0) ? env._e0 : env._s0)) / 2)
+          : (Number.isFinite(env.start_w) && Number.isFinite(env.end_w))
+            ? Math.floor(((env.start_w - 1) + (env.end_w - 1)) / 2)
+            : null;
+        if (Number.isFinite(aw)) {
+          const ids = getMacrostripeIdsAtWindow(state, aw | 0);
+          if (ids && ids.length) {
+            const counts = [];
+            for (let s = 0; s < ids.length; s++) {
+              const k = ids[s];
+              if (k < 0) continue;
+              while (counts.length <= k) counts.push(0);
+              counts[k]++;
+            }
+            if (counts.length > 0) n_per_macrostripe = counts;
+          }
+        }
+      }
+    } catch (_) { n_per_macrostripe = null; }
+    return {
+      l2idx: m.l2idx,
+      item_idx: i,
+      item_id: sortedItems[i].id,
+      seq_num: sortedItems[i].seq_num,
+      start_bp: m.env.start_bp,
+      end_bp: m.env.end_bp,
+      n_bands: m.n_bands,
+      n_per_group: Array.isArray(m.cluster.n_per_group)
+                    ? m.cluster.n_per_group.slice() : null,
+      n_per_macrostripe,
+      silhouette: silhouetteForL2FixedK(state, m.l2idx, m.cluster),
+    };
+  });
 
   state.l2SweepResult = result;
   state.l2SweepCacheKey = cacheKey;
@@ -376,10 +416,27 @@ export function autoPromoteFromSweep(state, result) {
       skipped.push({ l2idx, reason: 'LOW_SILHOUETTE', silhouette: meta.silhouette });
       continue;
     }
-    if (Array.isArray(meta.n_per_group)) {
-      const minBand = meta.n_per_group.reduce((a, b) => Math.min(a, b), Infinity);
+    // 2026-05-20 (SPEC_macrostripe_microgroup_hierarchy.md Phase 2):
+    // prefer macrostripe counts over per-window K-means counts when
+    // band-tracking has produced a chrom-wide assignment. Macrostripe
+    // purity is the biology-aware version — K-means can over-split a
+    // single biological lane into two clusters which then trip the
+    // SMALL_BAND gate even though the lane itself has plenty of
+    // samples. Falls back to n_per_group when bandingResult is
+    // absent (today's behaviour). The skipped record carries
+    // `band_source: 'macrostripe' | 'kmeans'` so the inspector UI
+    // can surface which gate fired.
+    const bandSource = Array.isArray(meta.n_per_macrostripe) ? 'macrostripe'
+                    : Array.isArray(meta.n_per_group)        ? 'kmeans'
+                    : null;
+    const bandCounts = bandSource === 'macrostripe' ? meta.n_per_macrostripe
+                    : bandSource === 'kmeans'      ? meta.n_per_group
+                    : null;
+    if (bandCounts) {
+      const minBand = bandCounts.reduce((a, b) => Math.min(a, b), Infinity);
       if (minBand < AUTO_PROMOTE_MIN_BAND_SIZE) {
-        skipped.push({ l2idx, reason: 'SMALL_BAND', min_band: minBand });
+        skipped.push({ l2idx, reason: 'SMALL_BAND', min_band: minBand,
+                       band_source: bandSource });
         continue;
       }
     }

@@ -69,26 +69,104 @@ export async function mount(root, atlasState, registry) {
     atlasState.inversion._page_dosage_cluster_adaptive_k_state = pageState;
   }
 
-  // 2026-05-20: auto-compute on direct mount. Builds a per-sample
-  // dosage-profile matrix D[sample × window] from the local_pca_dosage
-  // data (PC1 across windows is a reasonable per-sample profile when
-  // the raw dosage matrix isn't directly accessible), then runs
-  // adaptiveKDosageClustering. Falls back to a fresh scrubber_main
-  // resolve when the stash isn't populated.
+  // 2026-05-20 perf: compute is OPT-IN. Previously this page auto-ran
+  // adaptiveKDosageClustering on mount, which blocked the main thread
+  // for 3–8 s on long chromosomes and froze the whole atlas (user
+  // report: "this page makes everything crash always"). Now:
+  //   - On mount: only try to load a previously-cached result from
+  //     sessionStorage. If hit, refresh. If miss, do NOTHING — show
+  //     the empty hint that directs the user to click ▶ Compute.
+  //   - The ▶ Compute button (wired in _wireToolbar) is the only entry
+  //     point to the heavy sync K-means + bootstrap + silhouette run.
+  // Net effect: navigating to this page never blocks. The user only
+  // pays the compute cost when they explicitly ask for it, and only
+  // once per (chrom, n_samples, n_windows) per session.
   if (!pageState.cluster_result) {
     try {
+      const loaded = _tryLoadCachedClustering(atlasState);
+      if (loaded) {
+        pageState = _buildPageState(atlasState);
+        _setActiveState(pageState);
+        try { refreshDosageCluster(pageState); }
+        catch (e) { console.warn('dosage_cluster_adaptive_k.mount: post-cache refresh threw —', e); }
+        if (atlasState.inversion) {
+          atlasState.inversion._page_dosage_cluster_adaptive_k_state = pageState;
+        }
+      } else {
+        // No cached result — show the empty hint with Compute prompt.
+        _setLoadingHint(root, '');
+      }
+    } catch (e) {
+      console.warn('dosage_cluster_adaptive_k.mount: cache-load failed:', e);
+    }
+  }
+
+  // Wire the ▶ Compute button — explicit user-triggered compute.
+  try {
+    _wireComputeButton(root, atlasState, registry);
+  } catch (e) {
+    console.warn('dosage_cluster_adaptive_k.mount: compute-button wiring threw —', e);
+  }
+}
+
+// Read cached clustering result (if any) into atlasState.inversion.
+// Returns true on cache hit. Does NOT trigger any compute.
+function _tryLoadCachedClustering(atlasState) {
+  const inv = (atlasState && atlasState.inversion) || {};
+  const existing = inv.dosage_cluster_state || {};
+  if (existing.cluster_result) return true;
+  const stash = inv._local_pca_dosage_state;
+  const data = (stash && stash.data) || null;
+  if (!data || !Array.isArray(data.windows)) return false;
+  const nW = data.windows.length;
+  const nS = data.n_samples | 0;
+  if (nW <= 0 || nS <= 0) return false;
+  const chrom = (data && data.chrom)
+             || (atlasState.shared && atlasState.shared.activeChrom)
+             || 'unknown';
+  const cacheKey = `inv_atlas.dosage_cluster.${chrom}.${nS}.${nW}`;
+  try {
+    const cached = sessionStorage.getItem(cacheKey);
+    if (!cached) return false;
+    inv.dosage_cluster_state = Object.assign({}, existing, {
+      cluster_result:  JSON.parse(cached),
+      candidate_label: existing.candidate_label || chrom,
+      _cache_hit:      true,
+    });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+// Wire the explicit ▶ Compute button. On click, runs the heavy
+// adaptiveKDosageClustering and refreshes the page state.
+function _wireComputeButton(root, atlasState, registry) {
+  const btn = (root && root.querySelector && root.querySelector('#dosageClusterComputeBtn'))
+    || (typeof document !== 'undefined' && document.getElementById('dosageClusterComputeBtn'));
+  if (!btn || btn.dataset.wired === '1') return;
+  btn.dataset.wired = '1';
+  btn.addEventListener('click', async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.textContent = '⏳ Computing…';
+    try {
       await _autoComputeDosageClustering(root, atlasState, registry);
-      pageState = _buildPageState(atlasState);
+      const pageState = _buildPageState(atlasState);
       _setActiveState(pageState);
       try { refreshDosageCluster(pageState); }
-      catch (e) { console.warn('dosage_cluster_adaptive_k.mount: post-autocompute refresh threw —', e); }
+      catch (e) { console.warn('dosage_cluster_adaptive_k: post-compute refresh threw —', e); }
       if (atlasState.inversion) {
         atlasState.inversion._page_dosage_cluster_adaptive_k_state = pageState;
       }
     } catch (e) {
-      console.warn('dosage_cluster_adaptive_k.mount: auto-compute failed:', e);
+      console.warn('dosage_cluster_adaptive_k: compute failed:', e);
+      _setLoadingHint(root, `compute failed: ${e && e.message ? e.message : 'error'}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '▶ Recompute';
     }
-  }
+  });
 }
 
 async function _autoComputeDosageClustering(root, atlasState, registry) {
@@ -114,6 +192,43 @@ async function _autoComputeDosageClustering(root, atlasState, registry) {
   const nW = wins.length;
   const nS = data.n_samples | 0;
   if (nW <= 0 || nS <= 0) return;
+
+  // 2026-05-19 perf: cache the cluster result across navigations by
+  // (chrom, n_samples, n_windows). adaptiveKDosageClustering takes
+  // 3–8 s on a 226-sample × 9k-window chromosome (multi-start K-means
+  // + bootstrap + silhouette for K=2..6); user-reported "this page
+  // makes everything super slow". Result is deterministic for the
+  // same data shape — store in sessionStorage so it survives tab nav
+  // but doesn't pollute long-term storage. sessionStorage rather than
+  // localStorage because the upstream PC1 vectors CAN change between
+  // browser sessions (re-emit precomp) without a version stamp;
+  // session-scoped caching is the safe compromise.
+  const chrom = (data && data.chrom)
+             || (atlasState.shared && atlasState.shared.activeChrom)
+             || 'unknown';
+  const cacheKey = `inv_atlas.dosage_cluster.${chrom}.${nS}.${nW}`;
+  try {
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      inv.dosage_cluster_state = Object.assign({}, existing, {
+        cluster_result:  JSON.parse(cached),
+        candidate_label: existing.candidate_label || chrom,
+        _cache_hit:      true,
+      });
+      return;
+    }
+  } catch (_) { /* sessionStorage unavailable / malformed; recompute */ }
+
+  // Show a loading hint NOW so the user sees the page is alive while
+  // the multi-second sync compute runs (vs the previous behavior:
+  // page mounts in a blank/frozen state for the full compute duration).
+  _setLoadingHint(
+    root,
+    `computing adaptive-K dosage clustering on ${nS} samples × ${nW} windows… ` +
+    `(K=2..6 with bootstrap + silhouette; first run can take 3–8 s on long chromosomes — ` +
+    `subsequent visits load from session cache)`,
+  );
+
   // Build D[sample][window] = signed PC1 across windows. Float64Array
   // row-major n_samples × n_windows for adaptiveKDosageClustering's
   // expected contract.
@@ -129,7 +244,27 @@ async function _autoComputeDosageClustering(root, atlasState, registry) {
   try {
     const mod = await import('../../shared/mgl_dosage_clustering.js').catch(() => null);
     if (mod && typeof mod.adaptiveKDosageClustering === 'function') {
-      result = mod.adaptiveKDosageClustering(D, nS, nW, {});
+      // 2026-05-19 perf: yield so the browser PAINTS the loading
+      // hint before the multi-second sync compute starts. Just
+      // setTimeout(…, 0) doesn't guarantee a paint between yields —
+      // the task queue runs without necessarily letting the renderer
+      // tick. RAF-then-setTimeout pattern:
+      //   1. requestAnimationFrame waits for the next vsync (paint).
+      //   2. Inside the RAF callback, setTimeout(0) yields again so
+      //      the heavy compute runs as the next macrotask, AFTER the
+      //      paint has actually been flushed to the screen.
+      // Net effect: user sees "computing…" hint, then the tab freezes
+      // for the compute duration, then the result. Without this the
+      // tab freezes BEFORE the hint paints, and the user sees a blank
+      // page until the compute finishes.
+      result = await new Promise(resolve => {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            try { resolve(mod.adaptiveKDosageClustering(D, nS, nW, {})); }
+            catch (_) { resolve(null); }
+          }, 0);
+        });
+      });
     }
   } catch (e) {
     _setLoadingHint(root, `adaptiveKDosageClustering threw: ${e && e.message ? e.message : 'error'}`);
@@ -138,8 +273,15 @@ async function _autoComputeDosageClustering(root, atlasState, registry) {
   if (!result) return;
   inv.dosage_cluster_state = Object.assign({}, existing, {
     cluster_result:  result,
-    candidate_label: existing.candidate_label || (data.chrom || null),
+    candidate_label: existing.candidate_label || chrom,
   });
+  // Stash for next nav. sessionStorage has a per-origin quota (~5 MB
+  // typically) which the cluster_result usually fits inside (per-K
+  // labels are int8-ish + small metadata), but huge cohorts on huge
+  // chromosomes may overflow — silently skip caching on quota error,
+  // recompute is the worst case.
+  try { sessionStorage.setItem(cacheKey, JSON.stringify(result)); }
+  catch (_) { /* over quota or storage disabled */ }
 }
 
 function _setLoadingHint(root, msg) {

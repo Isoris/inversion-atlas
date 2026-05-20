@@ -37,6 +37,8 @@
 import { escapeHtml } from '../../shared/page1_utils.js';
 import { persistActiveCandidateId } from '../../shared/active_candidate.js';
 import { resolve as _registryResolve, getState as _getState } from '../../../../core/atlas_api.js';
+import { probeModeB, renderModeBBadge } from '../../../../core/mode_b_badge.js';
+import { getMacrostripeIdPerSample } from '../../shared/macrostripe.js';
 
 import { _setActiveState, _pageState } from './candidate_focus/_state.js';
 import {
@@ -362,6 +364,92 @@ export function wireCandidateNav(state, c) {
       refreshCandidateListUI(state);
     });
   }
+  // 2026-05-20 (SPEC_haplotype_burden_coloring.md Phase 1 deliverable #3):
+  // export per-sample group labels TSV. microgroup_id comes from
+  // cand.locked_labels (per-candidate K-band assignment); macrostripe_id
+  // comes from getMacrostripeIdPerSample which folds Stage 3
+  // band-tracking results onto the cohort. Both fall back to empty
+  // strings when the upstream computation hasn't run, so the column
+  // skeleton is always emittable — matches the SPEC's stated weekly
+  // goal: "make sure the atlas can export the group labels cleanly.
+  // That is enough."
+  const exportBtn = document.getElementById('candExportGroupLabelsBtn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', () => {
+      try { _exportGroupLabelsTsv(state, c); }
+      catch (e) {
+        console.error('export group labels failed:', e);
+        alert('Export failed: ' + (e && e.message ? e.message : e));
+      }
+    });
+  }
+}
+
+// Build the TSV string for a single candidate and trigger a browser
+// download. Pure-function-ish: only side-effects are document.createElement +
+// URL.createObjectURL + a brief anchor click. SPEC column order:
+//   sample_id   macrostripe_id   microgroup_id   stability_score
+function _exportGroupLabelsTsv(state, c) {
+  if (!state || !state.data || !c) {
+    alert('No candidate or data loaded.');
+    return;
+  }
+  const data = state.data;
+  const samples = Array.isArray(data.samples) ? data.samples : [];
+  const nS = (data.n_samples | 0) || samples.length || 0;
+  if (nS === 0) {
+    alert('No samples in dataset.');
+    return;
+  }
+  const sampleId = (si) => {
+    const s = samples[si];
+    if (typeof s === 'string') return s;
+    if (s && typeof s === 'object') {
+      return s.sample_id || s.id || s.cga || s.ind || s.name || ('S' + si);
+    }
+    return 'S' + si;
+  };
+  // macrostripe ids — chrom-wide band assignment at the candidate's
+  // ref_window (folds Stage 3 results). Null when banding hasn't run.
+  let macro = null;
+  try {
+    const savedCur = state.cur;
+    if (Number.isFinite(c.ref_window)) state.cur = c.ref_window | 0;
+    macro = getMacrostripeIdPerSample(state);
+    state.cur = savedCur;
+  } catch (_) { macro = null; }
+  // microgroup ids — the candidate's own K-band assignment from
+  // locked_labels. -1 means sample not assigned.
+  const locked = (c.locked_labels && c.locked_labels.length === nS)
+    ? c.locked_labels : null;
+  // stability_score — per-sample Hungarian-chain agreement within the
+  // candidate range. Stub for now (SPEC notes this lives in
+  // shared/lineage_clustering.js band-tracking); leave blank until that
+  // path is wired into candidate_focus.
+  const stability = null;
+
+  const header = ['sample_id', 'macrostripe_id', 'microgroup_id', 'stability_score'].join('\t');
+  const out = [header];
+  for (let si = 0; si < nS; si++) {
+    const sid = String(sampleId(si)).replace(/[\t\r\n]/g, ' ');
+    const m   = (macro && macro[si] != null && macro[si] >= 0) ? String(macro[si]) : '';
+    const u   = (locked && locked[si] != null && locked[si] >= 0) ? String(locked[si]) : '';
+    const s2  = (stability && stability[si] != null && Number.isFinite(stability[si]))
+                ? stability[si].toFixed(3) : '';
+    out.push(`${sid}\t${m}\t${u}\t${s2}`);
+  }
+  const chrom = c.chrom || data.chrom || 'unknown';
+  const candId = c.id || c.candidate_id || 'unknown';
+  const filename = `macrostripe_groups.${chrom}.${candId}.tsv`;
+  const blob = new Blob([out.join('\n') + '\n'], { type: 'text/tab-separated-values' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ---------------------------------------------------------------------------
@@ -396,6 +484,57 @@ export async function mount(root, atlasState, registry) {
 
   // Stash for inter-mount lookups.
   if (atlasState.inversion) atlasState.inversion._page2State = legacyState;
+
+  // Mode-B lineage probe — non-blocking. Only fires when an active
+  // candidate is selected; the badge stays hidden otherwise (matches
+  // the candidateEmpty/candidateMeta visibility pattern). Fail-soft.
+  _renderCandidateLineageBadge(atlasState, registry).catch((e) => {
+    console.warn('candidate_focus.mount: lineage badge probe threw —', e);
+  });
+}
+
+async function _renderCandidateLineageBadge(atlasState, registry) {
+  const slot = document.getElementById('cfModeBBadge');
+  if (!slot) return;
+  const cand = (atlasState && atlasState.shared && atlasState.shared.candidate) || null;
+  const candidate_id = cand && (cand.candidate_id || cand.id) || null;
+  if (!candidate_id) {
+    slot.style.display = 'none';
+    return;
+  }
+  slot.style.display = 'block';
+
+  const probe = await probeModeB(registry, 'candidate_lineage', { candidate_id }, {
+    extractRows: (p) => {
+      // lineage.versions is a map { version_id -> metadata }; flatten
+      // to entries so probeModeB's row-array contract is satisfied.
+      if (!p || !p.versions || typeof p.versions !== 'object') return null;
+      return Object.entries(p.versions).map(([version_id, meta]) =>
+        Object.assign({ version_id }, meta || {}));
+    },
+  });
+
+  renderModeBBadge('cfModeBBadge', probe, {
+    label:    'candidate lineage',
+    layerKey: 'candidate_lineage',
+    context:  candidate_id,
+    compare:  (probeResult) => {
+      const active = probeResult.payload && probeResult.payload.active_version_id;
+      const status = probeResult.payload && probeResult.payload.status;
+      const activeRow = active
+        ? probeResult.rows.find((r) => r.version_id === active)
+        : null;
+      const refinedAt = activeRow && (activeRow.refined_at || activeRow.created_at);
+      const pass = !!active && probeResult.n >= 1;
+      const versionsList = probeResult.rows.map((r) => r.version_id).join(', ');
+      const summary = `${probeResult.n} version${probeResult.n === 1 ? '' : 's'} ` +
+        `(${versionsList}) · ` +
+        (active ? `active = ${active}` : 'no active_version_id!') +
+        (refinedAt ? ` · ${refinedAt}` : '') +
+        (status ? ` · status: ${status}` : '');
+      return { pass, summary };
+    },
+  });
 }
 
 /**

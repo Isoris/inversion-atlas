@@ -257,28 +257,51 @@ function _buildGenomePC1Panel(state) {
 }
 
 function _drawGenomePlaceholder(containerId, message) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  const sub = container.querySelector('div');
-  if (!sub) return;
-  const cv = sub.querySelector('canvas');
-  if (!cv) return;
-  const ctx = cv.getContext && cv.getContext('2d');
-  if (!ctx) return;
-  // Size the canvas to its CSS box
-  const rect = cv.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  cv.width = Math.max(1, rect.width * dpr | 0);
-  cv.height = Math.max(1, rect.height * dpr | 0);
-  ctx.scale(dpr, dpr);
-  ctx.clearRect(0, 0, rect.width, rect.height);
-  ctx.fillStyle = '#1f2937';
-  ctx.fillRect(0, 0, rect.width, rect.height);
-  ctx.fillStyle = 'rgba(180,190,210,0.8)';
-  ctx.font = '11px ui-monospace, monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(message, rect.width / 2, rect.height / 2);
+  // 2026-05-20: defer the actual paint to a RAF. Previously this ran
+  // synchronously from _enableGenomePanels which had JUST flipped the
+  // panel container from display:none to display:'' — at sync-call
+  // time the browser hadn't laid out the new flex children yet, so
+  // canvas.getBoundingClientRect() returned 0×0. The canvas bitmap
+  // was set to 1×1, the fillRect/fillText painted into 1 pixel, and
+  // the user saw a black panel (user report: "When we show genome
+  // view the panels are black"). A single RAF lets layout settle;
+  // if the rect is STILL zero we retry once on the next frame, then
+  // log + bail so a stuck panel doesn't loop forever.
+  const paint = (attemptsLeft) => {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const sub = container.querySelector('div');
+    if (!sub) return;
+    const cv = sub.querySelector('canvas');
+    if (!cv) return;
+    const ctx = cv.getContext && cv.getContext('2d');
+    if (!ctx) return;
+    const rect = cv.getBoundingClientRect();
+    if ((rect.width < 4 || rect.height < 4) && attemptsLeft > 0) {
+      requestAnimationFrame(() => paint(attemptsLeft - 1));
+      return;
+    }
+    if (rect.width < 4 || rect.height < 4) {
+      console.warn('[regimes] _drawGenomePlaceholder: canvas has zero box',
+        '— parent layout collapsed. containerId=', containerId,
+        'rect=', rect.width, 'x', rect.height);
+      return;
+    }
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = Math.max(1, rect.width * dpr | 0);
+    cv.height = Math.max(1, rect.height * dpr | 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);   // reset any stale scale
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.fillStyle = '#1f2937';
+    ctx.fillRect(0, 0, rect.width, rect.height);
+    ctx.fillStyle = 'rgba(180,190,210,0.8)';
+    ctx.font = '11px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(message, rect.width / 2, rect.height / 2);
+  };
+  requestAnimationFrame(() => paint(2));
 }
 
 // ---------------------------------------------------------------------
@@ -356,6 +379,14 @@ function _renderHeader(state) {
     `<span style="opacity:0.7">· chrom_idx: ${rp.current_chromosome_idx}</span>`;
   hdr.appendChild(row);
 
+  // 2026-05-20: shared dark-theme button styling so the dynamically-
+  // created header buttons match the action-bar .rg-tb-btn buttons
+  // instead of rendering as browser-default white buttons.
+  const RG_BTN_CSS = 'margin-left:4px; padding:3px 10px; cursor:pointer; ' +
+    'background: var(--panel-3, #232a36); color: var(--ink, #e6edf6); ' +
+    'border: 1px solid var(--rule, #2a3242); border-radius: 3px; ' +
+    'font: 10.5px var(--mono, ui-monospace, monospace); white-space: nowrap;';
+
   // Genome-view toggle. Default is OFF; click to opt in. When on,
   // the genome panels appear as placeholders until the user clicks
   // "Compute genome view" (the same button that becomes "Recompute" once
@@ -363,7 +394,10 @@ function _renderHeader(state) {
   const genomeToggleBtn = document.createElement('button');
   genomeToggleBtn.textContent = state._regimesEnableGenome
     ? 'Hide genome view' : 'Show genome view';
-  genomeToggleBtn.style.cssText = 'margin-left:8px; padding:4px 10px; cursor:pointer;';
+  genomeToggleBtn.style.cssText = RG_BTN_CSS;
+  genomeToggleBtn.title = 'Show/hide the right column of genome-wide panels '
+    + '(target loci across all chromosomes). Off by default — turn on '
+    + 'before clicking "Compute genome view".';
   genomeToggleBtn.onclick = () => {
     if (state._regimesEnableGenome) _disableGenomePanels(state);
     else _enableGenomePanels(state);
@@ -376,7 +410,9 @@ function _renderHeader(state) {
     const computeBtn = document.createElement('button');
     computeBtn.textContent = state._regimesGenomeComputed
       ? 'Recompute genome view' : 'Compute genome view';
-    computeBtn.style.cssText = 'margin-left:4px; padding:4px 10px; cursor:pointer;';
+    computeBtn.style.cssText = RG_BTN_CSS;
+    computeBtn.title = 'Project the focal voter onto every target locus '
+      + 'across all chromosomes. May take a few seconds.';
     computeBtn.onclick = () => {
       computeGenomeView(state);
       _renderHeader(state);
@@ -384,10 +420,21 @@ function _renderHeader(state) {
     row.appendChild(computeBtn);
   }
 
-  // Cycle bandComboMode
+  // Cycle bandComboMode. Switches how K bands are combined into voter
+  // subsets — additive = one voter per band, all = every non-empty
+  // bitmask (2^K - 1 voters), informative = curated stable subsets.
+  // 2026-05-20: guarded against missing locus (was throwing silently
+  // when the pipeline produced no Stage 3 loci yet).
   const modeBtn = document.createElement('button');
   modeBtn.textContent = `Cycle combo mode (${rp.bandComboMode})`;
-  modeBtn.style.cssText = 'margin-left:4px; padding:4px 10px; cursor:pointer;';
+  modeBtn.style.cssText = RG_BTN_CSS;
+  modeBtn.title = 'Cycle through band-combination modes for the focal '
+    + 'voter:\n'
+    + '  • additive — one voter per band (b0, b1, …)\n'
+    + '  • all — every non-empty bitmask over K bands\n'
+    + '  • informative — curated subsets producing stable projections\n'
+    + 'The voter (focal.band_mask) is rebuilt as the UNION of the '
+    + 'chosen bands\' samples on each cycle.';
   modeBtn.onclick = () => {
     const order = ['additive', 'all', 'informative'];
     const cur = order.indexOf(rp.bandComboMode);
@@ -396,9 +443,18 @@ function _renderHeader(state) {
     if (state._regimesGenomeState) {
       state._regimesGenomeState.regimesPanel.bandComboMode = next;
     }
-    // Snap focal.band_mask onto first subset of the new mode
-    const newSubs = getActiveBandSubsets(rp, locus.K).subsets;
-    rp.focal.band_mask = newSubs[0] || 1;
+    // Snap focal.band_mask onto first subset of the new mode. Guard
+    // against missing locus (no Stage 3 loci → focal.seed_index points
+    // at undefined → throw on locus.K). Without the guard the button
+    // appeared broken when clicked before "run pipeline".
+    const K = locus ? locus.K : 1;
+    try {
+      const newSubs = getActiveBandSubsets(rp, K).subsets;
+      rp.focal.band_mask = newSubs[0] || 1;
+    } catch (e) {
+      console.warn('[cycleCombo] subset enum threw —', e);
+      rp.focal.band_mask = 1;
+    }
     _redrawAll(state);
     _renderHeader(state);
   };
@@ -407,7 +463,7 @@ function _renderHeader(state) {
   // Cycle current_chromosome_idx (chrom-scope target chromosome)
   const chrBtn = document.createElement('button');
   chrBtn.textContent = `Next chrom (${rp.current_chromosome_idx})`;
-  chrBtn.style.cssText = 'margin-left:4px; padding:4px 10px; cursor:pointer;';
+  chrBtn.style.cssText = RG_BTN_CSS;
   chrBtn.onclick = () => {
     const n = rp.chromosomes.length;
     rp.current_chromosome_idx = (rp.current_chromosome_idx + 1) % n;

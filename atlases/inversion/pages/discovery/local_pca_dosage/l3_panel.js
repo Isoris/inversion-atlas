@@ -57,14 +57,31 @@ import { setCur } from './events.js';
 import {
   clusterSlabAtK as _clusterSlabAtK,
   getSlabClusterAt as _getSlabClusterAtImpl,
+  slabRange         as _slabRangeImpl,
+  slabRangeOffset   as _slabRangeOffsetImpl,
+  compareUnitHalfW  as _compareUnitHalfWImpl,
 } from './l3_slab.js';
 
 // Bridge to the legacy bare-state call shape used by the render code.
+// 2026-05-20: slab geometry helpers were ported into l3_slab.js (they
+// existed only in the legacy file before — every slab render in
+// `renderL3PanelSlab` threw ReferenceError silently, which is exactly
+// the "L3 doesn't follow the cursor in 10w mode" bug. Quentin's report
+// 2026-05-20.
 function getSlabClusterAt(s, e, K) {
   return _getSlabClusterAtImpl(_pageState, s, e, K);
 }
 function clusterSlabAtK(s, e, K) {
   return _clusterSlabAtK(_pageState, s, e, K);
+}
+function slabRange(centerWin, halfW) {
+  return _slabRangeImpl(_pageState, centerWin, halfW);
+}
+function slabRangeOffset(centerWin, halfW, offset) {
+  return _slabRangeOffsetImpl(_pageState, centerWin, halfW, offset);
+}
+function compareUnitHalfW() {
+  return _compareUnitHalfWImpl(_pageState);
 }
 
 // =============================================================================

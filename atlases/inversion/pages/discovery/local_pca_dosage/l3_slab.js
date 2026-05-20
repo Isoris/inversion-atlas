@@ -34,6 +34,71 @@
 import { contextFromState } from '../../../shared/per_l2_cluster.js';
 import { kmeans1D, kmeans2D, silhouette1D, silhouette2D } from '../../../shared/kmeans.js';
 
+// =============================================================================
+// Slab geometry helpers — ported from legacy Inversion_atlas.html lines
+// 11799-11818 + 12016-12027. The modular tree imported them at use sites in
+// l3_panel.js#renderL3PanelSlab + l3_panel.js#offset_pane_loop but never
+// defined them — every slab render threw ReferenceError silently, which is
+// exactly the "L3 doesn't follow the cursor in 10w mode" bug Quentin reported
+// 2026-05-20.
+//
+// Signature change vs legacy (global `state` → first-arg `state`):
+//   slabRange(state, centerWin, halfW) → [s, e]   (was: slabRange(centerWin, halfW))
+//   slabRangeOffset(state, centerWin, halfW, offset) → [s, e]
+//   compareUnitHalfW(state) → number|null         (was: read state.compareUnit globally)
+// =============================================================================
+
+/**
+ * Symmetric window range around `centerWin`. Clamped to [0, n_windows-1] so
+ * edge slabs may be smaller than the requested W. Returns null if no data
+ * is loaded.
+ *
+ * @param {Object} state
+ * @param {number} centerWin
+ * @param {number} halfW   slab half-width in windows
+ * @returns {[number, number]|null}
+ */
+export function slabRange(state, centerWin, halfW) {
+  if (!state || !state.data) return null;
+  const N = state.data.n_windows | 0;
+  if (N <= 0) return null;
+  const c = Math.max(0, Math.min(N - 1, centerWin | 0));
+  const h = Math.max(0, halfW | 0);
+  const s = Math.max(0, c - h);
+  const e = Math.min(N - 1, c + h);
+  return [s, e];
+}
+
+/**
+ * Slab whose center is `offset` slabs away from `centerWin`. Slab "size" is
+ * (2*halfW + 1) windows, so offset=+1 moves center by that many windows.
+ * Useful for L3's +1/-1 neighbour panes in slab mode.
+ */
+export function slabRangeOffset(state, centerWin, halfW, offset) {
+  if (!state || !state.data) return null;
+  const W = 2 * (halfW | 0) + 1;
+  const newCenter = (centerWin | 0) + (offset | 0) * W;
+  return slabRange(state, newCenter, halfW);
+}
+
+/**
+ * Half-width derived from `state.compareUnit` ('L2', 'win1', 'win5', 'win10',
+ * 'winN'). Returns null for 'L2' (no slab applies). For 'win10' we use 9 windows
+ * centered on cur (halfW=4) — clean center, close enough.
+ */
+export function compareUnitHalfW(state) {
+  const u = (state && state.compareUnit) || 'L2';
+  if (u === 'L2')    return null;
+  if (u === 'win1')  return 0;
+  if (u === 'win5')  return 2;
+  if (u === 'win10') return 4;
+  if (u === 'winN') {
+    const W = Math.max(1, (state.compareUnitN | 0));
+    return Math.max(0, Math.floor((W - 1) / 2));
+  }
+  return null;
+}
+
 /**
  * Mean / median PC1 + mean PC2 across [s, e] windows for each sample.
  * Honours state.aggMethod (median_pc1 / mean_pc12 / default mean_pc1).

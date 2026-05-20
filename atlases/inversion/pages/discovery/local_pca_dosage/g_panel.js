@@ -180,13 +180,103 @@ function _renderModal(state) {
   });
   const closeBtn = overlay.querySelector('#gPanelClose');
   if (closeBtn) closeBtn.addEventListener('click', () => closeGPanel(state));
+
+  // 2026-05-20 (SPEC_cross_atlas_group_transfer.md stage 1): promote a
+  // staged selection into a manual group, or discard it. Both buttons
+  // live in the manual tab's stagedBanner (rendered when
+  // state.selectionGroup is non-empty); _renderTabBody emits them.
+  // After mutation we re-render the modal so the banner disappears and
+  // the new group appears in the list.
+  const saveBtn = overlay.querySelector('#_gpSaveSelectionBtn');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      _promoteStagedSelection(state);
+      _renderModal(state);
+      try { if (typeof window !== 'undefined' && window.drawPCA) window.drawPCA(state); }
+      catch (_) {}
+    });
+  }
+  const discardBtn = overlay.querySelector('#_gpDiscardSelectionBtn');
+  if (discardBtn) {
+    discardBtn.addEventListener('click', () => {
+      state.selectionGroup = null;
+      _renderModal(state);
+      try { if (typeof window !== 'undefined' && window.drawPCA) window.drawPCA(state); }
+      catch (_) {}
+    });
+  }
+}
+
+// Promote state.selectionGroup → a new entry in state.manualGroups,
+// then clear the staged slot. Caller re-renders the modal.
+function _promoteStagedSelection(state) {
+  const sg = state && state.selectionGroup;
+  if (!sg || !Array.isArray(sg.ids) || sg.ids.length === 0) return;
+  if (!Array.isArray(state.manualGroups)) state.manualGroups = [];
+  // Auto-name: lasso_<N> where N = existing count + 1.
+  const n = state.manualGroups.length + 1;
+  const name = 'lasso_' + n;
+  state.manualGroups.push({
+    name,
+    ids:     sg.ids.slice(),
+    source:  'selection_group',
+    source_atlas:  sg.source_atlas  || null,
+    source_page:   sg.source_page   || null,
+    source_window: Number.isFinite(sg.source_window) ? sg.source_window : null,
+    created_at:    Date.now(),
+  });
+  state.selectionGroup = null;
 }
 
 function _renderTabBody(state, key) {
   if (key === 'manual') {
     const groups = (state && Array.isArray(state.manualGroups)) ? state.manualGroups : [];
+    // 2026-05-20 (SPEC_cross_atlas_group_transfer.md stage 1): when the
+    // user has a staged selection in state.selectionGroup (from U-key
+    // selection mode + Shift+drag lasso), surface a one-click promote
+    // button at the top of the manual tab. Clicking it builds a new
+    // manualGroup entry from selectionGroup.ids and clears the staged
+    // slot so the next drag starts fresh.
+    const sg = state && state.selectionGroup;
+    const hasStaged = sg && Array.isArray(sg.ids) && sg.ids.length > 0;
+    let stagedBanner = '';
+    if (hasStaged) {
+      stagedBanner =
+        '<div id="_gpStagedSelection" style="' +
+          'margin: 0 0 12px 0; padding: 8px 12px;' +
+          'background: rgba(245,165,36,0.10); ' +
+          'border: 1px solid rgba(245,165,36,0.45);' +
+          'border-radius: 4px; color: var(--ink);' +
+          'font-size: 12px; display: flex; align-items: center; gap: 10px;">' +
+          '<div style="flex: 1;">' +
+            '<b>staged selection</b>: ' +
+            '<span style="color: var(--ink-dim);">' + (sg.ids.length | 0) +
+              ' sample' + (sg.ids.length === 1 ? '' : 's') + '</span>' +
+            '<span style="color: var(--ink-dimmer); font-size: 10.5px; margin-left: 8px;">' +
+              'from ' + _esc(sg.source_page || '?') +
+              (Number.isFinite(sg.source_window) ? ' · w' + (sg.source_window | 0) : '') +
+            '</span>' +
+          '</div>' +
+          '<button id="_gpSaveSelectionBtn" type="button" ' +
+            'title="Save the staged selection as a new manual group. Clears the staged slot." ' +
+            'style="background: var(--accent); color: #0b0e13; border: 0; ' +
+                   'border-radius: 3px; padding: 4px 10px; ' +
+                   'font-family: var(--mono); font-size: 11px; cursor: pointer;">' +
+            'save as group' +
+          '</button>' +
+          '<button id="_gpDiscardSelectionBtn" type="button" ' +
+            'title="Discard the staged selection without promoting." ' +
+            'style="background: transparent; color: var(--ink-dim); ' +
+                   'border: 1px solid var(--rule); border-radius: 3px; ' +
+                   'padding: 4px 8px; font-family: var(--mono); font-size: 11px; ' +
+                   'cursor: pointer;">' +
+            'discard' +
+          '</button>' +
+        '</div>';
+    }
     if (groups.length === 0) {
-      return '<div style="color: var(--ink-dim); font-size: 12px; line-height: 1.6;">'
+      return stagedBanner
+           + '<div style="color: var(--ink-dim); font-size: 12px; line-height: 1.6;">'
            + '<p><b>No manual groups yet.</b></p>'
            + '<p>Create one via:</p>'
            + '<ul style="margin: 8px 0 0 20px;">'
@@ -197,7 +287,7 @@ function _renderTabBody(state, key) {
            + 'Full manual-list rendering ports in Phase 1 (legacy 42820-42960).</p>'
            + '</div>';
     }
-    let s = '<div style="color: var(--ink); font-size: 12px;">';
+    let s = stagedBanner + '<div style="color: var(--ink); font-size: 12px;">';
     s += '<div style="margin-bottom: 8px; color: var(--ink-dim);">'
        + groups.length + ' manual group' + (groups.length === 1 ? '' : 's') + ':</div>';
     s += '<ul style="margin: 0; padding-left: 18px;">';

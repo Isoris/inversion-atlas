@@ -43,25 +43,25 @@ const STATIC_TRACKS = [
     edgeTop: 'diverse', edgeBot: 'low π',
     loadHint: 'Load Q04 enrichment with theta_pi track, or compute via /api/popstats/groupwise.' },
   { id: 'theta_invgt', label: 'θπ by invgt', height: 90, category: 'popstats',
-    renderer: 'line', color: '#3cc08a', yLabel: 'θπ invgt',
+    renderer: 'multiline', yLabel: 'θπ invgt',
     edgeTop: 'diverse', edgeBot: 'low π',
-    loadHint: 'Per-genotype θπ; needs groups + /api/popstats/groupwise (multi-line renderer pending).' },
+    loadHint: 'Per-genotype θπ; needs groups + /api/popstats/groupwise (one line per karyotype group).' },
   { id: 'fst_hom1_hom2', label: 'Fst Hom1-Hom2', height: 90, category: 'popstats',
     renderer: 'line', color: '#7b3294', yLabel: 'Fst',
     edgeTop: 'differentiated', edgeBot: 'panmictic',
     loadHint: 'Live FST needs groups + /api/popstats/groupwise.' },
   { id: 'hobs_hexp', label: 'Hobs/Hexp', height: 90, category: 'popstats',
-    renderer: 'line', color: '#e07b3a', yLabel: 'Hobs/Hexp',
+    renderer: 'multiline', yLabel: 'Hobs/Hexp',
     edgeTop: 'het excess (~2)', edgeBot: 'hom deficit (~0)',
-    loadHint: 'Hobs/Hexp needs groups + /api/popstats/hobs_groupwise (multi-line renderer pending).' },
+    loadHint: 'Hobs/Hexp needs groups + /api/popstats/hobs_groupwise (one line each for Hobs + Hexp).' },
   { id: 'delta12', label: 'ancestry Δ12', height: 90, category: 'popstats',
     renderer: 'line', color: '#2c7a39', yLabel: 'Δ12',
     edgeTop: 'clear', edgeBot: 'ambiguous',
     loadHint: 'Load Q04 enrichment with ancestry Δ12 track.' },
   { id: 'delta12_multi', label: 'Δ12 multi-scale', height: 90, category: 'popstats',
-    renderer: 'line', color: '#b07cf7', yLabel: 'Δ12 (1×/5×/10×)',
+    renderer: 'multiline', yLabel: 'Δ12 (1×/5×/10×)',
     edgeTop: 'scale-stable', edgeBot: 'scale-dep',
-    loadHint: 'Multi-scale Δ12 (multi-line renderer pending).' },
+    loadHint: 'Multi-scale Δ12 — one line per window-scale (1× / 5× / 10×).' },
   // ─ QC ─ off by default
   { id: 'snp_density', label: 'SNP density', height: 90, category: 'qc',
     renderer: 'line', color: '#2c7a39', yLabel: 'SNPs/10kb',
@@ -117,22 +117,91 @@ function _categoryFor(name) {
 }
 
 /**
- * Build a per-track {mb, values} getter against `data.tracks[trkName]`.
+ * Build a per-track getter against `data.tracks[trkName]`. Returns either a
+ * single-series `{mb, values, min, max}` payload or a multi-series
+ * `{mb, series: [{name, color?, values}, ...]}` payload, depending on the
+ * precomp's shape. The renderer dispatches off `Array.isArray(td.series)`.
+ *
+ * Supported shapes on `data.tracks[name]`:
+ *   1. `{ values: number[], pos_bp?: number[] }`                    — single line
+ *   2. `{ series: [{name, color?, values}, ...], pos_bp? }`         — already multi
+ *   3. `{ values_by_group: {GROUP: number[]}, pos_bp? }`            — keyed by group
+ *   4. `{ values: { GROUP: number[] }, pos_bp? }`                   — same, alt key
+ *
+ * Per-window `pos_bp` falls back to `data.windows[*].center_mb` when absent.
  */
 function _autoTrackGetData(trkName) {
   return (d) => {
     const t = d && d.tracks && d.tracks[trkName];
-    if (!t || !Array.isArray(t.values)) return null;
-    let mb;
-    if (Array.isArray(t.pos_bp) && t.pos_bp.length === t.values.length) {
+    if (!t) return null;
+
+    // Resolve the X axis (mb) once — every shape shares it.
+    let mb = null;
+    const N = _seriesLen(t);
+    if (N == null) return null;
+    if (Array.isArray(t.pos_bp) && t.pos_bp.length === N) {
       mb = t.pos_bp.map(bp => bp / 1e6);
-    } else if (d.windows && d.windows.length === t.values.length) {
+    } else if (d.windows && d.windows.length === N) {
       mb = d.windows.map(w => w.center_mb);
     } else {
       return null;
     }
-    return { mb, values: t.values, min: t.min, max: t.max };
+
+    // Shape 2 — explicit series array.
+    if (Array.isArray(t.series) && t.series.length > 0) {
+      return { mb, series: t.series.map(s => ({
+        name:   s.name || '',
+        color:  s.color,
+        values: s.values || [],
+      })) };
+    }
+
+    // Shape 3 / 4 — group-keyed bag.
+    const grouped = (t.values_by_group && typeof t.values_by_group === 'object')
+      ? t.values_by_group
+      : (t.values && typeof t.values === 'object' && !Array.isArray(t.values))
+        ? t.values : null;
+    if (grouped) {
+      const series = [];
+      for (const g of Object.keys(grouped)) {
+        const v = grouped[g];
+        if (Array.isArray(v) && v.length === N) {
+          series.push({ name: g, values: v });
+        }
+      }
+      if (series.length > 0) return { mb, series };
+    }
+
+    // Shape 1 — single-series legacy values array.
+    if (Array.isArray(t.values)) {
+      return { mb, values: t.values, min: t.min, max: t.max };
+    }
+    return null;
   };
+}
+
+/**
+ * Compute the length of whatever values shape `t` carries, so we can pair
+ * pos_bp / data.windows against it. Returns null if no values are present.
+ */
+function _seriesLen(t) {
+  if (!t) return null;
+  if (Array.isArray(t.values)) return t.values.length;
+  if (Array.isArray(t.series) && t.series.length > 0) {
+    const s0 = t.series[0];
+    if (s0 && Array.isArray(s0.values)) return s0.values.length;
+  }
+  const grouped = (t.values_by_group && typeof t.values_by_group === 'object')
+    ? t.values_by_group
+    : (t.values && typeof t.values === 'object' && !Array.isArray(t.values))
+      ? t.values : null;
+  if (grouped) {
+    for (const k of Object.keys(grouped)) {
+      const v = grouped[k];
+      if (Array.isArray(v)) return v.length;
+    }
+  }
+  return null;
 }
 
 /**
