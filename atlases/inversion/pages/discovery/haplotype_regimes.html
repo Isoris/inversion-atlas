@@ -236,6 +236,8 @@
                   title="Stage 1 V-walker: anchor sweep + Cramér's V boundary detection across the whole chromosome.">long-range</button>
           <button type="button" data-rg-mode="short"
                   title="User-curated candidates from local_pca_dosage (lock-promote / L3-draft confirms). No automatic discovery — review what you already drafted.">short-range</button>
+          <button type="button" data-rg-mode="het"
+                  title="Het-skeleton: per-window K-means → het_detect_candidate_band → het_track_skeleton → hom_anchor_to_het → cramers_v_merge. No band_quality gate, no V-walker. Matches the band_tracking/index.js Layer 1 order.">het-skeleton</button>
         </span>
         <button id="rgExportCatalogueBtn" class="rg-tb-btn" disabled
           title="Serialize the in-memory pipeline result to a regime catalogue JSON. Disabled until the pipeline has run."
