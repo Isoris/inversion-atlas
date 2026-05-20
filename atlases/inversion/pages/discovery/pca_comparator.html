@@ -135,10 +135,29 @@
                     display: flex; justify-content: space-between; align-items: center;"
              title="Band-persistence heatmap. Rows = samples sorted by dosage band at the current window. Columns = windows along the chromosome. Solid horizontal blocks = stable regime cores. Vertical transitions across many rows = breakpoint zones. Single deviant cells = microstripes (recombinants, conversion tracts, mosaicism).">
           <span><b>band persistence</b>
-            <span style="color: var(--ink-dim); font-weight: 400;">
+            <span id="pcaCompHeatmapScopeLabel" style="color: var(--ink-dim); font-weight: 400;">
               · genome × samples · dosage K-band</span>
           </span>
-          <span id="pcaCompHeatmapHint" style="font-size: 9.5px;">click a column to scrub · hover a row to track</span>
+          <span style="display: inline-flex; align-items: center; gap: 8px;">
+            <!-- 2026-05-20: scope toggle. Default = genome (heatmap shows
+                 every window). Focal = constrain to a slab matching the
+                 current step (1w / 5w / 10w / 25w / L2 / Cand) around the
+                 cursor — same interval the 3 PCAs are sampling. User's
+                 request: "when in 10w, click focal and the heatmap shows
+                 the 10-window slab around cursor like the PCAs". -->
+            <span id="pcaCompHeatmapScopeBar"
+                  style="display: inline-flex; gap: 2px;
+                         background: var(--panel-2); border: 1px solid var(--rule);
+                         border-radius: 3px; padding: 1px 2px;
+                         font: 10px ui-monospace, monospace;"
+                  title="Heatmap scope. Genome = all windows. Focal = slab matching the current step size around the cursor.">
+              <button type="button" data-heatmap-scope="genome" class="active"
+                      title="Show every window in the chromosome">genome</button>
+              <button type="button" data-heatmap-scope="focal"
+                      title="Show only the window slab around the cursor matching the current step">focal</button>
+            </span>
+            <span id="pcaCompHeatmapHint" style="font-size: 9.5px;">click a column to scrub · hover a row to track</span>
+          </span>
         </div>
         <div style="position: relative; height: 180px;">
           <canvas id="pcaCompHeatmapCanvas" style="width: 100%; height: 100%;

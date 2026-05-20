@@ -93,8 +93,13 @@ export function computeHetRateForRange(state, startBp, endBp, opts) {
   if (cacheKey != null && cache && cache.has(cacheKey)) return cache.get(cacheKey);
 
   const out = _emptyNaN(nS);
+  // 2026-05-20: previously we cached this all-NaN placeholder under the
+  // cacheKey on invalid-bp + chunk-miss paths. That defeated the
+  // onLoad-triggered repaint loop: chunk arrives, drawLinesPanel calls
+  // computeHetRateForRange with the same cacheKey, the stale NaN array
+  // wins, lines stay grey forever. Now: only cache when we actually
+  // compute a real result. Misses re-run on the next call.
   if (!Number.isFinite(startBp) || !Number.isFinite(endBp) || endBp < startBp) {
-    if (cacheKey != null && cache) cache.set(cacheKey, out);
     return out;
   }
 
@@ -103,7 +108,6 @@ export function computeHetRateForRange(state, startBp, endBp, opts) {
     ? getCachedChunk(startBp, endBp) : null;
   if (!chunk || !Array.isArray(chunk.markers) || !Array.isArray(chunk.dosage)
       || !Array.isArray(chunk.samples)) {
-    if (cacheKey != null && cache) cache.set(cacheKey, out);
     return out;
   }
 
@@ -125,7 +129,6 @@ export function computeHetRateForRange(state, startBp, endBp, opts) {
     inRange.push(mi);
   }
   if (inRange.length === 0) {
-    if (cacheKey != null && cache) cache.set(cacheKey, out);
     return out;
   }
 
@@ -247,8 +250,11 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
   if (cacheKey != null && cache && cache.has(cacheKey)) return cache.get(cacheKey);
 
   const out = _emptyNaN(nS);
+  // 2026-05-20: don't cache the placeholder on chunk-miss / invalid-bp
+  // paths — see the matching note on computeHetRateForRange. Caching
+  // NaN here used to lock the lines panel into grey even after the
+  // chunk landed and onLoad fired a repaint.
   if (!Number.isFinite(startBp) || !Number.isFinite(endBp) || endBp < startBp) {
-    if (cacheKey != null && cache) cache.set(cacheKey, out);
     return out;
   }
 
@@ -257,7 +263,6 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
     ? getCachedChunk(startBp, endBp) : null;
   if (!chunk || !Array.isArray(chunk.markers) || !Array.isArray(chunk.dosage)
       || !Array.isArray(chunk.samples)) {
-    if (cacheKey != null && cache) cache.set(cacheKey, out);
     return out;
   }
 
@@ -279,7 +284,6 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
     inRange.push(mi);
   }
   if (inRange.length === 0) {
-    if (cacheKey != null && cache) cache.set(cacheKey, out);
     return out;
   }
 

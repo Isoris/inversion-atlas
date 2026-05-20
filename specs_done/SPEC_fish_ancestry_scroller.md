@@ -1,11 +1,54 @@
 # FISH_ANCESTRY_SCROLLER_SPEC — ancestry-aware inversion browser page
 
-**Status**: SPEC ONLY. Not yet implemented. Awaiting audit.
+**Status**: shipped 2026-05-20 (audit-sweep — atlas-side page + shared
+modules + manifest registration all confirmed shipping). Promoted from
+`specs_todo/` after the per-slice audit below. Original SPEC body is
+preserved verbatim below as design archive.
+
+**Implemented in:**
+- [`atlases/inversion/pages/review/fish_ancestry_scroller.{html,js}`](../atlases/inversion/pages/review/) — page entry + 4-module subdir (`_state.js`, `layers.js`, `right_panel.js`, `selection.js`)
+- [`atlases/inversion/shared/ancestry_alignment.js`](../atlases/inversion/shared/ancestry_alignment.js) — 10 exports: `ANCESTRY_ALIGN_STATUS` / `ANCESTRY_ALIGN_DEFAULTS` / `ANCESTRY_ALIGN_METHOD` vocabularies, `bestPermutationByAffinity()`, `alignAncestryColumnsByF()` (F-based label-switching alignment — the headline algorithm), `alignAncestryColumnsByQ()` (Q-fallback for flanks), `applyAncestryPermutation()`, `classifyAncestryAlignmentStatus()`, `alignPerRFAncestry()`, `applyRegimeAwareSmoothing()`
+- [`atlases/inversion/shared/ancestry_bricks.js`](../atlases/inversion/shared/ancestry_bricks.js) — 6+ exports: `ANCESTRY_BRICK_FLAGS` (RARE_ANCESTRY / HIGH_HET / REGIME_DISCORDANT enum), `ANCESTRY_BRICK_DEFAULTS`, `dominantKFor()`, `shannonEntropyOfQ()`, `buildBricksForFish()`, `attachBrickMetrics()`, `buildAndAnnotateBricks()`
+- [`atlases/inversion/manifest.json`](../atlases/inversion/manifest.json) lines 215–221 — **page IS registered** (the README's older "manifest registration pending" entry was stale)
+- [`atlases/inversion/registries/data/pages.registry.json`](../atlases/inversion/registries/data/pages.registry.json) line 225 — page entry with full `_doc`
+- Tests: [`tests/test_review_fish_ancestry_scroller.js`](../tests/test_review_fish_ancestry_scroller.js) + [`tests/smoke_review_fish_ancestry_scroller_round5.mjs`](../tests/smoke_review_fish_ancestry_scroller_round5.mjs) + [`tests/test_shared_ancestry_alignment.js`](../tests/test_shared_ancestry_alignment.js) + [`tests/test_shared_ancestry_bricks.js`](../tests/test_shared_ancestry_bricks.js)
+
+**Per-slice status:**
+
+| slice | status | location |
+|---|---|---|
+| Page module + 4-module subdir (state / layers / right_panel / selection) | ✅ shipped | `pages/review/fish_ancestry_scroller{.html,.js,/}` |
+| F-based label-switching alignment (the critical signal-preservation step) | ✅ shipped | `ancestry_alignment.alignAncestryColumnsByF()` + `bestPermutationByAffinity()` |
+| Q-fallback alignment for flanks (per SPEC: only allowed in flanks) | ✅ shipped | `ancestry_alignment.alignAncestryColumnsByQ()` |
+| Regime-aware smoothing | ✅ shipped | `ancestry_alignment.applyRegimeAwareSmoothing()` |
+| Per-RF alignment pipeline (the entry point) | ✅ shipped | `ancestry_alignment.alignPerRFAncestry()` |
+| Alignment status classification (PASS / FAIL / etc — FAIL = grey not coloured) | ✅ shipped | `ancestry_alignment.classifyAncestryAlignmentStatus()` |
+| Brick-building from aligned Q rows | ✅ shipped | `ancestry_bricks.buildBricksForFish()` + `buildAndAnnotateBricks()` |
+| Brick metric labels (RARE_ANCESTRY / HIGH_HET / REGIME_DISCORDANT — NOT a discovery system per SPEC) | ✅ shipped | `ANCESTRY_BRICK_FLAGS` enum + `attachBrickMetrics()` |
+| Three numbered layers (PC1 Band / Ancestry Bricks / Brick summary cohort) | ✅ shipped | `pages/review/fish_ancestry_scroller/layers.js` |
+| 5-row brick-metrics heatmap + tab strip + right-side 3-block panel | ✅ shipped | `right_panel.js` + `layers.js` |
+| Layer-2 brick hit-test selection | ✅ shipped | `pages/review/fish_ancestry_scroller/selection.js` |
+| Manifest registration | ✅ shipped | `manifest.json` line 215 + `pages.registry.json` line 225 |
+| Cluster-side `instant_q` (Engine B) per-RF producer | ⏳ deferred | Cluster-side, out of atlas scope; the alignment pipeline reads whatever the producer emits |
+
+**Why archived now:** the SPEC's full atlas-side surface ships — page
+entry + 4 submodules + 16 shared-module exports + 4 tests + manifest
+registration. The headline algorithm (F-based label-switching alignment
+with Q-fallback restricted to flanks and FAIL=grey discipline) is
+present in `ancestry_alignment.js`. The brick discipline (metric labels
+rather than discovery system; SPEC's forbidden phrasing "we discovered
+N bricks" is structurally avoided because `ANCESTRY_BRICK_FLAGS` is a
+labelling enum, not a discovery vocab). The only deferred slice is the
+cluster-side `instant_q` producer, which by definition lives outside
+the atlas.
+
 **Source**: user mockup + accompanying design text, 2026-05-08 chat.
 **Position in pipeline**: a new atlas page that consumes Stage 4
 regime calls + per-RF `instant_q` (Engine B) output. Sibling page to
 the regimes-page (which is the discovery/discrimination view); this
 page is the **ancestry-interpretation view**.
+
+**Authored**: 2026-05-08 chat (1599-line SPEC body follows verbatim).
 
 ## Identity check — this page is generic, the catfish manuscript is one user
 

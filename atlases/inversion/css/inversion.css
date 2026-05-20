@@ -2394,11 +2394,22 @@ body[data-active-mode="ghsl"] #trackedSamplesSidebarSection {
    This adds a lit-up state that's still visually distinct from the
    viewmode-active style: accent border + accent text on panel-2 bg
    (instead of solid accent fill). Active whenever state.stepMode is one
-   of win1 / win5 / win10. */
+   of win1 / win5 / win10.
+   2026-05-20: !important required — the button carries inline styles for
+   color / border-color / background from the HTML (lines 464-467 of
+   local_pca_dosage.html), and inline always wins over un-!important
+   rules. User-reported: "when we click the window button it should at
+   least change color" — class toggled correctly but the lit-up colors
+   were silently overridden by the inline color. Added a soft accent
+   tint to background as well so the change reads instantly. */
 #viewModeBar #jumpToWindowsBtn.is-active-step {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+  background: rgba(245, 165, 36, 0.14) !important;
   font-weight: 600;
+}
+#viewModeBar #jumpToWindowsBtn.is-active-step:hover {
+  background: rgba(245, 165, 36, 0.22) !important;
 }
 /* Z color-mode toolbar */
 /* v3.99 turn 6: extended zColorMode's compact button styling to
@@ -2614,6 +2625,24 @@ body[data-layout-mode="free"] main#local_pca_dosage #pcaAsideResize { display: n
   box-sizing: border-box;
 }
 #stepModeBar > button { min-width: 36px; text-align: center; }
+/* 2026-05-20: bring the L3 unit-picker buttons up to the same visual
+   weight as the L2 button inside the same picker — and to match the
+   sidebar's #stepModeBar L2 / 1w / 5w / 10w / N w group. Quentin: "1w
+   5w 10w Nw in the L3 panels are out of style. they must be identical
+   copies of the L2 scale". The original `.l3-layout button` rule
+   gives 10px font + 1px 6px padding which felt cramped against the
+   neighbouring layout / recluster / draft buttons. Bump font to
+   10.5px and padding to match #stepModeBar. */
+#l3CompareUnit > button {
+  font-size: 10.5px;
+  padding: 4px 6px;
+  line-height: 1.2;
+  min-width: 36px;
+}
+#l3CompareUnit input[type="number"] {
+  height: 25px;
+  line-height: 23px;
+}
 /* v4 turn 7 ask 2: green-flash for promote-to-candidate buttons. Applied
    by the click handler; removed after ~700ms. The keyframe peaks bright
    green at ~30% then settles to a soft confirmed-green ring while the
@@ -4449,16 +4478,27 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
 }
 .mg-row .mg-swatch { width: 11px; height: 11px; border-radius: 2px; flex: 0 0 auto;
                      border: 1px solid rgba(0,0,0,0.18); }
-.mg-row .mg-name { flex: 1 1 auto; color: var(--ink); min-width: 0;
+/* 2026-05-20: flex-basis 0 (not auto) forces the name to actually grow
+   from zero and claim all spare row width — with flex-basis: auto,
+   contenteditable spans wedge themselves at their content's natural
+   width and don't grow, which is why labels like "lasso_1" showed as
+   "l…" with empty space stranded to the right of n=N. min-width 60px
+   guarantees a few chars are visible even on the narrowest row. */
+.mg-row .mg-name { flex: 1 1 0; color: var(--ink); min-width: 60px;
                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                    cursor: text; }
 .mg-row .mg-name[contenteditable="true"]:focus {
   outline: 1px solid var(--accent); background: var(--panel); }
 .mg-row .mg-count { color: var(--ink-dim); font-size: 10px; flex: 0 0 auto;
                     padding: 0 4px; }
+/* 2026-05-20: tighter pin / × buttons. Quentin: "the pin and the
+   cancel × are too wide" — they were sized by emoji glyph + 8px
+   horizontal padding. Explicit 18px width + centred glyph keeps them
+   compact and predictable. */
 .mg-row button { background: transparent; border: 0; color: var(--ink-dim);
                  font-family: var(--mono); font-size: 10px; cursor: pointer;
-                 padding: 1px 4px; border-radius: 2px; }
+                 padding: 1px 0; border-radius: 2px; flex: 0 0 auto;
+                 width: 18px; text-align: center; line-height: 1.2; }
 .mg-row button:hover { background: var(--panel-3); color: var(--ink); }
 .mg-row button.mg-pin.pinned { color: var(--accent); }
 .mg-row button.mg-del:hover { color: var(--bad); }
@@ -4965,6 +5005,16 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
   min-height: 0;
   overflow: hidden;
 }
+
+/* 2026-05-20: pca_comparator carries 3 PCA panels + heatmap + lines
+   + per-sample trajectory + footer. Total intrinsic height easily
+   exceeds a 720-1000px viewport, and the trajectory section only
+   appears on hover — by which point overflow:hidden clips it
+   off-screen. Allow vertical scroll on this page specifically so the
+   lower sections (heatmap / lines / trajectory) are always reachable.
+   Quentin: "the lower part of the page is hidden (trajectories??)". */
+.page#pca_comparator { overflow-y: auto !important; }
+.page#pca_comparator.active { overflow-y: auto !important; overflow-x: hidden; }
 
 /* ---- Generic header / body / footer scaffold (one selector per
    class prefix because the rule's structural targets share the same
@@ -5852,6 +5902,7 @@ body:not([data-l3-layout="dual"]) #cusumPanel #cusumPaneRight {
    the |Z| panel's nav lanes so users don't have to learn a second
    model when scrubbing inside the comparator. */
 #pcaCompScrubUnits button[data-scrub-unit],
+#pcaCompHeatmapScopeBar button[data-heatmap-scope],
 #rgModeBar button[data-rg-mode] {
   background: transparent;
   color: var(--ink-dim);
@@ -5864,11 +5915,13 @@ body:not([data-l3-layout="dual"]) #cusumPanel #cusumPaneRight {
   transition: background 80ms ease, color 80ms ease;
 }
 #pcaCompScrubUnits button[data-scrub-unit]:hover,
+#pcaCompHeatmapScopeBar button[data-heatmap-scope]:hover,
 #rgModeBar button[data-rg-mode]:hover {
   background: rgba(255,255,255,0.06);
   color: var(--ink);
 }
 #pcaCompScrubUnits button[data-scrub-unit].active,
+#pcaCompHeatmapScopeBar button[data-heatmap-scope].active,
 #rgModeBar button[data-rg-mode].active {
   background: var(--accent);
   color: #0b0e13;

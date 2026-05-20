@@ -1,11 +1,38 @@
 # SPEC — Cramér's V seed-merge auto-promote (alternative to L2-sweep)
 
-**Status**: design, 2026-05-18. Not implemented. Companion to
-`SPEC_macrostripe_microgroup_hierarchy.md` — that SPEC ships the
-band-tracking output as the default headline; this SPEC adds a
-simpler, more transparent auto-promote pipeline that runs ALONGSIDE
-the existing band tracking and L2-sweep so the user can compare
-outputs side-by-side.
+**Status**: shipped 2026-05-20 (audit-sweep — both operating modes
+confirmed shipping in `shared/cramers_v_merge.js`; the 2026-05-18
+"Not implemented" status note was stale by the time the audit ran).
+Promoted from `specs_todo/` after the per-slice audit below. Original
+SPEC body is preserved verbatim below as design archive.
+
+**Implemented in:**
+- [`atlases/inversion/shared/cramers_v_merge.js`](../atlases/inversion/shared/cramers_v_merge.js) — 5 exports covering the SPEC's full surface:
+  - `CRAMERS_V_MERGE_DEFAULTS` — frozen defaults block
+  - `computeAdjacentSeedMerges(args)` — adjacent-seed-pair Cramér's V scoring
+  - `chainsFromMergeVerdicts(verdicts, nSeeds, opts)` — chain-construction from per-pair verdicts
+  - `runCramersVMergeLocal(args)` — **Mode 1** from SPEC §"Mode 1 — `insulated_local`"
+  - `runCramersVMergeMacrostripe(args)` — **Mode 2** from SPEC §"Mode 2 — `post_long_range`"
+- Page-side consumers: [`pages/discovery/haplotype_regimes.{html,js}`](../atlases/inversion/pages/discovery/haplotype_regimes.js) — invokes the merge pipeline alongside band-tracking + L2-sweep for the side-by-side comparison view (per SPEC §"Side-by-side comparison")
+
+**Per-slice status:**
+
+| slice | status | location |
+|---|---|---|
+| Default values (window-pair adjacency, Cramér's V threshold) | ✅ shipped | `CRAMERS_V_MERGE_DEFAULTS` |
+| Adjacent-seed pairwise scoring | ✅ shipped | `computeAdjacentSeedMerges()` |
+| Chain construction from merge verdicts | ✅ shipped | `chainsFromMergeVerdicts()` |
+| Mode 1: `insulated_local` (no long-range regime input) | ✅ shipped | `runCramersVMergeLocal()` |
+| Mode 2: `post_long_range` (uses macrostripe regimes from `SPEC_macrostripe_microgroup_hierarchy`) | ✅ shipped | `runCramersVMergeMacrostripe()` |
+| Side-by-side comparison view (3-way: this + band-tracking + L2-sweep) | ✅ shipped | `pages/discovery/haplotype_regimes.{html,js}` consumers |
+| Dedicated unit-test for `cramers_v_merge.js` | ⏳ deferred | No dedicated test file — the algorithm is exercised indirectly via `pages/discovery/haplotype_regimes` smoke; a `tests/test_shared_cramers_v_merge.js` should be added in a follow-up for the edge cases described in SPEC §Algorithm |
+
+**Why archived now:** the SPEC's two-mode algorithm (insulated_local
+vs post_long_range) ships verbatim in `cramers_v_merge.js` with both
+entry points named exactly as the SPEC prescribes. The side-by-side
+comparison consumer also ships in `haplotype_regimes`. The only
+deferred item is a dedicated unit test — worth tracking but not a
+foundational gap (page-level smoke covers the integration).
 
 User direction (chat 2026-05-18): *"the Cramér's V seed-autopromote
 must come after the long-range haplotype regime — otherwise it will

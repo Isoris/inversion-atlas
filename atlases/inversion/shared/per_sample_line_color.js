@@ -146,24 +146,58 @@ export function perSampleValuesForMode(state, mode, range) {
   return null;
 }
 
-// Helper: per-sample mean across [startW, endW] inclusive when the
-// values are a flat sample-major 2D array: M[sample_idx][window_idx].
-// This is the shape theta_pi_per_window.values uses today.
+// Helper: per-sample mean across [startW, endW] inclusive. Auto-detects
+// orientation:
+//   sample-major: M[sample_idx][window_idx]   (outer.length == n_samples)
+//   window-major: M[window_idx][sample_idx]   (outer.length == n_windows)
+// 2026-05-20: previously assumed sample-major unconditionally. The user
+// reported θπ colors staying grey because theta_pi_per_window.values
+// actually ships window-major (M[w][si]) — every M[si] for si > nWin
+// was undefined → all-NaN → grey. Detection: pick whichever shape
+// makes outer.length match n_samples vs n_windows; tie-break favours
+// sample-major (legacy default).
 function _perSampleMeanFrom2D(M, nS, startW, endW) {
   if (!Array.isArray(M) || M.length === 0) return null;
+  // Inspect first non-empty row to find the inner dimension.
+  const innerLen = (M[0] && M[0].length) ? M[0].length : 0;
+  if (innerLen === 0) return null;
+  // Sample-major when outer length matches n_samples; window-major
+  // when inner length matches n_samples. If both match nS (rare —
+  // n_samples == n_windows), prefer sample-major.
+  const isSampleMajor = (M.length === nS) || (innerLen !== nS);
   const lo = Math.max(0, startW | 0);
-  const hi = Math.min((M[0] && M[0].length ? M[0].length - 1 : -1), endW | 0);
-  if (hi < lo) return null;
   const out = new Float64Array(nS);
-  for (let si = 0; si < nS; si++) {
-    const row = M[si];
-    if (!row) { out[si] = NaN; continue; }
-    let sum = 0, n = 0;
-    for (let w = lo; w <= hi; w++) {
-      const v = row[w];
-      if (Number.isFinite(v)) { sum += v; n++; }
+  if (isSampleMajor) {
+    const hi = Math.min(innerLen - 1, endW | 0);
+    if (hi < lo) return null;
+    for (let si = 0; si < nS; si++) {
+      const row = M[si];
+      if (!row) { out[si] = NaN; continue; }
+      let sum = 0, n = 0;
+      for (let w = lo; w <= hi; w++) {
+        const v = row[w];
+        if (Number.isFinite(v)) { sum += v; n++; }
+      }
+      out[si] = n > 0 ? (sum / n) : NaN;
     }
-    out[si] = n > 0 ? (sum / n) : NaN;
+    return out;
+  }
+  // Window-major: accumulate per sample by walking windows.
+  const hi = Math.min(M.length - 1, endW | 0);
+  if (hi < lo) return null;
+  const sums   = new Float64Array(nS);
+  const counts = new Int32Array(nS);
+  for (let w = lo; w <= hi; w++) {
+    const row = M[w];
+    if (!Array.isArray(row)) continue;
+    const N = Math.min(nS, row.length);
+    for (let si = 0; si < N; si++) {
+      const v = row[si];
+      if (Number.isFinite(v)) { sums[si] += v; counts[si]++; }
+    }
+  }
+  for (let si = 0; si < nS; si++) {
+    out[si] = counts[si] > 0 ? (sums[si] / counts[si]) : NaN;
   }
   return out;
 }

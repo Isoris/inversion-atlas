@@ -1,9 +1,45 @@
 # SPEC — Cross-Atlas Group Transfer
 
-**Status**: design exploration, 2026-05-18. Selection-mode primitives
-(U key + Shift+drag → `state.selectionGroup`) ship in this commit; the
-CTRL lateral bar + cross-atlas transfer is gated on the atlas-family
-infrastructure (per `docs/ATLAS_FAMILY_ROADMAP.md`) and ships later.
+**Status**: shipped 2026-05-20 (audit-sweep — Phase 1 selection-mode
+primitives confirmed shipping with 4 page-side consumers; Phase 2
+cross-atlas transfer correctly gated on atlas-family infrastructure
+that doesn't exist yet). Promoted from `specs_todo/` after the
+per-slice audit below. Original SPEC body is preserved verbatim below
+as design archive.
+
+**Implemented in:**
+- Selection-mode primitives — `state.selectionGroup` slot with U-key + Shift+drag entry interactions; live in 4 page modules:
+  - [`atlases/inversion/pages/discovery/local_pca_dosage.js`](../atlases/inversion/pages/discovery/local_pca_dosage.js) — entry-point key handler
+  - [`atlases/inversion/pages/discovery/local_pca_dosage/g_panel.js`](../atlases/inversion/pages/discovery/local_pca_dosage/g_panel.js) — G-panel integration (selection→group)
+  - [`atlases/inversion/pages/discovery/local_pca_dosage/pca_panel.js`](../atlases/inversion/pages/discovery/local_pca_dosage/pca_panel.js) — PCA-side lasso wiring
+  - [`atlases/inversion/pages/discovery/local_pca_dosage/sidebar.js`](../atlases/inversion/pages/discovery/local_pca_dosage/sidebar.js) — sidebar surface for the selection group
+
+**Per-slice status:**
+
+| slice | status | location |
+|---|---|---|
+| `state.selectionGroup` state slot | ✅ shipped | 4 page consumers above |
+| `U` key → enter selection mode | ✅ shipped | `local_pca_dosage.js` (entry handler) |
+| `Shift` + drag → lasso into `state.selectionGroup` | ✅ shipped | `pca_panel.js` (lasso wiring) |
+| `G` key → per-group tab (G panel) | ✅ shipped via `SPEC_g_panel_unified_groups` (already at `specs_done/`) | `g_panel.js` + `local_pca_dosage.html#gPanelOpenBtn` |
+| `CTRL` lateral bar → group-transfer UI | ⏳ deferred-by-design | Gated on the atlas-family infrastructure (per `docs/ATLAS_FAMILY_ROADMAP.md`). The transfer target — sending a selection to another atlas — only makes sense once a shell wraps multiple atlases. |
+| Notation toggle (g1/g2/g3 vs Hom1/HET/Hom2 vs H1/H1) per CTRL cycle | ⏳ deferred-by-design | Coupled to the lateral bar; ships when the cross-atlas transfer ships |
+| Atlas-family handshake (send group → receive on the other atlas, label mapping) | ⏳ deferred-by-design | Requires atlas-family roadmap items to land |
+
+**Why archived now:** the SPEC explicitly stages itself in two phases:
+selection-mode primitives now, cross-atlas transfer when the
+atlas-family roadmap delivers the shell wrapping multiple atlases.
+Phase 1 ships with 4 page consumers. Phase 2 is correctly gated by a
+real architectural dependency (no atlas-family infrastructure yet); it
+is not deferred "we forgot," it is deferred "the prerequisite doesn't
+exist." Per the audit convention, a SPEC whose deferred slices wait on
+documented external dependencies (with a tracking doc — here
+`docs/ATLAS_FAMILY_ROADMAP.md`) is shipped.
+
+**Audit caveat:** when the atlas-family shell lands and Phase 2
+becomes implementable, this archived SPEC should be referenced from
+the new work; the deferred-slice table here is the design contract
+for what to build.
 
 ## Why this SPEC exists
 

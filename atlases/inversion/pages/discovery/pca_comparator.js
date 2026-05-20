@@ -176,6 +176,13 @@ function _buildPageState(atlasState) {
     // 2026-05-20: cursor-unit picker (1w / 5w / 10w / 25w / L2 / Cand).
     // Drives ←/→ step size + snap behavior.
     scrubUnit: '1',
+    // 2026-05-20: heatmap scope toggle (genome / focal). 'genome' renders
+    // every window (default); 'focal' restricts to a slab matching the
+    // current scrubUnit centered on the cursor, so the heatmap shows the
+    // same interval the 3 PCAs are sampling. User-asked: "10w so 10
+    // windows by 10 windows … click focal and it would show the dosage
+    // but for 10 windows like the same interval as focal."
+    heatmapScope: 'genome',
     hoveredSample: -1,
     _teardownFns: [],
     _canvasIds: {
@@ -380,6 +387,31 @@ function _wireToolbar(state) {
         scrubBar.querySelectorAll('button[data-scrub-unit]').forEach(b => {
           b.classList.toggle('active', b === btn);
         });
+        // 2026-05-20: when in focal heatmap scope, scrubUnit change
+        // implies a different slab width — repaint so the heatmap
+        // tracks the new unit.
+        if (state.heatmapScope === 'focal') refresh(state);
+      };
+      btn.addEventListener('click', onClick);
+      state._teardownFns.push(() => btn.removeEventListener('click', onClick));
+    });
+  }
+  // 2026-05-20: heatmap scope toggle (genome / focal).
+  const scopeBar = document.getElementById('pcaCompHeatmapScopeBar');
+  if (scopeBar) {
+    try {
+      const saved = localStorage.getItem('pca_comparator.heatmapScope');
+      if (saved === 'focal' || saved === 'genome') state.heatmapScope = saved;
+    } catch (_) {}
+    scopeBar.querySelectorAll('button[data-heatmap-scope]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.heatmapScope === state.heatmapScope);
+      const onClick = () => {
+        state.heatmapScope = btn.dataset.heatmapScope;
+        try { localStorage.setItem('pca_comparator.heatmapScope', state.heatmapScope); } catch (_) {}
+        scopeBar.querySelectorAll('button[data-heatmap-scope]').forEach(b => {
+          b.classList.toggle('active', b === btn);
+        });
+        refresh(state);
       };
       btn.addEventListener('click', onClick);
       state._teardownFns.push(() => btn.removeEventListener('click', onClick));

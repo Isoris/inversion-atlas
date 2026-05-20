@@ -1395,6 +1395,15 @@ function _refreshBandPickAsideColors(state) {
     const btn = document.getElementById(id);
     if (btn) btn.textContent = `K=${state.k}`;
   }
+  // 2026-05-20: also strip the .active class from buttons that just
+  // became invalid (k >= state.k after a K-decrease). Without this,
+  // the user sees the old band button still highlighted but disabled
+  // — clicking does nothing and there's no obvious way to "clear" the
+  // stale selection. Quentin: "we still cannot clear selection when
+  // we select like a different K on the tracked samples PCA". When we
+  // strip .active from a disabled button, also re-activate the "all"
+  // button so the picker always has a sensible default highlight.
+  let anyDisabledActive = false;
   document.querySelectorAll('[data-k-band]').forEach(b => {
     const ki = parseInt(b.dataset.kBand, 10);
     if (!isFinite(ki)) return;
@@ -1416,8 +1425,20 @@ function _refreshBandPickAsideColors(state) {
       b.style.opacity = '0.4';
       b.disabled = true;
       b.style.cursor = 'not-allowed';
+      if (b.classList.contains('active')) {
+        b.classList.remove('active');
+        anyDisabledActive = true;
+      }
     }
   });
+  // Restore "all" as the active picker when a previously-active band
+  // got knocked out by a K decrease. Targets both surfaces (the aside
+  // [data-band-aside="all"] and the compact [data-band-compact="all"]).
+  if (anyDisabledActive) {
+    document.querySelectorAll('[data-band-aside="all"], [data-band-compact="all"]').forEach(allBtn => {
+      allBtn.classList.add('active');
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2060,17 +2081,20 @@ function _wireDataSection(state) {
   // Expose the setter on state so non-sidebar code (e.g. _applyViewMode)
   // can move sim to/from the minimap without re-implementing the logic.
   state._setSimInMinimap = _setSimInMinimap;
-  // 2026-05-20: default the sim heatmap into the minimap on fresh load
-  // so the main panel area opens up. Returning users keep their saved
-  // choice; only the unset case flips to '1'. Quentin: "by default we
-  // try to toggle the minimap".
+  // 2026-05-20 (revised): sim_mat defaults to the MAIN panel, NOT the
+  // minimap. Earlier we defaulted to minimap which opened up the main
+  // panel area, but with the sidebar now also defaulting to collapsed
+  // (Quentin: "close the settings panel on the left ... too messy"),
+  // sim ended up in a closed sidebar — invisible. Quentin reported
+  // "the sim_mat has disappeared". Default it to the main panel so
+  // there's always a visible sim heatmap; returning users with an
+  // explicit '1' in localStorage still get the minimap.
   try {
     const cur = localStorage.getItem('pca_scrubber_v3.siminminimap');
-    if (cur == null) {
-      requestAnimationFrame(() => _setSimInMinimap(true));
-    } else if (cur === '1') {
+    if (cur === '1') {
       requestAnimationFrame(() => _setSimInMinimap(true));
     }
+    // null / undefined / '0' → keep main panel (no-op; default state).
   } catch (_) {}
 }
 
@@ -3054,6 +3078,16 @@ function _wireSidebarToggle(state) {
     // null / undefined → keep the new default (true).
   } catch (e) {}
   _applySidebarState(state, savedCollapsed);
+  // 2026-05-20: when the sidebar boots collapsed, the sim_mat minimap
+  // sits inside that collapsed sidebar — invisible. Auto-restore sim
+  // to the main panel area so the heatmap is always visible. The
+  // user can move it back to minimap later (after opening the
+  // sidebar manually). Quentin: "the sim_mat has disappeared".
+  if (savedCollapsed && state.simInMinimap && typeof state._setSimInMinimap === 'function') {
+    requestAnimationFrame(() => {
+      try { state._setSimInMinimap(false); } catch (_) {}
+    });
+  }
 
   // --- #sidebarToggleBtn click — legacy lines 75473-75480 ---
   const btn = $('sidebarToggleBtn');
@@ -3064,6 +3098,13 @@ function _wireSidebarToggle(state) {
       const next = !isCollapsed;
       try { localStorage.setItem(_SIDEBAR_STORAGE_KEY, String(next)); } catch (e) {}
       _applySidebarState(state, next);
+      // 2026-05-20: same rule when the user manually collapses the
+      // sidebar — restore sim to the main panel so it doesn't vanish
+      // along with the sidebar. Re-opening the sidebar does NOT auto-
+      // move sim back to minimap; the user controls that explicitly.
+      if (next && state.simInMinimap && typeof state._setSimInMinimap === 'function') {
+        try { state._setSimInMinimap(false); } catch (_) {}
+      }
     });
   }
 }

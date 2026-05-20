@@ -1,5 +1,5 @@
   <div id="haplotype_regimes" class="page">
-    <div class="rg-content" style="display: flex; flex-direction: column; height: 100%; min-height: 0;">
+    <div class="rg-content" style="display: flex; flex-direction: column; height: 100%; min-height: 0; position: relative;">
 
       <!-- Header bar: focal voter info + mode toggles + compute genome button -->
       <div id="regimesPageHeader" class="rg-header" style="
@@ -42,29 +42,49 @@
            when seeds.length > 0). Quentin's feedback: "we have some
            results but like idk what to do" — this drawer answers that
            by mapping discovered artifacts (seeds / loci / regimes) to
-           concrete next actions (inspect / promote / merge / export). -->
+           concrete next actions (inspect / promote / merge / export).
+           Post-feedback 2026-05-20: collapsed into a small ? icon
+           pinned to the page's top-right corner (position: absolute
+           relative to .rg-content). Click the icon to expand the
+           full reading guide as a popover card. -->
       <details id="rgInterpretDrawer" style="
-        flex: 0 0 auto;
-        margin: 0 12px 8px 12px;
+        position: absolute;
+        top: 14px;
+        right: 16px;
+        z-index: 50;
         padding: 0;
-        background: var(--panel-2, #181d27);
-        border: 1px solid var(--rule, #2a3242);
-        border-radius: 4px;
+        background: transparent;
+        border: 0;
         display: none;
         font-family: ui-monospace, monospace;
         font-size: 10.5px;
         color: var(--ink, #e6edf6);
-      " open>
-        <summary style="
-          padding: 6px 10px;
-          cursor: pointer;
-          color: var(--ink-dim, #8895a8);
-          letter-spacing: 0.04em;
-          text-transform: uppercase;
-          font-size: 10px;
-          user-select: none;
-        ">▾ how to read these results — what to do next</summary>
-        <div style="padding: 4px 12px 10px 12px; line-height: 1.5;">
+      ">
+        <summary id="rgInterpretSummary"
+                 title="How to read these results — what to do next"
+                 style="
+                   list-style: none;
+                   display: inline-flex;
+                   align-items: center; justify-content: center;
+                   width: 22px; height: 22px;
+                   border-radius: 50%;
+                   background: var(--panel-2, #181d27);
+                   border: 1px solid var(--accent, #f5a524);
+                   color: var(--accent, #f5a524);
+                   cursor: pointer;
+                   font-size: 12px; font-weight: 700;
+                   user-select: none;
+                ">?</summary>
+        <div style="
+          position: absolute; top: 28px; right: 0;
+          width: min(620px, 80vw);
+          padding: 8px 14px 12px;
+          background: var(--panel-2, #181d27);
+          border: 1px solid var(--rule, #2a3242);
+          border-radius: 4px;
+          box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+          line-height: 1.5;
+        ">
           <div style="margin-bottom: 6px;">
             <b style="color: var(--accent, #f5a524);">Each chip in the seeds strip below</b>
             is one <b>Stage&nbsp;1 seed</b> the pipeline discovered — a

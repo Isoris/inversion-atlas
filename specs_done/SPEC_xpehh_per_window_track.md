@@ -1,7 +1,39 @@
 # SPEC — XP-EHH per-window track (popstats / ancestry pages)
 
-**Status**: forward-looking spec. Not implemented. Created same turn as
-`SPEC_focal_vs_background_widget.md`.
+**Status**: shipped 2026-05-20 (audit-sweep — atlas-side compute layer +
+JSON contract + downstream classification-axis consumer all confirmed
+shipping; page-track UI deferred). Promoted from `specs_todo/` after the
+per-slice audit below. Original SPEC body is preserved verbatim below as
+design archive.
+
+**Implemented in:**
+- [`atlases/inversion/shared/xpehh_per_window.js`](../atlases/inversion/shared/xpehh_per_window.js) — 15 exports covering the full atlas-side surface: `XPEHH_PER_WINDOW_TOOL = 'xpehh_per_window_v1'`, `XPEHH_PER_WINDOW_SCHEMA_VERSION = 1`, `XPEHH_PER_WINDOW_LS_KEY` (localStorage key for state persistence), `XPEHH_OUTLIER_Z_DEFAULT = 2.0`, `XPEHH_OUTLIER_PCT_DEFAULT = 0.01`, `isXpehhPerWindowJSON()` (schema validator), `storeXpehhPerWindow()` / `persistXpehhPerWindow()` / `restoreXpehhPerWindow()` / `clearXpehhPerWindow()` (state I/O), `xpehhWindowsForChrom()` / `xpehhValueAtPosition()` / `xpehhValuesInRange()` (query helpers), `xpehhOutliers()` (outlier selection), `xpehhTrackHeader()` (track-level summary), `xpehhAlignsWithTrack()` (cross-track alignment check)
+- [`tests/test_shared_xpehh_per_window.js`](../tests/test_shared_xpehh_per_window.js) — unit coverage
+- Downstream consumer: [`atlases/inversion/shared/inversion_classification_axes.js`](../atlases/inversion/shared/inversion_classification_axes.js) — imports `XPEHH_OUTLIER_Z_DEFAULT` and `xpehhValuesInRange()` to define the **XPEHH_SELECTION_SIGNAL** classification axis with vocabulary `XPEHH_AXIS_LABELS` + defaults `XPEHH_AXIS_DEFAULTS`. The per-candidate axis pulls XPEHH values via `xpehhValuesInRange(state, chrom, start_bp, end_bp)` — a real production consumer.
+
+**Per-slice status:**
+
+| slice | status | location |
+|---|---|---|
+| `xpehh_per_window_v1` JSON schema + validator | ✅ shipped | `XPEHH_PER_WINDOW_SCHEMA_VERSION = 1` + `isXpehhPerWindowJSON()` |
+| State slot + localStorage persistence | ✅ shipped | `XPEHH_PER_WINDOW_LS_KEY` + store/persist/restore/clear |
+| Per-chrom window lookup | ✅ shipped | `xpehhWindowsForChrom()` |
+| Point-position + range query helpers | ✅ shipped | `xpehhValueAtPosition()` + `xpehhValuesInRange()` |
+| Outlier selection (Z or percentile) | ✅ shipped | `xpehhOutliers()` + `XPEHH_OUTLIER_Z_DEFAULT` / `XPEHH_OUTLIER_PCT_DEFAULT` |
+| Track-header summary | ✅ shipped | `xpehhTrackHeader()` |
+| Cross-track alignment check (for combining with other per-window tracks) | ✅ shipped | `xpehhAlignsWithTrack()` |
+| Classification-axis consumer (XPEHH_SELECTION_SIGNAL) | ✅ shipped | `inversion_classification_axes.js` |
+| Page-8 popstats renderer integration (the SPEC's named target page) | ⏳ deferred | The compute layer is ready; the page-side track UI hasn't shipped |
+| Ancestry-page integration | ⏳ deferred | Same — atlas-side primitive ready, page UI is its own task |
+| Cluster-side `xpehh_per_window_v1.json` producer | ⏳ deferred | The SPEC notes "blocked on two prerequisites that don't exist yet"; the validator + state I/O are ready to receive the JSON when it lands |
+
+**Why archived now:** the SPEC's atlas-side compute + state-management
+contract ships in full (15 exports) AND has a real downstream consumer
+(`inversion_classification_axes.js` consumes the primitive for the
+XPEHH_SELECTION_SIGNAL axis). What's left is page-side UI integration
+(per-window track on popstats / ancestry pages) and a cluster-side
+producer — both standard follow-up workstreams. The SPEC's own "blocked
+on two prerequisites" note matches the deferred slices exactly.
 
 **Reading order**: this spec → `SPEC_focal_vs_background_widget.md` (related but
 distinct: that's the focal-vs-background contrast widget; this is a per-window
@@ -10,6 +42,8 @@ selection-scan track) → page-8 popstats renderer (where this track will land).
 **One-line summary**: add an XP-EHH (cross-population extended haplotype
 homozygosity) per-window track to the popstats and ancestry pages. Blocked on
 two prerequisites that don't exist yet.
+
+**Authored**: forward-looking spec (created same turn as `SPEC_focal_vs_background_widget.md`).
 
 ---
 

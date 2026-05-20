@@ -443,13 +443,117 @@ export function _winNavBand(layoutCtx) {
 }
 
 // --- _drawWRow / _drawWinNavLane — drawZ-side helpers ---
-// The drawZ-side painters for these lanes haven't been ported yet (they
-// need fullsim/Z-panel context: toX, xOfWin, currentMbRange). Once z_panel
-// wires them, replace these stubs. Keeping them as null no-ops mirrors
-// the pre-port behavior where drawZ ran with these as undefined (the
-// candidate-mode UI just rendered without the W-row / nav-lane painted).
-export function _drawWRow()      { return; }
-export function _drawWinNavLane(){ return; }
+// _drawWRow stays stubbed for now — it only matters in candidate-mode
+// editing and the W-row band is null otherwise (no reserved space).
+//
+// 2026-05-20: _drawWinNavLane IS implemented now. Quentin's report:
+// "the red arrow boundaries are too far from the L2 thats because
+// normally we have the L3 track window (Win)". The nav-lane band was
+// always reserved (6 px + 2 px gap below L2 zone bar), but the painter
+// was a no-op stub from the legacy carryover — leaving an empty strip
+// that pushed the L2-boundary triangles 8 px below the L2 bar.
+//
+// What this paints: a per-window strip where each cell is colored by
+// its L2 envelope's K-means majority cluster (groupColor palette,
+// matching the rest of the page). Windows outside any L2 envelope
+// render dim grey. A small vertical orange tick marks the cursor.
+// Net effect: closes the visual gap between L2 zone bar and the
+// boundary triangles AND surfaces the per-L2 dominant microgroup so
+// the reader can read "which band wins here" at a glance.
+export function _drawWRow() { return; }
+export function _drawWinNavLane(ctx, d, toX, _xOfWin, band, padL) {
+  if (!band || !ctx || !d || typeof toX !== 'function') return;
+  const state = _pageState;
+  if (!state) return;
+  const nWin = d.n_windows | 0;
+  if (nWin <= 0) return;
+  const wins = d.windows;
+  if (!Array.isArray(wins) || wins.length === 0) return;
+
+  const y = band.y0 | 0;
+  const h = Math.max(1, band.h | 0);
+
+  // Per-L2 majority label cache so we resolve each L2's labels once.
+  const w2l = state.windowToL2;
+  const envs = d.l2_envelopes;
+  const majByL2 = new Map();
+  const _majorityLabel = (l2idx) => {
+    if (majByL2.has(l2idx)) return majByL2.get(l2idx);
+    let maj = -1;
+    try {
+      const cl = (l2idx >= 0 && envs && envs[l2idx]) ? getL2Cluster(state, l2idx) : null;
+      const labels = cl && cl.labels;
+      if (labels && labels.length > 0) {
+        const counts = new Map();
+        for (let i = 0; i < labels.length; i++) {
+          const k = labels[i];
+          if (!Number.isFinite(k) || k < 0) continue;
+          counts.set(k, (counts.get(k) || 0) + 1);
+        }
+        let bestN = -1;
+        for (const [k, n] of counts) {
+          if (n > bestN) { bestN = n; maj = k; }
+        }
+      }
+    } catch (_) { /* fail-soft → dim grey */ }
+    majByL2.set(l2idx, maj);
+    return maj;
+  };
+
+  // Per-window paint. Each cell spans from the previous mid-mb to the
+  // next mid-mb so cells touch (no slivers between them) regardless of
+  // window non-uniformity.
+  ctx.save();
+  for (let i = 0; i < nWin; i++) {
+    const w = wins[i];
+    if (!w) continue;
+    const mbHere = w.center_mb;
+    const mbLeft = (i > 0) ? (wins[i - 1].center_mb + mbHere) / 2 : mbHere;
+    const mbRight = (i < nWin - 1) ? (mbHere + wins[i + 1].center_mb) / 2 : mbHere;
+    const x0 = toX(mbLeft);
+    const x1 = toX(mbRight);
+    if (!Number.isFinite(x0) || !Number.isFinite(x1)) continue;
+    const cellX = Math.min(x0, x1);
+    const cellW = Math.max(1, Math.abs(x1 - x0));
+    const l2 = (w2l && w2l[i] != null) ? (w2l[i] | 0) : -1;
+    let col = 'rgba(120,128,144,0.18)';
+    if (l2 >= 0) {
+      const maj = _majorityLabel(l2);
+      if (maj >= 0) {
+        const base = groupColor(maj);
+        // Same envelope as cursor → brighter; other envelopes → dimmer.
+        const curL2 = (w2l && state.cur != null) ? (w2l[state.cur] | 0) : -1;
+        col = (l2 === curL2) ? withAlpha(base, 0.95) : withAlpha(base, 0.45);
+      } else {
+        col = 'rgba(180,190,210,0.25)';
+      }
+    }
+    ctx.fillStyle = col;
+    ctx.fillRect(cellX, y, cellW + 0.5, h);
+  }
+
+  // Frame the band so it reads as one strip even when adjacent cells share a color.
+  ctx.strokeStyle = 'rgba(120,128,144,0.35)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect((padL | 0) + 0.5, y + 0.5,
+                 Math.max(1, toX(wins[nWin - 1].center_mb) - padL),
+                 h - 1);
+
+  // Cursor tick: thin orange notch over the band so the reader sees
+  // where the scrubber sits even before the |Z| plot starts below.
+  if (state.cur != null && state.cur >= 0 && state.cur < nWin) {
+    const cx = toX(wins[state.cur].center_mb);
+    if (Number.isFinite(cx)) {
+      ctx.strokeStyle = '#f5a524';
+      ctx.lineWidth = 1.25;
+      ctx.beginPath();
+      ctx.moveTo(cx + 0.5, y);
+      ctx.lineTo(cx + 0.5, y + h);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
 
 // --- _wRowHandleClick — legacy lines 68104-68140 ---
 // W-row click handler. Returns true if the click hit the W-row AND was

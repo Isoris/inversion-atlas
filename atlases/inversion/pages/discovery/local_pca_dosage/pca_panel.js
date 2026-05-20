@@ -1153,12 +1153,28 @@ export function cycleKAside(state) {
   state.kMode = 'fixed';
   state.k = next;
   state.l2GroupCache = null; state.cacheKey = null;
+  // 2026-05-20: drop tracked samples on K-change. The K-bands at the
+  // new K don't necessarily correspond to the bands the tracked set
+  // was picked from — keeping the old picks created a confusing state
+  // where the band picker was "stuck" on a now-invalid band but the
+  // tracked PCA still rendered the previous selection. Quentin: "we
+  // still cannot clear selection when we select like a different K
+  // on the tracked samples PCA". K-cycle is a coarse mode change;
+  // resetting state.tracked matches the user's mental model of
+  // "starting fresh in the new K".
+  state.tracked = [];
+  if (state.trackingAnchor) state.trackingAnchor = null;
   // Mirror to sidebar kSelect so both UIs stay aligned
   const _kSel = document.getElementById('kSelect');
   if (_kSel) _kSel.value = String(next);
   try { refreshBandPickBar(state); } catch (_) {}
-  if (state.trackingAnchor) state.trackingAnchor = null;
   try { recomputeAnchorConcord(); } catch (_) {}
+  // 2026-05-20: renderTrackedList sweeps the sidebar + compact + popup
+  // tracked-list surfaces. Because cycleKAside above just cleared
+  // state.tracked, this call wipes the visible chip list — without it,
+  // the UI would still show the stale sample chips until the next
+  // unrelated re-render.
+  try { renderTrackedList(state); } catch (_) {}
   try { drawPCA(state); }        catch (_) {}
   try { drawLinesPanel(state); } catch (_) {}
   try { renderZoneBlock(state); }catch (_) {}

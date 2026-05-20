@@ -1,19 +1,47 @@
 # SPEC — Local PCA Comparator (cross-evidence view)
 
-**Status**: Phase 1 (side-by-side) shipped 2026-05-18. Phase 2
-(per-sample trajectory + concordance score) shipped 2026-05-20 in
-`pca_comparator/renderer.js#paintTrajectory` + `computeConcordance`,
-wired via `pca_comparator.js#_refreshTrajectoryAndConcord`. Phase 3
-(Procrustes-aligned overlay) remains DEFERRED — the SPEC's own
-gating ("only if there's a real use case AFTER Phase 1+2") and
-rotation-misreading risk still apply. See
-`docs/generated/page_contracts/pca_comparator/` for the shipped
-contract; full design exploration below remains the source of truth
-for Phase 3 + open questions.
+**Status**: shipped 2026-05-20 (audit-sweep — Phases 1 + 2 confirmed
+shipping; Phase 3 explicitly gated by the SPEC's own "only-if-needed"
+rule). Promoted from `specs_todo/` after the per-slice audit below.
+Original SPEC body is preserved verbatim below as design archive.
 
-**Implemented in**: `atlases/inversion/pages/discovery/pca_comparator.{html,js}`
-+ `pca_comparator/{_state,renderer}.js` (page registered as
-`pca_comparator` in `manifest.json` + `pages.registry.json`).
+**Implemented in:**
+- [`atlases/inversion/pages/discovery/pca_comparator.{html,js}`](../atlases/inversion/pages/discovery/) — page entry
+- [`atlases/inversion/pages/discovery/pca_comparator/_state.js`](../atlases/inversion/pages/discovery/pca_comparator/_state.js) — per-page state
+- [`atlases/inversion/pages/discovery/pca_comparator/renderer.js`](../atlases/inversion/pages/discovery/pca_comparator/renderer.js) — Phase 1 + 2 renderers:
+  - `paintTrajectory(state, si)` at line 527 (per-sample (PC1, PC2) trajectory across the three evidence streams)
+  - `computeConcordance(state, si)` at line 630 (fraction of windows where the three streams agree on the sample's L2 cluster)
+- [`atlases/inversion/pages/discovery/pca_comparator/heatmap.js`](../atlases/inversion/pages/discovery/pca_comparator/heatmap.js) — supporting heatmap renderer
+- Wired in: `pca_comparator.js#_refreshTrajectoryAndConcord` invokes the renderer pair
+- Page registration: `manifest.json` + `pages.registry.json` ✓
+- Test: [`tests/test_discovery_pca_comparator.js`](../tests/test_discovery_pca_comparator.js)
+- Page contract: [`docs/generated/page_contracts/pca_comparator/`](../docs/generated/page_contracts/pca_comparator/) — manifest + canonical PAGE_CONTRACT.md
+
+**Per-slice status:**
+
+| slice | status | location |
+|---|---|---|
+| Phase 1: side-by-side comparator of 3 PCAs (z-blocks / θπ / GHSL) | ✅ shipped 2026-05-18 | `pca_comparator.{html,js}` + `_state.js` + `renderer.js` |
+| Phase 2: per-sample trajectory across the 3 streams | ✅ shipped 2026-05-20 | `renderer.js#paintTrajectory(state, si)` (line 527) |
+| Phase 2: per-sample concordance score | ✅ shipped 2026-05-20 | `renderer.js#computeConcordance(state, si)` (line 630) |
+| Phase 2 wiring | ✅ shipped 2026-05-20 | `pca_comparator.js#_refreshTrajectoryAndConcord` |
+| Page registration | ✅ shipped | `manifest.json` + `pages.registry.json` |
+| Test coverage | ✅ shipped | `tests/test_discovery_pca_comparator.js` |
+| Page contract docs | ✅ shipped | `docs/generated/page_contracts/pca_comparator/` |
+| Phase 3: Procrustes-aligned overlay (3 PCAs into a single rotation-aligned scatter) | ⏳ deferred-by-design | SPEC's own §"Phase 3" gate: "only if there's a real use case AFTER Phase 1+2." Plus rotation-misreading risk: Procrustes alignment can make spurious patterns look like real concordance. Won't ship unless a concrete request arrives that Phases 1+2 can't answer. |
+
+**Why archived now:** the SPEC explicitly stages itself in three
+phases, of which Phases 1+2 are shipped (with the exact line-number
+pointers and the page-contract docs to prove it). Phase 3 is
+deferred-by-design — the SPEC author (Quentin) wrote in the gating
+rule that Phase 3 must wait for a concrete use case AND that the
+rotation-misreading risk makes shipping it speculatively a mistake.
+Per the audit convention, a SPEC whose deferred slices are gated by
+its own intentional design (not by missing dependencies) is shipped.
+
+**User question**: "how could we try to have some sort of overlay of
+the 3 pcas at once so we can compare ? or have them side by side ?
+(for local PCA | local PCA theta pi | local PCA GHSL)"
 **User question**: "how could we try to have some sort of overlay of
 the 3 pcas at once so we can compare ? or have them side by side ?
 (for local PCA | local PCA theta pi | local PCA GHSL)"
