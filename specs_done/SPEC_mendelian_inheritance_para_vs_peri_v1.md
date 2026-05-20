@@ -1,6 +1,39 @@
 # SPEC — Mendelian inheritance, paracentric vs pericentric (v1)
 
-**Status**: drafted 2026-05-12
+**Status**: shipped 2026-05-20 (audit-sweep — full v1 surface confirmed
+shipping with page-side consumers). Promoted from `specs_todo/` after
+the per-slice audit below. Original SPEC body is preserved verbatim
+below as design archive.
+
+**Implemented in:**
+- [`atlases/inversion/shared/mendelian_family_test.js`](../atlases/inversion/shared/mendelian_family_test.js) — the generic per-family math: cross-expectation, χ² goodness-of-fit, reliability tier, segregation status, effect direction (inversion-type-agnostic). Exports the vocabulary (`SEGREGATION_STATUS`, `EFFECT_DIRECTIONS`, `INVERSION_TYPES`, `RELIABILITY_TIERS`, `RELIABILITY_DEFAULTS`, `PARA_PERI_DEFAULTS`), the format helpers (`expectedRatioForCross`, `formatExpectedRatio`), the classifier primitives (`chiSquareGoodnessOfFit`, `classifyEffectDirection`, `classifyReliabilityTier`, `classifySegregationStatus`), and the entry point `testFamilyCandidate()`
+- [`atlases/inversion/shared/mendelian_para_vs_peri.js`](../atlases/inversion/shared/mendelian_para_vs_peri.js) — the para-vs-peri-specific cohort math: `cohortParaPeriContingency()` (Stage 2 2×2 contingency per §3 + §8) + `cohortEffectDirectionBreakdown()`. Module is intentionally small — re-exports the generic vocabulary from `mendelian_family_test.js` for back-compat.
+- [`atlases/inversion/shared/mendelian_segregation.js`](../atlases/inversion/shared/mendelian_segregation.js) — segregation per-class math (sibling to family_test; used by recombination_suppression downstream)
+- [`atlases/inversion/analysis/mendelian.js`](../atlases/inversion/analysis/mendelian.js) + [`atlases/inversion/analysis/mendelian_inheritance.js`](../atlases/inversion/analysis/mendelian_inheritance.js) — the pre-existing 3-state base verdict (mendelian / non-mendelian / insufficient_data) on which the v1 extension builds
+- [`atlases/inversion/shared/contingency.js`](../atlases/inversion/shared/contingency.js) + [`atlases/inversion/shared/haplotype_vocab.js`](../atlases/inversion/shared/haplotype_vocab.js) — pre-existing dependencies (fisher2x2, chiSquare, STD/HET/INV vocab)
+- Tests: [`tests/test_shared_mendelian_para_vs_peri.js`](../tests/test_shared_mendelian_para_vs_peri.js), [`tests/test_shared_mendelian_family_test.js`](../tests/test_shared_mendelian_family_test.js), [`tests/test_shared_mendelian_segregation.js`](../tests/test_shared_mendelian_segregation.js), [`tests/test_analysis_mendelian.js`](../tests/test_analysis_mendelian.js), [`tests/test_analysis_mendelian_inheritance.js`](../tests/test_analysis_mendelian_inheritance.js)
+- Downstream page-side consumers: [`atlases/inversion/shared/inversion_classification.js`](../atlases/inversion/shared/inversion_classification.js), [`atlases/inversion/shared/inversion_classification_axes.js`](../atlases/inversion/shared/inversion_classification_axes.js), [`atlases/inversion/shared/recombination_suppression.js`](../atlases/inversion/shared/recombination_suppression.js)
+
+**Per-slice status:**
+
+| slice | status | location |
+|---|---|---|
+| Per-family Mendelian goodness-of-fit (Stage 1 §2-§3) | ✅ shipped | `mendelian_family_test.testFamilyCandidate()` + `chiSquareGoodnessOfFit()` |
+| Cross-expectation tables for ♂×♀ karyotype combos | ✅ shipped | `expectedRatioForCross()` + `formatExpectedRatio()` |
+| Segregation status (mendelian / distorted / insufficient) | ✅ shipped | `classifySegregationStatus()` + `SEGREGATION_STATUS` enum |
+| Effect direction (TRD_HET_DEFICIT / TRD_HET_EXCESS / …) | ✅ shipped | `classifyEffectDirection()` + `EFFECT_DIRECTIONS` enum |
+| Reliability tiers (n_offspring / multiple-family corroboration) | ✅ shipped | `classifyReliabilityTier()` + `RELIABILITY_TIERS` + `RELIABILITY_DEFAULTS` |
+| Cohort 2×2 contingency (Stage 2 §3 + §8) | ✅ shipped | `mendelian_para_vs_peri.cohortParaPeriContingency()` |
+| Cohort effect-direction breakdown | ✅ shipped | `mendelian_para_vs_peri.cohortEffectDirectionBreakdown()` |
+| Page-side consumption (`inversion_classification`, `recombination_suppression`) | ✅ shipped | 3 modules consume the helpers |
+
+**Why archived now:** all v1 slices ship with page-side consumers. The
+SPEC's framing distinction (per-family + cohort 2×2 against paracentric
+vs pericentric inversion types) is materialised in two coordinated
+modules — generic math in `mendelian_family_test.js`, type-aware
+contingency in `mendelian_para_vs_peri.js` — exactly as the SPEC
+prescribes. Test coverage spans both stages. No deferred slices.
+
 **Scope**: per-candidate Mendelian goodness-of-fit + cohort-level
 comparison of segregation distortion frequency between paracentric
 and pericentric inversions.
@@ -9,6 +42,8 @@ a 3-state verdict: mendelian / non-mendelian / insufficient_data),
 `atlases/inversion/shared/contingency.js` (fisher2x2 + chiSquare +
 chiSqSurvival), and `atlases/inversion/shared/haplotype_vocab.js`
 (per-band classifier → STD/HET/INV labels).
+
+**Authored**: drafted 2026-05-12.
 
 ---
 
