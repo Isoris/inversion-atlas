@@ -146,7 +146,7 @@ function _wireCtxCallbacks(state, atlasState) {
   // local_pca_dosage; we replicate here so this page works without local_pca_dosage having mounted.)
   const N = data.n_windows;
   const windowToL2 = new Int32Array(N).fill(-1);
-  if (Array.isArray(data.l2_envelopes)) {
+  if (Array.isArray(data.l2_envelopes) && data.l2_envelopes.length > 0) {
     data.l2_envelopes.forEach((env, i) => {
       const s0 = env.start_w - 1, e0 = env.end_w - 1;
       env._s0 = env._s0 != null ? env._s0 : s0;
@@ -156,7 +156,31 @@ function _wireCtxCallbacks(state, atlasState) {
       }
     });
   }
+  // Fallback: if no L2 envelopes are shipped (or none cover this chromosome's
+  // windows), synthesize a single chromosome-wide envelope so clusterL2 can
+  // produce labels. Without this, labelsForWindow returns null everywhere,
+  // band_quality is uncomputable, and Stage 1 anchor capture fails too.
+  // Matches STAGE_B_v3_NOTES §2 ('treat every window as one L2') without
+  // disabling L2 anywhere it's actually used.
+  let synthesizedL2 = false;
+  if (windowToL2[0] < 0 || windowToL2[N - 1] < 0) {
+    const allUnassigned = (() => {
+      for (let w = 0; w < N; w++) if (windowToL2[w] >= 0) return false;
+      return true;
+    })();
+    if (allUnassigned && N > 0) {
+      const synth = { start_w: 1, end_w: N, _s0: 0, _e0: N - 1, synthetic: true };
+      if (!Array.isArray(data.l2_envelopes)) data.l2_envelopes = [];
+      data.l2_envelopes.push(synth);
+      const synthIdx = data.l2_envelopes.length - 1;
+      for (let w = 0; w < N; w++) windowToL2[w] = synthIdx;
+      synthesizedL2 = true;
+      console.warn('[haplotype_regimes] no L2 envelopes for ' + state.activeChrom +
+                   ' — synthesized a single chromosome-wide envelope so the pipeline can run.');
+    }
+  }
   state.windowToL2 = windowToL2;
+  state._regimesL2Synthesized = synthesizedL2;
 
   // Build a clusterL2 ctx. contextFromState reads clustering knobs from
   // `state` directly; set Quentin's defaults on state before the call
@@ -1492,6 +1516,7 @@ function _bandQualityStats(state) {
     max:              Number.isFinite(max) ? +max.toFixed(3) : 0,
     first_10:         first10,
     provenance:       prov,
+    l2_synthesized:   !!state._regimesL2Synthesized,
   };
 }
 
