@@ -50,6 +50,14 @@ import { runCramersVMergeLocal } from '../../shared/cramers_v_merge.js';
 import { runBandingPipeline, BANDING_PIPELINE_DEFAULTS }
   from '../../shared/band_tracking/banding_pipeline.js';
 
+// band_quality scorer — computes silhouette + size-balance + eig-ratio
+// per window. Data producers do NOT ship band_quality on window objects;
+// without this the chain walk + seed discovery see 0 for every window
+// and the pipeline exits in 20-50 ms with "0 seeds detected". See
+// STAGE_B_v3_NOTES §2 + PIPELINE_WIRING_NOTES §1.
+import { bandQualityForWindow, BAND_QUALITY_DEFAULTS }
+  from '../../shared/band_tracking/band_quality.js';
+
 // Catalogue serializer
 import { buildCatalogue, computeKnobHash }
   from '../../shared/band_tracking/regime_catalogue.js';
@@ -180,19 +188,68 @@ function _wireCtxCallbacks(state, atlasState) {
     const cl = clCache.getOrCompute(clCtx, li);
     return (cl && cl.ok && cl.usedK) ? cl.usedK : 1;
   };
-  const bandQualityForWindow = (w) => {
+  // band_quality cache. Data producers don't ship band_quality on the
+  // window objects; we derive it once per chromosome load by running
+  // the silhouette + size-balance + eig-ratio scorer against the
+  // L2-aggregated K-means labels and the per-window PC1/eigenvalues.
+  // Without this every getBandQuality(w) returns 0 → the seed-discovery
+  // gate (min_anchor_band_quality = 0.50) rejects every window → 0
+  // seeds detected in 20-50 ms.
+  //
+  // Fallback to data.windows[w].band_quality is kept so a future
+  // producer that ships pre-computed BQ keeps working without a code
+  // change here.
+  const bqCache = new Float32Array(N);
+  let bqProducerCount = 0;     // count of windows where producer-shipped BQ is used
+  let bqComputedCount = 0;     // count of windows where we computed BQ from primary signals
+  let bqZeroCount     = 0;     // count of windows where BQ stays 0 (no labels / no pc1)
+  for (let w = 0; w < N; w++) {
     const win = data.windows && data.windows[w];
-    if (!win) return 0;
-    return win.band_quality != null ? win.band_quality
-         : win.bq != null           ? win.bq
-         : 0;
+    if (!win) { bqCache[w] = 0; bqZeroCount++; continue; }
+    // Producer-shipped (if present) wins — no recomputation needed.
+    const shipped = (win.band_quality != null) ? win.band_quality
+                  : (win.bq           != null) ? win.bq
+                  : null;
+    if (shipped != null && Number.isFinite(+shipped)) {
+      bqCache[w] = +shipped;
+      bqProducerCount++;
+      continue;
+    }
+    // Compute from primary signals.
+    const li = windowToL2[w];
+    if (li < 0 || !win.pc1) { bqCache[w] = 0; bqZeroCount++; continue; }
+    const cl = clCache.getOrCompute(clCtx, li);
+    if (!cl || !cl.ok || !cl.labels || !cl.usedK || cl.usedK < 2) {
+      bqCache[w] = 0; bqZeroCount++; continue;
+    }
+    const r = bandQualityForWindow({
+      pc1:    win.pc1,
+      labels: cl.labels,
+      K:      cl.usedK,
+      eig1:   Number.isFinite(win.lam1) ? win.lam1 : 0,
+      eig2:   Number.isFinite(win.lam2) ? win.lam2 : 0,
+    });
+    bqCache[w] = Number.isFinite(r.band_quality) ? r.band_quality : 0;
+    bqComputedCount++;
+  }
+  state._regimesBandQualityCache = bqCache;
+  state._regimesBandQualityProvenance = {
+    n_windows:    N,
+    n_from_producer: bqProducerCount,
+    n_computed:   bqComputedCount,
+    n_zero:       bqZeroCount,
+  };
+
+  const bandQualityForWindow_cb = (w) => {
+    if (w >= 0 && w < N) return bqCache[w] || 0;
+    return 0;
   };
 
   state._regimesCtx = {
     chromosomes: [{ s_window: 0, e_window: N - 1, name: state.activeChrom }],
     getLabels:      labelsForWindow,
     getK:           KForWindow,
-    getBandQuality: bandQualityForWindow,
+    getBandQuality: bandQualityForWindow_cb,
     getL2Idx:       (w) => windowToL2[w],
     isWindowValid:  (w) => KForWindow(w) >= 2,
     n_samples:      data.n_samples,
@@ -356,9 +413,27 @@ async function _runPipeline(root, state) {
   // so the status update paints.
   await new Promise(r => setTimeout(r, 0));
 
+  // Pre-flight diagnostic: dump band_quality distribution + a sample of
+  // the first 10 values to the console. If every getBandQuality returns
+  // 0 the chain walk + seed discovery exit instantly with 0 seeds; this
+  // log lets the user (and us, when reading their console screenshot)
+  // see exactly why.
+  const bqStats = _bandQualityStats(state);
+  console.log('[haplotype_regimes] band_quality stats:', bqStats);
+
+  // Adaptive seed-discovery threshold. Default is 0.50; if fewer than
+  // 5 windows pass that, lower it in steps until we have something to
+  // work with. STAGE_B_v3_NOTES §2: "If band_quality is computed
+  // correctly but every window is below the 0.4 default, lower the
+  // threshold rather than rejecting the windows."
+  const minAnchorBQ = _autoCalibrateAnchorBQ(bqStats);
+
   const opts = {
     stage4_scope: 'seeds_only',
     skip_stage4: false,
+    seed_discovery: Object.assign({}, BANDING_PIPELINE_DEFAULTS.seed_discovery, {
+      min_anchor_band_quality: minAnchorBQ,
+    }),
   };
 
   let result;
@@ -374,14 +449,32 @@ async function _runPipeline(root, state) {
 
   state._regimesResult = result;
   state._regimesOpts   = opts;
+  state._regimesBQStats = bqStats;
 
   const summary = result.summary || {};
-  _setStatus(root,
-    `pipeline ran in ${ms}ms · ` +
-    `${summary.n_seeds_after_plateau || 0} seeds · ` +
-    `${summary.n_loci || 0} loci · ` +
-    `${summary.n_targets || 0} targets · ` +
-    `${summary.n_stability_upgraded || 0} COHERENT_SPLIT promotions`);
+  // Surface band_quality diagnostics in the status bar when 0 seeds —
+  // otherwise the user has no way to tell whether the pipeline is
+  // broken or the calibration is wrong.
+  const nSeeds = summary.n_seeds_after_plateau || 0;
+  if (nSeeds === 0) {
+    _setStatus(root,
+      `pipeline ran in ${ms}ms · 0 seeds · ` +
+      `BQ: ${bqStats.n_pass_default}/${bqStats.n_windows} passed default 0.50 ` +
+      `(threshold used: ${minAnchorBQ.toFixed(2)}) · ` +
+      `BQ provenance: ${bqStats.provenance.n_computed} computed, ` +
+      `${bqStats.provenance.n_from_producer} producer-shipped, ` +
+      `${bqStats.provenance.n_zero} zero. See console for details.`);
+  } else {
+    _setStatus(root,
+      `pipeline ran in ${ms}ms · ` +
+      `${nSeeds} seeds · ` +
+      `${summary.n_loci || 0} loci · ` +
+      `${summary.n_targets || 0} targets · ` +
+      `${summary.n_stability_upgraded || 0} COHERENT_SPLIT promotions` +
+      (minAnchorBQ < 0.5
+        ? ` · anchor BQ lowered to ${minAnchorBQ.toFixed(2)} (only ${bqStats.n_pass_default} windows passed default 0.50)`
+        : ''));
+  }
 
   _afterPipelineRun(root, state, result, opts);
 }
@@ -1361,4 +1454,59 @@ function _downloadJson(filename, obj) {
 function _setStatus(root, msg) {
   const el = root.querySelector('#rgStatus');
   if (el) el.textContent = msg;
+}
+
+// ---------------------------------------------------------------------------
+// band_quality diagnostics — surfaces the cache distribution so when
+// the pipeline returns 0 seeds the user can see immediately whether
+// it's because BQ wasn't computed (producer didn't ship it AND we
+// couldn't derive it) or because every window's BQ is below the seed
+// gate's 0.50 default.
+// ---------------------------------------------------------------------------
+function _bandQualityStats(state) {
+  const bq = state._regimesBandQualityCache || new Float32Array(0);
+  const prov = state._regimesBandQualityProvenance || {};
+  let nNonZero = 0, nPass50 = 0, nPass40 = 0, nPass30 = 0;
+  let sum = 0, max = -Infinity;
+  for (let i = 0; i < bq.length; i++) {
+    const v = bq[i];
+    if (!Number.isFinite(v)) continue;
+    if (v > 0)    nNonZero++;
+    if (v >= 0.3) nPass30++;
+    if (v >= 0.4) nPass40++;
+    if (v >= 0.5) nPass50++;
+    sum += v;
+    if (v > max) max = v;
+  }
+  const first10 = [];
+  for (let i = 0; i < Math.min(10, bq.length); i++) {
+    first10.push(+bq[i].toFixed(3));
+  }
+  return {
+    n_windows:        bq.length,
+    n_nonzero:        nNonZero,
+    n_pass_default:   nPass50,        // 0.50 = seed_discovery default
+    n_pass_chain:     nPass40,        // 0.40 = chain-walk default
+    n_pass_low:       nPass30,        // 0.30 = low fallback
+    mean:             bq.length > 0 ? +(sum / bq.length).toFixed(3) : 0,
+    max:              Number.isFinite(max) ? +max.toFixed(3) : 0,
+    first_10:         first10,
+    provenance:       prov,
+  };
+}
+
+// Adaptive seed-discovery threshold. If the default 0.50 catches at
+// least 5 windows, use it. Otherwise step down to 0.40, then 0.30, then
+// 0.20. Below 0.20 we stop — at that point the data is too noisy for
+// the seed-discovery walker to produce meaningful seeds, and the right
+// answer is "no inversions detectable on this chromosome".
+function _autoCalibrateAnchorBQ(stats) {
+  if (!stats || !stats.n_windows) return 0.50;
+  if (stats.n_pass_default >= 5) return 0.50;
+  if (stats.n_pass_chain   >= 5) return 0.40;
+  if (stats.n_pass_low     >= 5) return 0.30;
+  // Last resort — pick anything above ~zero. This lets the walker
+  // attempt seeds; if nothing real is in the data it'll still return 0
+  // seeds, but at least we tried.
+  return Math.max(0.20, Math.min(0.30, stats.max * 0.5));
 }
