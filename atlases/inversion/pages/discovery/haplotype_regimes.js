@@ -120,6 +120,7 @@ import { buildCatalogue, computeKnobHash }
 
 // Panel modules (sibling files in haplotype_regimes/)
 import { initRegimesPage, computeGenomeView } from './haplotype_regimes/regimes_page.js';
+import { regimeGroupsFromBands } from '../../shared/candidate_groups.js';
 import { classifyProjection } from '../../shared/band_tracking/projection.js';
 import { _dosageClassColour } from './haplotype_regimes/regimes_panel.js';
 
@@ -1221,6 +1222,7 @@ function _focusSeedFromChip(state, idx) {
   if (!Array.isArray(loci) || idx < 0 || idx >= loci.length) return;
   const rp = state.regimesPanel;
   rp.focal.seed_index = idx;
+  _pushFocalSeedGroups(state);
   // Reset band_mask to the first available subset for the new locus.
   rp.focal.band_mask = 1;
   // If the new seed lives on a different chromosome, snap chrom panels too.

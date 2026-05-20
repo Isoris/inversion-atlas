@@ -629,6 +629,12 @@ export function renderCatalogue(state) {
   try { _renderSourceOverlap(state); } catch (e) {
     if (typeof console !== 'undefined') console.warn('[_renderSourceOverlap]', e);
   }
+  // 2026-05-20: refresh #catSourceFilter option labels with per-source
+  // counts so the user sees how many candidates each source carries
+  // before clicking.
+  try { _refreshSourceFilterCounts(state); } catch (e) {
+    if (typeof console !== 'undefined') console.warn('[_refreshSourceFilterCounts]', e);
+  }
   if (selInfo) {
     const nSel = state.catSelection ? state.catSelection.size : 0;
     selInfo.textContent = nSel + ' selected of ' + sorted.length;
