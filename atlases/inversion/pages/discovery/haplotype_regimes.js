@@ -424,6 +424,37 @@ function _wireActionBar(root, state, atlasState) {
     if (runBtn) runBtn.title = runBtnTooltip(state._regimesMode);
   }
 
+  // View toggle (independent of mode/seed-source). Switches the
+  // below-the-fold section between the seeds strip and the
+  // long-range regimes summary table. The 4 canvases stay the
+  // same in both views.
+  state._regimesView = state._regimesView || 'seeds';
+  try {
+    const savedView = localStorage.getItem('haplotype_regimes.view');
+    if (savedView === 'seeds' || savedView === 'regimes') {
+      state._regimesView = savedView;
+    }
+  } catch (_) {}
+  const viewBar = root.querySelector('#rgViewBar');
+  if (viewBar) {
+    viewBar.querySelectorAll('button[data-rg-view]').forEach(b => {
+      b.classList.toggle('active', b.dataset.rgView === state._regimesView);
+      b.addEventListener('click', () => {
+        state._regimesView = b.dataset.rgView;
+        try { localStorage.setItem('haplotype_regimes.view', state._regimesView); } catch (_) {}
+        viewBar.querySelectorAll('button[data-rg-view]').forEach(b2 => {
+          b2.classList.toggle('active', b2 === b);
+        });
+        try { _applyViewToggle(root, state); }
+        catch (e) { console.warn('_applyViewToggle:', e); }
+      });
+    });
+  }
+  // Initial visibility: hide regimes wrap until a pipeline run populates
+  // it; the seeds strip starts hidden too and shows on pipeline run.
+  try { _applyViewToggle(root, state); }
+  catch (e) { console.warn('_applyViewToggle init:', e); }
+
   if (runBtn) {
     runBtn.addEventListener('click', async () => {
       // 2026-05-20: wrap in try/catch so a throw before _runPipeline's
@@ -2075,6 +2106,13 @@ function _runPostSeedingTail(root, state, result, modeLabel, msSoFar) {
   // Drive the existing panel render.
   try { _afterPipelineRun(root, state, result, {}); }
   catch (e) { console.warn('[post-seeding] _afterPipelineRun threw —', e); }
+
+  // Populate the long-range regimes summary table + apply the
+  // current view toggle so the right section is visible.
+  try { _renderRegimesSummary(root, state); }
+  catch (e) { console.warn('[post-seeding] _renderRegimesSummary threw —', e); }
+  try { _applyViewToggle(root, state); }
+  catch (e) { console.warn('[post-seeding] _applyViewToggle threw —', e); }
 }
 
 // Convert a stage3 locus into the interval shape refineRegimesFromIntervals
@@ -2126,4 +2164,101 @@ function _locusToInterval(locus, data, ctx) {
   }
   if (!hom_a || !hom_b || !het) return null;
   return { id, start_bp, end_bp, hom_a, hom_b, het };
+}
+
+// ---------------------------------------------------------------------------
+// View toggle (Cluster 3 surface — seeds-view vs long-range-regimes-view).
+//
+// Independent of the mode (seed source) toggle. The 4 canvases above
+// stay identical in both views. The toggle only switches what's
+// rendered below the canvas grid:
+//   seeds view   — show the seeds strip (one chip per Stage 1 seed)
+//   regimes view — show the long-range regime blocs table (one row
+//                  per refined regime from Cluster 3)
+// ---------------------------------------------------------------------------
+function _applyViewToggle(root, state) {
+  if (!root || typeof document === 'undefined') return;
+  const seedsWrap   = root.querySelector('#rgSeedsStripWrap');
+  const regimesWrap = root.querySelector('#rgRegimesWrap');
+  const view = state._regimesView || 'seeds';
+  const haveResult = !!(state && state._regimesResult);
+  const havePost   = !!(state && state._regimesPostSeeding);
+  if (seedsWrap) {
+    // Show the seeds strip only when we have a result AND the view is
+    // seeds. Until a run produces seeds, the strip stays hidden in
+    // both views.
+    seedsWrap.style.display = (view === 'seeds' && haveResult) ? 'flex' : 'none';
+  }
+  if (regimesWrap) {
+    // Show regimes only when in regimes view AND a post-seeding tail
+    // ran (i.e. we have refined regimes to display).
+    regimesWrap.style.display = (view === 'regimes' && havePost) ? 'flex' : 'none';
+  }
+}
+
+function _renderRegimesSummary(root, state) {
+  if (!root || typeof document === 'undefined') return;
+  const tbody = root.querySelector('#rgRegimesBody');
+  const countEl = root.querySelector('#rgRegimesCount');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  const post = state && state._regimesPostSeeding;
+  const refined = post && post.refined;
+  const regimes = refined && Array.isArray(refined.regimes) ? refined.regimes : [];
+  if (regimes.length === 0) {
+    tbody.innerHTML =
+      '<tr><td colspan="8" style="padding: 6px 10px; color: var(--ink-dimmer, #5a6472);">' +
+      'No refined regimes yet. Run the pipeline.' +
+      '</td></tr>';
+    if (countEl) countEl.textContent = '';
+    return;
+  }
+  // Map regime → chain_id (when topology produced multi-regime chains).
+  const chainOf = new Map();
+  const chains = (post.topology && Array.isArray(post.topology.chains))
+                 ? post.topology.chains : [];
+  chains.forEach((ch, ci) => {
+    if (!ch || !Array.isArray(ch)) return;
+    for (const uid of ch) chainOf.set(String(uid), ci);
+  });
+  for (let i = 0; i < regimes.length; i++) {
+    const r = regimes[i];
+    const id = r.regime_id != null ? r.regime_id : (r.regime_uid != null ? r.regime_uid : ('reg_' + i));
+    const chrom = r.chrom_idx != null
+      ? `chr${r.chrom_idx}`
+      : (state.activeChrom || '—');
+    const bpStart = Number.isFinite(r.start_bp) ? (r.start_bp / 1e6).toFixed(2) + ' Mb' : '—';
+    const bpEnd   = Number.isFinite(r.end_bp)   ? (r.end_bp   / 1e6).toFixed(2) + ' Mb' : '—';
+    const nIv     = r.n_intervals != null ? r.n_intervals
+                  : (r.member_interval_ids ? r.member_interval_ids.length : 0);
+    const sizeOf = (s) => {
+      if (s == null) return 0;
+      if (s instanceof Set) return s.size;
+      if (Array.isArray(s)) return s.length;
+      return 0;
+    };
+    const nHomA = sizeOf(r.hom_a_intersect || r.hom_a);
+    const nHomB = sizeOf(r.hom_b_intersect || r.hom_b);
+    const nHet  = sizeOf(r.het_union || r.het);
+    const chainKey = String(r.regime_uid != null ? r.regime_uid : id);
+    const chainId  = chainOf.has(chainKey) ? `chain ${chainOf.get(chainKey)}` : '—';
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid var(--rule, #2a3242)';
+    tr.innerHTML =
+      `<td style="padding: 3px 6px; color: var(--ink, #e6edf6); font-weight: 600;">${_esc(String(id))}</td>` +
+      `<td style="padding: 3px 6px; color: var(--ink-dim, #8895a8);">${_esc(String(chrom))}</td>` +
+      `<td style="padding: 3px 6px; color: var(--ink-dim, #8895a8);">${bpStart} – ${bpEnd}</td>` +
+      `<td style="padding: 3px 6px; color: var(--ink-dim, #8895a8);">${nIv}</td>` +
+      `<td style="padding: 3px 6px; color: #5fb3ff;">${nHomA}</td>` +
+      `<td style="padding: 3px 6px; color: #c7d3e4;">${nHet}</td>` +
+      `<td style="padding: 3px 6px; color: #e07b7b;">${nHomB}</td>` +
+      `<td style="padding: 3px 6px; color: var(--ink-dimmer, #5a6472);">${_esc(chainId)}</td>`;
+    tbody.appendChild(tr);
+  }
+  if (countEl) {
+    const nReg = regimes.length;
+    const nCh  = chains.length;
+    countEl.textContent = `${nReg} regime${nReg === 1 ? '' : 's'}` +
+                          (nCh > 0 ? ` · ${nCh} chain${nCh === 1 ? '' : 's'}` : '');
+  }
 }
