@@ -1,12 +1,44 @@
 # SPEC — `busco_4d_age_brackets`: BUSCO 4D-neutral sites + three-μ bracketing for absolute inversion age
 
-**Status**: drafted 2026-05-06.
+**Status**: shipped 2026-05-20 (audit-sweep — atlas-side consumer surface
+confirmed shipping). Promoted from `specs_todo/` after the per-slice
+audit below. Original SPEC body is preserved verbatim below as design
+archive.
+
+**Implemented in:**
+- [`atlases/inversion/shared/busco_4d_age.js`](../atlases/inversion/shared/busco_4d_age.js) — 12 exports covering the Method 3 compute surface end-to-end: `BUSCO_4D_MUS` (3 frozen μ values per §2), `BUSCO_4D_DEFAULTS`, `BUSCO_4D_SCHEMA_VERSION`, `BUSCO_4D_MU_KEYS`, `computeAgeFromDxy()`, `computeAllThreeAges()`, `computeAgeCiFromDxyCi()`, `buildBuscoAgeBracketsBlock()` (the JSON block builder per §3), `validateBuscoAgeBracketsBlock()` (the JSON validator), `verifyAgeMatchesDxy()` (post-validation cross-check), `formatBuscoAgeBracketsTaskText()` + `formatBuscoAgeBracketsEmptyText()` (Page-3 Row C formatters per AMENDMENT §4.1)
+- [`tests/test_shared_busco_4d_age.js`](../tests/test_shared_busco_4d_age.js) — unit coverage
+- Cited by: [`specs_done/SPEC_inversion_age_atlas_surface.md`](../specs_done/SPEC_inversion_age_atlas_surface.md) §1 (compute primitive for Method 3) and [`specs_todo/SPEC_inversion_age_atlas_surface_AMENDMENT.md`](SPEC_inversion_age_atlas_surface_AMENDMENT.md) §4.1 (Row C display)
+
+**Per-slice status:**
+
+| slice | status | location |
+|---|---|---|
+| Three-μ frozen values (μ_low / μ_mid / μ_high) per §2 | ✅ shipped | `BUSCO_4D_MUS` (frozen Object) |
+| dXY → age_my conversion under one μ | ✅ shipped | `computeAgeFromDxy()` |
+| All-three-μ ages from one dXY | ✅ shipped | `computeAllThreeAges()` |
+| CI propagation from dXY CI → age_my CI | ✅ shipped | `computeAgeCiFromDxyCi()` |
+| `inversion_age_v1.busco_4d_age_brackets` JSON block schema + builder (§3) | ✅ shipped | `buildBuscoAgeBracketsBlock()` + `BUSCO_4D_SCHEMA_VERSION = 1` |
+| Validator + post-validation `verifyAgeMatchesDxy` cross-check | ✅ shipped | `validateBuscoAgeBracketsBlock()` + `verifyAgeMatchesDxy()` |
+| Formatters for Page-3 Row C (populated + empty states) | ✅ shipped | `formatBuscoAgeBracketsTaskText()` / `formatBuscoAgeBracketsEmptyText()` |
+| Cluster-side producer `STEP_C01f_e_emit_busco_4d_age.py` | ⏳ deferred | LANTA-side step; SPEC defines it but cluster ships independently of the atlas |
+| Page-3 Row C UI consumer that invokes the formatters | ⏳ deferred | See `SPEC_inversion_age_atlas_surface.md` §3 — atlas-side row layout is deferred until the AMENDMENT's row work ships |
+
+**Why archived now (vs kept partial):** the SPEC's atlas-side compute
+surface ships fully (12 functions, all validators, all formatters). The
+remaining items are (a) cluster-side producer — by definition outside
+the atlas — and (b) UI row-C consumer, which is tracked by
+`SPEC_inversion_age_atlas_surface.md` §3 already. This SPEC's job
+(define the BUSCO 4D + three-μ contract + ship the compute) is done.
+
 **Sibling spec**: `SPEC_inversion_age_atlas_surface_AMENDMENT.md` (atlas display).
 **Producer**: NEW — `STEP_C01f_e_emit_busco_4d_age.py` on LANTA, runs after
 `STEP_C01f_c_burden_regression.R`. Does not exist yet — this spec defines it.
 **Reads**: BUSCO ortholog table for *C. gariepinus*, GFF3 of CDS coordinates,
 BEAGLE dosage matrix, per-candidate karyotype calls.
 **Writes**: extension block in `inversion_age_v1.json` per inversion (see §3).
+
+**Authored**: drafted 2026-05-06.
 
 ---
 
