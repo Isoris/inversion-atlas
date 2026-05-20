@@ -8,7 +8,7 @@ The legacy `INVERSION_PIPELINE_METHOD_v2.md` and the band_tracking/index.js head
 
 ---
 
-## Total inventory: 43 scripts
+## Total inventory: 45 scripts
 
 - **33** in `atlases/inversion/shared/band_tracking/`
 - **5** L3 primitives in `atlases/inversion/shared/` (`contingency`, `hungarian`, `kmeans`, `per_l2_cluster`, `cramers_v_merge`)
@@ -18,18 +18,22 @@ The legacy `INVERSION_PIPELINE_METHOD_v2.md` and the band_tracking/index.js head
 
 Every band_tracking/ script is placed below. Three are flagged as legacy/diagnostic and explicitly NOT part of the live pipeline.
 
+**Cluster split**:
+- **Clusters 1-3** run on the haplotype_regimes page (this PR's scope). The page ends with the catalogue serialiser.
+- **Cluster 4** (4 band_tracking/ scripts + the relatedness-half of `genome_scale.js`) runs on a separate relatedness-atlas / ngsPedigree page, consuming Cluster 3's catalogue.
+
 ---
 
-## Three execution-flow clusters
+## Four execution-flow clusters
 
-The user's mental model: pre-voting (build seeds + their bands + band-subset combos) → voting (every band/window votes for every other) → post-voting (annotate, review, export). The 5-script voting cluster is the middle; everything else feeds in or out.
+Pre-voting (build seeds + their bands + band-subset combos) → voting (every band/window votes for every other) → post-voting on the haplotype_regimes page (END OF PAGE: arrangement identity + cross-regime topology + annotation + UI + serialiser) → forwarded to relatedness atlas / ngsPedigree (Mendelian + pedigree + linkage + dyad). The 5-script voting cluster is the middle of Clusters 1–3; Cluster 4 is a separate page that consumes Cluster 3's serialised output.
 
 ```
   ┌────────────────────────────────────────────────────────────────────┐
   │  CLUSTER 1 — PRE-VOTING                                            │
   │  Build seeds, their K bands, and 2^K-1 band-subset voter universe  │
   │                                                                    │
-  │  Two alternative entry paths produce the same shape:               │
+  │  Three alternative entry paths produce the same shape:             │
   │   (A) V-walker:    banding_pipeline → seed_discovery + ...         │
   │   (B) Het-skeleton: het.js → hom.js → cramers_v_merge → ...        │
   │   (C) Curated:      candidate-list from local_pca_dosage           │
@@ -51,16 +55,31 @@ The user's mental model: pre-voting (build seeds + their bands + band-subset com
                                │
                                ▼
   ┌────────────────────────────────────────────────────────────────────┐
-  │  CLUSTER 3 — POST-VOTING                                           │
+  │  CLUSTER 3 — POST-VOTING (END OF haplotype_regimes PAGE)           │
   │                                                                    │
-  │  Dosage overlay + per-sample karyotype call                        │
+  │  Dosage overlay + per-sample karyotype call (Stage C5-C7)          │
   │  Karyotype-model verdict (BIALLELIC / MULTI / COMPLEX / AMBIGUOUS) │
   │  Within-regime arrangement-identity (haplotype_regime.js)          │
   │  Cross-regime topology (regime_topology)                           │
-  │  Mendelian + pedigree + linkage + dyad annotation                  │
+  │  Genome-scale aggregation + cross-chrom CHAINED (genome_scale)     │
   │  Positional + structural annotation                                │
-  │  Genome-scale wiring                                               │
-  │  Serializer + UI panels                                            │
+  │  Catalogue serialiser + UI registry + 4-canvas review UI           │
+  │                                                                    │
+  └────────────────────────────┬───────────────────────────────────────┘
+                               │
+                               ▼  (serialised catalogue — cross-page boundary)
+                               │
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  CLUSTER 4 — RELATEDNESS ATLAS / ngsPedigree (DIFFERENT PAGE)      │
+  │                                                                    │
+  │  Cohort LD + family recombination (regime_linkage)                 │
+  │  Trio + family Mendelian per regime (regime_mendelian)             │
+  │  Dyad Mendelian + meiotic drive (regime_dyad_mendelian)            │
+  │  Inverse pedigree: regime co-membership → relatedness              │
+  │    (regime_pedigree)                                               │
+  │                                                                    │
+  │  NOT wired by the haplotype_regimes page. Consumes Cluster 3's     │
+  │  regime catalogue + KING/ngsRelate edges from MODULE_2B.           │
   │                                                                    │
   └────────────────────────────────────────────────────────────────────┘
 ```
@@ -146,7 +165,9 @@ For each focal `(seed_id, band_mask)`, project onto every target window/seed in 
 
 ---
 
-## CLUSTER 3 — post-voting (annotate, refine, review, export)
+## CLUSTER 3 — post-voting (annotate, refine, review, export) — END OF haplotype_regimes PAGE
+
+This cluster is everything the haplotype_regimes page itself runs and renders. Its serialised output (regime catalogue + per-regime per-sample karyotype calls) crosses the page boundary into Cluster 4 (relatedness atlas / ngsPedigree), which is a different page and is NOT wired by the haplotype_regimes page.
 
 ### 3a — Dosage overlay + per-sample karyotype call (Stage C5-C7)
 
@@ -169,15 +190,11 @@ For each focal `(seed_id, band_mask)`, project onto every target window/seed in 
 |---|---|
 | `band_tracking/haplotype_regime.js` | `intervalSampleCore` + `relateIntervals` + `buildHaplotypeRegimeGraph` + `clusterHaplotypeRegimes` + `refineRegimesFromIntervals`. Given intervals that the voting pass has identified as part of the segregation pattern, decide whether two intervals represent the **same physical inversion arrangement**: EXTENSION (same arrangement) / NESTED (one contains other) / SHARED_HET (same heterozygotes, different homozygote pools) / SWAPPED (same arrangement with PC1-sign flip) / UNRELATED (different biology). It's arrangement-identity resolution, **not** the source of the long-range segregation signal — that comes from Cluster 2. |
 
-### 3d — Cross-regime topology + Mendelian + pedigree + linkage + dyad
+### 3d — Cross-regime topology (intra-page)
 
 | File | Role |
 |---|---|
-| `band_tracking/regime_topology.js` | `regimePairwiseTopology` / `buildRegimeTopologyGraph` / `findChromosomeRegimeChains` / `serializeRegimesToJson`. Per-chromosome cross-regime relationships: NESTED / ADJACENT / CHAINED / OVERLAPPING_CONFLICT / INDEPENDENT. Walks CHAINED edges into multi-inversion lineage chains. |
-| `band_tracking/regime_mendelian.js` | Method A (trio contradiction counting) + Method B (per-family χ² goodness-of-fit). Per-regime `support_status ∈ {SUPPORTED, INCONCLUSIVE, CONTRADICTED}` + per-(regime, family) `segregation_status` (6 states) + `effect_direction` (7 tags). |
-| `band_tracking/regime_pedigree.js` | Inverse direction: cross-regime co-membership → pairwise relatedness verdicts (DUPLICATE / FIRST_DEGREE / SECOND_DEGREE / UNRELATED / INSUFFICIENT_DATA). Cross-checks ngsPedigree pair calls. |
-| `band_tracking/regime_linkage.js` | Cohort LD between regimes (3×3 karyotype contingency + Cramér's V across all samples) + family-level recombination test (doubly-het parents → offspring → r̂). Pairwise verdict: LINKED / WEAKLY_LINKED / INDEPENDENT / INSUFFICIENT_DATA. |
-| `band_tracking/regime_dyad_mendelian.js` | Dyad (single-parent) gates + pooled-dyad binomial transmission test + meiotic-drive classification: MENDELIAN / MILD_DRIVE / STRONG_DRIVE / INVIABILITY / INSUFFICIENT_DATA. |
+| `band_tracking/regime_topology.js` | `regimePairwiseTopology` / `buildRegimeTopologyGraph` / `findChromosomeRegimeChains` / `serializeRegimesToJson`. Per-chromosome cross-regime relationships: NESTED / ADJACENT / CHAINED / OVERLAPPING_CONFLICT / INDEPENDENT. Walks CHAINED edges into multi-inversion lineage chains. **Final structural step on the haplotype_regimes page** — Mendelian/pedigree/linkage/dyad annotation is forwarded out to Cluster 4 (different page). |
 
 ### 3e — Positional + structural annotation
 
@@ -187,11 +204,11 @@ For each focal `(seed_id, band_mask)`, project onto every target window/seed in 
 | `shared/regime_annotation/positional.js` | `annotateRegimePosition` / `annotateRegimePositions`: per-regime chromosome-position context. Label ∈ {CENTROMERIC, PERICENTROMERIC, SUBTELOMERIC, ARM_SCALE, INTERSTITIAL} + distance to centromere/telomeres + arm scale. |
 | `shared/regime_annotation/structure.js` | `annotateRegimeStructure` / `annotateRegimeStructures`: per-regime structural label ∈ {SIMPLE_HAPLOTYPE_SPLIT, INVERSION_DOSAGE_LIKE, NESTED_OR_COMPOUND, NOISE_OR_RECOMBINANT, ...} from M / K / boundary sharpness / internal nesting. |
 
-### 3f — Genome-scale integration hub
+### 3f — Genome-scale aggregation (the on-page parts)
 
 | File | Role |
 |---|---|
-| `band_tracking/genome_scale.js` | `mergePerChromosomeRegimes` (per-chrom outputs → flat array with chrom + regime_uid) + `crossChromosomeRegimeLinks` (CHAINED links across chromosomes with min_shared HOM samples) + `genomeWidePedigreeFromRegimes` + `genomeWideRegimeReport`. **The single-call top-level orchestrator for Layers 4-5.** |
+| `band_tracking/genome_scale.js` | **Two exports belong to Cluster 3 (this page):** `mergePerChromosomeRegimes` (per-chrom outputs → flat array with chrom + regime_uid) and `crossChromosomeRegimeLinks` (CHAINED links across chromosomes with min_shared HOM samples). **Two exports belong to Cluster 4 (different page):** `genomeWidePedigreeFromRegimes` and the relatedness-annotation half of `genomeWideRegimeReport`. The split: aggregation + cross-chrom CHAINED stays on the haplotype_regimes page; per-pair pedigree/linkage/Mendelian/dyad annotation gets forwarded to the relatedness atlas. |
 
 ### 3g — Catalogue serializer + UI persistence
 
@@ -208,6 +225,58 @@ For each focal `(seed_id, band_mask)`, project onto every target window/seed in 
 | `haplotype_regimes/regimes_page.js` | 4-canvas 2×2 grid layout. Focal-voter selector + arrow-key navigation. Houses `enumerateBandSubsets` + `maskToBands` + `maskLabel` (the band-combo enumerator). |
 | `haplotype_regimes/regimes_panel.js` | Target-band-lanes panel (chrom + genome scope). Per-window pattern_class strip on top; per-sample lane jumps below. `_dosageClassColour` palette. |
 | `haplotype_regimes/regimes_pc1_panel.js` | PC1-lines panel (chrom + genome scope). Per-sample lines coloured by voter-band membership. "You are here" rectangle over the seed window range with dosage-tinted K stripes. |
+
+**END OF haplotype_regimes PAGE.** Cluster 3's serialised catalogue (manifest + knobs + catalogue JSON triple from §3g) is the cross-page boundary. Cluster 4 consumes it from a different page.
+
+---
+
+## CLUSTER 4 — relatedness atlas / ngsPedigree (DIFFERENT PAGE)
+
+The four scripts below are not invoked by the haplotype_regimes page. They are consumed by a separate relatedness page / ngsPedigree workflow that takes the haplotype_regimes catalogue + KING/ngsRelate kinship edges (from `MODULE_2B` on the cluster side) as input. They are listed here so the analysis-order audit is complete; their wiring is out of scope for the haplotype_regimes page next-turn commit.
+
+### 4a — Cohort LD + family recombination per regime pair
+
+| File | Role |
+|---|---|
+| `band_tracking/regime_linkage.js` | Cohort LD: 3×3 karyotype contingency + Cramér's V across all samples per regime pair. Family-level recombination test: doubly-heterozygous parents → offspring karyotype ratio → r̂ via testcross design. Pairwise verdict: LINKED / WEAKLY_LINKED / INDEPENDENT / INSUFFICIENT_DATA. |
+
+### 4b — Trio + family Mendelian per regime
+
+| File | Role |
+|---|---|
+| `band_tracking/regime_mendelian.js` | Method A (trio contradiction counting) + Method B (per-family χ² goodness-of-fit). Per-regime `support_status ∈ {SUPPORTED, INCONCLUSIVE, CONTRADICTED}` + per-(regime, family) `segregation_status` (6 states) + `effect_direction` (7 tags). |
+
+### 4c — Dyad Mendelian + meiotic-drive classification
+
+| File | Role |
+|---|---|
+| `band_tracking/regime_dyad_mendelian.js` | Dyad (single-parent) Mendelian gates + pooled-dyad binomial transmission test + meiotic-drive classification: MENDELIAN / MILD_DRIVE / STRONG_DRIVE / INVIABILITY / INSUFFICIENT_DATA. Complements (does not replace) trio-based Method A. |
+
+### 4d — Inverse pedigree: regime co-membership → relatedness
+
+| File | Role |
+|---|---|
+| `band_tracking/regime_pedigree.js` | "Scan genomes → find inversions → use regime co-membership to find who is parent/offspring." Pairwise same-class fraction across many regimes → classification: DUPLICATE / FIRST_DEGREE / SECOND_DEGREE / UNRELATED / INSUFFICIENT_DATA. Cross-checks ngsPedigree pair calls. |
+
+### 4e — Genome-scale relatedness annotation (the off-page parts of `genome_scale.js`)
+
+| File | Role |
+|---|---|
+| `band_tracking/genome_scale.js` (partial) | `genomeWidePedigreeFromRegimes` + the optional Mendelian/linkage/dyad annotation parameters of `genomeWideRegimeReport`. These are the relatedness-atlas-side parts of the genome-scale hub; the haplotype_regimes page calls only the aggregation/cross-chrom-link parts (see §3f). |
+
+**Cluster 4 inputs**:
+- Cluster 3 serialised catalogue (regime list + per-sample karyotype calls + cross-regime topology)
+- KING / ngsRelate kinship edges (from `MODULE_2B` cluster-side step)
+- Trios / families / dyads (cohort metadata)
+
+**Cluster 4 outputs**:
+- Per-regime relatedness verdicts (regime_linkage)
+- Per-regime Mendelian support (regime_mendelian)
+- Per-regime meiotic-drive verdicts (regime_dyad_mendelian)
+- Per-sample-pair relatedness from regime co-membership (regime_pedigree)
+- Whole-genome pedigree report (genome_scale's relatedness exports)
+
+These outputs feed the relatedness atlas UI + the ngsPedigree cross-check workflow. Not in scope for the haplotype_regimes page's "Run pipeline" button.
 
 ---
 
@@ -264,14 +333,14 @@ Three different "long-range" meanings; the user's primary one is the voting one.
 
 ---
 
-## Three load-bearing entry points for the haplotype_regimes page
+## Load-bearing entry points for the haplotype_regimes page (Clusters 1-3 only)
 
-The page's "Run pipeline" button should chain (per mode):
+The page's "Run pipeline" button should chain (per mode). **All three modes end at Cluster 3** — Cluster 4 (relatedness / ngsPedigree) is invoked from a different page that consumes Cluster 3's serialised catalogue.
 
 **Mode 1 — V-walker (current default)**
 1. Cluster 1 Path A: `runBandingPipeline(ctx, opts)` — Stages 1-4.
-2. Cluster 3 from §3a onward: dosage_overlay → karyotype_caller → karyotype_model → haplotype_regime (refine arrangement identity) → regime_topology → optional 4b-4d → genome_scale.
-3. Render via `initRegimesPage` (already wired) + post-render annotations.
+2. Cluster 3 from §3a onward: dosage_overlay → karyotype_caller → karyotype_model → haplotype_regime (arrangement identity) → regime_topology (cross-regime topology) → genome_scale aggregation + cross-chrom CHAINED → regime_annotation/positional + structure → regime_catalogue serialiser.
+3. Render via `initRegimesPage` (already wired) + the positional/structural annotation badges.
 
 **Mode 2 — Curated candidates (short-range, existing)**
 1. Cluster 1 Path C: `_buildShortRangeResult(state)` — seeds from candidate list.
@@ -281,7 +350,11 @@ The page's "Run pipeline" button should chain (per mode):
 1. Cluster 1 Path B: per-window `kmeans1D` → `het_detect_candidate_band` per window → `het_track_skeleton` from each HET seed → `het_define_interval` → `hom_anchor_to_het` per skeleton → `computeAdjacentSeedMerges` between adjacent intervals → fuse into Cramér's V seeds.
 2. Same Cluster 2 + Cluster 3 tail as Modes 1 and 2.
 
-All three modes share Clusters 2 and 3 verbatim — they differ only in how Cluster 1 produces seeds.
+All three modes share Clusters 2 and 3 verbatim — they differ only in how Cluster 1 produces seeds. **None of the three modes invokes Cluster 4.**
+
+## Cross-page boundary (Cluster 3 → Cluster 4)
+
+Cluster 3's last on-page step (`regime_catalogue.serializeCatalogue`) emits a `manifest.json` + `knobs.json` + `catalogue.json` triple, content-addressed by `knob_hash`. A separate relatedness-atlas page picks that catalogue up and runs Cluster 4 against it + KING/ngsRelate kinship edges from `MODULE_2B`. **That second page is out of scope for the haplotype_regimes work** — but the catalogue format is the cross-page contract and must be stable.
 
 ---
 
@@ -314,17 +387,18 @@ This single change unblocks Cluster 1 Path A (V-walker sees non-degenerate adjac
    - `computeAdjacentSeedMerges` between adjacent intervals → fuse chains
    - Output: same seed-with-bands shape Mode 1's `runStage3` produces
 
-4. **Implement the shared Cluster 2 + Cluster 3 tail** (called by all three modes):
+4. **Implement the shared Cluster 2 + Cluster 3 tail** (called by all three modes — ends at the catalogue serialiser; Cluster 4 is a different page):
    - `breadth_voting.runBreadthVoting` (Cluster 2 — already inside `runBandingPipeline` for Mode 1, called explicitly for Modes 2+3)
    - `dosage_overlay.classifyMacroBands` + `dosage_overlay.countAxesByHetDisjointness`
    - `karyotype_caller.callAxisKaryotype` per axis per sample
-   - `karyotype_model.kt_resolve_karyotype_model` for the verdict
-   - `haplotype_regime.refineRegimesFromIntervals` for arrangement identity
-   - `regime_topology.buildRegimeTopologyGraph` + `findChromosomeRegimeChains`
-   - Optional 4b-4d (Mendelian/pedigree/linkage/dyad) when trios/families/dyads supplied
-   - `genome_scale.genomeWideRegimeReport` — single-call hub that can take all the above
-   - `regime_annotation/positional.annotateRegimePositions` + `regime_annotation/structure.annotateRegimeStructures`
-   - `regime_catalogue.serializeCatalogue` for the export button
+   - `karyotype_model.kt_resolve_karyotype_model` for the candidate-level verdict
+   - `haplotype_regime.refineRegimesFromIntervals` for arrangement identity (EXTENSION/NESTED/SHARED_HET/SWAPPED/UNRELATED)
+   - `regime_topology.buildRegimeTopologyGraph` + `findChromosomeRegimeChains` for the cross-regime topology — **this is the last structural step on the page**
+   - `genome_scale.mergePerChromosomeRegimes` + `genome_scale.crossChromosomeRegimeLinks` for genome-wide aggregation (the on-page subset of genome_scale's exports)
+   - `regime_annotation/positional.annotateRegimePositions` + `regime_annotation/structure.annotateRegimeStructures` for the annotation badges
+   - `regime_catalogue.serializeCatalogue` for the export button — emits the cross-page catalogue triple that the relatedness atlas / ngsPedigree page (Cluster 4) consumes
+
+**NOT invoked on this page:** `regime_mendelian`, `regime_dyad_mendelian`, `regime_pedigree`, `regime_linkage`, `genomeWidePedigreeFromRegimes`. These are Cluster 4 (relatedness atlas / ngsPedigree page — separate workflow).
 
 5. **Diagnostics**:
    - band_quality stats (mean, max, n_pass_default, first 10)
