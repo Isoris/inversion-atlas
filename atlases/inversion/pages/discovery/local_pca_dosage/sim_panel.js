@@ -56,37 +56,58 @@ export function drawSim(state) {
     const sim = scale.sim;
     const zArr = scale.z;
     const usePdf = state.pdfStyle && zArr;
-    const img = ctx.createImageData(N, N);
 
-    if (usePdf) {
-      const q_lo = scale.q_lo, q_hi = scale.q_hi, z_max = scale.z_max;
-      for (let k = 0; k < sim.length; k++) {
-        const i = Math.floor(k / N), j = k - i * N;
-        let r, g, b;
-        if (i === j) {
-          r = 232; g = 197; b = 71;  // diagonal yellow
-        } else if (j < i) {
-          [r, g, b] = simColorPDF(sim[k], q_lo, q_hi);
-        } else {
-          [r, g, b] = zColorPDF(zArr[k], z_max);
-        }
-        img.data[k*4]=r; img.data[k*4+1]=g; img.data[k*4+2]=b; img.data[k*4+3]=255;
-      }
+    // 2026-05-19 perf: cache the offscreen N×N sim_mat image so per-cursor
+    // scrubs skip the N² pixel loop + putImageData (was running every
+    // setCur — dominant cost when the scrub instrumentation logs
+    // `drawSim=` higher than any other panel). The image depends only on
+    // (sim array identity, z array identity, pdfStyle, N) — none of
+    // those change when the user steps the cursor. Reference equality
+    // on `sim` / `zArr` is enough: getActiveSimScale returns the same
+    // typed-array references unless the chrom or active mode changes,
+    // and pdfStyle is a state-level toggle. Cache lives on state so
+    // remount tears it down naturally.
+    const cacheKey = `${N}|${usePdf ? 'pdf' : 'plain'}`;
+    const cache = state.__simImgCache;
+    let off;
+    if (cache
+        && cache.key === cacheKey
+        && cache.sim === sim
+        && cache.zArr === zArr) {
+      off = cache.canvas;
     } else {
-      let mn = Infinity, mx = -Infinity;
-      for (let i = 0; i < sim.length; i++) {
-        if (sim[i] < mn) mn = sim[i]; if (sim[i] > mx) mx = sim[i];
+      const img = ctx.createImageData(N, N);
+      if (usePdf) {
+        const q_lo = scale.q_lo, q_hi = scale.q_hi, z_max = scale.z_max;
+        for (let k = 0; k < sim.length; k++) {
+          const i = Math.floor(k / N), j = k - i * N;
+          let r, g, b;
+          if (i === j) {
+            r = 232; g = 197; b = 71;  // diagonal yellow
+          } else if (j < i) {
+            [r, g, b] = simColorPDF(sim[k], q_lo, q_hi);
+          } else {
+            [r, g, b] = zColorPDF(zArr[k], z_max);
+          }
+          img.data[k*4]=r; img.data[k*4+1]=g; img.data[k*4+2]=b; img.data[k*4+3]=255;
+        }
+      } else {
+        let mn = Infinity, mx = -Infinity;
+        for (let i = 0; i < sim.length; i++) {
+          if (sim[i] < mn) mn = sim[i]; if (sim[i] > mx) mx = sim[i];
+        }
+        const rng = Math.max(1e-9, mx - mn);
+        for (let i = 0; i < sim.length; i++) {
+          const v = (sim[i] - mn) / rng;
+          const [r, g, b] = simColor(v);
+          img.data[i*4]=r; img.data[i*4+1]=g; img.data[i*4+2]=b; img.data[i*4+3]=255;
+        }
       }
-      const rng = Math.max(1e-9, mx - mn);
-      for (let i = 0; i < sim.length; i++) {
-        const v = (sim[i] - mn) / rng;
-        const [r, g, b] = simColor(v);
-        img.data[i*4]=r; img.data[i*4+1]=g; img.data[i*4+2]=b; img.data[i*4+3]=255;
-      }
+      off = document.createElement('canvas');
+      off.width = N; off.height = N;
+      off.getContext('2d').putImageData(img, 0, 0);
+      state.__simImgCache = { key: cacheKey, sim, zArr, canvas: off };
     }
-    const off = document.createElement('canvas');
-    off.width = N; off.height = N;
-    off.getContext('2d').putImageData(img, 0, 0);
     // v4 turn 72: adaptive smoothing. When the source matrix N is comparable
     // to or larger than the display side, keep crisp pixels (false). When the
     // source is significantly smaller (e.g. 200×200 thumbnail blit to 800×800
@@ -364,32 +385,50 @@ export function drawSimMini(state) {
     const sim = scale.sim;
     const zArr = scale.z;
     const usePdf = state.pdfStyle && zArr;
-    const img = ctx.createImageData(N, N);
-    if (usePdf) {
-      const q_lo = scale.q_lo, q_hi = scale.q_hi, z_max = scale.z_max;
-      for (let k = 0; k < sim.length; k++) {
-        const i = Math.floor(k / N), j = k - i * N;
-        let r, g, b;
-        if (i === j) { r = 232; g = 197; b = 71; }
-        else if (j < i) { [r, g, b] = simColorPDF(sim[k], q_lo, q_hi); }
-        else { [r, g, b] = zColorPDF(zArr[k], z_max); }
-        img.data[k*4] = r; img.data[k*4+1] = g; img.data[k*4+2] = b; img.data[k*4+3] = 255;
-      }
+
+    // 2026-05-19 perf: reuse the drawSim image cache. drawSim and
+    // drawSimMini produce IDENTICAL offscreen N×N images from the same
+    // (sim, zArr, pdfStyle) inputs — only the final drawImage target
+    // rect differs. Sharing one cache means drawSimMini gets a free
+    // ride on the cache drawSim already populated (or vice versa,
+    // whichever fires first this scrub).
+    const cacheKey = `${N}|${usePdf ? 'pdf' : 'plain'}`;
+    const cache = state.__simImgCache;
+    let off;
+    if (cache
+        && cache.key === cacheKey
+        && cache.sim === sim
+        && cache.zArr === zArr) {
+      off = cache.canvas;
     } else {
-      let mn = Infinity, mx = -Infinity;
-      for (let i = 0; i < sim.length; i++) {
-        if (sim[i] < mn) mn = sim[i]; if (sim[i] > mx) mx = sim[i];
+      const img = ctx.createImageData(N, N);
+      if (usePdf) {
+        const q_lo = scale.q_lo, q_hi = scale.q_hi, z_max = scale.z_max;
+        for (let k = 0; k < sim.length; k++) {
+          const i = Math.floor(k / N), j = k - i * N;
+          let r, g, b;
+          if (i === j) { r = 232; g = 197; b = 71; }
+          else if (j < i) { [r, g, b] = simColorPDF(sim[k], q_lo, q_hi); }
+          else { [r, g, b] = zColorPDF(zArr[k], z_max); }
+          img.data[k*4] = r; img.data[k*4+1] = g; img.data[k*4+2] = b; img.data[k*4+3] = 255;
+        }
+      } else {
+        let mn = Infinity, mx = -Infinity;
+        for (let i = 0; i < sim.length; i++) {
+          if (sim[i] < mn) mn = sim[i]; if (sim[i] > mx) mx = sim[i];
+        }
+        const rng = Math.max(1e-9, mx - mn);
+        for (let i = 0; i < sim.length; i++) {
+          const v = (sim[i] - mn) / rng;
+          const [r, g, b] = simColor(v);
+          img.data[i*4] = r; img.data[i*4+1] = g; img.data[i*4+2] = b; img.data[i*4+3] = 255;
+        }
       }
-      const rng = Math.max(1e-9, mx - mn);
-      for (let i = 0; i < sim.length; i++) {
-        const v = (sim[i] - mn) / rng;
-        const [r, g, b] = simColor(v);
-        img.data[i*4] = r; img.data[i*4+1] = g; img.data[i*4+2] = b; img.data[i*4+3] = 255;
-      }
+      off = document.createElement('canvas');
+      off.width = N; off.height = N;
+      off.getContext('2d').putImageData(img, 0, 0);
+      state.__simImgCache = { key: cacheKey, sim, zArr, canvas: off };
     }
-    const off = document.createElement('canvas');
-    off.width = N; off.height = N;
-    off.getContext('2d').putImageData(img, 0, 0);
     // v4 turn 72: adaptive smoothing — see main sim_mat draw above.
     if (side / N > 1.5) {
       ctx.imageSmoothingEnabled = true;

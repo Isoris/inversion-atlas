@@ -36,6 +36,36 @@
         </div>
       </div>
 
+      <!-- 2026-05-20: seeds inspector strip. Horizontal scrollable chip
+           list — one chip per Stage 1 seed produced by the pipeline.
+           Click a chip to set focal_seed_index + repaint the 4 panels.
+           Hidden until the pipeline produces seeds; populated by
+           _renderSeedsStrip() in haplotype_regimes.js. -->
+      <div id="rgSeedsStripWrap" style="
+        flex: 0 0 auto;
+        margin: 0 12px 8px 12px;
+        padding: 4px 6px;
+        background: var(--panel-2, #181d27);
+        border: 1px solid var(--rule, #2a3242);
+        border-radius: 4px;
+        display: none;
+        gap: 6px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        white-space: nowrap;
+      ">
+        <span style="
+          flex: 0 0 auto;
+          padding: 3px 6px 3px 2px;
+          color: var(--ink-dimmer, #5a6472);
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+        ">seeds:</span>
+        <div id="rgSeedsStripList" style="display: inline-flex; gap: 4px; align-items: center;"></div>
+      </div>
+
       <!-- 2x2 panel grid -->
       <div class="regimes-grid" style="
         flex: 1 1 0;
@@ -113,6 +143,69 @@
         </div>
       </div>
 
+      <!-- 2026-05-20: L3 adjacent-pair Cramér's V mini-table. Shown
+           ONLY in short-range mode — surfaces every adjacent (L2_i,
+           L2_{i+1}) pair on the active chromosome with its Cramér's V
+           between Hungarian-aligned K-means labels. High V = the two
+           L2s see the same haplotype structure → candidate merge. A
+           "merge" button per row promotes the joined range as a new
+           candidate via the existing addCandidateToList plumbing. -->
+      <div id="rgL3PairsWrap" style="
+        flex: 0 0 auto;
+        margin: 0 12px 12px 12px;
+        padding: 0;
+        background: var(--panel-2, #181d27);
+        border: 1px solid var(--rule, #2a3242);
+        border-radius: 4px;
+        display: none;
+        flex-direction: column;
+        max-height: 200px;
+        overflow: hidden;
+      ">
+        <div style="
+          flex: 0 0 auto;
+          padding: 6px 10px;
+          border-bottom: 1px solid var(--rule, #2a3242);
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font: 10px ui-monospace, monospace;
+          color: var(--ink-dim, #8895a8);
+        ">
+          <b style="color: var(--ink, #e6edf6);">L3 adjacent-L2 Cramér's V</b>
+          <span style="color: var(--ink-dimmer, #5a6472);">
+            high V = same haplotype structure across the boundary → candidate merge
+          </span>
+          <span style="flex: 1 1 auto"></span>
+          <span id="rgL3PairsCount" style="color: var(--ink-dimmer, #5a6472);"></span>
+        </div>
+        <div style="flex: 1 1 auto; overflow-y: auto;">
+          <table id="rgL3PairsTable" style="
+            width: 100%;
+            border-collapse: collapse;
+            font: 10.5px ui-monospace, monospace;
+            color: var(--ink, #e6edf6);
+          ">
+            <thead>
+              <tr style="
+                background: var(--panel-3, #232a36);
+                color: var(--ink-dim, #8895a8);
+                font-size: 9.5px;
+                text-align: left;
+                position: sticky; top: 0;
+              ">
+                <th style="padding: 4px 8px;">L2 pair</th>
+                <th style="padding: 4px 8px;">span</th>
+                <th style="padding: 4px 8px;">V</th>
+                <th style="padding: 4px 8px;">n samples</th>
+                <th style="padding: 4px 8px;">action</th>
+              </tr>
+            </thead>
+            <tbody id="rgL3PairsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Bottom action bar: catalogue export + status -->
       <div class="rg-actionbar" style="
         flex: 0 0 auto;
@@ -126,6 +219,24 @@
         gap: 12px;
         align-items: center;
       ">
+        <!-- 2026-05-20: mode toggle. Long-range = the V-walker Stage 1
+             seed discovery + Stage 3 locus construction (the default
+             pipeline). Short-range = use the user's curated candidate
+             list as seeds — no V-walker, no auto-discovery. Helpful for
+             reviewing user-flagged regions instead of waiting for the
+             whole-chrom sweep. -->
+        <span id="rgModeBar" title="Seed source for the pipeline."
+              style="display: inline-flex; align-items: center; gap: 2px;
+                     background: var(--panel-2, #181d27);
+                     border: 1px solid var(--rule, #2a3242);
+                     border-radius: 3px; padding: 1px 2px;
+                     font: 10px ui-monospace, monospace;">
+          <span style="color: var(--ink-dimmer, #5a6472); padding: 0 6px 0 4px;">seeds:</span>
+          <button type="button" data-rg-mode="long" class="active"
+                  title="Stage 1 V-walker: anchor sweep + Cramér's V boundary detection across the whole chromosome.">long-range</button>
+          <button type="button" data-rg-mode="short"
+                  title="User-curated candidates from local_pca_dosage (lock-promote / L3-draft confirms). No automatic discovery — review what you already drafted.">short-range</button>
+        </span>
         <button id="rgExportCatalogueBtn" class="rg-tb-btn" disabled
           title="Serialize the in-memory pipeline result to a regime catalogue JSON. Disabled until the pipeline has run."
           style="
@@ -146,6 +257,41 @@
             font: inherit;
             cursor: pointer;
           ">run pipeline</button>
+        <!-- 2026-05-20: promote the focal Stage 1 seed to a candidate inversion.
+             Disabled until the pipeline has run AND a seed is focal (the
+             keyboard nav selects one by default after init). Reuses the
+             addCandidateToList + setCandidate plumbing local_pca_dosage uses
+             for lock-based promotions, so a promoted seed shows up in the
+             same candidate carousel + persists to localStorage. -->
+        <button id="rgPromoteSeedBtn" class="rg-tb-btn" disabled
+          title="Promote the focal Stage 1 seed to a candidate inversion. The seed's anchor labels become the candidate's locked labels; the seed footprint becomes start_w/end_w. Disabled until 'run pipeline' produces a seed."
+          style="
+            background: var(--panel-3, #232a36);
+            color: var(--ink, #e6edf6);
+            border: 1px solid var(--rule, #2a3242);
+            padding: 4px 10px;
+            font: inherit;
+            cursor: pointer;
+          ">&#9733; promote seed&hellip;</button>
+        <!-- 2026-05-20: auto-merge adjacent Stage 1 seeds via Cramér's V
+             (Mode 1 = insulated_local). Walks every adjacent seed pair,
+             runs a Hungarian-aligned K×K contingency test, groups
+             consecutive MERGE verdicts into chains, then promotes each
+             multi-seed chain as a candidate spanning seeds[start].s_window
+             to seeds[end].e_window. SPEC_cramers_v_seed_merge.md Phase 1
+             deliverable #2 (the UI half — compute is in
+             shared/cramers_v_merge.js). Disabled until a pipeline run
+             produces ≥ 2 seeds. -->
+        <button id="rgAutoMergeBtn" class="rg-tb-btn" disabled
+          title="Walk adjacent Stage 1 seeds, run the Cramér's V contingency test (Hungarian-aligned K-band labels), and auto-promote each consecutive-MERGE chain as a candidate inversion. Insulated_local: never compares non-adjacent seeds. Disabled until 'run pipeline' produces ≥ 2 seeds."
+          style="
+            background: var(--panel-3, #232a36);
+            color: var(--ink, #e6edf6);
+            border: 1px solid var(--rule, #2a3242);
+            padding: 4px 10px;
+            font: inherit;
+            cursor: pointer;
+          ">&#8634; auto-merge V&hellip;</button>
         <span id="rgStatus" style="margin-left: auto; color: var(--ink-dim, #8895a8);">
           idle &middot; pipeline not yet run
         </span>

@@ -311,3 +311,95 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
   if (cacheKey != null && cache) cache.set(cacheKey, out);
   return out;
 }
+
+// =====================================================================
+// 2026-05-19 — lazy chunk fetcher (closes the dosage-coloring loop)
+//
+// The synchronous design above was inherited from the monolith: callers
+// (`computeDosageMeanForRange`, `computeHetRateForRange`) take
+// `opts.getCachedChunk(startBp, endBp)` and return NaN if no chunk is
+// available. Nothing in the ported atlas populated that cache, so the
+// per-sample lines panel's "color: dosage" / "color: het" modes always
+// painted everything grey even though `dosage_chunks` was marked
+// present (the synthetic-bridge layer attaches a TEMPLATE url; the
+// actual fetch never happened until this fetcher was installed).
+//
+// `installDosageChunkFetcher(state, opts)` attaches a callback at
+// `state._linesPanelGetCachedChunk(startBp, endBp)` that:
+//   - looks up the requested range in an LRU on state.__dosageChunkLru
+//   - if hit, returns the cached chunk synchronously
+//   - if miss, fires an async fetch against the templated URL in
+//     state.data.dosage_chunks.chunks[0].url and returns null. The
+//     fetch resolves into the LRU and invokes `opts.onLoad()` so the
+//     lines panel can repaint with the freshly cached values.
+//
+// One in-flight request per range; LRU bounded to 12 chunks.
+// =====================================================================
+
+const _DOSAGE_LRU_SIZE = 12;
+
+function _ensureChunkLru(state) {
+  if (!state.__dosageChunkLru) state.__dosageChunkLru = new Map();
+  return state.__dosageChunkLru;
+}
+
+function _chunkKey(chrom, startBp, endBp) {
+  return `${chrom}:${startBp | 0}-${endBp | 0}`;
+}
+
+function _templateUrl(template, chrom, startBp, endBp, cap) {
+  return template
+    .replace('__CHROM__', encodeURIComponent(chrom))
+    .replace('__START__', String(startBp | 0))
+    .replace('__END__',   String(endBp | 0))
+    .replace('__CAP__',   String(cap | 0));
+}
+
+export function installDosageChunkFetcher(state, opts) {
+  if (!state || !state.data) return;
+  const dc = state.data.dosage_chunks;
+  if (!dc || !Array.isArray(dc.chunks) || dc.chunks.length === 0) return;
+  const template = dc.chunks[0].url || dc._endpoint || null;
+  if (!template || template.indexOf('__START__') < 0) return;
+  const cap = (dc.cap_default | 0) || 1000;
+  const onLoad = (opts && typeof opts.onLoad === 'function') ? opts.onLoad : () => {};
+  if (!state.__dosageInflight) state.__dosageInflight = new Map();
+  const inflight = state.__dosageInflight;
+
+  state._linesPanelGetCachedChunk = (startBp, endBp) => {
+    const chrom = state.data && state.data.chrom;
+    if (!chrom) return null;
+    if (!Number.isFinite(startBp) || !Number.isFinite(endBp)) return null;
+    const lru = _ensureChunkLru(state);
+    const key = _chunkKey(chrom, startBp, endBp);
+    if (lru.has(key)) return lru.get(key);
+    if (inflight.has(key)) return null;
+    const url = _templateUrl(template, chrom, startBp, endBp, cap);
+    const pr = fetch(url)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(chunk => {
+        if (!chunk || typeof chunk !== 'object') return;
+        lru.set(key, chunk);
+        while (lru.size > _DOSAGE_LRU_SIZE) {
+          const firstKey = lru.keys().next().value;
+          if (!firstKey) break;
+          lru.delete(firstKey);
+        }
+        // The per-sample lines panel caches its computed mean/het by
+        // (mode, startW-endW) — invalidate so the next paint recomputes
+        // against the freshly cached chunk instead of the stale NaN.
+        try { invalidateDosageMeanCache(state); } catch (_) {}
+        try { invalidateHetRateCache(state); }    catch (_) {}
+        try { onLoad(); } catch (_) {}
+      })
+      .catch((e) => {
+        console.warn('Dosage chunk fetch failed:', url, e);
+      })
+      .finally(() => inflight.delete(key));
+    inflight.set(key, pr);
+    return null;
+  };
+}

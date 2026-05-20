@@ -76,12 +76,12 @@ async function _populateLayerInventory() {
   if (!resp.ok) {
     if (resp.status === 503) {
       slot.innerHTML =
-        '<span style="color: #888; font-style: italic;">' +
+        '<span class="ov-hint">' +
         'Action pipeline subsystem not configured (no workspace root). ' +
         'Start atlas_server.py with <code>--workspace-root</code> to enable.</span>';
     } else {
       slot.innerHTML =
-        `<span style="color: #b00;">/api/layers returned HTTP ${resp.status}: ` +
+        `<span class="ov-error">/api/layers returned HTTP ${resp.status}: ` +
         `${_escape((resp.error || '').slice(0, 200))}</span>`;
     }
     return;
@@ -91,7 +91,7 @@ async function _populateLayerInventory() {
   const total = (resp.json && resp.json.total) || rows.length;
   if (rows.length === 0) {
     slot.innerHTML =
-      '<span style="color: #888; font-style: italic;">' +
+      '<span class="ov-hint">' +
       '◌  No layer envelopes captured yet. Submit an action via ' +
       '<code>POST /api/actions</code> or <code>scripts/atlas_action.py</code> ' +
       'to populate the inventory.</span>';
@@ -112,25 +112,25 @@ async function _populateLayerInventory() {
 
   const sortedTypes = Array.from(groups.keys()).sort();
   let html =
-    `<div style="margin-bottom: 8px; color: #666;">` +
+    `<div class="ov-summary">` +
     `<b>${total}</b> envelope${total === 1 ? '' : 's'} across ` +
     `<b>${sortedTypes.length}</b> layer type${sortedTypes.length === 1 ? '' : 's'}.` +
     `</div>` +
-    `<table style="width: 100%; border-collapse: collapse;">` +
-    `<thead><tr style="background: #f0f0f0;">` +
-    `<th style="text-align: left; padding: 4px 8px; border-bottom: 1px solid #ccc;">layer_type</th>` +
-    `<th style="text-align: right; padding: 4px 8px; border-bottom: 1px solid #ccc;">count</th>` +
-    `<th style="text-align: left; padding: 4px 8px; border-bottom: 1px solid #ccc;">latest</th>` +
-    `<th style="text-align: left; padding: 4px 8px; border-bottom: 1px solid #ccc;">created</th>` +
+    `<table class="ov-table">` +
+    `<thead><tr>` +
+    `<th>layer_type</th>` +
+    `<th class="ov-right">count</th>` +
+    `<th>latest</th>` +
+    `<th>created</th>` +
     `</tr></thead><tbody>`;
   for (const t of sortedTypes) {
     const g = groups.get(t);
     html +=
       `<tr>` +
-      `<td style="padding: 4px 8px; border-bottom: 1px solid #eee;"><code>${_escape(t)}</code></td>` +
-      `<td style="padding: 4px 8px; border-bottom: 1px solid #eee; text-align: right;">${g.count}</td>` +
-      `<td style="padding: 4px 8px; border-bottom: 1px solid #eee;"><code>${_escape(g.latest.layer_id || '')}</code></td>` +
-      `<td style="padding: 4px 8px; border-bottom: 1px solid #eee; color: #666;">${_escape(g.latest.created_at || '')}</td>` +
+      `<td><code>${_escape(t)}</code></td>` +
+      `<td class="ov-right">${g.count}</td>` +
+      `<td><code>${_escape(g.latest.layer_id || '')}</code></td>` +
+      `<td class="ov-dim">${_escape(g.latest.created_at || '')}</td>` +
       `</tr>`;
   }
   html += `</tbody></table>`;

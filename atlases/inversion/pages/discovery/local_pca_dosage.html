@@ -269,31 +269,39 @@
       <span class="val" id="trailNVal">15</span>
     </div>
 
-    <h2>Tracked samples</h2>
-    <div class="ctl hrange">
-      <label class="inline">N</label>
-      <input type="range" id="trackedN" min="0" max="30" step="1" value="10" />
-      <span class="val" id="trackedNVal">10</span>
-    </div>
-    <div class="ctl">
-      <label style="font-size: 11px; color: var(--ink-dim); margin-bottom: 3px;">pick N from focal L2</label>
-      <div class="color-mode-row" id="bandPickBar">
-        <button data-band="all"   class="active">all bands</button>
-        <button data-band="0" data-vocab-band-k3="0">band 1 (lo)</button>
-        <button data-band="1" data-vocab-band-k3="1">band 2 (mid)</button>
-        <button data-band="2" data-vocab-band-k3="2">band 3 (hi)</button>
+    <!-- 2026-05-19: wrap the sidebar's Tracked-samples settings in a
+         native <details> so the user can fold them away. The aside in
+         the PCA card + the #tPanelOverlay popup carry the same controls,
+         so the sidebar copy is the lowest-priority surface; folded by
+         default to reduce vertical scroll. Collapse state persists via
+         the small wiring in sidebar.js (_wireSidebarSectionPersist). -->
+    <details id="trackedSamplesSidebarSection" class="sidebar-section" data-persist-key="trackedSamplesSidebar">
+      <summary><h2 style="display: inline; margin: 0;">Tracked samples</h2></summary>
+      <div class="ctl hrange">
+        <label class="inline">N</label>
+        <input type="range" id="trackedN" min="0" max="30" step="1" value="10" />
+        <span class="val" id="trackedNVal">10</span>
       </div>
-    </div>
-    <div class="ctl"><button id="autoPickRadial">Auto-pick: radial (any window)</button></div>
-    <div class="ctl"><button id="clearPicks">Clear all</button></div>
-    <div class="ctl" id="trackedList"></div>
-    <div class="ctl"><label style="font-size:10px; color: var(--ink-dimmer); line-height:1.4;">
-      Same samples persist as you scrub across L2 boundaries — watch where they land in each
-      envelope's K-means split. Click any dot in the PCA to add/remove. The "pick from focal L2"
-      buttons sample N from a specific K-means band of the current L2 envelope (or spread N across
-      all K bands). Currently
-      <span id="trackedCountInfo">0</span>/<span id="trackedNInfo">10</span>.
-    </label></div>
+      <div class="ctl">
+        <label style="font-size: 11px; color: var(--ink-dim); margin-bottom: 3px;">pick N from focal L2</label>
+        <div class="color-mode-row" id="bandPickBar">
+          <button data-band="all"   class="active">all bands</button>
+          <button data-band="0" data-vocab-band-k3="0">band 1 (lo)</button>
+          <button data-band="1" data-vocab-band-k3="1">band 2 (mid)</button>
+          <button data-band="2" data-vocab-band-k3="2">band 3 (hi)</button>
+        </div>
+      </div>
+      <div class="ctl"><button id="autoPickRadial">Auto-pick: radial (any window)</button></div>
+      <div class="ctl"><button id="clearPicks">Clear all</button></div>
+      <div class="ctl" id="trackedList"></div>
+      <div class="ctl"><label style="font-size:10px; color: var(--ink-dimmer); line-height:1.4;">
+        Same samples persist as you scrub across L2 boundaries — watch where they land in each
+        envelope's K-means split. Click any dot in the PCA to add/remove. The "pick from focal L2"
+        buttons sample N from a specific K-means band of the current L2 envelope (or spread N across
+        all K bands). Currently
+        <span id="trackedCountInfo">0</span>/<span id="trackedNInfo">10</span>.
+      </label></div>
+    </details>
 
     <h2 title="Manually-curated sample groups — overrides K-means coloring when 'manual' color mode is active. Saved per-chromosome by default; pin to cohort to share across LGs.">Manual groups</h2>
     <div class="ctl">
@@ -548,16 +556,36 @@
          Default settings: residual='cohort_mean', op='mean', axis='pc1'.
          Override via console: state.cusumResidual / state.cusumOp /
          state.cusumAxis. -->
+    <!-- 2026-05-20: CUSUM panel now hosts TWO canvases — the focal CUSUM
+         (left, always shown) and a secondary CUSUM (right, painted only
+         when the L3 layout is "Dual" and state.secondaryL2 is pinned).
+         The split is driven by data-l3-layout="dual" on body; CSS gives
+         each canvas 50% width in dual mode, 100% / 0 otherwise. -->
     <div class="panel" id="cusumPanel" style="display: none; position: relative;
-         border-bottom: 1px solid var(--rule); overflow: hidden;">
-      <canvas id="cusumCanvas" style="display: block; width: 100%; height: 100%;
-              background: #0b0e13; cursor: crosshair;"></canvas>
-      <div id="cusumPanelLabel" style="position: absolute; top: 3px; left: 8px;
-           font-size: 10px; color: var(--ink-dim); pointer-events: none;
-           font-family: ui-monospace, monospace; font-weight: 600;
-           text-shadow: 0 0 4px rgba(0,0,0,0.85);">
-        Σ CUSUM <span style="color: var(--ink-dimmer); font-weight: normal;
-        ">(cohort-mean residual · per-band mean)</span>
+         border-bottom: 1px solid var(--rule); overflow: hidden;
+         display: flex;">
+      <div id="cusumPaneLeft" style="position: relative; flex: 1 1 100%; min-width: 0;
+           border-right: 1px solid transparent;">
+        <canvas id="cusumCanvas" style="display: block; width: 100%; height: 100%;
+                background: #0b0e13; cursor: crosshair;"></canvas>
+        <div id="cusumPanelLabel" style="position: absolute; top: 3px; left: 8px;
+             font-size: 10px; color: var(--ink-dim); pointer-events: none;
+             font-family: ui-monospace, monospace; font-weight: 600;
+             text-shadow: 0 0 4px rgba(0,0,0,0.85);">
+          Σ CUSUM <span style="color: var(--ink-dimmer); font-weight: normal;
+          ">(cohort-mean residual · per-band mean)</span>
+        </div>
+      </div>
+      <div id="cusumPaneRight" style="position: relative; flex: 0 0 0; min-width: 0;
+           overflow: hidden;">
+        <canvas id="cusumCanvasRight" style="display: block; width: 100%; height: 100%;
+                background: #0b0e13; cursor: crosshair;"></canvas>
+        <div id="cusumPanelLabelRight" style="position: absolute; top: 3px; left: 8px;
+             font-size: 10px; color: var(--ink-dim); pointer-events: none;
+             font-family: ui-monospace, monospace; font-weight: 600;
+             text-shadow: 0 0 4px rgba(0,0,0,0.85);">
+          Σ CUSUM (secondary L2)
+        </div>
       </div>
     </div>
 
@@ -892,24 +920,27 @@
            state.pcaPanelH directly. Position: absolute relative to pcaPanel,
            sits over the bottom edge so drag-down grows PCA, drag-up shrinks. -->
       <div id="pcaResize" title="Drag to resize · double-click to reset"></div>
-      <div id="pcaAxisBar" class="pca-axis-bar" style="display: flex; gap: 8px; align-items: center; padding: 4px 8px; font-size: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--rule, #2a3242);">
-        <span style="color: var(--dim, #888); font-weight: 500;">scatter axes:</span>
-        <label style="display: flex; align-items: center; gap: 3px;">X:
-          <select id="pcaXSelect" data-axis="X" style="font-size: 9.5px; padding: 1px 2px;"></select>
+      <!-- 2026-05-20: refreshed scatter-axes header. Inline styles
+           replaced by .pca-axis-* CSS classes (defined in inversion.css)
+           for proper hover/focus states and a vertical rule between the
+           axes pickers and the linked-views toggle. -->
+      <div id="pcaAxisBar" class="pca-axis-bar">
+        <span class="pca-axis-label">scatter axes:</span>
+        <label class="pca-axis-group">X:
+          <select id="pcaXSelect" data-axis="X"></select>
         </label>
-        <label style="display: flex; align-items: center; gap: 3px;">Y:
-          <select id="pcaYSelect" data-axis="Y" style="font-size: 9.5px; padding: 1px 2px;"></select>
+        <label class="pca-axis-group">Y:
+          <select id="pcaYSelect" data-axis="Y"></select>
         </label>
-        <label style="display: flex; align-items: center; gap: 3px; margin-left: 6px;">
+        <span class="pca-axis-sep" aria-hidden="true"></span>
+        <label class="pca-axis-link"
+               title="When linked, the lines panel above (stage 2) tracks the same PCs as the scatter">
           <input type="checkbox" id="viewControlsLinked" />
-          <span title="When linked, the lines panel above (stage 2) tracks the same PCs as the scatter">link with lines panel</span>
+          <span>link with lines panel</span>
         </label>
-        <span id="pcaAxisAvailNote" style="margin-left: auto; color: var(--dim, #888); font-size: 9.5px;"></span>
-        <button id="pcaCollapseBtn" title="Collapse / expand the PCA panel — drag the L3 panel up to take its space"
-                style="background: var(--panel-2); color: var(--ink-dim);
-                       border: 1px solid var(--rule); border-radius: 3px;
-                       padding: 1px 8px; font-family: var(--mono); font-size: 10.5px;
-                       cursor: pointer; margin-left: 6px;">▼</button>
+        <span id="pcaAxisAvailNote" class="pca-axis-avail"></span>
+        <button id="pcaCollapseBtn" class="pca-axis-collapse"
+                title="Collapse / expand the PCA panel — drag the L3 panel up to take its space">▼</button>
       </div>
       <!-- v3.73: split body — canvas left, optional tracked-samples aside right.
            In fixed mode the aside is shown at 30% width (canvas takes 70%).
@@ -1252,8 +1283,22 @@
                   display: flex; align-items: center; justify-content: space-between;
                   cursor: pointer; user-select: none;"
            title="Click to collapse / expand the tracked samples controls">
-        <span>tracked samples</span>
+        <span>tracked samples <span id="trackedSamplesPanelCompactCount"
+              style="color: var(--ink-dimmer); font-weight: normal;
+                     text-transform: none; letter-spacing: 0;"></span></span>
         <div style="display: flex; gap: 4px; align-items: center;">
+          <!-- 2026-05-20: clear-all button on the panel header so users
+               don't have to expand the body + scroll to the Clear button.
+               Quentin: "there should be a simple way to clear the
+               selected samples in the tracked samples plane." Stops
+               propagation so it doesn't toggle the collapse. -->
+          <button id="clearPicksHeaderBtn"
+                  title="Clear all tracked samples"
+                  style="background: transparent; border: 1px solid var(--rule);
+                         color: var(--ink-dim); border-radius: 3px;
+                         padding: 0 6px; font-family: var(--mono); font-size: 9.5px;
+                         cursor: pointer; line-height: 14px;"
+                  onclick="event.stopPropagation();">&times; clear</button>
           <!-- 2026-05-18 — settings popup toggle (parity with the fixed-mode
                aside's tPanelOpenBtn). Opens the same #tPanelOverlay; secondary
                controls (trails / sign-align PC1 / lasso / scree / trail-back
@@ -1415,21 +1460,22 @@
           <span id="trackedNInfoCompact">10</span>
         </div>
 
-        <!-- v4 turn 73c: action buttons mirroring sidebar — stacked vertically
-             so the labels read fully even at narrow column widths. Each
-             button is a thin proxy that delegates to the existing sidebar
-             handler (no logic duplication). -->
-        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;
-                    display: flex; flex-direction: column; gap: 3px;">
-          <button id="lockColorsBtnCompact"
-                  title="Freeze cluster colors using current L2's labels — stay stable as you scrub"
-                  style="font-size: 10px; padding: 3px 6px; text-align: left;">🔒 lock colors</button>
-          <button id="promoteCandidateBtnCompact" disabled
-                  title="Lock colors on an L2 first (🔒 button above)"
-                  style="font-size: 10px; padding: 3px 6px; text-align: left;">⬆ promote to candidate</button>
-          <button id="exportKLabelsBtnCompact"
-                  title="Download per-(L2, sample) K-means labels as TSV — feed into C++ pop-stats engine"
-                  style="font-size: 10px; padding: 3px 6px; text-align: left;">⬇ export K labels TSV</button>
+        <!-- 2026-05-20: lock-colors / promote-to-candidate / export-K-labels
+             moved OUT of the tracked-samples compact panel. None of them are
+             tracked-samples-specific — they operate on global state (color
+             palette / candidate list / cluster labels). The sidebar (when
+             expanded) and the #tPanelOverlay settings popup carry them. The
+             compact tracked-samples panel now contains ONLY tracked-samples
+             controls. Hidden stub IDs kept (display:none) so sidebar mirror
+             wires that target them don't ReferenceError during the
+             transition.
+             Quentin (2026-05-20): "I feel that these buttons are deprecated
+             or shouldnt be there in the tracked samples. or move them to
+             the settings toggle". -->
+        <div style="display: none;">
+          <button id="lockColorsBtnCompact"></button>
+          <button id="promoteCandidateBtnCompact" disabled></button>
+          <button id="exportKLabelsBtnCompact"></button>
         </div>
 
         <!-- v4 turn 73c: color-mode picker. Same five buttons as sidebar. -->
@@ -1655,16 +1701,18 @@
              default, kmeans-K6, distance-uv); six modes scaffold-only
              (gmm-3/4/5/6, dbscan, dosage) with tooltips naming what each
              will do. SCHEMA §11.3 documents the mode table. -->
-        <div class="l3-layout" id="l3ReclusterMode" style="margin-left: 12px; flex-direction: column; align-items: flex-start; gap: 0;"
+        <div class="l3-layout" id="l3ReclusterMode" style="margin-left: 12px; flex-direction: row; align-items: center; gap: 6px;"
              title="Re-clustering method for the L3 contingency table. Default kmeans-K3 = current behavior; alternatives let you re-cluster each L2's samples differently before computing concord / Cramér's V / NMI / AMI / ARI to test whether the merge call is robust to the clustering method.">
-          <!-- v4 turn 113 (Ask 2): #l3ReclusterMode flipped to column layout
-               so the merge ↑ / separate ↓ / confirm action row can sit
-               directly UNDER the recluster dropdown — Quentin's request:
-               "its just to show visually like can merge interval, separate
-               or enter to confirm bc now its below at the bottom of the
-               panel its not convenient." Top row keeps the original
-               label-+-select horizontal pairing inside #l3ReclusterTopRow
-               so it reads identically to the previous single-row layout. -->
+          <!-- 2026-05-20: collapsed from column → row. The original v4
+               turn 113 column layout stacked recluster + draft action row
+               + candidate-edit row into 3 vertical rows = a ~80px-thick
+               L3 banner that Quentin called out as unprofessional. Now
+               all three clusters sit inline; the toolbar's natural
+               flex-wrap on .l3-head still wraps each cluster atomically
+               to a new line on narrow viewports, so the merge/sep/confirm
+               row still ends up visually near the recluster dropdown
+               (the original request) without consuming three rows on
+               wider viewports. -->
           <div id="l3ReclusterTopRow" style="display: flex; gap: 2px; align-items: center;">
             <span class="dim" style="font-size: 9px; margin-right: 4px; align-self: center;">recluster:</span>
             <select id="l3ReclusterSel"

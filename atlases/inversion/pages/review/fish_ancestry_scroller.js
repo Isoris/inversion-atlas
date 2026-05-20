@@ -146,8 +146,12 @@ function _renderHeader(state) {
 // ---------------------------------------------------------------------
 
 function _paintAll(state) {
-  if (!state || !state.model) return;
   if (typeof document === 'undefined' || !document.getElementById) return;
+  if (!state || !state.model) {
+    _showEmptyState(state);
+    return;
+  }
+  _hideEmptyState();
   const m  = state.model;
   const vs = state.view_state;
 
@@ -157,6 +161,59 @@ function _paintAll(state) {
     paintMetrics(document.getElementById('ancScrollMetricsCanvas'), m);
   }
   paintLayer3(document.getElementById('ancScrollLayer3Canvas'), m);
+}
+
+/**
+ * Show the empty-state surface when there's no upstream ancestry model.
+ * Inserts a #ancScrollEmpty block inside .anc-scroll-tracks (above the
+ * unpainted Layer 1 / 2 / metrics / 3 sections). Replaces any prior copy.
+ *
+ * The page is a pure renderer: alignment + brick construction happen
+ * cluster-side (instant_q → ancestry_alignment.js → ancestry_bricks.js).
+ * The empty state surfaces this contract so users don't see four blank
+ * canvases and wonder if the page is broken.
+ */
+function _showEmptyState(state) {
+  const root = document.getElementById('fish_ancestry_scroller');
+  if (!root) return;
+  const tracks = root.querySelector ? root.querySelector('.anc-scroll-tracks') : null;
+  if (!tracks) return;
+  // Hide the layer + metrics blocks so the empty state owns the column.
+  const blocks = tracks.querySelectorAll
+    ? tracks.querySelectorAll('.anc-scroll-layer, .anc-scroll-metrics')
+    : [];
+  blocks.forEach(el => { if (el.style) el.style.display = 'none'; });
+
+  let empty = root.querySelector ? root.querySelector('#ancScrollEmpty') : null;
+  if (!empty) {
+    empty = document.createElement('div');
+    empty.id = 'ancScrollEmpty';
+    empty.className = 'anc-scroll-empty';
+    tracks.insertBefore(empty, tracks.firstChild);
+  }
+  const chrom     = state && state.chrom;
+  const candidate = state && state.candidate;
+  const ctx = (chrom || candidate)
+    ? `Current scope: ${chrom || '(no chrom)'}${candidate ? ` · ${candidate.id || candidate}` : ''}.`
+    : 'No chromosome / candidate selected.';
+  empty.innerHTML =
+    '<div class="anc-empty-title">No ancestry model loaded</div>'
+    + '<div>This page is a renderer for the cluster-side ancestry pipeline:</div>'
+    + '<div><code>instant_q</code> → <code>ancestry_alignment.js</code> '
+    + '→ <code>ancestry_bricks.js</code> → <code>atlasState.inversion.ancestry_scroller.model</code>.</div>'
+    + `<div>${ctx}</div>`
+    + '<div>Spec: <code>specs_todo/SPEC_fish_ancestry_scroller.md</code>.</div>';
+}
+
+function _hideEmptyState() {
+  const empty = document.getElementById('ancScrollEmpty');
+  if (empty && empty.style) empty.style.display = 'none';
+  const root = document.getElementById('fish_ancestry_scroller');
+  if (!root) return;
+  const blocks = root.querySelectorAll
+    ? root.querySelectorAll('.anc-scroll-layer, .anc-scroll-metrics')
+    : [];
+  blocks.forEach(el => { if (el.style) el.style.display = ''; });
 }
 
 // ---------------------------------------------------------------------

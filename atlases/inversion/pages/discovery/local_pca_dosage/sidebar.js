@@ -77,6 +77,8 @@ import {
 } from './pca_panel.js';
 import { renderL3Panel } from './l3_panel.js';
 import { wireGPanel } from './g_panel.js';
+import { wireLinesSettingsPanel } from './lines_settings_panel.js';
+import { wirePerfHud } from './perf_hud.js';
 import {
   exportKLabelsTSV,
   makeCandidateFromLock,
@@ -122,8 +124,131 @@ export function attachSidebarHandlers(state) {
   _wireLayoutMode(state);
   _wireViewMode(state);
   _wirePanelCollapseButtons(state);
+  // 2026-05-19: lines-settings flying panel — must run BEFORE
+  // _wireNewShellControls because the panel stamps
+  // #linesHeaderMoreToggle.dataset.wiredAsSettings=1, which the legacy
+  // ▾more click-handler at line ~492 reads to skip its own wiring.
+  // If we wired AFTER, both handlers would attach and clicks would
+  // double-fire (modal + legacy inline toggle).
+  try { wireLinesSettingsPanel(state); }
+  catch (e) { console.warn('[wireLinesSettingsPanel]', e); }
+  // 2026-05-19: perf HUD + Shift+P hotkey. Wires the document-level
+  // keydown listener and restores HUD on/off from localStorage. Off by
+  // default — dev tool, not a user-facing surface. Updates piped from
+  // setCur via window._perfHudUpdate.
+  try { wirePerfHud(state); }
+  catch (e) { console.warn('[wirePerfHud]', e); }
   _wireNewShellControls(state);
   _wireActiveModeBar(state);
+  _wireL3Controls(state);
+}
+
+// =============================================================================
+// L3 panel controls — layout / color-mode / K-mode / recluster (2026-05-20)
+// =============================================================================
+// The L3 contingency bar has 4 control surfaces that were rendered but
+// never wired (Quentin's report: "when we push these buttons nothing
+// happens. when we recluster with Kmeans nothing happens"). Each control
+// mutates a `state.l3*` slot and calls renderL3Panel — the renderer
+// already reads these state slots, so wiring is all that was missing.
+function _wireL3Controls(state) {
+  if (typeof document === 'undefined') return;
+  const repaint = () => {
+    try { renderL3Panel(state); }
+    catch (e) { console.warn('[l3] renderL3Panel:', e); }
+  };
+  // Restore persisted state slots so a reload lands on the same selection.
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.l3Layout');
+    if (saved) state.l3Layout = saved;
+  } catch (_) {}
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.l3ColorMode');
+    if (saved) state.l3ColorMode = saved;
+  } catch (_) {}
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.l3KMode');
+    if (saved) state.l3KMode = saved;
+  } catch (_) {}
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.l3ReclusterMode');
+    if (saved) state.l3ReclusterMode = saved;
+  } catch (_) {}
+
+  // Helper for click-bar wiring with idempotency + active-class mirror +
+  // optional persist key.
+  const wireBar = (containerSel, dataAttr, stateKey, persistKey) => {
+    const container = document.querySelector(containerSel);
+    if (!container) return;
+    container.querySelectorAll('button[' + dataAttr + ']').forEach(btn => {
+      if (btn.dataset.l3Wired === '1') return;
+      btn.dataset.l3Wired = '1';
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        const val = btn.getAttribute(dataAttr);
+        state[stateKey] = val;
+        if (persistKey) {
+          try { localStorage.setItem(persistKey, val); } catch (_) {}
+        }
+        container.querySelectorAll('button[' + dataAttr + ']').forEach(b => {
+          b.classList.toggle('active', b === btn);
+        });
+        // 2026-05-20: mirror state.l3Layout onto body[data-l3-layout]
+        // so the CUSUM dual-pane CSS rules (and any future layout-aware
+        // chrome) can react. Done here so every layout button stays in
+        // sync; the restore branch below does the same after pageload.
+        if (stateKey === 'l3Layout' && document.body && document.body.dataset) {
+          document.body.dataset.l3Layout = val;
+        }
+        repaint();
+      });
+    });
+    // Reflect restored state on the active class.
+    const cur = state[stateKey];
+    if (cur != null) {
+      container.querySelectorAll('button[' + dataAttr + ']').forEach(b => {
+        b.classList.toggle('active', b.getAttribute(dataAttr) === cur);
+      });
+      if (stateKey === 'l3Layout' && document.body && document.body.dataset) {
+        document.body.dataset.l3Layout = cur;
+      }
+    }
+  };
+
+  wireBar('#l3Layout',    'data-layout',  'l3Layout',    'pca_scrubber_v3.l3Layout');
+  wireBar('#l3ColorMode', 'data-l3color', 'l3ColorMode', 'pca_scrubber_v3.l3ColorMode');
+  wireBar('#l3KMode',     'data-l3k',     'l3KMode',     'pca_scrubber_v3.l3KMode');
+
+  // Recluster dropdown — change event sets state.l3ReclusterMode + repaints.
+  const reclusterSel = document.getElementById('l3ReclusterSel');
+  if (reclusterSel && reclusterSel.dataset.l3Wired !== '1') {
+    reclusterSel.dataset.l3Wired = '1';
+    if (state.l3ReclusterMode) reclusterSel.value = state.l3ReclusterMode;
+    reclusterSel.addEventListener('change', (e) => {
+      state.l3ReclusterMode = e.target.value;
+      try { localStorage.setItem('pca_scrubber_v3.l3ReclusterMode', e.target.value); }
+      catch (_) {}
+      repaint();
+    });
+  }
+
+  // L3 het-coloring toggle (#l3HetToggle) — flips state.l3HetColoring and
+  // repaints. Persisted to its own key.
+  const l3HetToggle = document.getElementById('l3HetToggle');
+  if (l3HetToggle && l3HetToggle.dataset.l3Wired !== '1') {
+    l3HetToggle.dataset.l3Wired = '1';
+    try {
+      const saved = localStorage.getItem('pca_scrubber_v3.l3HetColoring');
+      if (saved === '1') state.l3HetColoring = true;
+    } catch (_) {}
+    l3HetToggle.checked = !!state.l3HetColoring;
+    l3HetToggle.addEventListener('change', (e) => {
+      state.l3HetColoring = !!e.target.checked;
+      try { localStorage.setItem('pca_scrubber_v3.l3HetColoring', e.target.checked ? '1' : '0'); }
+      catch (_) {}
+      repaint();
+    });
+  }
 }
 
 // =============================================================================
@@ -387,9 +512,21 @@ function _wireNewShellControls(state) {
   // and persists the choice. User feedback (chat 2026-05-18): "in
   // the per sample lines the settings are still too many they
   // should be put under some toggle tab".
+  // 2026-05-19: this inline "▾ more / ▴ less" toggle has been replaced
+  // by the flying settings modal in lines_settings_panel.js. The button
+  // text + click handler now belong to wireLinesSettingsPanel(); the
+  // dataset.wiredAsSettings guard prevents the legacy click handler
+  // below from also running. Kept here as a no-op default so older
+  // builds (without lines_settings_panel.js loaded) keep working with
+  // the inline collapse. When the panel module IS loaded, it sets
+  // dataset.wiredAsSettings=1 on the button BEFORE this code runs
+  // (page1 mount calls wireLinesSettingsPanel before applyData →
+  // _wireNewShellControls), and we skip the legacy wiring entirely.
   const moreBtn = $('linesHeaderMoreToggle');
   const moreGroup = $('linesHeaderMoreGroup');
-  if (moreBtn && moreGroup && moreBtn.dataset.wired !== '1') {
+  if (moreBtn && moreGroup
+      && moreBtn.dataset.wired !== '1'
+      && moreBtn.dataset.wiredAsSettings !== '1') {
     let on = false;
     try { on = localStorage.getItem('inversion_atlas.linesHeaderMoreOn') === '1'; }
     catch (_) {}
@@ -405,6 +542,14 @@ function _wireNewShellControls(state) {
       apply();
     });
     moreBtn.dataset.wired = '1';
+  }
+  // When the settings modal is wired, force the inline group hidden so
+  // its children only ever surface inside the modal. (Without this, the
+  // group remains display:none from its inline HTML default, which is
+  // already correct — but we set it explicitly here too as a belt &
+  // braces guard.)
+  if (moreBtn && moreGroup && moreBtn.dataset.wiredAsSettings === '1') {
+    moreGroup.style.display = 'none';
   }
 
   // ===========================================================================
@@ -465,6 +610,14 @@ function _wireNewShellControls(state) {
   // but no JS wired it.
   // ===========================================================================
   _wireCompactTrackedCollapse(state);
+
+  // ===========================================================================
+  // Collapsible sidebar sections (2026-05-19). Native <details> handles
+  // the visual toggle; this helper just restores the persisted open/closed
+  // state and writes back on user toggle. Each section opts in by carrying
+  // a `data-persist-key` attribute on the <details>.
+  // ===========================================================================
+  _wireSidebarSectionPersist();
 
   // ===========================================================================
   // First-use attention pulses (v4 turn 80 — never wired in modular tree).
@@ -620,9 +773,16 @@ function _wireCompactTrackedCollapse(state) {
   if (!head || !body) return;
 
   // Restore persisted state on first wire.
-  let collapsed = false;
-  try { collapsed = localStorage.getItem(_TRACKED_COMPACT_LS_KEY) === '1'; }
-  catch (_) {}
+  // 2026-05-20: default to collapsed on fresh load. The compact tracked
+  // panel hosts a long stack of controls (band picker, manual groups,
+  // color-mode picker, ...) most users don't need open while scrubbing.
+  // Returning users keep their saved choice.
+  let collapsed = true;
+  try {
+    const v = localStorage.getItem(_TRACKED_COMPACT_LS_KEY);
+    if (v === '0') collapsed = false;
+    else if (v === '1') collapsed = true;
+  } catch (_) {}
 
   const apply = () => {
     body.style.display = collapsed ? 'none' : '';
@@ -650,6 +810,71 @@ function _wireCompactTrackedCollapse(state) {
     });
   });
   head.dataset.wired = '1';
+
+  // 2026-05-20: clear-all button on the panel header. Stops propagation
+  // so the header's collapse toggle doesn't fire. Mirrors the existing
+  // #clearPicks (sidebar) handler — state.tracked = [], repaint chain.
+  const clearBtn = document.getElementById('clearPicksHeaderBtn');
+  if (clearBtn && clearBtn.dataset.wired !== '1') {
+    clearBtn.dataset.wired = '1';
+    clearBtn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      state.tracked = [];
+      try { renderTrackedList(state); }  catch (_) {}
+      try { drawPCA(state); }            catch (_) {}
+      try { drawLinesPanel(state); }     catch (_) {}
+      try { renderL3Panel(state); }      catch (_) {}
+      _updateCompactHeaderCount(state);
+    });
+  }
+  // Initial count paint.
+  _updateCompactHeaderCount(state);
+}
+
+// Refresh the small `(n=N)` chip in the compact panel header so the
+// user can read the tracked count without expanding the body. Called
+// from _wireCompactTrackedCollapse + on any tracked-set mutation we
+// can hook (clear-all here; future: pick / lasso confirm).
+function _updateCompactHeaderCount(state) {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById('trackedSamplesPanelCompactCount');
+  if (!el) return;
+  const n = (state && Array.isArray(state.tracked)) ? state.tracked.length : 0;
+  el.textContent = n > 0 ? `· ${n}` : '';
+}
+
+// ---------------------------------------------------------------------------
+// Collapsible sidebar sections — persistence for native <details>.
+//
+// Sections opt in by carrying a `data-persist-key="<slug>"` attribute on
+// the <details> element. The slug is appended to a shared localStorage
+// prefix so multiple atlases can coexist. On mount we restore the saved
+// open/closed state (default = closed for the Tracked-samples section,
+// since the aside + popup carry the same controls); on toggle we save.
+// Idempotent via dataset.persistWired.
+// ---------------------------------------------------------------------------
+const _SIDEBAR_SECTION_LS_PREFIX = 'inversion_atlas.sidebarSection.';
+
+function _wireSidebarSectionPersist() {
+  if (typeof document === 'undefined') return;
+  const nodes = document.querySelectorAll('details.sidebar-section[data-persist-key]');
+  nodes.forEach(node => {
+    if (node.dataset.persistWired === '1') return;
+    const key = _SIDEBAR_SECTION_LS_PREFIX + node.dataset.persistKey;
+    // Restore — default is *closed*. If no entry exists, the section
+    // starts collapsed; the user can open it once and the new state
+    // persists from then on.
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored === '1') node.setAttribute('open', '');
+      else if (stored === '0') node.removeAttribute('open');
+      else node.removeAttribute('open');   // default = collapsed
+    } catch (_) {}
+    node.addEventListener('toggle', () => {
+      try { localStorage.setItem(key, node.open ? '1' : '0'); } catch (_) {}
+    });
+    node.dataset.persistWired = '1';
+  });
 }
 
 // Target buttons by ID. Picked from legacy turn-80 comment (inversion.css L135).
@@ -1189,7 +1414,18 @@ function _wireTrackedSettingsPopup(state) {
   // 2026-05-18: dual open buttons — the fixed-mode aside header
   // hosts #tPanelOpenBtn; the compact-mode panel header hosts
   // #tPanelOpenBtnCompact. Both open the same #tPanelOverlay popup.
-  for (const id of ['tPanelOpenBtn', 'tPanelOpenBtnCompact']) {
+  // 2026-05-19: also wire #pcaCollapseBtn (the top-right arrow on the
+  // PCA toolbar) to open the same popup. Quentin: "the collapse and
+  // expand tracked samples PCA arrow down button should not be a
+  // collapse and expand but rather the settings ... now its 2 arrows
+  // down better have a single one and on the top." pcaCollapseBtn was
+  // removed from _wirePanelCollapseButtons' SPECS array (see comment
+  // there) so it's free to repurpose. We also hide #tPanelOpenBtn (the
+  // duplicate bottom arrow in #pcaTrackedAside) since pcaCollapseBtn is
+  // now the single entry-point. #tPanelOpenBtnCompact stays — compact
+  // mode has its own panel layout where the aside button is the only
+  // affordance.
+  for (const id of ['tPanelOpenBtn', 'tPanelOpenBtnCompact', 'pcaCollapseBtn']) {
     const openBtn = $(id);
     if (!openBtn || openBtn.dataset.wired === '1') continue;
     openBtn.addEventListener('click', (e) => {
@@ -1200,6 +1436,18 @@ function _wireTrackedSettingsPopup(state) {
     });
     openBtn.dataset.wired = '1';
   }
+  // Visual update for the repurposed pcaCollapseBtn: turn the ▼ collapse
+  // arrow into a ⚙ settings affordance + update the title. Done after
+  // the wire so we don't fight any default text from elsewhere.
+  const pcaBtn = $('pcaCollapseBtn');
+  if (pcaBtn) {
+    pcaBtn.textContent = '⚙';
+    pcaBtn.title = 'Tracked-samples settings — trails, sign-align PC1, lasso, '
+                 + 'scree, trail-back, N-tracked. Hotkey: t.';
+  }
+  // Hide the now-redundant bottom arrow in #pcaTrackedAside (fixed mode).
+  const dupBtn = $('tPanelOpenBtn');
+  if (dupBtn) dupBtn.style.display = 'none';
   const closeBtn = $('tPanelClose');
   if (closeBtn && closeBtn.dataset.wired !== '1') {
     closeBtn.addEventListener('click', close);
@@ -1286,12 +1534,21 @@ function _wireTrackedSettingsPopup(state) {
       window._refreshScreeInset();
     } else { drawPCA(state); } } catch (_) {}
   };
-  // Restore from localStorage if not already set.
+  // 2026-05-20: default scree ON on fresh load. Quentin: "I think that
+  // the scree plot in the tracked samples local PCA must be able to be
+  // on By default". Returning users keep their saved choice; only the
+  // unset case lands enabled. (The drag-to-reattach corner feature
+  // mentioned in the same message is queued — for now the inset uses
+  // its existing absolute-positioned upper-right corner, which the
+  // smart-corner-placement logic in pca_panel.js handles by moving
+  // away from dense scatter regions.)
   if (state.screePlotEnabled == null) {
     try {
       const v = localStorage.getItem('inversion_atlas.screePlotEnabled');
-      if (v === '1') state.screePlotEnabled = true;
-    } catch (_) {}
+      if (v === '0') state.screePlotEnabled = false;
+      else if (v === '1') state.screePlotEnabled = true;
+      else state.screePlotEnabled = true;  // fresh-load default = on
+    } catch (_) { state.screePlotEnabled = true; }
   }
   for (const id of screeMirrors) {
     const el = $(id);
@@ -1311,7 +1568,13 @@ function _wireTrackedSettingsPopup(state) {
 // grows into the freed space. State is persisted to localStorage.
 function _wirePanelCollapseButtons(state) {
   const SPECS = [
-    { btn: 'pcaCollapseBtn', slot: 'pcaCollapsed', lsKey: 'pca_scrubber_v3.pcacollapsed' },
+    // 2026-05-19: pcaCollapseBtn dropped from this loop — repurposed as
+    // the tracked-samples settings entry-point (opens #tPanelOverlay) by
+    // _wirePcaSettingsButton below. Quentin: "the collapse and expand
+    // tracked samples PCA arrow down button should not be a collapse and
+    // expand but rather the settings ... now its 2 arrows down better
+    // have a single one and on the top." The second arrow (#tPanelOpenBtn
+    // in the aside) is hidden by the same wire to leave one entry point.
     { btn: 'l3CollapseBtn',  slot: 'l3Collapsed',  lsKey: 'pca_scrubber_v3.l3collapsed' },
     { btn: 'zCollapseBtn',   slot: 'zCollapsed',   lsKey: 'pca_scrubber_v3.zcollapsed' },
   ];
@@ -1361,6 +1624,29 @@ function _applyViewMode(state, mode) {
   document.querySelectorAll('#viewModeBar button[data-viewmode]').forEach(b => {
     b.classList.toggle('active', b.dataset.viewmode === mode);
   });
+  // 2026-05-20: push the new zoom scale into stepMode + compareUnit so
+  // arrow-key cursor movement AND the L3 contingency tables operate at
+  // the scale the user just selected. Without this, clicking "L2 zoom"
+  // visually zoomed the Z panel but left arrow keys still stepping
+  // window-by-window and the L3 table cached at its previous scale.
+  //
+  // Mapping:
+  //   genome → win1   (small steps, single-window cursor)
+  //   l1     → win10  (broader scale; no native L1 unit on L3, win10 is closest)
+  //   l2     → l2     (1:1 — arrow keys jump L2 envelopes, L3 table aligned)
+  if (state.stepModeSync !== false) {
+    const stepFor = { genome: 'win1', l1: 'win10', l2: 'l2' }[mode];
+    if (stepFor && stepFor !== state.stepMode) {
+      state.stepMode = stepFor;
+      document.querySelectorAll('#stepModeBar button').forEach(b =>
+        b.classList.toggle('active', b.dataset.step === stepFor));
+      try { localStorage.setItem('pca_scrubber_v3.stepmode', stepFor); } catch (_) {}
+      const info = document.getElementById('stepModeInfo');
+      if (info) info.textContent = _stepModeLabel(state, stepFor);
+      try { _syncStepModeToCompareUnit(state); } catch (_) {}
+      try { _refreshStepSizeBtn(state); } catch (_) {}
+    }
+  }
   // Auto-move sim_mat into the minimap when zooming to L1/L2 — the
   // heatmap shows the WHOLE chromosome so its scale stops matching the
   // zoomed Z panel below it. Move back to the main panel when returning
@@ -1427,6 +1713,12 @@ function _cycleStepSize(state) {
   });
   try { localStorage.setItem('pca_scrubber_v3.stepmode', next); } catch (_) {}
   _refreshStepSizeBtn(state);
+  // 2026-05-20: also push the new step size into the L3 compareUnit so
+  // the contingency table follows the cursor at the same scale. The
+  // #stepModeBar buttons already do this via _syncStepModeToCompareUnit
+  // — the header cycler was missing the call, so cycling Windows(N)
+  // from the header left the L3 table on its prior scale.
+  _syncStepModeToCompareUnit(state);
 }
 
 function _wireViewMode(state) {
@@ -1672,9 +1964,15 @@ function _wireDataSection(state) {
   // Expose the setter on state so non-sidebar code (e.g. _applyViewMode)
   // can move sim to/from the minimap without re-implementing the logic.
   state._setSimInMinimap = _setSimInMinimap;
-  // Restore persisted state on first wire-up.
+  // 2026-05-20: default the sim heatmap into the minimap on fresh load
+  // so the main panel area opens up. Returning users keep their saved
+  // choice; only the unset case flips to '1'. Quentin: "by default we
+  // try to toggle the minimap".
   try {
-    if (localStorage.getItem('pca_scrubber_v3.siminminimap') === '1') {
+    const cur = localStorage.getItem('pca_scrubber_v3.siminminimap');
+    if (cur == null) {
+      requestAnimationFrame(() => _setSimInMinimap(true));
+    } else if (cur === '1') {
       requestAnimationFrame(() => _setSimInMinimap(true));
     }
   } catch (_) {}
@@ -1830,38 +2128,68 @@ function _wireL3Clustering(state) {
 // =============================================================================
 
 function _wireDisplay(state) {
+  // 2026-05-19: shared apply-color-mode routine called from BOTH the
+  // sidebar #colorModeBar and the in-PCA-panel #colorModeBarCompact.
+  // The two bars were drifting because only the sidebar was wired —
+  // the compact buttons looked clickable but did nothing. This factors
+  // out the shared logic so the two surfaces stay in lock-step and
+  // either one repaints the PCA / lines / L3 strip.
+  const applyColorMode = (newMode) => {
+    state.colorMode = newMode;
+    state.colorByL2 = (state.colorMode === 'cluster');   // legacy alias
+    // Mirror the active class onto BOTH bars so the highlight stays in sync.
+    document.querySelectorAll('#colorModeBar button').forEach(b => {
+      b.classList.toggle('active', b.dataset.mode === newMode);
+    });
+    document.querySelectorAll('#colorModeBarCompact button').forEach(b => {
+      b.classList.toggle('active', b.dataset.modeCompact === newMode);
+    });
+    // v4 turn 86: show/hide Q-ancestry sub-controls when mode toggles
+    // to/from q_ancestry. Refresh the K dropdown options from the
+    // registered set each time the panel is shown.
+    const qaSubs = document.getElementById('qAncestrySubControls');
+    if (qaSubs) {
+      if (state.colorMode === 'q_ancestry') {
+        qaSubs.style.display = 'flex';
+        if (typeof _qaPopulateKSelect === 'function') _qaPopulateKSelect();
+      } else {
+        qaSubs.style.display = 'none';
+      }
+    }
+    if (typeof updateColorModeInfo === 'function') {
+      try { updateColorModeInfo(); } catch (_) {}
+    }
+    drawPCA(state);
+    // 2026-05-18: also redraw the per-sample lines panel — many modes
+    // (family, lineage) affect both surfaces. The lines panel reads its
+    // own state.linesColorMode, so this is a no-op when the lines mode
+    // is independent (kmeans default), but it picks up changes to the
+    // shared scope-color modes (family/lineage) cleanly.
+    try { drawLinesPanel(state); } catch (_) {}
+    renderL3Panel(state);
+  };
+
   // --- #colorModeBar button click — legacy lines 66470-66493 ---
   document.querySelectorAll('#colorModeBar button').forEach(btn => {
     btn.addEventListener('click', () => {
       if (btn.disabled) return;
-      document.querySelectorAll('#colorModeBar button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.colorMode = btn.dataset.mode;
-      state.colorByL2 = (state.colorMode === 'cluster');   // legacy alias
-      // v4 turn 86: show/hide Q-ancestry sub-controls when mode toggles
-      // to/from q_ancestry. Refresh the K dropdown options from the
-      // registered set each time the panel is shown.
-      const qaSubs = document.getElementById('qAncestrySubControls');
-      if (qaSubs) {
-        if (state.colorMode === 'q_ancestry') {
-          qaSubs.style.display = 'flex';
-          if (typeof _qaPopulateKSelect === 'function') _qaPopulateKSelect();
-        } else {
-          qaSubs.style.display = 'none';
-        }
-      }
-      if (typeof updateColorModeInfo === 'function') {
-        try { updateColorModeInfo(); } catch (_) {}
-      }
-      drawPCA(state);
-      // 2026-05-18: also redraw the per-sample lines panel — many modes
-      // (family, lineage) affect both surfaces. The lines panel reads its
-      // own state.linesColorMode, so this is a no-op when the lines mode
-      // is independent (kmeans default), but it picks up changes to the
-      // shared scope-color modes (family/lineage) cleanly.
-      try { drawLinesPanel(state); } catch (_) {}
-      renderL3Panel(state);
+      applyColorMode(btn.dataset.mode);
     });
+  });
+  // --- #colorModeBarCompact button click (2026-05-19) ---
+  // The compact bar lives inside the PCA panel card; it has its own
+  // `data-mode-compact` attribute (sidebar uses `data-mode`). Without
+  // this loop, clicking any of the 6 compact buttons fired no handler
+  // — the user saw the buttons but the PCA scatter never recoloured.
+  document.querySelectorAll('#colorModeBarCompact button').forEach(btn => {
+    if (btn.dataset.wired === '1') return;
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      const mode = btn.dataset.modeCompact;
+      if (!mode) return;
+      applyColorMode(mode);
+    });
+    btn.dataset.wired = '1';
   });
 
   // --- #qAncestrySubControls widgets — legacy lines 66495-66548 ---
@@ -2002,41 +2330,63 @@ function _wireDisplay(state) {
       if (typeof _flashPromoteGreen === 'function') {
         try { _flashPromoteGreen(promoteBtn); } catch (_) {}
       }
-      // Switch to page 2 FIRST so the canvas has non-zero bounding rect.
-      // Under the new atlas-core shell the tabBar may not exist; we
-      // tolerate a missing DOM and just install the candidate.
-      document.querySelectorAll('#tabBar button').forEach(b => b.classList.remove('active'));
-      const p2Btn = document.querySelector('#tabBar button[data-page="candidate_focus"]');
-      if (p2Btn) p2Btn.classList.add('active');
-      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      const p2 = document.getElementById('candidate_focus');
-      if (p2) p2.classList.add('active');
-      // Now install the candidate (this triggers render + drawCandidateSigmaChart)
-      const _setCand = () => {
-        try { setCandidate(state, cand); }
-        catch (e) { console.warn('[promote] setCandidate failed:', e); }
-      };
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(_setCand);
-      else _setCand();
+      // 2026-05-19: install the candidate FIRST, then navigate. The old
+      // code twiddled #tabBar / .page.active (atlas-core has neither),
+      // wrapped setCandidate in rAF, and hoped the DOM would re-resolve
+      // — under the new shell the rAF fired against the still-active
+      // local_pca_dosage DOM, not candidate_focus's. New flow:
+      //   1. setCandidate on the current page's state so the candidate
+      //      list / promote chain runs in its proper home;
+      //   2. hash-navigate to candidate_focus so the router mounts it
+      //      against fresh DOM with the candidate already in state.
+      try { setCandidate(state, cand); }
+      catch (e) { console.warn('[promote] setCandidate failed:', e); }
+      try { window.location.hash = '#/inversion/candidate_focus'; } catch (_) {}
     });
   }
 
-  // --- #openDosageHeatmapBtn click (2026-05-18) ---
+  // --- #openDosageHeatmapBtn click (2026-05-18, rewired 2026-05-19) ---
   // Quick jump from local_pca_dosage to the dosage_heatmap page for the
   // active candidate. The dosage_heatmap page reads its rich payload
-  // from atlasState.inversion.dosage_heatmap_state — we stash the
-  // candidate label so the page header reflects context even when no
-  // dosage payload is loaded (empty state shows the candidate).
+  // from atlasState.inversion.dosage_heatmap_state.
+  //
+  // 2026-05-19 — the prior version relied on the LEGACY tab bar's DOM
+  // (#tabBar + .page elements) which doesn't exist under atlas-core.
+  // Clicking did nothing — the page never navigated. New flow:
+  //   1. fetch a dosage chunk covering the candidate's bp span via
+  //      the same /api/dosage/chunk endpoint the lines panel uses
+  //   2. stash it on inv.dosage_heatmap_state as `legacy_chunk` (the
+  //      adapter the page already understands)
+  //   3. navigate by setting window.location.hash — the router picks
+  //      it up and mounts dosage_heatmap.
   const dhBtn = $('openDosageHeatmapBtn');
   if (dhBtn) {
     const _syncDhBtnEnabled = () => { dhBtn.disabled = !state.candidate; };
     _syncDhBtnEnabled();
-    dhBtn.addEventListener('click', () => {
+    dhBtn.addEventListener('click', async () => {
       const cand = state.candidate;
       if (!cand) {
         alert('Focus a candidate first (promote one above, or pick from the saved list).');
         return;
       }
+      const chrom = (state.data && state.data.chrom) || cand.chrom;
+      // Bp span: prefer the candidate's own start/end; fall back to its
+      // start_w/end_w mapped to the window centres if absent.
+      let startBp = Number.isFinite(cand.start_bp) ? cand.start_bp : null;
+      let endBp   = Number.isFinite(cand.end_bp)   ? cand.end_bp   : null;
+      const wins  = state.data && state.data.windows;
+      if ((startBp == null || endBp == null) && wins && Array.isArray(wins)) {
+        const ws = Number.isFinite(cand.start_w) ? cand.start_w | 0 : 0;
+        const we = Number.isFinite(cand.end_w)   ? cand.end_w   | 0 : wins.length - 1;
+        const w0 = wins[Math.max(0, Math.min(wins.length - 1, ws))];
+        const w1 = wins[Math.max(0, Math.min(wins.length - 1, we))];
+        if (w0 && w1) {
+          if (startBp == null) startBp = w0.start_bp != null ? w0.start_bp : w0.center_bp;
+          if (endBp   == null) endBp   = w1.end_bp   != null ? w1.end_bp   : w1.center_bp;
+        }
+      }
+      // Stash candidate label + a placeholder so the page mount can
+      // render the header even while the chunk fetch is in flight.
       if (typeof window !== 'undefined' && window.atlasState) {
         const inv = window.atlasState.inversion || (window.atlasState.inversion = {});
         const prev = inv.dosage_heatmap_state || {};
@@ -2044,12 +2394,41 @@ function _wireDisplay(state) {
           candidate_label: cand.label || cand.id || null,
         });
       }
-      document.querySelectorAll('#tabBar button').forEach(b => b.classList.remove('active'));
-      const dhTab = document.querySelector('#tabBar button[data-page="dosage_heatmap"]');
-      if (dhTab) dhTab.classList.add('active');
-      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-      const dhPage = document.getElementById('dosage_heatmap');
-      if (dhPage) dhPage.classList.add('active');
+      // Fire the fetch BEFORE navigating so the data lands on the inv
+      // bucket the next mount reads. If it fails, the page still mounts
+      // and shows its empty state. Re-uses the templated URL from the
+      // synthetic dosage_chunks layer so we don't have to know the
+      // server's host/port here.
+      try {
+        const dc = state.data && state.data.dosage_chunks;
+        const template = dc && Array.isArray(dc.chunks) && dc.chunks[0] && (dc.chunks[0].url || dc._endpoint);
+        if (template && Number.isFinite(startBp) && Number.isFinite(endBp) && chrom) {
+          const cap = (dc.cap_default | 0) || 1000;
+          const url = template
+            .replace('__CHROM__', encodeURIComponent(chrom))
+            .replace('__START__', String(startBp | 0))
+            .replace('__END__',   String(endBp | 0))
+            .replace('__CAP__',   String(cap));
+          const r = await fetch(url);
+          if (r.ok) {
+            const chunk = await r.json();
+            if (typeof window !== 'undefined' && window.atlasState) {
+              const inv = window.atlasState.inversion;
+              inv.dosage_heatmap_state = Object.assign({}, inv.dosage_heatmap_state, {
+                legacy_chunk: chunk,
+              });
+            }
+          } else {
+            console.warn('open dosage heatmap: chunk fetch HTTP', r.status, url);
+          }
+        }
+      } catch (e) {
+        console.warn('open dosage heatmap: chunk fetch failed:', e);
+      }
+      // Navigate via the router's hash-based URL contract.
+      try {
+        window.location.hash = '#/inversion/dosage_heatmap';
+      } catch (_) {}
     });
     // Expose so other code paths (promoteCandidate, candidate-list
     // selection) can re-sync the disabled state when state.candidate
@@ -2541,12 +2920,18 @@ function _applySidebarState(state, collapsed) {
 }
 
 function _wireSidebarToggle(state) {
-  // Restore saved sidebar state on load (default: expanded)
-  // --- legacy lines 75465-75471 ---
-  let savedCollapsed = false;
+  // 2026-05-20: default-collapse the parameters pane on first load. The
+  // sidebar carries 20+ controls but most users land on the page wanting
+  // to see the canvases, not the knobs (Quentin: "close the settings
+  // panel on the left ... too messy"). The wheel button on the sidebar
+  // header stays as the toggle. Returning users get whatever they last
+  // saved — only the unset / fresh-install case flips to collapsed.
+  let savedCollapsed = true;
   try {
     const v = localStorage.getItem(_SIDEBAR_STORAGE_KEY);
-    if (v === 'true') savedCollapsed = true;
+    if (v === 'false') savedCollapsed = false;
+    else if (v === 'true') savedCollapsed = true;
+    // null / undefined → keep the new default (true).
   } catch (e) {}
   _applySidebarState(state, savedCollapsed);
 

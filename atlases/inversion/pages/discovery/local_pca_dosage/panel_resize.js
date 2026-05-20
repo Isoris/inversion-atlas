@@ -37,6 +37,15 @@ const DEFAULTS = {
   linesPanelH: 200,
   pcaPanelH:   280,
   l3PanelH:    360,
+  // Default for #pcaTrackedAside flex-basis (fixed-mode horizontal split with
+  // #pcaCanvasWrap). Matches the inline `flex: 0 0 30%` in the HTML — the
+  // value is read at first drag and persisted from then on.
+  pcaAsideWPct:        30,
+  // CSS-variable defaults for compact-mode handles. Mirror the values in
+  // inversion.css `body[data-layout-mode="compact"] main#local_pca_dosage`.
+  compactLeftPct:      50,    // --compact-leftpct
+  compactLeftUpperPct: 75,    // --compact-leftupperpct
+  compactL3Fr:         1.4,   // --compact-l3fr (fr units)
 };
 
 const LS_KEY = {
@@ -45,6 +54,10 @@ const LS_KEY = {
   linesPanelH: 'pca_scrubber_v3.linesPanelH',
   pcaPanelH:   'pca_scrubber_v3.pcaPanelH',
   l3PanelH:    'pca_scrubber_v3.l3PanelH',
+  pcaAsideWPct:        'pca_scrubber_v3.pcaAsideWPct',
+  compactLeftPct:      'pca_scrubber_v3.compactLeftPct',
+  compactLeftUpperPct: 'pca_scrubber_v3.compactLeftUpperPct',
+  compactL3Fr:         'pca_scrubber_v3.compactL3Fr',
 };
 
 function _redrawAllPanels(state) {
@@ -187,13 +200,151 @@ function _wireOne(state, handleId, stateKey, defaultH, minH) {
   });
 }
 
-// Restore persisted heights on mount.
+// ─────────────────────────────────────────────────────────────────────────────
+// Horizontal flex-basis drag (fixed-mode pcaAsideResize seam).
+//
+// Geometry (see local_pca_dosage.html ~line 929-1037):
+//   #pcaPanel  ┐
+//     ├ #pcaCanvasWrap          flex: 1 1 70%   (scatter)
+//     ├ #pcaAsideResize         flex: 0 0 4px   (this handle)
+//     └ #pcaTrackedAside        flex: 0 0 30%   (tracked-samples settings)
+//
+// Drag right ⇒ shrink the aside; drag left ⇒ grow it. We store a *percent*
+// of pcaPanel's width so the layout stays responsive when the window
+// resizes. dblclick restores DEFAULTS.pcaAsideWPct.
+//
+// Bug history: v3.99 shipped the handle DOM + CSS hover-affordance but
+// never wired pointerdown — drags did nothing. Fixed 2026-05-19.
+// ─────────────────────────────────────────────────────────────────────────────
+function _wireAsideHoriz(state) {
+  const handle = document.getElementById('pcaAsideResize');
+  const aside  = document.getElementById('pcaTrackedAside');
+  const pane   = document.getElementById('pcaPanel');
+  if (!handle || !aside || !pane) return;
+
+  const applyPct = (pct) => {
+    const p = Math.max(15, Math.min(60, pct));
+    aside.style.flex = `0 0 ${p}%`;
+    state.pcaAsideWPct = p;
+  };
+
+  // Restore on mount.
+  if (Number.isFinite(state.pcaAsideWPct)) applyPct(state.pcaAsideWPct);
+
+  let dragging = false, startX = 0, startPct = 0, paneW = 0;
+  handle.addEventListener('pointerdown', e => {
+    dragging = true;
+    startX   = e.clientX;
+    paneW    = pane.getBoundingClientRect().width || 1;
+    startPct = Number.isFinite(state.pcaAsideWPct)
+                 ? state.pcaAsideWPct
+                 : ((aside.getBoundingClientRect().width / paneW) * 100) || DEFAULTS.pcaAsideWPct;
+    handle.classList.add('dragging');
+    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    // Drag right = mouse +X = aside shrinks.
+    const dxPct = ((e.clientX - startX) / paneW) * 100;
+    const next  = startPct - dxPct;
+    applyPct(next);
+    try { localStorage.setItem(LS_KEY.pcaAsideWPct, String(state.pcaAsideWPct)); } catch (_) {}
+  });
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+    _redrawAllPanels(state);
+  }
+  handle.addEventListener('pointerup',     endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+  handle.addEventListener('dblclick', () => {
+    applyPct(DEFAULTS.pcaAsideWPct);
+    try { localStorage.removeItem(LS_KEY.pcaAsideWPct); } catch (_) {}
+    _redrawAllPanels(state);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CSS-variable drag wirer for the 3 compact-mode seams.
+//
+//   compactColumnResize  → --compact-leftpct      (left vs right columns, ew-resize)
+//   compactStackResize   → --compact-leftupperpct (PCA above vs tracked below, ns-resize)
+//   compactL3Resize      → --compact-l3fr         (L3 row fraction, ns-resize)
+//
+// Same pointerdown / pointermove / pointerup / dblclick contract as the
+// flex-basis fixed-mode helpers. Drags read from getComputedStyle and write
+// back via setProperty on main#local_pca_dosage so the value is scoped to
+// the page (not the global :root).
+// ─────────────────────────────────────────────────────────────────────────────
+function _wireCssVar(state, handleId, opts) {
+  const handle = document.getElementById(handleId);
+  const main   = document.getElementById('local_pca_dosage');
+  if (!handle || !main) return;
+  const { cssVar, stateKey, axis, defaultVal, minVal, maxVal, unit, sign = 1 } = opts;
+
+  const apply = (val) => {
+    const v = Math.max(minVal, Math.min(maxVal, val));
+    main.style.setProperty(cssVar, `${v}${unit}`);
+    state[stateKey] = v;
+  };
+  if (Number.isFinite(state[stateKey])) apply(state[stateKey]);
+
+  let dragging = false, startCoord = 0, startVal = 0, dimPx = 0;
+  handle.addEventListener('pointerdown', e => {
+    dragging   = true;
+    startCoord = (axis === 'x') ? e.clientX : e.clientY;
+    const rect = main.getBoundingClientRect();
+    dimPx      = (axis === 'x' ? rect.width : rect.height) || 1;
+    startVal   = Number.isFinite(state[stateKey]) ? state[stateKey] : defaultVal;
+    handle.classList.add('dragging');
+    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const cur  = (axis === 'x') ? e.clientX : e.clientY;
+    const dPx  = cur - startCoord;
+    let delta;
+    if (unit === '%')  delta = (dPx / dimPx) * 100 * sign;
+    else if (unit === 'fr') delta = (dPx / dimPx) * 3 * sign; // 1 main-axis = ~3fr feel
+    else               delta = dPx * sign;
+    apply(startVal + delta);
+    try { localStorage.setItem(LS_KEY[stateKey], String(state[stateKey])); } catch (_) {}
+  });
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+    _redrawAllPanels(state);
+  }
+  handle.addEventListener('pointerup',     endDrag);
+  handle.addEventListener('pointercancel', endDrag);
+  handle.addEventListener('dblclick', () => {
+    apply(defaultVal);
+    try { localStorage.removeItem(LS_KEY[stateKey]); } catch (_) {}
+    _redrawAllPanels(state);
+  });
+}
+
+// Restore persisted heights / widths on mount. Accepts integers OR floats so
+// pcaAsideWPct (percent) and compactL3Fr (fr units) round-trip cleanly.
 function _restorePersisted(state) {
+  const FLOAT_KEYS = new Set(['pcaAsideWPct', 'compactLeftPct',
+                              'compactLeftUpperPct', 'compactL3Fr']);
   for (const [key, lsKey] of Object.entries(LS_KEY)) {
     try {
       const v = localStorage.getItem(lsKey);
-      const n = parseInt(v, 10);
-      if (Number.isFinite(n) && n > 40 && n < 2000) state[key] = n;
+      if (v == null) continue;
+      const n = FLOAT_KEYS.has(key) ? parseFloat(v) : parseInt(v, 10);
+      if (FLOAT_KEYS.has(key)) {
+        if (Number.isFinite(n) && n > 0 && n < 200) state[key] = n;
+      } else {
+        if (Number.isFinite(n) && n > 40 && n < 2000) state[key] = n;
+      }
     } catch (_) {}
   }
 }
@@ -206,6 +357,29 @@ export function attachPanelResize(state) {
   _wireOne(state, 'linesResize',  'linesPanelH', DEFAULTS.linesPanelH, 40);
   _wireOne(state, 'pcaResize',    'pcaPanelH',   DEFAULTS.pcaPanelH,   80);
   _wireOne(state, 'l3Resize',     'l3PanelH',    DEFAULTS.l3PanelH,    80);
+
+  // Fixed-mode horizontal seam between PCA scatter and tracked-samples aside.
+  _wireAsideHoriz(state);
+
+  // Compact-mode seams (CSS-variable driven; CSS hides them in other modes).
+  _wireCssVar(state, 'compactColumnResize', {
+    cssVar: '--compact-leftpct', stateKey: 'compactLeftPct',
+    axis: 'x', defaultVal: DEFAULTS.compactLeftPct,
+    minVal: 20, maxVal: 80, unit: '%', sign: 1,
+  });
+  _wireCssVar(state, 'compactStackResize',  {
+    cssVar: '--compact-leftupperpct', stateKey: 'compactLeftUpperPct',
+    axis: 'y', defaultVal: DEFAULTS.compactLeftUpperPct,
+    minVal: 20, maxVal: 90, unit: '%', sign: 1,
+  });
+  _wireCssVar(state, 'compactL3Resize',     {
+    cssVar: '--compact-l3fr', stateKey: 'compactL3Fr',
+    // Drag DOWN should shrink L3 (it's the bottom row of the grid),
+    // drag UP should grow it. axis=y with sign=-1.
+    axis: 'y', defaultVal: DEFAULTS.compactL3Fr,
+    minVal: 0.2, maxVal: 6.0, unit: 'fr', sign: -1,
+  });
+
   applyMainGrid(state);
 }
 

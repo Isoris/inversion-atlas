@@ -209,6 +209,74 @@ export function renderL3Panel(state) {
     try { _wireL3PaneToolsDelegation(); } catch (_) {}
   }
 
+  // 2026-05-19: install restrict-band-chip delegation once. The chips
+  // (rendered ~line 1716, .band-chip + .band-chip-action) carry full data-
+  // attributes (data-l2idx, data-bandk, data-bandkres, data-action) and
+  // the state slot state.bandSelection[l2idx] = { K, keep:[…] } is read
+  // by restrictedConcord() — but no click handler was ever writing to
+  // that slot, so clicking chips did nothing. The selection is per-L2
+  // and per-K-resolution (matters when l3KMode='both' renders K=3 + K=6
+  // simultaneously). "keep all" resets selection for the focal L2.
+  if (!window._restrictChipHandlerInstalled && typeof document !== 'undefined') {
+    window._restrictChipHandlerInstalled = true;
+    document.body.addEventListener('click', function (ev) {
+      const tgt = ev.target;
+      if (!tgt || !tgt.closest) return;
+      const chip   = tgt.closest('.band-chip[data-l2idx]');
+      const action = tgt.closest('.band-chip-action[data-l2idx]');
+      if (!chip && !action) return;
+
+      // Resolve the active state. _setActiveState is called from renderL3Panel
+      // so _pageState is the same object the renderer reads.
+      if (!_pageState) return;
+      const st = _pageState;
+      const l2idx = parseInt((chip || action).getAttribute('data-l2idx'), 10);
+      const resK  = parseInt((chip || action).getAttribute('data-bandkres'), 10);
+      if (!Number.isFinite(l2idx) || !Number.isFinite(resK)) return;
+
+      if (!st.bandSelection) st.bandSelection = {};
+
+      if (action && action.getAttribute('data-action') === 'all') {
+        // Reset — drop the per-L2 selection entirely.
+        if (st.bandSelection[l2idx]) delete st.bandSelection[l2idx];
+      } else if (chip) {
+        const k = parseInt(chip.getAttribute('data-bandk'), 10);
+        if (!Number.isFinite(k)) return;
+        const existing = st.bandSelection[l2idx];
+        // If the existing selection was at a different K-resolution, treat
+        // it as stale and start fresh from "all kept".
+        const startKeep = (existing && existing.K === resK)
+          ? new Set(existing.keep)
+          : (function () {
+              const all = new Set();
+              for (let i = 0; i < resK; i++) all.add(i);
+              return all;
+            })();
+        if (startKeep.has(k)) startKeep.delete(k);
+        else                  startKeep.add(k);
+        // Normalize: empty keep = no useful restriction; treat as "drop all"
+        // by leaving selection null so restrictedConcord short-circuits and
+        // the verdict re-falls-through to the full-cohort path.
+        if (startKeep.size === 0) {
+          delete st.bandSelection[l2idx];
+        } else if (startKeep.size === resK) {
+          // All kept = no restriction.
+          delete st.bandSelection[l2idx];
+        } else {
+          st.bandSelection[l2idx] = { K: resK, keep: Array.from(startKeep) };
+        }
+      } else {
+        return;
+      }
+
+      // Re-render the L3 panel so chips repaint with the new kept/dropped
+      // visuals and the restricted-concord line above the table updates.
+      try { renderL3Panel(st); }
+      catch (e) { console.warn('band-chip click: renderL3Panel threw —', e); }
+      ev.stopPropagation();
+    }, true);
+  }
+
   // 2026-05-19 mode-switch — paint contingency panes from the active
   // mode's view. L3 reads l2_envelopes + windows[].pc1/pc2 + labels;
   // all of those are synthesized onto theta_pi_view / ghsl_view by
@@ -477,8 +545,17 @@ export function renderL3Panel(state) {
     if (l2idx == null) {
       h3.innerHTML = `<span class="l3-pane-title">${titlePrefix} <b>—</b></span>${paneToolsHtml}`;
     } else {
-      const env = d.l2_envelopes[l2idx];
-      h3.innerHTML = `<span class="l3-pane-title">${titlePrefix} <b>${shortId(env.candidate_id)}</b> <span class="dim" style="font-weight:400;">${env.n_windows}W · sim ${fmt(env.mean_sim)}</span></span>${paneToolsHtml}`;
+      // 2026-05-19: env may be undefined when switching activeMode
+      // (dosage ↔ θπ ↔ GHSL) and the focal L2 index from the previous
+      // mode is out of range for the new mode's l2_envelopes array.
+      // Defensive fallback to the empty-pane render instead of throwing
+      // a TypeError on env.candidate_id.
+      const env = d.l2_envelopes && d.l2_envelopes[l2idx];
+      if (!env) {
+        h3.innerHTML = `<span class="l3-pane-title">${titlePrefix} <b>—</b> <span class="dim" style="font-weight:400;">(no envelope at idx ${l2idx} in ${state.activeMode || 'current'} mode)</span></span>${paneToolsHtml}`;
+      } else {
+        h3.innerHTML = `<span class="l3-pane-title">${titlePrefix} <b>${shortId(env.candidate_id)}</b> <span class="dim" style="font-weight:400;">${env.n_windows}W · sim ${fmt(env.mean_sim)}</span></span>${paneToolsHtml}`;
+      }
     }
     col.appendChild(h3);
 

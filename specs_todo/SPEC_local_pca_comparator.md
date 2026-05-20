@@ -1,10 +1,15 @@
 # SPEC — Local PCA Comparator (cross-evidence view)
 
-**Status**: Phase 1 (side-by-side) shipped 2026-05-18.
-Phases 2 + 3 still proposed. See
+**Status**: Phase 1 (side-by-side) shipped 2026-05-18. Phase 2
+(per-sample trajectory + concordance score) shipped 2026-05-20 in
+`pca_comparator/renderer.js#paintTrajectory` + `computeConcordance`,
+wired via `pca_comparator.js#_refreshTrajectoryAndConcord`. Phase 3
+(Procrustes-aligned overlay) remains DEFERRED — the SPEC's own
+gating ("only if there's a real use case AFTER Phase 1+2") and
+rotation-misreading risk still apply. See
 `docs/generated/page_contracts/pca_comparator/` for the shipped
 contract; full design exploration below remains the source of truth
-for Phases 2 + 3.
+for Phase 3 + open questions.
 
 **Implemented in**: `atlases/inversion/pages/discovery/pca_comparator.{html,js}`
 + `pca_comparator/{_state,renderer}.js` (page registered as

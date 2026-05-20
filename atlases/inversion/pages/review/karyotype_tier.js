@@ -99,6 +99,7 @@
 // =============================================================================
 
 import { _pageState, _setActiveState } from './karyotype_tier/_state.js';
+import { renderCandidateNavInline } from '../../shared/candidate_nav.js';
 import { renderTierAxesGrid as _renderTierAxesGrid, TIER_AXES, TIER_GROUPS, tierAxisValueColor } from './karyotype_tier/tier_axes.js';
 import {
   renderKaryotypeBody as _renderCandidateKaryotypeBody,
@@ -477,10 +478,54 @@ export async function mount(root, atlasState, registry) {
   const legacyState = _buildLegacyState(atlasState);
   _setActiveState(legacyState);
 
+  _mountCandidateNav(root, atlasState, registry);
+
   try { renderCandidateKaryotype(); }
   catch (e) { console.warn('karyotype_tier.mount: renderCandidateKaryotype threw —', e); }
 
   if (atlasState.inversion) atlasState.inversion._page4State = legacyState;
+}
+
+/**
+ * Insert the prev/next candidate nav bar at the very top of
+ * #karyotype_tier via the shared cartridge (shared/candidate_nav.js).
+ * Karyotype/tier is candidate-level — prev/next is the right primary
+ * navigation, more discoverable than the inline candidate list pane.
+ */
+function _mountCandidateNav(root, atlasState, registry) {
+  const page = (root && root.querySelector) ? root.querySelector('#karyotype_tier') : null;
+  if (!page) return;
+  const old = page.querySelector('.cand-nav-inline');
+  if (old) old.remove();
+
+  const sh  = atlasState.shared    || {};
+  const inv = atlasState.inversion || {};
+  const navState = {
+    candidate:         sh.activeCandidate || null,
+    candidateList:     inv.candidateList   || [],
+    candidatePageMode: inv.candidatePageMode || null,
+  };
+
+  const apply = (target) => {
+    if (target && target.chrom && target.chrom !== sh.activeChrom) {
+      if (typeof atlasState.setActiveChrom === 'function') atlasState.setActiveChrom(target.chrom);
+      else atlasState.shared.activeChrom = target.chrom;
+    }
+    if (typeof atlasState.setActiveCandidate === 'function') {
+      atlasState.setActiveCandidate(target);
+    } else {
+      atlasState.shared.activeCandidate = target;
+    }
+    mount(root, atlasState, registry).catch(err =>
+      console.warn('karyotype_tier: re-mount after candidate change threw —', err));
+  };
+
+  const bar = renderCandidateNavInline(navState, {
+    idPrefix:      'kt',
+    onNavigate:    (_st, target) => apply(target),
+    onClearActive: ()             => apply(null),
+  });
+  if (bar) page.insertBefore(bar, page.firstChild);
 }
 
 /**

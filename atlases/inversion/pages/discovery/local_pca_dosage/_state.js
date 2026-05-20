@@ -52,6 +52,7 @@ import {
 import { diagSampleColor } from './diag_residuals.js';
 import { xpSampleColor } from '../../../shared/cross_page_clusters.js';
 import { qaSampleColor } from '../../../shared/q_ancestry.js';
+import { perSampleColorFor } from '../../../shared/per_sample_line_color.js';
 
 // =====================================================================
 // Cache-invalidation helpers (legacy 34321 / 39362 / 39973)
@@ -181,9 +182,31 @@ function manualGroupColor(si) {
 }
 
 // --- getSampleColor — legacy lines 47816-47845 ---
+// 2026-05-20: modes that use a per-sample value → color ramp (driven
+// by perSampleColorFor). drawPCA pre-computes the values once per frame
+// and stashes them on state._pcaModePsVals so this function can map
+// (si, val) → color in O(1) inside the per-sample loop. Previously these
+// modes fell through to the 'none' grey default on the PCA scatter even
+// though the lines panel painted them — Quentin's report: "Color-by-het
+// but by every other type on tracked-samples PCA scatter".
+const _PER_SAMPLE_RAMP_MODES = new Set([
+  'het', 'dosage', 'theta_pi', 'ghsl', 'froh', 'confounder_alert',
+]);
+
 export function getSampleColor(si, mode, groupLabels) {
   const state = _pageState;
   mode = mode || state.colorMode || 'cluster';
+  // Ramp-mode short-circuit. Falls back to the legacy paths below when
+  // the cache is absent (e.g. caller didn't pre-compute) so existing
+  // call sites that pass a non-ramp mode aren't affected.
+  if (_PER_SAMPLE_RAMP_MODES.has(mode) && state && state._pcaModePsVals
+      && state._pcaModePsVals.mode === mode
+      && state._pcaModePsVals.vals) {
+    const vals = state._pcaModePsVals.vals;
+    const c = perSampleColorFor(mode, vals[si], vals);
+    if (c) return c;
+    return '#888';
+  }
   if (mode === 'cluster') {
     // 2026-05-18: Phase 1 of SPEC_macrostripe_microgroup_hierarchy.md.
     // When state.useMacrostripeColors is on AND state.bandingResult is

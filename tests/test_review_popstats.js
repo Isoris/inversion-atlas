@@ -1,36 +1,24 @@
-// tests/test_review_page6.js
+// tests/test_review_popstats.js
 //
-// Sub-module + main re-export coverage for the popstats popstats view
-// (lifecycle scaffolding + verbatim chat-33 thin-loader exports).
+// Sub-module + main re-export coverage for the popstats track-stack view.
 //
-// Round 5 step 18 (chat 38 cont., 2026-05-07): popstats promoted from
-// chat-33 "thin loader stub for window.renderPopstatsPage" to the
-// _pageState live-binding pattern + atlas-router mount/unmount
-// lifecycle + state-aware public wrapper. **Direct twin of ancestry_per_window**
-// (the first migrated review-stage page, shipped step 17). Second
-// migrated review-stage page (review group: 1 of 5 → 2 of 5).
-//
-// Page6 is a thin loader stub for an external renderer
-// (window.renderPopstatsPage, defined in js/atlas_page6_wiring.js).
-// The chat-33 module exports showPopstatsPage(state) and
-// refreshPopstatsPage(); both preserved verbatim because the tab
-// dispatcher at legacy lines 59626-59627 + 59729-59730 calls them via
-// typeof guard.
+// 2026-05-20: rewritten for the native-port architecture. Previous incarnation
+// of this test asserted the chat-33 thin-loader-stub fallback ("Popstats
+// wiring (atlas_page6_wiring.js) not loaded"). That fallback was retired when
+// renderPopstatsPage was ported into ./popstats/_render.js — the page now
+// resolves scrubber_main and renders chips + a canvas track stack directly.
 //
 // This test verifies:
-//   - Both chat-33 thin-loader exports survive unchanged.
-//   - Lifecycle exports present (mount + unmount + refreshPage6).
+//   - Module exports present (mount, unmount, refreshPage6, plus the
+//     showPopstatsPage / refreshPopstatsPage back-compat aliases).
 //   - _state.js live-binding pattern.
-//   - showPopstatsPage gracefully handles missing window.renderPopstatsPage
-//     (the "fallback empty-state" path in the chat-33 body).
-//   - refreshPage6(state) sets _pageState as side effect.
-//
-// Replaces the chat-33 batch-2 test_review_page6.js, which imported
-// from `../inversion_review/popstats.js` (pre-migration path) and was
-// not run by the harness.
+//   - Sub-module helpers (collectTracks / loadView / saveView / categoryOf)
+//     are pure and Node-friendly.
 
-import * as popstats from '../atlases/inversion/pages/review/popstats.js';
-import * as state from '../atlases/inversion/pages/review/popstats/_state.js';
+import * as popstats   from '../atlases/inversion/pages/review/popstats.js';
+import * as state      from '../atlases/inversion/pages/review/popstats/_state.js';
+import * as tracksMod  from '../atlases/inversion/pages/review/popstats/_tracks.js';
+import * as viewMod    from '../atlases/inversion/pages/review/popstats/_view.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {
@@ -39,62 +27,131 @@ function check(label, cond, extra) {
 }
 function group(name) { console.log('\n--- ' + name + ' ---'); }
 
-// -----------------------------------------------------------------------------
-group('popstats.js: lifecycle entry-points');
-check('exports mount',                       typeof popstats.mount === 'function');
-check('exports unmount',                     typeof popstats.unmount === 'function');
-check('exports refreshPage6 (wrapper)',      typeof popstats.refreshPage6 === 'function');
-check('__MODULE_ID__ NOT exported',          !('__MODULE_ID__' in popstats));
+// localStorage polyfill — saveView/loadView call it.
+if (typeof globalThis.localStorage === 'undefined') {
+  const _store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (_store.has(k) ? _store.get(k) : null),
+    setItem: (k, v) => _store.set(k, String(v)),
+    removeItem: (k) => _store.delete(k),
+    clear: () => _store.clear(),
+  };
+}
 
 // -----------------------------------------------------------------------------
-group('popstats.js: chat-33 thin-loader exports preserved verbatim');
-check('exports showPopstatsPage',            typeof popstats.showPopstatsPage === 'function');
-check('exports refreshPopstatsPage',         typeof popstats.refreshPopstatsPage === 'function');
+group('popstats.js: lifecycle entry-points');
+check('exports mount',                  typeof popstats.mount === 'function');
+check('exports unmount',                typeof popstats.unmount === 'function');
+check('exports refreshPage6',           typeof popstats.refreshPage6 === 'function');
+check('exports showPopstatsPage alias', typeof popstats.showPopstatsPage === 'function');
+check('exports refreshPopstatsPage alias',
+      typeof popstats.refreshPopstatsPage === 'function');
+check('__MODULE_ID__ not exported',     !('__MODULE_ID__' in popstats));
 
 // -----------------------------------------------------------------------------
 group('_state.js: live-binding pattern');
-check('exports _pageState',                  '_pageState' in state);
-check('exports _setActiveState',             typeof state._setActiveState === 'function');
-check('_pageState starts null',              state._pageState === null);
+check('exports _pageState',             '_pageState' in state);
+check('exports _setActiveState',        typeof state._setActiveState === 'function');
+state._setActiveState(null);
+check('_pageState starts null',         state._pageState === null);
 state._setActiveState({ marker: 'A' });
-check('_setActiveState mutates _pageState',  state._pageState && state._pageState.marker === 'A');
+check('_setActiveState mutates _pageState',
+      state._pageState && state._pageState.marker === 'A');
 state._setActiveState(null);
-check('_setActiveState(null) clears',        state._pageState === null);
+check('_setActiveState(null) clears',   state._pageState === null);
 
 // -----------------------------------------------------------------------------
-group('Pure helpers: chat-33 loader behaviour without window');
-// In Node without a window polyfill, showPopstatsPage() should early-
-// return cleanly (typeof window === 'undefined' check at top).
-let runOK = true; let runErr = null;
-try { popstats.showPopstatsPage({ candidate: null }); }
-catch (e) { runOK = false; runErr = e; }
-check('showPopstatsPage(state) no-window → early return',
-      runOK, runErr ? runErr.message : '');
-
-let runOK2 = true; let runErr2 = null;
-try { popstats.refreshPopstatsPage(); }
-catch (e) { runOK2 = false; runErr2 = e; }
-check('refreshPopstatsPage() no-window → early return',
-      runOK2, runErr2 ? runErr2.message : '');
-
-// -----------------------------------------------------------------------------
-group('refreshPage6(state) wrapper sets _pageState as a side effect');
+group('refreshPage6() with no _pageState: degenerate fallback (does not throw)');
 state._setActiveState(null);
-const synthState = { marker: 'B', candidate: null };
-popstats.refreshPage6(synthState);
-check('_pageState set after refreshPage6(state)',
-      state._pageState === synthState);
-
-// -----------------------------------------------------------------------------
-group('refreshPage6() with no args: degenerate fallback (does not throw)');
-state._setActiveState({ marker: 'C', candidate: null });
 let fbOK = true; let fbErr = null;
 try { popstats.refreshPage6(); }
 catch (e) { fbOK = false; fbErr = e; }
-check('refreshPage6() no-arg fallback runs without throwing',
+check('refreshPage6() with null _pageState does not throw',
       fbOK, fbErr ? fbErr.message : '');
 
-state._setActiveState(null);
+// -----------------------------------------------------------------------------
+group('_tracks.js: collectTracks() shape on empty data');
+const emptyTracks = tracksMod.collectTracks(null);
+check('collectTracks(null) returns array',         Array.isArray(emptyTracks));
+check('collectTracks(null) includes ideogram',     emptyTracks.some(t => t.id === 'ideogram'));
+check('collectTracks(null) ideogram alwaysOn',
+      emptyTracks.find(t => t.id === 'ideogram')?.alwaysOn === true);
+check('collectTracks(null) z track has hasData=false',
+      emptyTracks.find(t => t.id === 'z')?.hasData === false);
+
+// -----------------------------------------------------------------------------
+group('_tracks.js: collectTracks() with synthetic precomp data');
+const synth = {
+  windows: [
+    { center_mb: 1.0, z: 0.5 },
+    { center_mb: 2.0, z: 1.2 },
+    { center_mb: 3.0, z: 3.5 },
+  ],
+  tracks: {
+    theta_pi: { values: [0.01, 0.02, 0.015] },
+    ghsl_overlap: { values: [0, 1, 0] },
+  },
+};
+const t2 = tracksMod.collectTracks(synth);
+check('collectTracks(synth) z track has hasData=true',
+      t2.find(t => t.id === 'z')?.hasData === true);
+// theta_pi from data.tracks adopts the static popstats placeholder rather
+// than minting a tracksdict_ chip → the static entry's chip lights up.
+check('collectTracks(synth) theta_pi static chip lit by data.tracks.theta_pi',
+      (() => {
+        const t = t2.find(x => x.id === 'theta_pi');
+        if (!t || typeof t.getData !== 'function') return false;
+        const d = t.getData(synth);
+        return !!d && t.hasData === true
+          && Array.isArray(d.mb) && Array.isArray(d.values)
+          && d.values.length === 3;
+      })());
+check('collectTracks(synth) ghsl_overlap appears as auto-discovered',
+      t2.some(t => t.id === 'tracksdict_ghsl_overlap'));
+check('collectTracks sort: always category before popstats',
+      (() => {
+        const cats = t2.map(t => t.category || 'other');
+        const idxAlways  = cats.indexOf('always');
+        const idxPop     = cats.indexOf('popstats');
+        return idxAlways < idxPop || idxPop === -1;
+      })());
+check('collectTracks sort: popstats category before qc',
+      (() => {
+        const cats = t2.map(t => t.category || 'other');
+        const idxPop = cats.indexOf('popstats');
+        const idxQc  = cats.indexOf('qc');
+        return idxPop < idxQc || idxQc === -1 || idxPop === -1;
+      })());
+check('collectTracks: popstats chip set includes theta_pi + hobs_hexp + delta12_multi',
+      ['theta_pi', 'hobs_hexp', 'delta12_multi'].every(id => t2.some(t => t.id === id)));
+
+// -----------------------------------------------------------------------------
+group('_view.js: chip-toggle persistence');
+localStorage.clear();
+const v0 = viewMod.loadView();
+check('loadView() empty store returns hidden+shown Sets',
+      v0.hidden instanceof Set && v0.shown instanceof Set);
+v0.shown.add('theta_pi');
+v0.hidden.add('z');
+viewMod.saveView(v0);
+const v1 = viewMod.loadView();
+check('saveView round-trips shown',  v1.shown.has('theta_pi'));
+check('saveView round-trips hidden', v1.hidden.has('z'));
+
+// -----------------------------------------------------------------------------
+group('_view.js: categoryOf + isVisible defaults');
+check('categoryOf({category:"qc"}) === qc',
+      viewMod.categoryOf({ category: 'qc' }) === 'qc');
+check('categoryOf({}) === other',
+      viewMod.categoryOf({}) === 'other');
+const emptyView = { hidden: new Set(), shown: new Set() };
+check('isVisible(alwaysOn, ...) === true',
+      viewMod.isVisible({ alwaysOn: true }, emptyView));
+check('isVisible(qc-track-with-data, empty-view) === false',
+      !viewMod.isVisible({ category: 'qc', hasData: true, id: 'x' }, emptyView));
+emptyView.shown.add('x');
+check('isVisible(qc-track-with-data, shown-has-x) === true',
+      viewMod.isVisible({ category: 'qc', hasData: true, id: 'x' }, emptyView));
 
 // -----------------------------------------------------------------------------
 console.log('\n=================');

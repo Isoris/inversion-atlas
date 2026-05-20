@@ -38,6 +38,7 @@ import {
   ariBetweenTreeAndClusters,
   createTreePanelSelection,
 } from './tree_panel/selection.js';
+import { autoBuildTreeFromPCA } from './tree_panel/_auto_build.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   show_sample_tree:    true,
@@ -70,6 +71,11 @@ export function initTreePanelToolbar() {
 // =====================================================================
 
 export async function mount(root, atlasState, registry) {
+  // If candidate-mode workflow hasn't stuffed a tree_panel_state yet,
+  // auto-build one from local-PCA dosage so the page never lands on
+  // the bare "No tree loaded" empty state.
+  await _seedTreePanelStateIfMissing(atlasState, registry);
+
   const pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
 
@@ -82,6 +88,56 @@ export async function mount(root, atlasState, registry) {
   if (atlasState.inversion) {
     atlasState.inversion._page_tree_panel_state = pageState;
   }
+}
+
+async function _seedTreePanelStateIfMissing(atlasState, registry) {
+  const inv = (atlasState && atlasState.inversion) || null;
+  if (!inv) return;
+  if (!registry || typeof registry.resolve !== 'function') return;
+  const sh = atlasState.shared || {};
+  const chrom = sh.activeChrom;
+  if (!chrom) return;
+  const candidate = sh.activeCandidate || inv.candidate || null;
+
+  // Keep a candidate-mode-supplied tree as-is; only short-circuit on a
+  // previously-auto-built tree if it was built for THIS chrom + candidate.
+  // Otherwise a chrom switch (or candidate switch) would keep showing the
+  // old tree because tree_panel_state still has a non-null `tree`.
+  const prev = inv.tree_panel_state;
+  if (prev && prev.tree) {
+    const vs = prev.view_state || {};
+    if (!vs.auto_built) return;                                  // manual / external tree — leave alone
+    if (vs._chrom === chrom && vs._candidate_id === (candidate && candidate.id || null)) return;
+  }
+
+  let data;
+  try {
+    // resolve() may return sync (hot-tier cache hit) or a Promise — wrap.
+    data = await Promise.resolve(registry.resolve('scrubber_main', { chrom }));
+  } catch (e) {
+    console.warn('tree_panel.mount: scrubber_main resolve failed —', e);
+    return;
+  }
+  let auto;
+  try {
+    auto = autoBuildTreeFromPCA(data, candidate);
+  } catch (e) {
+    console.warn('tree_panel.mount: autoBuildTreeFromPCA threw —', e);
+    return;
+  }
+  if (!auto) return;
+  inv.tree_panel_state = {
+    tree:                   auto.tree,
+    leaf_cluster_labels:    auto.leaf_cluster_labels,
+    leaf_colors_by_cluster: auto.leaf_colors_by_cluster,
+    candidate_label:        auto.candidate_label,
+    view_state: {
+      auto_built:    true,
+      l2idx:         auto.l2idx,
+      _chrom:        chrom,
+      _candidate_id: candidate && candidate.id || null,
+    },
+  };
 }
 
 export async function unmount(root) {
@@ -140,6 +196,35 @@ function _renderHeader(state) {
 // Tree paint
 // =====================================================================
 
+// 2026-05-20: size the canvas to its CSS box × DPR before paintTree
+// runs. Without this the canvas stayed at its 300×150 default backing-
+// store and the browser stretch-scaled it up to fill the layout box,
+// rendering text and dots ~3-4× their intended size (Quentin's report:
+// "our tree has its text a bit strange"). The renderer uses
+// `canvas.width`/`.height` directly for its draw coords, so we also
+// apply `ctx.setTransform(dpr, …)` so the renderer can keep operating
+// in CSS-px terms — coords drawn at e.g. (300, 200) land at the right
+// place on a 2× display instead of in the upper-left quadrant.
+function _fitTreeCanvas(canvas) {
+  if (!canvas || !canvas.getContext) return null;
+  const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+  const cssW = Math.max(1, canvas.clientWidth  | 0);
+  const cssH = Math.max(1, canvas.clientHeight | 0);
+  const targetW = Math.max(1, (cssW * dpr) | 0);
+  const targetH = Math.max(1, (cssH * dpr) | 0);
+  if (canvas.width !== targetW || canvas.height !== targetH) {
+    canvas.width  = targetW;
+    canvas.height = targetH;
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // Stash CSS dims so paintTree can read them via canvas.__cssW/H
+  // instead of the backing-store canvas.width/.height.
+  canvas.__cssW = cssW;
+  canvas.__cssH = cssH;
+  return { dpr, cssW, cssH, ctx };
+}
+
 function _paintTreeCanvas(state) {
   if (!state) return;
   if (typeof document === 'undefined' || !document.getElementById) return;
@@ -161,6 +246,12 @@ function _paintTreeCanvas(state) {
   if (!state.layout) {
     state.layout = layoutFromMglTree(state.tree, { cladogram: true });
   }
+  // 2026-05-20: fit canvas to CSS box × DPR before painting. paintTree
+  // (renderer.js) was updated to honor canvas.__cssW / __cssH when
+  // present (falls back to canvas.width / .height otherwise) — we
+  // stash CSS dims so the renderer's scale math runs in CSS px while
+  // the backing store stays at DPR for crisp pixels.
+  _fitTreeCanvas(canvas);
   // Map leaf_id → colour.
   const leaf_colors_by_id = _buildLeafColorMap(state);
   const paint = paintTree(canvas, state.layout, {

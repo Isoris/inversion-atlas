@@ -10,6 +10,25 @@
         <span id="pcaCompMbLabel" style="color: var(--ink-dim);"></span>
       </div>
       <div style="display: flex; align-items: center; gap: 10px;">
+        <!-- 2026-05-20: cursor-unit picker. Drives the ←/→ step size +
+             snap behavior. 1w / 5w / 10w / 25w / L2 / Cand mirror the
+             |Z| panel's nav lanes so the gesture is the same here. -->
+        <span id="pcaCompScrubUnits"
+              title="Cursor step size for ←/→ navigation. 1w-25w step by N windows; L2 snaps to the next L2 envelope boundary; Cand snaps to the next candidate."
+              style="display: inline-flex; align-items: center; gap: 2px;
+                     background: var(--panel-2); border: 1px solid var(--rule);
+                     border-radius: 3px; padding: 1px 2px;
+                     font-family: var(--mono); font-size: 10px;">
+          <span style="color: var(--ink-dimmer); padding: 0 4px 0 2px;">step:</span>
+          <button type="button" data-scrub-unit="1"     class="active">1w</button>
+          <button type="button" data-scrub-unit="5">5w</button>
+          <button type="button" data-scrub-unit="10">10w</button>
+          <button type="button" data-scrub-unit="25">25w</button>
+          <button type="button" data-scrub-unit="l2"
+                  title="Snap ←/→ to the next/previous L2 envelope boundary on the active chromosome. Uses the local_pca_dosage state's windowToL2 index.">L2</button>
+          <button type="button" data-scrub-unit="cand"
+                  title="Snap ←/→ to the next/previous candidate (state.candidateList) on the active chromosome.">Cand</button>
+        </span>
         <label style="display: flex; align-items: center; gap: 4px; color: var(--ink-dim);"
                title="Anchor for the K-color palette. Each sample keeps its anchor band color across all 3 panels so you can see at a glance where it lands in each evidence axis. Default = dosage (the primary scanner).">
           anchor:
@@ -22,6 +41,19 @@
             <option value="ghsl">GHSL</option>
           </select>
         </label>
+        <!-- 2026-05-20 Phase 2: concordance badge. When a sample is
+             hovered, shows the fraction of windows where its PC1 sign
+             agrees across all 3 evidence axes. 100% = the sample sits
+             on the same haplotype side of PC1 in dosage / θπ / GHSL
+             at every window (high concordance — consistent biology).
+             Lower = the layers disagree somewhere (recombinant /
+             gene-conversion / mosaic). Empty unless a sample is hovered. -->
+        <span id="pcaCompConcordBadge"
+              title="Per-window PC1-sign agreement across the 3 evidence axes for the hovered sample. 100% = same haplotype call everywhere; lower = layers disagree."
+              style="font-family: var(--mono); font-size: 10.5px;
+                     padding: 1px 8px; border-radius: 3px;
+                     background: var(--panel-2); border: 1px solid var(--rule);
+                     color: var(--ink-dim); display: none;"></span>
         <span id="pcaCompHoveredSample" style="color: var(--ink-dim); min-width: 80px;
                font-family: var(--mono); font-size: 10.5px;">hover: —</span>
       </div>
@@ -128,6 +160,32 @@
       <div style="position: relative; height: 130px;">
         <canvas id="pcaCompLinesCanvas" style="width: 100%; height: 100%;
                 background: #0b0e13; cursor: crosshair;"></canvas>
+      </div>
+    </div>
+
+    <!-- 2026-05-20 Phase 2: per-sample 3-axis trajectory. When a sample
+         is hovered, the 3 mini-canvases below paint that sample's
+         PC1×PC2 trajectory across all windows for each evidence axis.
+         Lets you read "does this fish drift the same way in dosage,
+         θπ, and GHSL?". Hidden unless a sample is hovered (or pinned).
+         3 inline mini-panels, each ~100px wide, in a 3-col grid. -->
+    <div id="pcaCompTrajectoryWrap" class="pca-comp-trajectory"
+         style="margin: 4px 14px 0; border: 1px solid var(--rule); border-radius: 4px;
+                background: var(--panel); overflow: hidden; display: none;
+                flex-direction: column;">
+      <div style="padding: 4px 8px; border-bottom: 1px solid var(--rule);
+                  font-family: var(--mono); font-size: 10px; color: var(--ink-dim);
+                  display: flex; align-items: center; gap: 10px;">
+        <span><b>per-sample trajectory</b> · <span id="pcaCompTrajLabel">—</span> · PC1×PC2 across windows · each panel is one evidence axis</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px;
+                  padding: 4px; height: 110px;">
+        <canvas id="pcaCompTrajDosage"   style="width: 100%; height: 100%;
+                background: #0b0e13; border: 1px solid var(--rule); border-radius: 3px;"></canvas>
+        <canvas id="pcaCompTrajThetaPi"  style="width: 100%; height: 100%;
+                background: #0b0e13; border: 1px solid var(--rule); border-radius: 3px;"></canvas>
+        <canvas id="pcaCompTrajGhsl"     style="width: 100%; height: 100%;
+                background: #0b0e13; border: 1px solid var(--rule); border-radius: 3px;"></canvas>
       </div>
     </div>
 

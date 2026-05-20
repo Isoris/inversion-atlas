@@ -597,4 +597,18 @@ function _installPageKeyboardNav(state) {
 if (typeof window !== 'undefined') {
   window._initRegimesPage   = initRegimesPage;
   window._computeGenomeView = computeGenomeView;
+  // 2026-05-20: hook used by the seeds inspector strip in
+  // haplotype_regimes.js. After mutating state.regimesPanel.focal.*
+  // (e.g. on a chip click) the strip calls this to redraw the 4 panels
+  // without going through the full initRegimesPage rebuild.
+  window._refreshRegimesPanels = function _refreshRegimesPanels(state) {
+    if (!state || !state.regimesPanel) return;
+    try { _renderHeader(state); } catch (_) {}
+    try { drawRegimesPanel(state); } catch (_) {}
+    try { drawRegimesPC1Panel(state); } catch (_) {}
+    if (state._regimesGenomeState) {
+      try { drawRegimesPanel(state._regimesGenomeState); } catch (_) {}
+      try { drawRegimesPC1Panel(state._regimesGenomeState); } catch (_) {}
+    }
+  };
 }

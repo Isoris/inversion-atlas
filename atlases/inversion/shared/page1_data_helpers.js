@@ -472,6 +472,18 @@ function _synthesizeThetaPiView(tv) {
       // theta-pi z is a chrom-wide per-window scalar (robust |Z|).
       if (w.z === undefined && lp.z && lp.z[i] !== undefined) w.z = lp.z[i];
     }
+    // 2026-05-20: trim tv.windows to the actual data extent so the X
+    // axis in θπ mode matches where the data is. Quentin's report:
+    // "theta pi doesnt take full panel you see the data stops in the
+    // middle of the track or the track dont go to the end". When the
+    // pc_loadings_aligned array has FEWER per-window entries than
+    // theta_pi_per_window.windows lists, the trailing windows would
+    // have NaN PCs and pad the axis with empty space. Dropping them
+    // makes currentMbRange and the panels paint a tight, data-filled
+    // axis.
+    if (nw < tv.windows.length) {
+      tv.windows = tv.windows.slice(0, nw);
+    }
   }
   // n_samples (some panels read this directly off view, not state.data).
   if (tv.n_samples == null && lp && Number.isFinite(lp.n_samples)) tv.n_samples = lp.n_samples;
@@ -569,9 +581,15 @@ function _synthesizeGhslView(gv) {
       if (w.pc4 === undefined && pcs[3]) w.pc4 = pcs[3][i];
       if (w.z === undefined && lp.z && lp.z[i] !== undefined) w.z = lp.z[i];
     }
+    // 2026-05-20: same data-extent trim as the θπ synthesizer — drop
+    // trailing windows past the per-window PC array length so the X
+    // axis in GHSL mode matches the data range.
+    if (nw < gv.windows.length) {
+      gv.windows = gv.windows.slice(0, nw);
+    }
   }
   if (gv.n_samples == null && lp && Number.isFinite(lp.n_samples)) gv.n_samples = lp.n_samples;
-  if (gv.n_windows == null && Array.isArray(gv.windows)) gv.n_windows = gv.windows.length;
+  if (Array.isArray(gv.windows)) gv.n_windows = gv.windows.length;
   if (gv.ghsl_envelopes) {
     if (!gv.l1_envelopes && Array.isArray(gv.ghsl_envelopes.l1)) {
       gv.l1_envelopes = gv.ghsl_envelopes.l1;
@@ -585,10 +603,24 @@ function _synthesizeGhslView(gv) {
   }
   if (!gv.cusum && gv.ghsl_cusum) gv.cusum = gv.ghsl_cusum;
   if (lp && lp.sim_mat && !gv.sim_scales) {
+    // 2026-05-20 — GHSL sim_mat artifact fix. The renderer (sim_panel.js)
+    // assumes a flat row-major N*N array indexed as sim[i*N+j]. The
+    // legacy code blindly used `lp.sim_mat_n || lp.sim_mat.length` which
+    // is wrong for two real shapes that show up in GHSL pipeline output:
+    //   (a) 2D nested array `[[N entries], [N entries], ...]` — length
+    //       gives N rows, not N*N cells.
+    //   (b) packed upper-triangular flat array (length = N*(N+1)/2) — the
+    //       renderer reads past the end of the array for cells below the
+    //       diagonal, giving the visible "upper-left triangle filled,
+    //       lower half gray" artifact Quentin reported on 2026-05-20.
+    // _normalizeSimMat detects both shapes and returns a flat row-major
+    // N*N Float32Array, so the renderer paints a full square in every
+    // mode regardless of how the precomp shipped the matrix.
+    const norm = _normalizeSimMat(lp.sim_mat, lp.sim_mat_n);
     gv.sim_scales = {
       default: {
-        sim:   lp.sim_mat,
-        n:     lp.sim_mat_n || (Array.isArray(lp.sim_mat) ? lp.sim_mat.length : 0),
+        sim:   norm.sim,
+        n:     norm.n,
         z:     lp.z,
         q_lo:  0.05,
         q_hi:  0.95,
@@ -598,6 +630,57 @@ function _synthesizeGhslView(gv) {
     if (!gv.default_sim_scale) gv.default_sim_scale = 'default';
   }
   _filterTracksForMode(gv, 'ghsl');
+}
+
+// Normalize a similarity matrix to a flat row-major N*N Float32Array.
+// Accepts:
+//   - 2D nested `[[N..], [N..], …]` (length=N rows)
+//   - flat row-major N*N (length = N*N)
+//   - packed upper-triangular flat (length = N*(N+1)/2, row-major over
+//     the upper triangle including the diagonal — the convention used
+//     by some GHSL pipeline outputs)
+// Falls back to the input as-is when the shape doesn't match any of
+// these (e.g. legitimate flat with a hint_n; renderer can still cope).
+function _normalizeSimMat(sim, hintN) {
+  // Case 1: 2D nested array.
+  if (Array.isArray(sim) && Array.isArray(sim[0])) {
+    const N = sim.length;
+    const out = new Float32Array(N * N);
+    for (let i = 0; i < N; i++) {
+      const row = sim[i];
+      const len = Math.min(N, row && row.length ? row.length : 0);
+      for (let j = 0; j < len; j++) {
+        const v = +row[j];
+        out[i * N + j] = Number.isFinite(v) ? v : 0;
+      }
+    }
+    return { sim: out, n: N };
+  }
+  if (!sim || typeof sim.length !== 'number') return { sim, n: hintN || 0 };
+  const len = sim.length;
+  // Case 2: flat square. Use hintN if it squares to len; otherwise check
+  // if len has an integer square root.
+  if (hintN && hintN * hintN === len) return { sim, n: hintN };
+  const sqrtN = Math.round(Math.sqrt(len));
+  if (sqrtN * sqrtN === len) return { sim, n: sqrtN };
+  // Case 3: packed upper-triangular. Solve N*(N+1)/2 = len → N = (-1 + sqrt(1+8*len))/2.
+  const triN = Math.round((Math.sqrt(1 + 8 * len) - 1) / 2);
+  if (triN * (triN + 1) / 2 === len) {
+    const N = triN;
+    const out = new Float32Array(N * N);
+    let k = 0;
+    for (let i = 0; i < N; i++) {
+      for (let j = i; j < N; j++) {
+        const v = +sim[k++];
+        const fv = Number.isFinite(v) ? v : 0;
+        out[i * N + j] = fv;
+        out[j * N + i] = fv;
+      }
+    }
+    return { sim: out, n: N };
+  }
+  // Unknown shape — pass through with whatever hint we have.
+  return { sim, n: hintN || 0 };
 }
 
 // Convenience: invalidate the synthesis flag so the next call re-runs.

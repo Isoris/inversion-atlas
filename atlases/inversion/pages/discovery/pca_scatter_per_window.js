@@ -85,7 +85,7 @@ export function initPcaPanelToolbar() {
 // =====================================================================
 
 export async function mount(root, atlasState, registry) {
-  const pageState = _buildPageState(atlasState);
+  let pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
 
   try { refreshPcaPanel(pageState); }
@@ -97,6 +97,103 @@ export async function mount(root, atlasState, registry) {
   if (atlasState.inversion) {
     atlasState.inversion._page_pca_scatter_per_window_state = pageState;
   }
+
+  // 2026-05-20: auto-build pca_panel_state from the local_pca_dosage
+  // stash on direct mount. The page expects a pre-computed pca_results[]
+  // array, but the data already lives on state.data.windows[w].{pc1,pc2,
+  // lam1,lam2} — no compute kernel needed, just adaptation.
+  if (!pageState.data || !pageState.data.pca_results) {
+    try {
+      await _autoBuildPcaPanelState(atlasState, registry);
+      pageState = _buildPageState(atlasState);
+      _setActiveState(pageState);
+      try { refreshPcaPanel(pageState); }
+      catch (e) { console.warn('pca_scatter_per_window.mount: post-autobuild refresh threw —', e); }
+      if (atlasState.inversion) {
+        atlasState.inversion._page_pca_scatter_per_window_state = pageState;
+      }
+    } catch (e) {
+      console.warn('pca_scatter_per_window.mount: auto-build failed:', e);
+    }
+  }
+}
+
+// Build a pca_panel_state envelope. 2026-05-20: falls back to a fresh
+// registry.resolve('scrubber_main') when the local_pca_dosage stash isn't
+// populated yet — so this page works as a first-mount destination
+// (user opens it directly from the tab bar without visiting local_pca_dosage
+// first).
+async function _autoBuildPcaPanelState(atlasState, registry) {
+  const inv = (atlasState && atlasState.inversion) || {};
+  const existing = inv.pca_panel_state || {};
+  if (existing.pca_results) return;
+  const stash = inv._local_pca_dosage_state;
+  let data = (stash && stash.data) || null;
+  if (!data && registry) {
+    const chrom = atlasState.shared && atlasState.shared.activeChrom;
+    if (chrom) {
+      try { data = await registry.resolve('scrubber_main', { chrom }); }
+      catch (e) {
+        console.warn('pca_scatter_per_window: scrubber_main resolve threw —', e);
+        return;
+      }
+    }
+  }
+  if (!data || !Array.isArray(data.windows)) return;
+  const wins = data.windows;
+  const n = wins.length;
+  const pca_results = new Array(n);
+  const window_meta = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const w = wins[i];
+    if (!w || !w.pc1 || !w.pc2) {
+      pca_results[i] = null;
+      window_meta[i] = { idx: i, start_bp: w && w.start_bp, end_bp: w && w.end_bp };
+      continue;
+    }
+    pca_results[i] = {
+      pc1:  w.pc1,
+      pc2:  w.pc2,
+      lam1: Number.isFinite(w.lam1) ? w.lam1 : null,
+      lam2: Number.isFinite(w.lam2) ? w.lam2 : null,
+      n_samples: data.n_samples | 0,
+    };
+    window_meta[i] = {
+      idx:      Number.isFinite(w.idx) ? w.idx : i,
+      start_bp: Number.isFinite(w.start_bp) ? w.start_bp : null,
+      end_bp:   Number.isFinite(w.end_bp)   ? w.end_bp   : null,
+    };
+  }
+  // Sample labels from data.samples[].cga / .id / fallback.
+  let sample_labels = null;
+  if (Array.isArray(data.samples) && data.samples.length === data.n_samples) {
+    sample_labels = data.samples.map((s, i) =>
+      (s && (s.cga || s.id || s.ind || s.sample)) || ('S' + i)
+    );
+  }
+  // Cluster assignment from the cursor's L2 (best-effort — null if the
+  // cluster module isn't reachable from here, which is fine; the page
+  // renders without cluster coloring).
+  let cluster_assignment = null;
+  const cur = Number.isFinite(stash.cur) ? (stash.cur | 0) : 0;
+  if (stash.windowToL2 && stash.windowToL2[cur] >= 0
+      && typeof window !== 'undefined') {
+    try {
+      // _state.js exposes getL2Cluster via the inversion stash's helpers
+      // — but the chain through getOrCompute isn't exported clean. We
+      // skip cluster pre-seeding and let the page render without it.
+      // The user can color-by-cluster from the toolbar once the page
+      // is up; the inv._local_pca_dosage_state stash is still queryable.
+    } catch (_) { /* no-op */ }
+  }
+  inv.pca_panel_state = Object.assign({}, existing, {
+    pca_results,
+    candidate_label:    existing.candidate_label   || (data.chrom || null),
+    anchor_label:       existing.anchor_label      || 'view_self',
+    sample_labels,
+    cluster_assignment,
+    window_meta,
+  });
 }
 
 export async function unmount(root) {

@@ -36,6 +36,7 @@ import {
   summariseInterval,
   candidateCountsByStratum,
 } from './nested_inversion_detector/selection.js';
+import { detectNestedInversion } from '../../shared/mgl_nested_detector.js';
 
 // =====================================================================
 // Public entry — refresh
@@ -58,7 +59,7 @@ export function initNestedDetectorToolbar() {
 // =====================================================================
 
 export async function mount(root, atlasState, registry) {
-  const pageState = _buildPageState(atlasState);
+  let pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
 
   try { refreshNestedDetector(pageState); }
@@ -69,6 +70,143 @@ export async function mount(root, atlasState, registry) {
 
   if (atlasState.inversion) {
     atlasState.inversion._page_nested_inversion_detector_state = pageState;
+  }
+
+  // 2026-05-20: auto-run detectNestedInversion on direct mount. Builds
+  // a per-stratum-per-window PC set from the local_pca_dosage data
+  // (filtering the full-cohort PC1/PC2 per window down to each
+  // stratum's sample subset). This is a proxy — the strict version
+  // would re-run PCA on each stratum subset — but the cluster
+  // structure within each stratum still surfaces and the page renders
+  // a meaningful verdict instead of the "feed detectNestedInversion
+  // first" empty state.
+  if (!pageState.detector_result) {
+    try {
+      await _autoDetectNested(root, atlasState, registry);
+      pageState = _buildPageState(atlasState);
+      _setActiveState(pageState);
+      try { refreshNestedDetector(pageState); }
+      catch (e) { console.warn('nested_inversion_detector.mount: post-autodetect refresh threw —', e); }
+      if (atlasState.inversion) {
+        atlasState.inversion._page_nested_inversion_detector_state = pageState;
+      }
+    } catch (e) {
+      console.warn('nested_inversion_detector.mount: auto-detect failed:', e);
+    }
+  }
+}
+
+// Build per_stratum_per_window_pcs from the local_pca_dosage data + the
+// focal L2's K-means assignment, then call detectNestedInversion. The
+// resulting verdict + per-stratum inner-band candidates + contiguous
+// inner intervals land on inv.nested_detector_state. Silently returns
+// when prerequisites are missing.
+async function _autoDetectNested(root, atlasState, registry) {
+  const inv = (atlasState && atlasState.inversion) || {};
+  const existing = inv.nested_detector_state || {};
+  if (existing.detector_result) return;
+  // 2026-05-20: fall back to a fresh registry resolve when the stash
+  // isn't populated, so this page works as a first-mount destination.
+  const stash = inv._local_pca_dosage_state;
+  let data = (stash && stash.data) || null;
+  if (!data && registry) {
+    const chrom = atlasState.shared && atlasState.shared.activeChrom;
+    if (chrom) {
+      try { data = await registry.resolve('scrubber_main', { chrom }); }
+      catch (e) {
+        console.warn('nested_inversion_detector: scrubber_main resolve threw —', e);
+      }
+    }
+  }
+  if (!data || !Array.isArray(data.windows)) {
+    _setLoadingHint(root, 'no scrubber data on this chromosome.');
+    return;
+  }
+  const wins = data.windows;
+  const nW = wins.length;
+  const nS = data.n_samples | 0;
+  if (nW <= 0 || nS <= 0) return;
+  // Pull labels via priority: lockedLabels > stash focal-L2 K-means >
+  // auto-cluster the active window's PC1×PC2 via K-means K=3 (so the
+  // page works even when local_pca_dosage hasn't run yet).
+  let labels = stash && stash.lockedLabels;
+  if (!labels) {
+    const cur = (stash && Number.isFinite(stash.cur)) ? (stash.cur | 0)
+              : Math.floor(nW / 2);
+    const w = wins[Math.max(0, Math.min(nW - 1, cur))];
+    if (w && w.pc1 && w.pc2) {
+      try {
+        const km = await import('../../shared/kmeans.js').catch(() => null);
+        if (km && typeof km.kmeans2D === 'function') {
+          const result = km.kmeans2D(w.pc1, w.pc2, 3);
+          if (result && result.labels) labels = result.labels;
+        }
+      } catch (e) {
+        console.warn('nested_inversion_detector: K-means fallback threw —', e);
+      }
+    }
+  }
+  if (!labels) {
+    _setLoadingHint(root, 'no K-means labels available — lock colors on a focal L2 in local_pca_dosage first (🔒 button).');
+    return;
+  }
+  // Group sample indices by label.
+  const idxByLabel = [[], [], []];
+  for (let s = 0; s < nS; s++) {
+    const k = labels[s];
+    if (k >= 0 && k < 3) idxByLabel[k].push(s);
+  }
+  const strataNames = ['HOM1', 'HET', 'HOM2'];
+  const per_stratum_per_window_pcs = Object.create(null);
+  for (let st = 0; st < 3; st++) {
+    const idx = idxByLabel[st];
+    const per_window = new Array(nW);
+    for (let i = 0; i < nW; i++) {
+      const w = wins[i];
+      if (!w || !w.pc1 || !w.pc2) { per_window[i] = { idx: i, pcs: [] }; continue; }
+      const pc1Sub = new Float64Array(idx.length);
+      const pc2Sub = new Float64Array(idx.length);
+      for (let j = 0; j < idx.length; j++) {
+        pc1Sub[j] = +w.pc1[idx[j]] || 0;
+        pc2Sub[j] = +w.pc2[idx[j]] || 0;
+      }
+      per_window[i] = { idx: i, pcs: [pc1Sub, pc2Sub] };
+    }
+    per_stratum_per_window_pcs[strataNames[st]] = per_window;
+  }
+  // Build parent_karyotype mapping 0/1/2 → HOM1/HET/HOM2 for the
+  // detector's verdict + stratum-size gating.
+  const parent_karyotype = new Array(nS);
+  for (let s = 0; s < nS; s++) {
+    const k = labels[s];
+    parent_karyotype[s] = (k === 0) ? 'HOM1'
+                       : (k === 1) ? 'HET'
+                       : (k === 2) ? 'HOM2'
+                       : null;
+  }
+  let result = null;
+  try {
+    result = detectNestedInversion({
+      per_stratum_per_window_pcs,
+      parent_karyotype,
+    });
+  } catch (e) {
+    _setLoadingHint(root, `detectNestedInversion threw: ${e && e.message ? e.message : 'error'}`);
+    return;
+  }
+  inv.nested_detector_state = Object.assign({}, existing, {
+    detector_result: result,
+    candidate_label: existing.candidate_label || (data.chrom || null),
+    n_windows:       nW,
+  });
+}
+
+function _setLoadingHint(root, msg) {
+  const el = (root && root.querySelector && root.querySelector('#nestedDetectorEmpty'))
+    || (typeof document !== 'undefined' && document.getElementById('nestedDetectorEmpty'));
+  if (el) {
+    el.style.display = '';
+    el.textContent = msg;
   }
 }
 

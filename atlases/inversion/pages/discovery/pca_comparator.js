@@ -25,6 +25,10 @@ import { _pageState, _setActiveState } from './pca_comparator/_state.js';
 import {
   paintPanel,
   findSampleAtPixel,
+  paintLines,
+  paintTrajectory,
+  computeConcordance,
+  windowAtLinesX,
 } from './pca_comparator/renderer.js';
 import {
   paintHeatmap,
@@ -90,6 +94,10 @@ function _buildPageState(atlasState) {
   return {
     sharedState,
     anchor: 'dosage',        // 'dosage' | 'theta_pi' | 'ghsl'
+    linesAxis: 'pc1',        // 'pc1' | 'pc2' — drives the per-sample lines strip
+    // 2026-05-20: cursor-unit picker (1w / 5w / 10w / 25w / L2 / Cand).
+    // Drives ←/→ step size + snap behavior.
+    scrubUnit: '1',
     hoveredSample: -1,
     _teardownFns: [],
     _canvasIds: {
@@ -137,10 +145,72 @@ function _renderHeader(state) {
       hoverEl.textContent = 'hover: —';
     }
   }
+  // 2026-05-20 Phase 2: trajectory panel + concordance badge.
+  _refreshTrajectoryAndConcord(state);
+}
+
+// Show/hide the per-sample trajectory row + compute concordance badge.
+// Runs on every header refresh (cheap when nothing to do; the heavy
+// trajectory paint is gated on hoveredSample being valid).
+function _refreshTrajectoryAndConcord(state) {
+  if (typeof document === 'undefined') return;
+  const wrap = document.getElementById('pcaCompTrajectoryWrap');
+  const label = document.getElementById('pcaCompTrajLabel');
+  const badge = document.getElementById('pcaCompConcordBadge');
+  const si = state.hoveredSample;
+  const ss = state.sharedState;
+  if (si < 0 || !ss || !ss.data) {
+    if (wrap) wrap.style.display = 'none';
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+  if (wrap) wrap.style.display = 'flex';
+  if (label && ss.data.samples && ss.data.samples[si]) {
+    const s = ss.data.samples[si];
+    label.textContent = (s.cga || s.ind || `si=${si}`);
+  } else if (label) {
+    label.textContent = `si=${si}`;
+  }
+  try { paintTrajectory(state, si); } catch (e) {
+    console.warn('paintTrajectory:', e);
+  }
+  if (badge) {
+    let cc = null;
+    try { cc = computeConcordance(state, si); } catch (_) {}
+    if (cc && Number.isFinite(cc.frac)) {
+      const pct = Math.round(cc.frac * 100);
+      const col = cc.frac >= 0.9 ? '#3cc08a'
+                : cc.frac >= 0.6 ? '#f5a524'
+                : '#e0555c';
+      badge.style.display = 'inline';
+      badge.style.color = col;
+      badge.style.borderColor = col;
+      badge.textContent = `concord ${pct}% (${cc.agree}/${cc.total}w)`;
+      badge.title = `PC1-sign agreement across all 3 evidence axes for this sample: ${cc.agree} of ${cc.total} valid windows. High = consistent biology across signals; low = layers disagree (recombinant / mosaic).`;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Paint all 3 panels.
+//
+// 2026-05-20 — lazy/cached lines paint. The lines panel paints 226
+// polylines × n_windows (~9000 on LG01) onto a canvas → millions of
+// ctx ops, ~hundreds of ms blocking the main thread. Quentin: "for
+// cross evidence PCA you must lazy load or manage it because its
+// freezing". Two-phase fix:
+//   1. paintLines is deferred to the next idle/animation frame so the
+//      3 scatters reveal instantly. Initial mount no longer blocks
+//      ~200ms on the lines render.
+//   2. The per-paint scheduler coalesces overlapping refresh() calls
+//      (arrow-key scrubs, anchor change, hover) so we never queue a
+//      paint while one is already pending.
+// The lines renderer (renderer.js#paintLines) internally caches a
+// background canvas keyed by (anchor + axis + nWin) — subsequent
+// paints with the same key skip the polyline pass and only redraw
+// the cursor / yMin/yMax overlay.
 // ---------------------------------------------------------------------------
 function _paintAll(state) {
   if (typeof document === 'undefined') return;
@@ -148,6 +218,44 @@ function _paintAll(state) {
   paintPanel(state, 'theta_pi');
   paintPanel(state, 'ghsl');
   paintHeatmap(state);
+  _scheduleLinesPaint(state);
+  _refreshLinesStatus(state);
+}
+
+let _linesPaintScheduled = 0;
+function _scheduleLinesPaint(state) {
+  if (_linesPaintScheduled) return;
+  const run = () => {
+    _linesPaintScheduled = 0;
+    try { paintLines(state, state.linesAxis || 'pc1'); }
+    catch (e) { console.warn('pca_comparator: paintLines threw —', e); }
+  };
+  // requestIdleCallback when available; rAF fallback. Either way the
+  // 3 scatters render synchronously above and the lines fill in on
+  // the next tick — the page becomes interactive immediately.
+  if (typeof requestIdleCallback === 'function') {
+    _linesPaintScheduled = requestIdleCallback(run, { timeout: 120 });
+  } else {
+    _linesPaintScheduled = requestAnimationFrame(run);
+  }
+}
+
+function _refreshLinesStatus(state) {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById('pcaCompStatusLines');
+  if (el) el.textContent = `anchor: ${state.anchor || 'dosage'} · ${(state.linesAxis || 'pc1').toUpperCase()}`;
+  // Update the PC1/PC2 button highlight to reflect the active axis.
+  const b1 = document.getElementById('pcaCompLinesAxisPC1');
+  const b2 = document.getElementById('pcaCompLinesAxisPC2');
+  if (b1 && b2) {
+    const isPC1 = (state.linesAxis || 'pc1') === 'pc1';
+    b1.style.background = isPC1 ? 'var(--accent)' : 'var(--panel-2)';
+    b1.style.color      = isPC1 ? '#0b0e13'       : 'var(--ink)';
+    b1.style.border     = isPC1 ? '0'             : '1px solid var(--rule)';
+    b2.style.background = !isPC1 ? 'var(--accent)' : 'var(--panel-2)';
+    b2.style.color      = !isPC1 ? '#0b0e13'       : 'var(--ink)';
+    b2.style.border     = !isPC1 ? '0'             : '1px solid var(--rule)';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -156,14 +264,65 @@ function _paintAll(state) {
 function _wireToolbar(state) {
   if (typeof document === 'undefined') return;
   const anchorSel = document.getElementById('pcaCompAnchor');
-  if (!anchorSel) return;
-  anchorSel.value = state.anchor || 'dosage';
-  const onChange = (e) => {
-    state.anchor = e.target.value;
-    _paintAll(state);
-  };
-  anchorSel.addEventListener('change', onChange);
-  state._teardownFns.push(() => anchorSel.removeEventListener('change', onChange));
+  if (anchorSel) {
+    anchorSel.value = state.anchor || 'dosage';
+    const onChange = (e) => {
+      state.anchor = e.target.value;
+      _paintAll(state);
+    };
+    anchorSel.addEventListener('change', onChange);
+    state._teardownFns.push(() => anchorSel.removeEventListener('change', onChange));
+  }
+  // PC1 / PC2 buttons for the per-sample lines strip.
+  const b1 = document.getElementById('pcaCompLinesAxisPC1');
+  const b2 = document.getElementById('pcaCompLinesAxisPC2');
+  if (b1) {
+    const onB1 = () => { state.linesAxis = 'pc1'; _paintAll(state); };
+    b1.addEventListener('click', onB1);
+    state._teardownFns.push(() => b1.removeEventListener('click', onB1));
+  }
+  if (b2) {
+    const onB2 = () => { state.linesAxis = 'pc2'; _paintAll(state); };
+    b2.addEventListener('click', onB2);
+    state._teardownFns.push(() => b2.removeEventListener('click', onB2));
+  }
+  // 2026-05-20: cursor-unit picker on the header. Sets state.scrubUnit
+  // which the ←/→ hotkey reads. Persisted so a reload keeps the choice.
+  const scrubBar = document.getElementById('pcaCompScrubUnits');
+  if (scrubBar) {
+    try {
+      const saved = localStorage.getItem('pca_comparator.scrubUnit');
+      if (saved) state.scrubUnit = saved;
+    } catch (_) {}
+    scrubBar.querySelectorAll('button[data-scrub-unit]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.scrubUnit === state.scrubUnit);
+      const onClick = () => {
+        state.scrubUnit = btn.dataset.scrubUnit;
+        try { localStorage.setItem('pca_comparator.scrubUnit', state.scrubUnit); } catch (_) {}
+        scrubBar.querySelectorAll('button[data-scrub-unit]').forEach(b => {
+          b.classList.toggle('active', b === btn);
+        });
+      };
+      btn.addEventListener('click', onClick);
+      state._teardownFns.push(() => btn.removeEventListener('click', onClick));
+    });
+  }
+  // Click-to-scrub on the lines canvas.
+  const linesCanvas = document.getElementById('pcaCompLinesCanvas');
+  if (linesCanvas) {
+    const onClick = (e) => {
+      const rect = linesCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const wi = windowAtLinesX(x);
+      if (wi < 0) return;
+      const ss = state.sharedState;
+      if (!ss || !ss.data) return;
+      ss.cur = wi;
+      refresh(state);
+    };
+    linesCanvas.addEventListener('click', onClick);
+    state._teardownFns.push(() => linesCanvas.removeEventListener('click', onClick));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -176,25 +335,104 @@ function _wireHotkeys(state) {
   const onKey = (e) => {
     const tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    // The shell router replaces #app-root.innerHTML between pages and our
+    // mount/unmount handler manages this listener's lifetime — so simply
+    // checking the page element still exists in the DOM is enough.
+    // The old code required a `.active` class that the router never sets,
+    // which silently killed arrow-key navigation here.
     const pageEl = document.getElementById('pca_comparator');
-    if (!pageEl || !pageEl.classList.contains('active')) return;
+    if (!pageEl) return;
     const ss = state.sharedState;
     if (!ss || !ss.data) return;
     const nWin = ss.data.n_windows | 0;
     if (nWin <= 0) return;
-    const step = e.shiftKey ? 20 : 1;
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      ss.cur = Math.max(0, (ss.cur | 0) - step);
-      refresh(state);
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      ss.cur = Math.min(nWin - 1, (ss.cur | 0) + step);
-      refresh(state);
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const dir = (e.key === 'ArrowLeft') ? -1 : 1;
+    // 2026-05-20: scrub-unit-aware navigation. The picker on the header
+    // sets state.scrubUnit; here we translate it into a target cur.
+    // Numeric units = step by N windows (×20 with shift, same as before).
+    // L2 snaps to the next/previous L2 envelope boundary; Cand snaps to
+    // the next/previous candidate. Both read from the local_pca_dosage
+    // stash (inv._local_pca_dosage_state) — comparator is a read-only
+    // inspector and doesn't own L2/candidate state.
+    const unit = state.scrubUnit || '1';
+    const cur = ss.cur | 0;
+    let target = cur;
+    if (unit === 'l2') {
+      target = _snapToL2(state, cur, dir);
+    } else if (unit === 'cand') {
+      target = _snapToCandidate(state, cur, dir);
+    } else {
+      const step = (parseInt(unit, 10) || 1) * (e.shiftKey ? 20 : 1);
+      target = cur + dir * step;
     }
+    ss.cur = Math.max(0, Math.min(nWin - 1, target));
+    refresh(state);
   };
   document.addEventListener('keydown', onKey);
   state._teardownFns.push(() => document.removeEventListener('keydown', onKey));
+}
+
+// ---------------------------------------------------------------------------
+// Snap helpers for the cursor-unit picker (2026-05-20).
+// Both helpers read L2 / candidate state from the local_pca_dosage stash
+// since the comparator is a read-only inspector and doesn't own that
+// state. Fall back to a ±25 window step when the source isn't available
+// so the keypress still moves the cursor noticeably.
+// ---------------------------------------------------------------------------
+function _snapToL2(state, cur, dir) {
+  const ss = state.sharedState;
+  const wToL2 = ss && ss.windowToL2;
+  const env = ss && ss.data && ss.data.l2_envelopes;
+  if (!wToL2 || !Array.isArray(env) || env.length === 0) return cur + dir * 25;
+  // Find the next L2 boundary in `dir`. Boundaries are at e._s0 (left
+  // edge) and e._e0 + 1 (right edge) of each envelope. We collect all
+  // boundary window indices on the chrom, sort, and pick the closest
+  // strictly in the direction of travel.
+  const boundaries = [];
+  for (const e of env) {
+    if (!e) continue;
+    if (Number.isFinite(e._s0)) boundaries.push(e._s0);
+    if (Number.isFinite(e._e0)) boundaries.push(Math.min((ss.data.n_windows | 0) - 1, e._e0 + 1));
+  }
+  if (boundaries.length === 0) return cur + dir * 25;
+  boundaries.sort((a, b) => a - b);
+  if (dir > 0) {
+    for (const b of boundaries) if (b > cur) return b;
+    return boundaries[boundaries.length - 1];
+  } else {
+    for (let i = boundaries.length - 1; i >= 0; i--) {
+      if (boundaries[i] < cur) return boundaries[i];
+    }
+    return boundaries[0];
+  }
+}
+
+function _snapToCandidate(state, cur, dir) {
+  const ss = state.sharedState;
+  const cands = ss && Array.isArray(ss.candidateList) ? ss.candidateList : [];
+  if (cands.length === 0) return cur + dir * 25;
+  // Anchor each candidate at its ref_window (or start_w as fallback).
+  const anchors = [];
+  for (const c of cands) {
+    if (!c) continue;
+    const w = Number.isFinite(c.ref_window) ? c.ref_window
+            : Number.isFinite(c.start_w)   ? c.start_w
+            : null;
+    if (w != null) anchors.push(w | 0);
+  }
+  if (anchors.length === 0) return cur + dir * 25;
+  anchors.sort((a, b) => a - b);
+  if (dir > 0) {
+    for (const a of anchors) if (a > cur) return a;
+    return anchors[anchors.length - 1];
+  } else {
+    for (let i = anchors.length - 1; i >= 0; i--) {
+      if (anchors[i] < cur) return anchors[i];
+    }
+    return anchors[0];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -250,6 +488,30 @@ function _wireHeatmap(state) {
 
 function _wireCanvasHover(state) {
   if (typeof document === 'undefined') return;
+  // 2026-05-20: comparator hover was repainting EVERYTHING on every
+  // mousemove that changed hoveredSample — 3 scatters AND the
+  // per-sample lines panel (226 polylines × thousands of windows).
+  // The lines redraw was the bottleneck (Quentin: "The PCA comparator
+  // page is supper slow and laggy"). Fixes:
+  //   1. rAF-coalesce hover repaints so multiple moves in the same
+  //      frame batch into one paint.
+  //   2. Skip paintLines on hover-only changes. The lines panel doesn't
+  //      visually highlight the hovered sample meaningfully (one of 226
+  //      threads gets amber instead of light blue — invisible). It
+  //      stays repainted on click / arrow-key (cursor scrub) where it
+  //      actually matters.
+  //   3. Only repaint the 3 scatters on hover.
+  let _hoverRafId = 0;
+  const requestHoverRepaint = () => {
+    if (_hoverRafId) return;
+    _hoverRafId = requestAnimationFrame(() => {
+      _hoverRafId = 0;
+      _renderHeader(state);
+      paintPanel(state, 'dosage');
+      paintPanel(state, 'theta_pi');
+      paintPanel(state, 'ghsl');
+    });
+  };
   for (const layer of ['dosage', 'theta_pi', 'ghsl']) {
     const canvas = document.getElementById(state._canvasIds[layer]);
     if (!canvas) continue;
@@ -260,15 +522,13 @@ function _wireCanvasHover(state) {
       const si = findSampleAtPixel(state, layer, x, y);
       if (si !== state.hoveredSample) {
         state.hoveredSample = si;
-        _renderHeader(state);
-        _paintAll(state);
+        requestHoverRepaint();
       }
     };
     const onLeave = () => {
       if (state.hoveredSample !== -1) {
         state.hoveredSample = -1;
-        _renderHeader(state);
-        _paintAll(state);
+        requestHoverRepaint();
       }
     };
     canvas.addEventListener('mousemove', onMove);

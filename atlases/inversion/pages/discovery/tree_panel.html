@@ -6,32 +6,32 @@
         <span id="treePanelCandidateLabel" class="tree-panel-meta">—</span>
       </div>
       <div class="tree-panel-controls">
-        <label class="tree-toggle">
+        <label class="tree-panel-toggle">
           <input id="treePanelShowSampleTree" type="checkbox" checked>
           Sample tree
         </label>
-        <label class="tree-toggle">
+        <label class="tree-panel-toggle">
           <input id="treePanelShowBandTree" type="checkbox">
           Band tree (Path A — placeholder)
         </label>
-        <label class="tree-toggle">
+        <label class="tree-panel-toggle">
           <input id="treePanelColorByCluster" type="checkbox" checked>
           Color leaves by cluster
         </label>
-        <span class="tree-sep"></span>
-        <label class="tree-distance-pick">
+        <span class="tree-panel-sep"></span>
+        <label class="tree-panel-toggle">
           Distance:
-          <select id="treePanelDistanceMode">
+          <select id="treePanelDistanceMode" class="tree-panel-select">
             <option value="dxy">dXY</option>
             <option value="dA">dA</option>
           </select>
         </label>
-        <span id="treePanelARIBadge" class="tree-ari-badge" title="ARI between tree clades and cluster labels">—</span>
+        <span id="treePanelARIBadge" class="tree-panel-ari-badge" title="ARI between tree clades and cluster labels">—</span>
       </div>
     </header>
 
     <div class="tree-panel-body">
-      <div class="tree-panel-canvas-wrap">
+      <div class="tree-panel-track-wrap">
         <canvas id="treePanelCanvas" class="tree-panel-canvas"></canvas>
         <div id="treePanelEmpty" class="tree-panel-empty" style="display:none;">
           No tree loaded. Build one via the candidate-mode controls.

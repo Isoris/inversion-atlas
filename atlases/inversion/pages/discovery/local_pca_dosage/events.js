@@ -41,47 +41,133 @@ import {
 } from './candidates.js';
 
 // --- updateWinLabel(state) — legacy lines 51738-51742 ---
+// 2026-05-19: read window from the active mode view so the "window N at
+// X.YYY Mb" label reflects θπ / GHSL coordinates when in those modes.
 export function updateWinLabel(state) {
   _setActiveState(state);
-  if (!state || !state.data || !state.data.windows) return;
-  const w = state.data.windows[state.cur];
+  if (!state || !state.data) return;
+  const view = getActiveModeView(state) || state.data;
+  const wins = view && view.windows;
+  if (!wins) return;
+  const i = Math.max(0, Math.min(wins.length - 1, state.cur | 0));
+  const w = wins[i];
   if (!w) return;
   const winIdxEl = document.getElementById('winIdx');
   const winBpEl  = document.getElementById('winBp');
   if (winIdxEl) winIdxEl.textContent = state.cur;
-  if (winBpEl)  winBpEl.innerHTML = `· <b>${w.center_mb.toFixed(3)} Mb</b>`;
+  if (winBpEl && Number.isFinite(w.center_mb)) {
+    winBpEl.innerHTML = `· <b>${w.center_mb.toFixed(3)} Mb</b>`;
+  }
 }
 
 // --- setCur() — legacy lines 51747-51792 ---
+// 2026-05-19: clamp cur to the active view's n_windows so a click on a
+// theta-pi-frame x position doesn't fly past the dosage view's bounds
+// (or vice versa). The view's window count is the source of truth.
 export function setCur(state, i) {
   _setActiveState(state);
   if (!state || !state.data) return;
-  state.cur = Math.max(0, Math.min(state.data.n_windows - 1, i | 0));
+  const view = getActiveModeView(state) || state.data;
+  const N = (view && view.n_windows)
+         || (view && view.windows && view.windows.length)
+         || state.data.n_windows;
+  const clamped = Math.max(0, Math.min((N | 0) - 1, i | 0));
+  // 2026-05-19 perf: skip the whole 13-panel redraw when cur didn't
+  // actually change. Audit of every setCur(...) caller confirmed none
+  // pass state.cur intentionally as a "force redraw" idiom — they all
+  // supply a navigation target (arrow keys, click-to-jump, scrubber
+  // value, L2 boundary jump, candidate focus). If a future path DOES
+  // need to force a same-cur redraw, it should call the specific draw
+  // functions directly rather than going through setCur.
+  if (clamped === state.cur) return;
+  state.cur = clamped;
   const _scrubEl = document.getElementById('scrubber');
   if (_scrubEl) _scrubEl.value = state.cur;
+
+  // 2026-05-19 perf instrumentation. Opt-in: set `window.__perfDbg = true`
+  // in the dev console to enable. Off by default → zero overhead. Logs
+  // per-call ms in the format `[scrub] setCur(N): total=Xms (drawSim=…
+  // drawZ=… …)`. Knowing which step dominates is the first step toward
+  // fixing it; the user-facing wins below (same-L2 skip for renderL3Panel,
+  // cursor-only path for drawSim) are also gated on this measurement.
+  const _PERF = (typeof window !== 'undefined') && window.__perfDbg === true;
+  const _tAll = _PERF ? performance.now() : 0;
+  const _ts = _PERF ? {} : null;
+  const _time = _PERF
+    ? (key, fn) => { const t = performance.now(); try { fn(); } catch (_) {} _ts[key] = performance.now() - t; }
+    : (_key, fn) => { try { fn(); } catch (_) {} };
+
   // 2026-05-06 round 3 (parity step): bare drawX() / updateWinLabel(state) / etc.
   // calls in legacy assumed `state` was a global. Under the new shell every
   // entry point takes `state` as first arg, so we wrap each in a guarded
   // call. The original try/catch pattern around drawSimMini/drawAnchorStrip
   // is preserved verbatim.
-  try { updateWinLabel(state); } catch (_) {}
-  try { drawSim(state); }       catch (_) {}
-  try { drawZ(state); }         catch (_) {}
-  try { drawTracks(state); }    catch (_) {}
-  try { drawLinesPanel(state); }catch (_) {}
-  try { drawPCA(state); }       catch (_) {}
+  _time('updateWinLabel',   () => updateWinLabel(state));
+  _time('drawSim',          () => drawSim(state));
+  _time('drawZ',            () => drawZ(state));
+  _time('drawTracks',       () => drawTracks(state));
+  _time('drawLinesPanel',   () => drawLinesPanel(state));
+  _time('drawPCA',          () => drawPCA(state));
   // v3.51: keep the minimap's orange crosshair in sync with the scrubber
   if (state.simInMinimap) {
-    try { drawSimMini(state); } catch (_) {}
+    _time('drawSimMini',    () => drawSimMini(state));
   }
   // v3.52: anchor concord strip — orange cursor line follows scrubber
-  try { drawAnchorStrip(state); } catch (_) {}
+  _time('drawAnchorStrip',  () => drawAnchorStrip(state));
   // v3.71: concord V badge (above per-sample-lines header) follows the scrubber
-  try { _updateConcordBadge(state); } catch (_) {}
-  try { updateSidebarInfo(state); } catch (_) {}
-  try { renderZoneBlock(state); }   catch (_) {}
+  _time('concordBadge',     () => _updateConcordBadge(state));
+  _time('updateSidebarInfo',() => updateSidebarInfo(state));
+  _time('renderZoneBlock',  () => renderZoneBlock(state));
   if (typeof renderL3Panel === 'function') {
-    try { renderL3Panel(state); } catch (_) {}
+    _time('renderL3Panel',  () => renderL3Panel(state));
+  }
+
+  if (_PERF) {
+    const total = (performance.now() - _tAll).toFixed(1);
+    const parts = Object.entries(_ts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, v]) => `${k}=${v.toFixed(1)}`)
+      .join(' ');
+    console.log(`[scrub] setCur(${state.cur}): total=${total}ms · ${parts}`);
+    // 2026-05-19: also stash raw timings on window for offline analysis.
+    // Use `window.__perfSummary()` (defined below in this module's first
+    // call) to get mean/p50/p95 per panel across all logged scrubs.
+    if (!window.__perfScrubLog) window.__perfScrubLog = [];
+    window.__perfScrubLog.push({ cur: state.cur, total: +total, ts: { ..._ts } });
+    if (!window.__perfSummary) {
+      window.__perfSummary = function () {
+        const log = window.__perfScrubLog || [];
+        if (log.length === 0) { console.log('[perf] no scrubs logged yet'); return; }
+        const keys = new Set();
+        for (const row of log) for (const k of Object.keys(row.ts)) keys.add(k);
+        const stats = [];
+        const pct = (arr, p) => arr.slice().sort((a, b) => a - b)[Math.floor(arr.length * p)] || 0;
+        for (const k of [...keys, '_total']) {
+          const vals = log.map(r => k === '_total' ? r.total : (r.ts[k] || 0)).filter(v => v > 0);
+          if (vals.length === 0) continue;
+          const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+          stats.push({
+            panel:    k,
+            n:        vals.length,
+            mean_ms:  +mean.toFixed(1),
+            p50_ms:   +pct(vals, 0.50).toFixed(1),
+            p95_ms:   +pct(vals, 0.95).toFixed(1),
+            max_ms:   +Math.max(...vals).toFixed(1),
+          });
+        }
+        stats.sort((a, b) => b.mean_ms - a.mean_ms);
+        console.table(stats);
+        console.log(`[perf] n_scrubs=${log.length}. Reset with: window.__perfScrubLog = []`);
+        return stats;
+      };
+    }
+    // 2026-05-19: ping the live HUD if it's mounted (perf_hud.js installs
+    // window._perfHudUpdate when the HUD is opened via Shift+P or
+    // restored from localStorage). No-op when the HUD module hasn't
+    // loaded yet, so this stays free in the non-HUD path.
+    if (typeof window._perfHudUpdate === 'function') {
+      try { window._perfHudUpdate(); } catch (_) {}
+    }
   }
   // v3.94: live dosage heatmap follows cursor (debounced; no-op when closed)
   if (typeof redrawCursorHeatmap === 'function') {
@@ -110,9 +196,16 @@ export function setCur(state, i) {
 }
 
 // --- onSimClick() — legacy lines 52067-52111 ---
+// 2026-05-19: route window-count lookups through getActiveModeView(state)
+// so a click while in θπ / GHSL mode lands on the active view's window
+// frame, not dosage's. Falls back to state.data when no alternate view
+// is loaded (dosage mode).
 export function onSimClick(state, evt) {
   _setActiveState(state);
   if (!state.data) return;
+  const view = getActiveModeView(state) || state.data;
+  const Nw_view = (view && view.n_windows) || (view && view.windows && view.windows.length) || 0;
+  if (Nw_view <= 0) return;
   const rect = document.getElementById('simCanvas').getBoundingClientRect();
   const px = evt.clientX - rect.left;
   const py = evt.clientY - rect.top;
@@ -129,7 +222,7 @@ export function onSimClick(state, evt) {
   {
     const csIdx = _ensureCsOverlayIndex();
     if (csIdx && csIdx.bps.length > 0) {
-      const Nw = state.data.n_windows;
+      const Nw = Nw_view;
       // Replicate drawSim's mapping exactly (it lives inside drawSim's
       // closure so we can't reuse it; re-derive from state._simGeom).
       const _toPx = (wIdx) => g.x0 + (wIdx + 0.5) * g.side / Nw;
@@ -154,10 +247,15 @@ export function onSimClick(state, evt) {
   // Prefer x-axis (horizontal) → window index. The heatmap is symmetric, so
   // either axis works, but x is the natural "scrub through chromosome" gesture.
   const frac = (px - g.x0) / g.side;
-  setCur(state, Math.round(frac * (state.data.n_windows - 1)));
+  setCur(state, Math.round(frac * (Nw_view - 1)));
 }
 
 // --- onZClick() — legacy lines 52112-52202 ---
+// 2026-05-19: route window lookups through getActiveModeView so clicks
+// in θπ / GHSL mode map onto the active view's window frame. Without
+// this, a Z-panel click while in θπ mode landed on the dosage-frame
+// window at that x-fraction, putting state.cur out of sync with the
+// other panels.
 export function onZClick(state, evt) {
   _setActiveState(state);
   if (!state.data) return;
@@ -168,13 +266,17 @@ export function onZClick(state, evt) {
   const y = evt.clientY - rect.top;     // v4 turn 10: track y for W-row hit-test
   const plotW = rect.width - pad.l - pad.r;
   const frac = Math.max(0, Math.min(1, (x - pad.l) / plotW));
-  const d = state.data;
+  const d = getActiveModeView(state) || state.data;
+  const N = (d && d.n_windows) || (d && d.windows && d.windows.length) || 0;
+  if (N <= 0 || !d.windows || !d.windows[0] || !d.windows[N - 1]) return;
   const mbMin = d.windows[0].center_mb;
-  const mbMax = d.windows[d.n_windows - 1].center_mb;
+  const mbMax = d.windows[N - 1].center_mb;
   const targetMb = mbMin + frac * (mbMax - mbMin);
   let bestI = 0, bestD = Infinity;
-  for (let i = 0; i < d.n_windows; i++) {
-    const dd = Math.abs(d.windows[i].center_mb - targetMb);
+  for (let i = 0; i < N; i++) {
+    const w0 = d.windows[i];
+    if (!w0 || !Number.isFinite(w0.center_mb)) continue;
+    const dd = Math.abs(w0.center_mb - targetMb);
     if (dd < bestD) { bestD = dd; bestI = i; }
   }
   // v4 turn 10: if the click landed inside the W-row, treat it as a window-
@@ -376,7 +478,12 @@ export function drawTracks(state) {
 function drawOneTrack(state, canvas, trk, label) {
   const { ctx, w, h } = fitCanvas(canvas);
   ctx.clearRect(0, 0, w, h);
-  const wins = state.data.windows;
+  // 2026-05-19: track values are aligned to the ACTIVE view's window
+  // grid (drawTracks reads tracks from getActiveModeView). Drawing
+  // them against the dosage view's windows misaligned every track when
+  // the active mode was θπ / GHSL. Use the view's windows here too.
+  const view = getActiveModeView(state) || state.data;
+  const wins = (view && view.windows) || state.data.windows;
   const Nwins = wins.length;
   if (Nwins === 0) return;
   const pad = { l: 44, r: 16, t: 16, b: 6 };
@@ -475,16 +582,23 @@ function drawOneTrack(state, canvas, trk, label) {
 }
 
 // --- updateSidebarInfo(state) — legacy lines 51729-51737 ---
+// 2026-05-19: read the current window from the active view so the
+// sidebar's |Z|/λ₁/λ₂ readout reflects θπ / GHSL when the user has
+// switched modes (was always showing dosage values).
 export function updateSidebarInfo(state) {
   _setActiveState(state);
-  if (!state || !state.data || !Array.isArray(state.data.windows)) return;
+  if (!state || !state.data) return;
+  const view = getActiveModeView(state) || state.data;
+  if (!view || !Array.isArray(view.windows)) return;
   const el = document.getElementById('sidebarInfo');
   if (!el) return;
-  const w = state.data.windows[state.cur];
+  const cur = Math.max(0, Math.min(view.windows.length - 1, state.cur | 0));
+  const w = view.windows[cur];
   if (!w) return;
+  const mbStr = Number.isFinite(w.center_mb) ? w.center_mb.toFixed(3) : '—';
   el.innerHTML =
     `<span class="dim">idx</span> ${state.cur}<br>` +
-    `<span class="dim">Mb </span> ${w.center_mb.toFixed(3)}<br>` +
+    `<span class="dim">Mb </span> ${mbStr}<br>` +
     `<span class="dim">|Z|</span> ${fmt(Math.abs(w.z || 0))}<br>` +
     `<span class="dim">λ₁ </span> ${fmt(w.lam1)}<br>` +
     `<span class="dim">λ₂ </span> ${fmt(w.lam2)}`;

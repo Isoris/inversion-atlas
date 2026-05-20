@@ -165,38 +165,21 @@ export function buildCandidateNavHtml(state, opts) {
   const nav = navStateFor(state);
   const c = state && state.candidate;
   const activeName = c
-    ? '<span style="color: var(--accent); font-weight: 500;">'
-      + _escape(c.id || '?') + '</span>'
-    : '<span style="color: var(--ink-dim); font-style: italic;">no candidate selected</span>';
+    ? '<span class="cnav-id">' + _escape(c.id || '?') + '</span>'
+    : '<span class="cnav-id cnav-empty">no candidate selected</span>';
   const prevAttr = nav.prevDisabled ? ' disabled' : '';
   const nextAttr = nav.nextDisabled ? ' disabled' : '';
-  const prevCursor = nav.prevDisabled ? 'default' : 'pointer';
-  const nextCursor = nav.nextDisabled ? 'default' : 'pointer';
-  const prevOpacity = nav.prevDisabled ? 0.4 : 1;
-  const nextOpacity = nav.nextDisabled ? 0.4 : 1;
   return ''
-    + '<button id="' + prefix + 'NavPrev"' + prevAttr
-    + ' title="Previous candidate by genomic position"'
-    + ' style="background: var(--panel); border: 1px solid var(--rule);'
-    + '        color: var(--ink); border-radius: 3px; padding: 4px 12px;'
-    + '        font-family: var(--mono); font-size: 11px;'
-    + '        cursor: ' + prevCursor + '; opacity: ' + prevOpacity + ';">‹ prev</button>'
-    + '<span style="color: var(--ink-dim); min-width: 130px; text-align: center;'
-    + '             white-space: nowrap;">' + _escape(nav.posLabel) + '</span>'
-    + '<button id="' + prefix + 'NavNext"' + nextAttr
-    + ' title="Next candidate by genomic position"'
-    + ' style="background: var(--panel); border: 1px solid var(--rule);'
-    + '        color: var(--ink); border-radius: 3px; padding: 4px 12px;'
-    + '        font-family: var(--mono); font-size: 11px;'
-    + '        cursor: ' + nextCursor + '; opacity: ' + nextOpacity + ';">next ›</button>'
-    + '<span style="color: var(--ink-dim); margin: 0 6px;">·</span>'
-    + '<span style="color: var(--ink-dim);">active:</span> ' + activeName
-    + '<span style="flex: 1;"></span>'
-    + '<button id="' + prefix + 'NavGenome"'
-    + ' title="Clear candidate selection — show whole-genome view"'
-    + ' style="background: var(--panel); border: 1px solid var(--rule);'
-    + '        color: var(--ink-dim); border-radius: 3px; padding: 4px 12px;'
-    + '        font-family: var(--mono); font-size: 11px; cursor: pointer;">'
+    + '<button id="' + prefix + 'NavPrev" class="cnav-btn"' + prevAttr
+    + ' title="Previous candidate by genomic position">‹ prev</button>'
+    + '<span class="cnav-pos">' + _escape(nav.posLabel) + '</span>'
+    + '<button id="' + prefix + 'NavNext" class="cnav-btn"' + nextAttr
+    + ' title="Next candidate by genomic position">next ›</button>'
+    + '<span class="cnav-sep">·</span>'
+    + '<span class="cnav-label">active:</span> ' + activeName
+    + '<span class="cnav-spacer"></span>'
+    + '<button id="' + prefix + 'NavGenome" class="cnav-btn cnav-btn-dim"'
+    + ' title="Clear candidate selection — show whole-genome view">'
     + '🌍 whole genome</button>';
 }
 
@@ -229,12 +212,6 @@ export function renderCandidateNavInline(state, opts) {
 
   const bar = document.createElement('div');
   bar.className = 'cand-nav-inline';
-  if (bar.style) {
-    bar.style.cssText = 'display: flex; align-items: center; gap: 10px; '
-      + 'padding: 6px 12px; background: var(--panel-2); '
-      + 'border: 1px solid var(--rule); border-radius: 4px; '
-      + 'margin-bottom: 12px; font-family: var(--mono); font-size: 11.5px;';
-  }
   bar.innerHTML = buildCandidateNavHtml(state, { idPrefix: prefix });
 
   const nav = navStateFor(state);
