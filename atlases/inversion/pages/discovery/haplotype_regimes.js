@@ -199,10 +199,18 @@ export async function mount(root, atlasState, registry) {
 }
 
 export async function unmount(root) {
+  // 2026-05-20: tear down the document-level arrow-key handler that
+  // initRegimesPage installs via _installPageKeyboardNav. Without this,
+  // every mount stacks another keydown listener on document — after N
+  // tab-outs each arrow press would advance the focal seed N times.
+  // The teardown closure was stashed on state by initRegimesPage; we
+  // captured the state ref on mount as _pageState.
+  if (_pageState && typeof _pageState._regimesTeardownKeyboard === 'function') {
+    try { _pageState._regimesTeardownKeyboard(); }
+    catch (e) { console.warn('[haplotype_regimes.unmount] keyboard teardown threw —', e); }
+    _pageState._regimesTeardownKeyboard = null;
+  }
   _pageState = null;
-  // Note: arrow-key handlers attached by initRegimesPage are document-level.
-  // initRegimesPage returns a teardown closure but we don't currently
-  // capture it — TODO: capture the unsubscribe and call it here.
 }
 
 // ---------------------------------------------------------------------------

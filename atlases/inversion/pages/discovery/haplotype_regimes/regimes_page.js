@@ -153,8 +153,18 @@ export function initRegimesPage(state, args) {
   // Header bar (focal-voter readout + mode buttons)
   _renderHeader(state);
 
-  // Keyboard nav: drives all four panels (or just chrom if genome disabled)
-  _installPageKeyboardNav(state);
+  // Keyboard nav: drives all four panels (or just chrom if genome disabled).
+  // 2026-05-20: if a previous initRegimesPage call left a teardown closure
+  // on state, call it FIRST so we don't stack listeners. _afterPipelineRun
+  // calls initRegimesPage on every pipeline re-run; without this guard each
+  // re-run installs another document-level keydown handler and the arrow
+  // keys would advance the focal seed N times per press.
+  if (typeof state._regimesTeardownKeyboard === 'function') {
+    try { state._regimesTeardownKeyboard(); }
+    catch (_) {}
+  }
+  state._regimesTeardownKeyboard = _installPageKeyboardNav(state);
+  return state._regimesTeardownKeyboard;
 }
 
 // Hide the genome panel containers if they exist. Tolerant of absence

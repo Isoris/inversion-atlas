@@ -1901,6 +1901,33 @@ html[data-theme="light"] .cli-subband[data-verdict="CROSS_CUTTING"] { color: #b9
                      border-bottom: 1px solid var(--rule); }
 #popstats .ps-toolbar .label { font-family: var(--mono); font-size: 11px;
                             color: var(--ink-dim); margin-right: 4px; }
+/* Live-fetch status strip — populated by popstats.js _setLiveStatus().
+   Pushed to the right of the chip row via margin-left:auto. Color-coded by
+   data-state: idle/skipped = dim, fetching = accent, served = good,
+   failed = bad. Empty until the live fetch attempts (no candidate → idle). */
+#popstats .ps-live-status {
+  margin-left: auto;
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--ink-dimmer);
+  padding: 2px 8px;
+  border: 1px solid var(--rule); border-radius: 2px;
+  background: var(--panel-2);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: background 100ms, color 100ms, border-color 100ms;
+}
+#popstats .ps-live-status:empty { display: none; }
+#popstats .ps-live-status:hover { background: var(--panel-3); }
+#popstats .ps-live-status[data-state="idle"]    { color: var(--ink-dimmer); }
+#popstats .ps-live-status[data-state="skipped"] { color: var(--ink-dim); border-color: var(--ink-dimmer); }
+#popstats .ps-live-status[data-state="fetching"]{
+  color: var(--accent); border-color: var(--accent);
+  cursor: progress;
+}
+#popstats .ps-live-status[data-state="served"]  { color: var(--good, #3cc08a); border-color: var(--good, #3cc08a); }
+#popstats .ps-live-status[data-state="failed"]  { color: var(--bad, #e0555c); border-color: var(--bad, #e0555c); }
 #popstats .ps-chip { background: var(--panel-2); border: 1px solid var(--rule);
                   color: var(--ink); padding: 4px 10px; border-radius: 12px;
                   font-family: var(--mono); font-size: 11px; cursor: pointer;

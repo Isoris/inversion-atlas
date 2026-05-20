@@ -163,6 +163,11 @@ export function filterCatalogueRows(rows, state) {
     ? state.catFilter.trim().toLowerCase() : '';
   const verdict = (state && typeof state.catVerdictFilter === 'string')
     ? state.catVerdictFilter : '';
+  // 2026-05-20: source filter — narrows the catalogue to candidates
+  // tagged with one provenance source (e.g. only V·local auto-merge,
+  // only manual lock_promote). Empty string = no filter.
+  const sourceF = (state && typeof state.catSourceFilter === 'string')
+    ? state.catSourceFilter : '';
   const viewMode = (state && typeof state.catViewMode === 'string')
     ? state.catViewMode : 'l2_raw';
   const favs = (state && state.catFavorites instanceof Set)
@@ -175,8 +180,9 @@ export function filterCatalogueRows(rows, state) {
       if (!favs || !favs.has(r.id)) continue;
     }
     if (verdict && r.verdict !== verdict) continue;
+    if (sourceF && r.source !== sourceF) continue;
     if (filter) {
-      const hay = [r.id, r.chr, r.verdict, r.parent_l1]
+      const hay = [r.id, r.chr, r.verdict, r.parent_l1, r.source]
         .map(s => (s == null ? '' : String(s).toLowerCase()))
         .join('\t');
       if (!hay.includes(filter)) continue;
@@ -569,6 +575,7 @@ function _ensureCatalogueState(state) {
   if (!(state.catSelection instanceof Set)) state.catSelection = new Set();
   if (typeof state.catFilter !== 'string')        state.catFilter = '';
   if (typeof state.catVerdictFilter !== 'string') state.catVerdictFilter = '';
+  if (typeof state.catSourceFilter !== 'string')  state.catSourceFilter = '';
   if (typeof state.catViewMode !== 'string')      state.catViewMode = 'l2_raw';
   if (typeof state.catDispMode !== 'string')      state.catDispMode = 'detailed';
   if (typeof state.catSortKey !== 'string')       state.catSortKey = 'id';
@@ -790,6 +797,7 @@ function _canListen(t) {
 
 let _filterInputHandler   = null;
 let _verdictChangeHandler = null;
+let _sourceChangeHandler  = null;
 let _headClickHandler     = null;
 let _bodyClickHandler     = null;
 let _selectAllHandler     = null;
@@ -833,6 +841,7 @@ export function wireCatalogueToolbar(state, opts) {
 
   const filterIn  = document.getElementById('catFilter');
   const verdictIn = document.getElementById('catVerdictFilter');
+  const sourceIn  = document.getElementById('catSourceFilter');
   const head      = document.getElementById('catHead');
   const body      = document.getElementById('catBody');
   const selectAll = document.getElementById('catSelectAll');
@@ -860,6 +869,11 @@ export function wireCatalogueToolbar(state, opts) {
   _verdictChangeHandler = (evt) => {
     if (!state) return;
     state.catVerdictFilter = (evt && evt.target && evt.target.value) || '';
+    refresh();
+  };
+  _sourceChangeHandler = (evt) => {
+    if (!state) return;
+    state.catSourceFilter = (evt && evt.target && evt.target.value) || '';
     refresh();
   };
   _headClickHandler = (evt) => {
@@ -978,6 +992,8 @@ export function wireCatalogueToolbar(state, opts) {
 
   if (_canListen(filterIn))  filterIn.addEventListener('input',  _filterInputHandler);
   if (_canListen(verdictIn)) verdictIn.addEventListener('change', _verdictChangeHandler);
+  if (_canListen(sourceIn))  sourceIn.addEventListener('change',  _sourceChangeHandler);
+  if (sourceIn && state.catSourceFilter) sourceIn.value = state.catSourceFilter;
   if (_canListen(head))      head.addEventListener('click',      _headClickHandler);
   if (_canListen(body))      body.addEventListener('click',      _bodyClickHandler);
   if (_canListen(selectAll)) selectAll.addEventListener('click', _selectAllHandler);
@@ -1001,6 +1017,7 @@ export function teardownCatalogueToolbar() {
   const pairs = [
     ['catFilter',        'input',  '_filterInputHandler'],
     ['catVerdictFilter', 'change', '_verdictChangeHandler'],
+    ['catSourceFilter',  'change', '_sourceChangeHandler'],
     ['catHead',          'click',  '_headClickHandler'],
     ['catBody',          'click',  '_bodyClickHandler'],
     ['catSelectAll',     'click',  '_selectAllHandler'],
@@ -1018,7 +1035,8 @@ export function teardownCatalogueToolbar() {
     ['catDiamondStrict2',  'click', '_diamondStrict2Handler'],
   ];
   const handlers = {
-    _filterInputHandler,   _verdictChangeHandler, _headClickHandler, _bodyClickHandler,
+    _filterInputHandler,   _verdictChangeHandler, _sourceChangeHandler,
+    _headClickHandler, _bodyClickHandler,
     _selectAllHandler,     _clearSelHandler,      _viewFavHandler,   _viewL2Handler,
     _dispSimpleHandler,    _dispDetailedHandler,
     _exportTSVHandler,     _exportMDHandler,      _exportJSONHandler,
@@ -1031,7 +1049,8 @@ export function teardownCatalogueToolbar() {
     const el = document.getElementById(id);
     if (_canListen(el)) el.removeEventListener(evt, h);
   }
-  _filterInputHandler = _verdictChangeHandler = _headClickHandler = _bodyClickHandler = null;
+  _filterInputHandler = _verdictChangeHandler = _sourceChangeHandler = null;
+  _headClickHandler = _bodyClickHandler = null;
   _selectAllHandler   = _clearSelHandler      = _viewFavHandler   = _viewL2Handler = null;
   _dispSimpleHandler  = _dispDetailedHandler  = null;
   _exportTSVHandler   = _exportMDHandler      = _exportJSONHandler = null;

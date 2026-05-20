@@ -1308,13 +1308,36 @@
               <button data-mode-compact="ancestry"
                       style="font-size: 10px; padding: 3px 6px;">ancestry</button>
               <button data-mode-compact="manual"
-                      title="Manually-curated groups (set in 'Manual groups' section of the compact panel)"
+                      title="Manually-curated groups (see 'Manual groups' section below)"
                       style="font-size: 10px; padding: 3px 6px;">manual</button>
               <button data-mode-compact="residual"
                       title="Diagnostic mode. Recolors PCA + L3 strip by per-fish residual_z from band centroid. Cool blue = clean homozygote; red = suspicious carrier (≥2.5σ)."
                       style="font-size: 10px; padding: 3px 6px;">⚡ residual</button>
               <button data-mode-compact="none"
                       style="font-size: 10px; padding: 3px 6px;">none</button>
+            </div>
+          </div>
+          <!-- 2026-05-20: manual groups section. Relocated here from
+               the compact tracked-samples panel below the PCA — same
+               IDs as before (#manualGroupsListCompact / #mgAddBtnCompact
+               / #mgClearAllBtnCompact) so the renderer dual-writes
+               into this element without any JS change. -->
+          <div style="border-top: 1px solid var(--rule); padding-top: 10px;">
+            <div style="font-size: 10px; color: var(--ink-dim); margin-bottom: 6px;"
+                 title="Manually-curated sample groups — overrides K-means coloring when 'manual' color mode is active.">
+              manual groups
+            </div>
+            <div id="manualGroupsListCompact"
+                 style="display: flex; flex-direction: column; gap: 3px;
+                        font-size: 10.5px; max-height: 120px; overflow-y: auto;
+                        margin-bottom: 6px;"></div>
+            <div style="display: flex; gap: 4px;">
+              <button id="mgAddBtnCompact"
+                      title="Create a new manual group from the current tracked samples"
+                      style="font-size: 10px; padding: 3px 8px; flex: 1 1 auto;">+ from tracked</button>
+              <button id="mgClearAllBtnCompact"
+                      title="Delete all manual groups (cannot be undone)"
+                      style="font-size: 10px; padding: 3px 8px; flex: 0 0 auto; color: var(--bad);">×</button>
             </div>
           </div>
         </div>
@@ -1547,24 +1570,15 @@
           <div id="trackedListCompact" style="font-size: 10px; max-height: 140px; overflow-y: auto;"></div>
         </div>
 
-        <!-- v4 turn 73c: manual groups section. Renderer dual-writes into
-             #manualGroupsListCompact when present. -->
-        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;">
-          <div style="font-size: 10px; color: var(--ink-dim); margin-bottom: 3px;"
-               title="Manually-curated sample groups — overrides K-means coloring when 'manual' color mode is active.">
-            manual groups
-          </div>
-          <div id="manualGroupsListCompact"
-               style="display: flex; flex-direction: column; gap: 3px; font-size: 10px; max-height: 100px; overflow-y: auto;"></div>
-          <div style="display: flex; gap: 3px; margin-top: 4px;">
-            <button id="mgAddBtnCompact"
-                    title="Create a new manual group from the current tracked samples"
-                    style="font-size: 9.5px; padding: 2px 4px; flex: 1 1 auto;">+ from tracked</button>
-            <button id="mgClearAllBtnCompact"
-                    title="Delete all manual groups (cannot be undone)"
-                    style="font-size: 9.5px; padding: 2px 4px; flex: 0 0 auto; color: var(--bad);">×</button>
-          </div>
-        </div>
+        <!-- 2026-05-20: manual groups section relocated to
+             #tPanelOverlay (the ▾ tracked-samples settings popup),
+             same pattern as the color-mode picker move above. Manual
+             groups are a settings-like surface (curated groups +
+             create/clear actions), not main tracked-samples controls.
+             Inline placement was pushing the compact panel to vertical
+             scroll. Same IDs preserved (#manualGroupsListCompact,
+             #mgAddBtnCompact, #mgClearAllBtnCompact) so the renderer
+             in sidebar.js + manual_groups.js still finds them. -->
       </div>
     </div>
 
