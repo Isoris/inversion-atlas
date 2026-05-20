@@ -80,10 +80,11 @@ Current contents:
 
 ## SPECs **referenced in shipping code but missing from disk**
 
-Detail at `_handoff_docs/SPECS_AUDIT.md`. Summary:
-- 9 SPEC names cited in legacy/Inversion_atlas.html, current pages, or producer code that have no on-disk file (e.g. `SPEC_g_panel_unified_groups`, `SPEC_lines_panel_candidate_bands`, `SPEC_sv_evidence_page`, `SPEC_DEFERRED`)
-- Likely lost when only `specs_todo/` was copied across from the legacy tarball (`Atlas/specs_done/` and `Atlas/specs_new_turn131/` were not imported)
-- Action: either author one-page SPECs from the shipped code (mark as `specs_done/`) or retire the references
+**RESOLVED 2026-05-20.** Detail at `_handoff_docs/SPECS_AUDIT.md` (§"STATUS UPDATE 2026-05-20"). Summary:
+- The 8 SPECs missing as of the original audit (2026-05-15) were authored from shipped code → `specs_done/SPEC_<name>.md`. See `SPECS_AUDIT.md` for the full status table.
+- The 9th — `SPEC_inversion_age_atlas_surface.md` (turn-117 parent of the `_AMENDMENT`) — was authored 2026-05-20 from `shared/mgl_inversion_divergence.js` + `busco_4d_age.js` + `age_model_suggester.js` + `pages/evolution/age_divergence.{html,js}` → `specs_done/SPEC_inversion_age_atlas_surface.md`.
+- `SPEC_DEFERRED.md` is **retired** as a target — it was a register of deferred decisions, now expressed inline via per-slice `Status: deferred` annotations on the individual SPECs (see e.g. `SPEC_inversion_age_atlas_surface.md` §3).
+- `HANDOFF_BATCH_3.md` / `HANDOFF_BATCH_5.md` references are **retired by design** — phantom handoffs that were never authored; the citations are corrective notes flagging mislabels (canonical record is the on-disk `pages/<stage>/BATCH_*_NOTES.md` files).
 
 ## Working-doc folders (NOT specs — handoffs, audits, plans)
 

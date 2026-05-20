@@ -792,6 +792,49 @@ function _renderSourceOverlap(state) {
 }
 
 // =====================================================================
+// Source-filter option counts (2026-05-20)
+// =====================================================================
+// Updates the labels of every #catSourceFilter <option> to include the
+// per-source candidate count: "V · local" → "V · local (8)". Hides
+// options for sources that have 0 matching candidates (so the dropdown
+// doesn't surface obsolete legacy sources). The "all sources" option
+// always shows the unfiltered count.
+function _refreshSourceFilterCounts(state) {
+  if (typeof document === 'undefined') return;
+  const sel = document.getElementById('catSourceFilter');
+  if (!sel) return;
+  const list = (state && Array.isArray(state.candidateList))
+    ? state.candidateList : [];
+  // Tally per-source counts.
+  const counts = new Map();
+  for (const c of list) {
+    if (!c) continue;
+    const key = (typeof c.source === 'string' && c.source) ? c.source : '';
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  // Walk every <option>; preserve its original (count-free) label in
+  // dataset.baseLabel so re-renders don't accumulate "(N) (N) (N)".
+  for (const opt of sel.options) {
+    if (!opt.dataset.baseLabel) {
+      opt.dataset.baseLabel = opt.textContent;
+    }
+    const base = opt.dataset.baseLabel;
+    if (!opt.value) {
+      // "all sources" — show total
+      opt.textContent = list.length > 0 ? `${base} (${list.length})` : base;
+      opt.hidden = false;
+      continue;
+    }
+    const n = counts.get(opt.value) || 0;
+    opt.textContent = n > 0 ? `${base} (${n})` : base;
+    // Hide zero-count options unless they're currently selected (so
+    // the user can still un-pick them).
+    opt.hidden = (n === 0) && (sel.value !== opt.value);
+  }
+}
+
+// =====================================================================
 // Event wiring
 // =====================================================================
 

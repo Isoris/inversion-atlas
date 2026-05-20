@@ -776,6 +776,11 @@ function _afterPipelineRun(root, state, result, opts) {
   try { _renderSeedsStrip(root, state); }
   catch (e) { console.warn('_renderSeedsStrip:', e); }
   _wireSeedStripFocalSync(root, state);
+
+  // Push the initial focal seed's regime partition into shared.activeGroups
+  // so popstats (and any other consumer of the groups slot) sees the
+  // partition immediately, without waiting for a promote action.
+  try { _pushFocalSeedGroups(state); } catch (_) {}
   // 2026-05-20: L3 adjacent-pair Cramér mini-table — visible only in
   // short-range mode. Computes V between every consecutive L2 pair
   // on the active chrom, then paints a table row per pair with a
@@ -1215,6 +1220,56 @@ function _qualityDotColor(q) {
   return '#e0555c';
 }
 
+/**
+ * Push the focal seed's per-band partition into atlasState.shared.activeGroups.
+ *
+ * The Stage 3 locus carries `per_band_samples` — `Array<Set<sample_idx>>` —
+ * which is the canonical regime-band partition. We convert it to a flat
+ * Int8Array of band-index-per-sample (same shape candidate.locked_labels
+ * uses) and feed it through `regimeGroupsFromBands` so popstats and any
+ * other consumer of `shared.activeGroups` picks up the partition without
+ * needing to know about the regimes-pipeline internals.
+ *
+ * Fires on three entry points:
+ *   - _afterPipelineRun (initial seed becomes focal after pipeline finishes)
+ *   - _focusSeedFromChip (user clicks a different seed chip)
+ *   - _wireSeedStripFocalSync (arrow-key cycle through seeds)
+ *
+ * No-op when nothing meaningful to push (no atlasState, no result, no
+ * focal index, no per_band_samples on the locus).
+ */
+function _pushFocalSeedGroups(state) {
+  const atlasState = state && state._atlasState;
+  if (!atlasState || typeof atlasState.setActiveGroups !== 'function') return;
+  const rp = state.regimesPanel;
+  if (!rp || !rp.focal || !Number.isFinite(rp.focal.seed_index)) return;
+  const focalIdx = rp.focal.seed_index | 0;
+  const loci = state._regimesResult && state._regimesResult.stage3
+            && state._regimesResult.stage3.loci;
+  if (!Array.isArray(loci) || focalIdx < 0 || focalIdx >= loci.length) return;
+  const locus = loci[focalIdx];
+  if (!locus || !Array.isArray(locus.per_band_samples)) return;
+  const data = state.data;
+  if (!data || !Array.isArray(data.samples) || !Number.isFinite(data.n_samples)) return;
+
+  // Flatten per_band_samples (Array<Set<sample_idx>>) → Int8Array per sample.
+  // Same conversion the promote path uses (see _promoteFocalSeed); kept inline
+  // here so this helper has no side effects on the promote module.
+  const nS = data.n_samples | 0;
+  const bandPerSample = new Array(nS).fill(-1);
+  for (let b = 0; b < locus.per_band_samples.length; b++) {
+    const set = locus.per_band_samples[b];
+    if (!set || typeof set.forEach !== 'function') continue;
+    set.forEach((si) => { if (si >= 0 && si < nS) bandPerSample[si] = b; });
+  }
+
+  const derived = regimeGroupsFromBands(bandPerSample, data, { labelStyle: 'server' });
+  if (derived && derived.groups) {
+    try { atlasState.setActiveGroups(derived.groups); }
+    catch (e) { console.warn('haplotype_regimes: setActiveGroups threw —', e); }
+  }
+}
+
 function _focusSeedFromChip(state, idx) {
   if (!state || !state.regimesPanel || !state.regimesPanel.focal) return;
   const loci = state._regimesResult && state._regimesResult.stage3
@@ -1285,6 +1340,8 @@ function _wireSeedStripFocalSync(root, state) {
         try { target.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
         catch (_) {}
       }
+      // Push the new focal seed's regime partition to shared.activeGroups.
+      try { _pushFocalSeedGroups(state); } catch (_) {}
     });
   });
 }
