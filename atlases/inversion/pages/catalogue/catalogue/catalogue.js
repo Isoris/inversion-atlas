@@ -616,10 +616,166 @@ export function renderCatalogue(state) {
       empty.style.display = 'none';
     }
   }
+  // 2026-05-20: refresh the compare-modes overlap strip on every
+  // catalogue re-render so it tracks list mutations + auto-merge
+  // promotions in real time.
+  try { _renderSourceOverlap(state); } catch (e) {
+    if (typeof console !== 'undefined') console.warn('[_renderSourceOverlap]', e);
+  }
   if (selInfo) {
     const nSel = state.catSelection ? state.catSelection.size : 0;
     selInfo.textContent = nSel + ' selected of ' + sorted.length;
   }
+}
+
+// =====================================================================
+// Compare-modes overlap strip (SPEC_cramers_v_seed_merge.md Phase 2)
+// =====================================================================
+// Reads state.candidateList, partitions by the auto / semi-auto modes
+// shipped on the haplotype_regimes + local_pca_dosage pages
+// (`l3_pair_merge` from the L3 adjacent-pair Cramér mini-table,
+// `auto_cramers_v_local` from the ↻ auto-merge V Mode 1 button,
+// `auto_cramers_v_macrostripe` from the ↻ auto-merge V macro Mode 2
+// button), and computes pairwise + triple genomic overlap. Two
+// candidates "agree" when same chrom + bp range intersects
+// (max(start) <= min(end)). Renders a single-line summary strip;
+// hidden when no candidates carry any of the tracked sources.
+//
+// 2026-05-20 (Quentin feedback): the original 3-set was
+// (auto_l2_sweep, auto_cramers_v_local, auto_cramers_v_macrostripe)
+// per the SPEC, but the legacy inheritance L2-sweep is no longer the
+// workflow — every promote path now flows through the regimes-page
+// pipeline. Replaced auto_l2_sweep with l3_pair_merge so the audit
+// strip compares the three modes the user actually runs today.
+//
+// Output shape per source bucket A:
+//   |A|      = number of candidates tagged with source A
+//   A∩B      = candidates in A with ≥1 overlapping candidate in B
+//   A∩B∩C    = candidates in A with overlap in both B and C
+//   A-only   = candidates in A with no overlap in B nor C
+//
+// (Counts are computed from each source's perspective. By symmetry,
+//  A∩B == B∩A is not guaranteed because two candidates can map 1:N —
+//  but the agreement read is the right one for the audit question.)
+// =====================================================================
+
+const _AUTO_SOURCES = [
+  { key: 'l3_pair_merge',              label: 'L3-pair',   short: 'L3p',
+    chip: 'src-chip-l3_pair_merge' },
+  { key: 'auto_cramers_v_local',       label: 'V · local', short: 'Vloc',
+    chip: 'src-chip-auto_cramers_v_local' },
+  { key: 'auto_cramers_v_macrostripe', label: 'V · macro', short: 'Vmac',
+    chip: 'src-chip-auto_cramers_v_macrostripe' },
+];
+
+function _overlapsBp(a, b) {
+  if (!a || !b) return false;
+  const sa = a.start_bp | 0, ea = a.end_bp | 0;
+  const sb = b.start_bp | 0, eb = b.end_bp | 0;
+  if (!Number.isFinite(sa) || !Number.isFinite(ea)) return false;
+  if (!Number.isFinite(sb) || !Number.isFinite(eb)) return false;
+  if (a.chrom && b.chrom && a.chrom !== b.chrom) return false;
+  return Math.max(sa, sb) <= Math.min(ea, eb);
+}
+
+function _renderSourceOverlap(state) {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById('catSourceOverlap');
+  if (!el) return;
+  const list = (state && Array.isArray(state.candidateList))
+    ? state.candidateList : [];
+  // Partition by source.
+  const buckets = _AUTO_SOURCES.map(s => ({
+    src: s, cands: list.filter(c => c && c.source === s.key),
+  }));
+  const totalAuto = buckets.reduce((acc, b) => acc + b.cands.length, 0);
+  if (totalAuto === 0) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  el.style.display = 'flex';
+
+  // Per-bucket overlap counts.
+  const stats = buckets.map((bk, bi) => {
+    const others = buckets.filter((_, j) => j !== bi);
+    let nABC = 0;          // overlap with BOTH other sources
+    let nOnly = 0;         // overlap with neither other source
+    const pairwise = others.map(() => 0);
+    for (const c of bk.cands) {
+      const hits = others.map(ob =>
+        ob.cands.some(d => d.id !== c.id && _overlapsBp(c, d)));
+      hits.forEach((h, hi) => { if (h) pairwise[hi]++; });
+      if (hits.every(Boolean)) nABC++;
+      else if (hits.every(h => !h)) nOnly++;
+    }
+    return { src: bk.src, n: bk.cands.length, pairwise, others,
+             nABC, nOnly };
+  });
+
+  // Build the HTML.
+  const parts = [];
+  parts.push('<span style="color: var(--ink); font-weight: 500;">compare modes:</span>');
+  for (const st of stats) {
+    const colour = st.src.chip;
+    parts.push(
+      '<span class="src-chip ' + colour + '" title="Candidates auto-promoted as ' +
+      _escape(st.src.label) + ' (source=' + _escape(st.src.key) + ').">' +
+      _escape(st.src.label) + ': <b>' + st.n + '</b>' +
+      '</span>'
+    );
+  }
+  // Pairwise: A∩B (count from A's perspective + count from B's perspective
+  // — we show whichever is non-zero. Two candidates can map 1:N so they
+  // can differ; the audit read is "at least N regions from A intersect B").
+  const pairLabels = [
+    [0, 1, 'L2 ∩ Vloc'],
+    [0, 2, 'L2 ∩ Vmac'],
+    [1, 2, 'Vloc ∩ Vmac'],
+  ];
+  for (const [ai, bi, lbl] of pairLabels) {
+    const A = stats[ai], B = stats[bi];
+    // A's "overlap with bucket index" — A.others matches buckets with index != ai,
+    // in original order. We need to find the slot whose .src.key matches B's key.
+    const aIdxInOthers = A.others.findIndex(o => o.src.key === B.src.key);
+    const bIdxInOthers = B.others.findIndex(o => o.src.key === A.src.key);
+    const nA = aIdxInOthers >= 0 ? A.pairwise[aIdxInOthers] : 0;
+    const nB = bIdxInOthers >= 0 ? B.pairwise[bIdxInOthers] : 0;
+    const n  = Math.max(nA, nB);
+    if (n > 0) {
+      parts.push(
+        '<span style="padding: 1px 8px; border-radius: 3px; ' +
+        'background: rgba(120,140,170,0.10); border: 1px solid var(--rule); ' +
+        'color: var(--ink);" title="Candidates from each side that overlap a candidate from the other (max of both directions).">' +
+        _escape(lbl) + ': <b>' + n + '</b></span>'
+      );
+    }
+  }
+  // Triple intersection.
+  const tripleN = stats[0].nABC;
+  if (tripleN > 0) {
+    parts.push(
+      '<span style="padding: 1px 8px; border-radius: 3px; ' +
+      'background: rgba(60,192,138,0.15); border: 1px solid var(--good); ' +
+      'color: var(--good); font-weight: 600;" title="Regions where all three auto-promote modes agree (each has a candidate that overlaps a candidate from each of the other two).">' +
+      'all 3 agree: <b>' + tripleN + '</b></span>'
+    );
+  }
+  // Per-source "only" counts.
+  const onlyParts = [];
+  for (const st of stats) {
+    if (st.nOnly > 0) {
+      onlyParts.push(_escape(st.src.short) + '-only: <b>' + st.nOnly + '</b>');
+    }
+  }
+  if (onlyParts.length) {
+    parts.push(
+      '<span style="color: var(--ink-dimmer); margin-left: 6px;" ' +
+      'title="Candidates each mode caught that no other mode caught (disagreement regions).">' +
+      onlyParts.join(' · ') + '</span>'
+    );
+  }
+  el.innerHTML = parts.join('');
 }
 
 // =====================================================================

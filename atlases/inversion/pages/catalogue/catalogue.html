@@ -92,6 +92,24 @@
       </span>
       <span class="sel-info" id="catSelInfo" title="Live counts of selected rows / visible rows / total rows in the catalogue.">0 selected of 0</span>
     </div>
+    <!-- 2026-05-20 (SPEC_cramers_v_seed_merge.md Phase 2 deliverable):
+         "compare modes" overlap strip. Counts candidates from each
+         auto-promote source (L2-sweep, Cramér V local, Cramér V
+         macrostripe) plus pairwise / triple genomic-overlap. Lets the
+         user see at a glance which regions all three modes agree on
+         vs. which are caught by only one mode. Hidden when no
+         candidates carry any of those three sources. Populated by
+         _renderSourceOverlap(state) in catalogue/catalogue.js. -->
+    <div id="catSourceOverlap" style="display: none; margin: 0 0 8px 0;
+                                       padding: 6px 10px;
+                                       background: var(--panel-2);
+                                       border: 1px solid var(--rule);
+                                       border-radius: 4px;
+                                       font-family: var(--mono); font-size: 11px;
+                                       color: var(--ink-dim);
+                                       display: flex; align-items: center;
+                                       gap: 10px; flex-wrap: wrap;"
+         title="Compare-modes overlap — how do the 3 auto-promote sources agree on regions? Two candidates 'agree' if they're on the same chromosome and their bp ranges overlap."></div>
     <table class="cat" id="catTable">
       <thead><tr id="catHead"></tr></thead>
       <tbody id="catBody"></tbody>

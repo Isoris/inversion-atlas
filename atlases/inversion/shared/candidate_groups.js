@@ -1,28 +1,32 @@
 // shared/candidate_groups.js
 // =============================================================================
-// Derive `atlasState.shared.activeGroups` from a candidate's locked K-means
-// labels. The output dict is the canonical shape every per-group analysis
-// (popstats live server, ancestry, breeding panel) consumes:
+// Derive `atlasState.shared.activeGroups` from a promoted candidate's locked
+// label vector. The output dict is the canonical shape every per-group
+// analysis (popstats live server, ancestry, breeding panel) consumes:
 //
 //   { 'H1/H1': ['CGA_0023', 'CGA_0041', …],
 //     'H1/H2': [...],
 //     'H2/H2': [...] }
 //
-// Why this lives here, not on each consumer page:
-//   - candidate-mode and regimes-mode both partition samples; the consumers
-//     (popstats / fish_ancestry_scroller / marker_readiness / …) shouldn't
-//     each reinvent the partition-derivation.
-//   - The popstats server's POST /api/popstats/groupwise wants
-//     { groups: { name: [sample_ids] } } directly; this helper builds that
-//     shape from atlas-side state.
+// Where `candidate.locked_labels` comes from
+// ------------------------------------------
+// A candidate enters the atlas via PROMOTION from one of:
+//   - the catalogue page (browse + promote interval → candidate)
+//   - the haplotype_regimes page (promote a long-range regime band)
+//   - the local_pca_dosage page (lock K-means colors → promote)
+// Each producer attaches a `locked_labels` Int8Array (length = n_samples)
+// to the candidate. The labels are *what they are* — this helper doesn't
+// care how the partition was derived; it just maps label indices to
+// sample-id buckets. The same code path serves K-means-derived candidates
+// and regime-band-derived candidates identically.
 //
-// Sample id convention: data.samples[i].cga is the canonical id used by the
-// VCF / BAM lists + popstats server. We fall back to .ind / .sample_id when
-// cga is absent (e.g. legacy precomp).
+// Sample id convention: data.samples[i].cga is the canonical id used by
+// the VCF / BAM lists + popstats server. We fall back to .ind / .sample_id
+// when cga is absent (e.g. legacy precomp).
 //
 // Server group-size floor: popstats_server defaults to min_group_n=10 (see
 // atlas_server.py). Groups below the floor would be rejected; we still
-// emit them but flag with the n_per_group counts so callers can decide.
+// emit them and the popstats page checks n_per_group before firing.
 // =============================================================================
 
 import {

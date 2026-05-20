@@ -34,6 +34,8 @@
 import { _pageState, _setActiveState } from './popstats/_state.js';
 import { renderPopstatsPage } from './popstats/_render.js';
 import { renderCandidateNavInline } from '../../shared/candidate_nav.js';
+import { candidateGroupsFromLabels } from '../../shared/candidate_groups.js';
+import { fetchPopstatsGroupwise, stitchTracksFromGroupwise } from './popstats/_live.js';
 
 export async function mount(root, atlasState, registry) {
   const chrom = atlasState.shared && atlasState.shared.activeChrom;
@@ -59,8 +61,85 @@ export async function mount(root, atlasState, registry) {
   _setActiveState(pageState);
   if (atlasState.inversion) atlasState.inversion._page6State = pageState;
 
+  // Derive shared.activeGroups from the active candidate's locked label
+  // vector. The candidate was promoted from the catalogue or the
+  // haplotype_regimes page (or local_pca_dosage's K-means lock); whichever
+  // producer it came from, the labels live on the candidate by the time
+  // popstats sees it. Pushed to the cross-page slot so future consumers
+  // (fish_ancestry_scroller, marker_readiness, …) pick up the same
+  // partition. None of this overwrites a manually-set groups dict — only
+  // fills it when null.
+  const derived = candidateGroupsFromLabels(candidate, data, { labelStyle: 'server' });
+  if (derived && derived.groups) {
+    if (!atlasState.shared.activeGroups
+        && typeof atlasState.setActiveGroups === 'function') {
+      atlasState.setActiveGroups(derived.groups);
+    }
+  }
+
   _mountCandidateNav(root, atlasState, registry);
   renderPopstatsPage({ root, data, candidate, cur });
+
+  // Fire the live POST /api/popstats/groupwise in the background. On
+  // success, the per-metric columns get stitched into multi-series tracks
+  // on `data.tracks.theta_invgt` / `fst_pairs` / `fst_hom1_hom2` / `dxy_pairs`
+  // / etc., then we re-render. Single in-flight per (chrom, groups) signature
+  // so navigating back to the page doesn't re-fire if the answer is already
+  // in pageState._liveTracks.
+  _maybeFetchLivePopstats(root, atlasState, pageState).catch(err =>
+    console.warn('popstats: live-groupwise fetch failed —', err));
+}
+
+async function _maybeFetchLivePopstats(root, atlasState, pageState) {
+  const sh = atlasState.shared || {};
+  const groups = sh.activeGroups;
+  if (!groups || Object.keys(groups).length < 2) return;
+
+  // Server requires min_group_n=10 per group by default; skip if any group is
+  // too small (the server would 400 anyway). Caller can override the floor
+  // via a future popstats-config slot.
+  const minN = 10;
+  for (const g of Object.keys(groups)) {
+    if (!Array.isArray(groups[g]) || groups[g].length < minN) return;
+  }
+
+  // Dedup: a previous mount with the same chrom + groups signature stashed
+  // the response on pageState._liveTracks. Skip the re-fetch.
+  const sig = `${pageState.chrom}|${_groupsSig(groups)}`;
+  if (pageState._liveSig === sig) return;
+  pageState._liveSig = sig;
+
+  let envelope;
+  try {
+    envelope = await fetchPopstatsGroupwise({
+      serverBaseUrl: sh.serverBaseUrl || '',
+      chrom:         pageState.chrom,
+      groups,
+    });
+  } catch (e) {
+    console.warn('popstats: /api/popstats/groupwise →', e.message);
+    return;
+  }
+
+  // Splice the per-metric multi-series tracks into data.tracks. The
+  // existing auto-discover path in popstats/_tracks.js notices the new
+  // names and adopts the static placeholders (theta_invgt / fst_hom1_hom2)
+  // so their chips light up + canvases paint as multi-line.
+  const stitched = stitchTracksFromGroupwise(envelope);
+  if (Object.keys(stitched).length === 0) return;
+  pageState.data.tracks = Object.assign({}, pageState.data.tracks || {}, stitched);
+  pageState._liveTracks = stitched;
+
+  // Re-render with the enriched data.
+  renderPopstatsPage({
+    root, data: pageState.data, candidate: pageState.candidate, cur: pageState.cur,
+  });
+}
+
+function _groupsSig(groups) {
+  return Object.keys(groups).sort()
+    .map(k => `${k}=${(groups[k] || []).length}`)
+    .join(',');
 }
 
 /**
