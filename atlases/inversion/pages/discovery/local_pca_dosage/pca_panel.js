@@ -698,10 +698,137 @@ export function drawPCA(state) {
       && state.selectionGroup.ids.length && _pcaScreenXY) {
     _drawSelectionHalo(ctx, state.selectionGroup.ids, _pcaScreenXY);
   }
+  // 2026-05-20: K-cluster colour legend. User: "can we get a scale or
+  // smth to know a bit our colors correspond to what in the tracked
+  // samples pca". Renders a small chip row at the top-right of the
+  // scatter when kmeans labels are available, mirroring the palette
+  // used by the tracked-dot halos at line ~666 so chips + halos read
+  // the same. Cheap: one chip per K, no per-sample loop.
+  // When colorMode='cluster' but groupLabels is null, render a short
+  // "why grey" hint instead — that case fires when the cursor is
+  // between L2 envelopes (state.windowToL2[cur] === -1), and the user
+  // otherwise has no clue why points dropped from coloured to grey.
+  try {
+    if (groupLabels) {
+      _drawKLegend(ctx, groupLabels, state, pad, plotW);
+    } else if (state.colorMode === 'cluster' && curL2 < 0) {
+      _drawNoClusterHint(ctx, pad, plotW);
+    }
+  } catch (e) { /* fail-soft */ }
   // turn 120: refresh the scree inset on every PCA draw. Cheap (pure SVG
   // string write to an absolutely-positioned div, no canvas, no layout).
   // The renderer handles the off/on toggle and the empty-state internally.
   try { _refreshScreeInset(); } catch (e) { /* fail-soft */ }
+}
+
+// 2026-05-20: K-cluster legend renderer. Paints a row of small chips at
+// the top-right of the scatter showing color → cluster mapping for the
+// current K. Uses the same palette as the tracked-dot halo so the user
+// can read the scatter without scrolling to the K-bar at the bottom.
+// Mode-aware labels: in kmeans mode shows "k1, k2, k3", in macrostripe
+// or h_system mode falls back to numeric indices.
+const _K_LEGEND_PALETTE = ['#4fa3ff', '#b8b8b8', '#f5a524',
+                           '#3cc08a', '#e0555c', '#b07cf7'];
+function _drawKLegend(ctx, groupLabels, state, pad, plotW) {
+  if (!groupLabels) return;
+  // Find K = max label + 1, clipped against the palette size.
+  let K = 0;
+  for (let i = 0; i < groupLabels.length; i++) {
+    const v = groupLabels[i];
+    if (Number.isFinite(v) && v + 1 > K) K = v + 1;
+  }
+  if (K < 1) return;
+  K = Math.min(K, _K_LEGEND_PALETTE.length);
+
+  // Count samples per cluster — surfaces the per-K population.
+  const counts = new Array(K).fill(0);
+  for (let i = 0; i < groupLabels.length; i++) {
+    const v = groupLabels[i];
+    if (Number.isFinite(v) && v >= 0 && v < K) counts[v]++;
+  }
+
+  // Layout: chips along a row inside the scatter's top-right corner,
+  // each chip = "● kN (count)". Drawn over the points with a panel
+  // background so the text stays readable on top of dense clusters.
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.textBaseline = 'middle';
+  const dotR = 4;
+  const padInside = 5;
+  const gap = 10;
+  const labels = [];
+  let totalW = 0;
+  for (let k = 0; k < K; k++) {
+    const text = `k${k + 1} (${counts[k]})`;
+    const tw = ctx.measureText(text).width;
+    labels.push({ text, tw, color: _K_LEGEND_PALETTE[k] });
+    totalW += dotR * 2 + 4 + tw + gap;
+  }
+  totalW -= gap;   // no trailing gap
+  const boxW = totalW + padInside * 2;
+  const boxH = 18;
+  // Right-anchored. Reserve room for the scree inset above the scatter
+  // (it's positioned via _positionScreeInsetSmart and varies; we just
+  // dodge the very top-right corner by parking under it).
+  const boxX = pad.l + plotW - boxW - 4;
+  const boxY = pad.t + 4;
+  ctx.save();
+  ctx.fillStyle = 'rgba(14, 17, 24, 0.78)';
+  ctx.strokeStyle = themeColor('rule');
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(boxX + 0.5, boxY + 0.5, boxW, boxH, 3);
+  } else {
+    ctx.rect(boxX + 0.5, boxY + 0.5, boxW, boxH);
+  }
+  ctx.fill();
+  ctx.stroke();
+  let cx = boxX + padInside + dotR;
+  const cy = boxY + boxH / 2;
+  for (const item of labels) {
+    ctx.fillStyle = item.color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = themeColor('ink');
+    ctx.textAlign = 'left';
+    ctx.fillText(item.text, cx + dotR + 4, cy);
+    cx += dotR * 2 + 4 + item.tw + gap;
+  }
+  ctx.restore();
+}
+
+// 2026-05-20: explanatory hint shown in the legend slot when colorMode
+// is 'cluster' but the cursor is outside any L2 envelope. Without this
+// the user sees grey dots with no explanation — the scatter falls back
+// to grey because there's nothing to colour by until the cursor enters
+// an L2.
+function _drawNoClusterHint(ctx, pad, plotW) {
+  const text = 'no cluster · cursor outside any L2 envelope';
+  ctx.save();
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.textBaseline = 'middle';
+  const tw = ctx.measureText(text).width;
+  const padInside = 8;
+  const boxW = tw + padInside * 2;
+  const boxH = 18;
+  const boxX = pad.l + plotW - boxW - 4;
+  const boxY = pad.t + 4;
+  ctx.fillStyle = 'rgba(14, 17, 24, 0.78)';
+  ctx.strokeStyle = themeColor('rule');
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(boxX + 0.5, boxY + 0.5, boxW, boxH, 3);
+  } else {
+    ctx.rect(boxX + 0.5, boxY + 0.5, boxW, boxH);
+  }
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = themeColor('ink-dim') || '#aaa';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, boxX + boxW / 2, boxY + boxH / 2);
+  ctx.restore();
 }
 
 // ---------------------------------------------------------------------------

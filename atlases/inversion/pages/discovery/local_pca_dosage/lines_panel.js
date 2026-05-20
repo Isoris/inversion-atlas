@@ -1287,6 +1287,21 @@ export function buildLinesPanel(state) {
         const dd = Math.abs(d.windows[i].center_mb - targetMb);
         if (dd < bestD) { bestD = dd; bestWin = i; }
       }
+      // 2026-05-20: opt-in click diagnostic. User reported "per-sample
+      // lines click doesn't work anymore". Most likely culprits: (1)
+      // bestWin === state.cur so setCur's same-cur guard returns
+      // silently; (2) lasso swallow flag stuck; (3) plotW <= 0 (panel
+      // collapsed). Toggle via window.__linesClickDbg = true.
+      if (typeof window !== 'undefined' && window.__linesClickDbg === true) {
+        console.log('[linesClick]', {
+          src: cv.dataset.linesSource,
+          x: Math.round(x), plotW: Math.round(plotW),
+          frac: frac.toFixed(3), targetMb: targetMb.toFixed(3),
+          bestWin, curBefore: state.cur,
+          lassoActive: !!state.linesLassoActive,
+          swallowFlag: !!cv.__lassoSwallowClick,
+        });
+      }
       setCur(state, bestWin);
     });
     // v4 turn 114d: cs-breakpoint hover-glow on this subpanel. Same toX
