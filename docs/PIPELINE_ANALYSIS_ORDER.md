@@ -1,353 +1,287 @@
 # Inversion pipeline — canonical analysis order
 
 **Status**: mapping doc (no code changes in this commit).
-**Authored** 2026-05-20 from a band_tracking/ + shared/ recon and the user's
-reconstructed-from-memory analysis order. The legacy
-`INVERSION_PIPELINE_METHOD_v2.md` is partly outdated; this doc supersedes
-it where they disagree.
+**Authored** 2026-05-20, **revised** 2026-05-20 after user feedback re-positioning `haplotype_regime.js` and re-organising around three execution-flow clusters.
+The legacy `INVERSION_PIPELINE_METHOD_v2.md` and the band_tracking/index.js header use a layer ordering; this doc uses an **execution-flow** ordering that matches what the haplotype_regimes page needs to call, in order.
 
-**Purpose**: single source of truth for which file does what, in what order,
-with what inputs/outputs. The next-turn wiring pass will use this to thread
-the haplotype_regimes page through the full pipeline instead of just the
-legacy `runBandingPipeline` V-walker (which is one entry path among several).
-
-**Total inventory**: 33 files in `atlases/inversion/shared/band_tracking/`
-plus 7 supporting primitives in `atlases/inversion/shared/`, plus 3 utilities
-in `atlases/inversion/shared/regime_annotation/`. 43 scripts.
+**Purpose**: single source of truth for which file does what, in what order, with what inputs/outputs. The next-turn wiring pass will use this to thread the haplotype_regimes page through the full pipeline instead of just the legacy `runBandingPipeline` V-walker (which is one entry path among several).
 
 ---
 
-## Pipeline shape (compressed)
+## Total inventory: 43 scripts
+
+- **33** in `atlases/inversion/shared/band_tracking/`
+- **5** L3 primitives in `atlases/inversion/shared/` (`contingency`, `hungarian`, `kmeans`, `per_l2_cluster`, `cramers_v_merge`)
+- **1** UI state in `atlases/inversion/shared/` (`regimes_registry`)
+- **3** annotation utilities in `atlases/inversion/shared/regime_annotation/`
+- **3** page-side renderers in `atlases/inversion/pages/discovery/haplotype_regimes/`
+
+Every band_tracking/ script is placed below. Three are flagged as legacy/diagnostic and explicitly NOT part of the live pipeline.
+
+---
+
+## Three execution-flow clusters
+
+The user's mental model: pre-voting (build seeds + their bands + band-subset combos) → voting (every band/window votes for every other) → post-voting (annotate, review, export). The 5-script voting cluster is the middle; everything else feeds in or out.
 
 ```
-LAYER 0   L3 primitives          contingency, hungarian, kmeans,
-                                 per_l2_cluster, cramers_v_merge
-                                            │
-LAYER 1a  single-band trajectory          single_band.js
-LAYER 1b  HET skeleton                    het.js
-LAYER 1c  HOM anchors                     hom.js
-LAYER 1d  per-sample karyotype call       iv.js
-LAYER 1e  PC1 sign anchor + grouping      trajectory.js
-LAYER 1f  karyotype-model combiner        karyotype_model.js
-                                            │
-LAYER 2   Stages 1-4 unified              banding_pipeline.js
-          ├ Stage 1  seed discovery       seed_discovery.js + anchor_signals +
-          │                               window_classification + band_quality
-          ├ Stage 2  cross-seed voting    cross_seed_voting.js
-          ├ Stage 3  locus construction   locus_construction.js
-          └ Stage 4  breadth voting       breadth_voting.js +
-                                          partition_consensus + partition_enumerate +
-                                          vote_evidence + band_voters + projection
-                                            │
-LAYER 3   long-range regime refinement    haplotype_regime.js
-                                            │
-LAYER 4a  cross-regime topology           regime_topology.js
-LAYER 4b  Mendelian (trios + families)    regime_mendelian.js
-LAYER 4c  pedigree (inverse direction)    regime_pedigree.js
-LAYER 4c  regime LD                       regime_linkage.js
-LAYER 4d  dyad Mendelian + meiotic drive  regime_dyad_mendelian.js
-                                            │
-LAYER 5   chromosome-scale wiring         genome_scale.js
-                                            │
-POST      regime annotation               regime_annotation/positional.js
-                                          regime_annotation/structure.js
-POST      catalogue serializer            regime_catalogue.js
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  CLUSTER 1 — PRE-VOTING                                            │
+  │  Build seeds, their K bands, and 2^K-1 band-subset voter universe  │
+  │                                                                    │
+  │  Two alternative entry paths produce the same shape:               │
+  │   (A) V-walker:    banding_pipeline → seed_discovery + ...         │
+  │   (B) Het-skeleton: het.js → hom.js → cramers_v_merge → ...        │
+  │   (C) Curated:      candidate-list from local_pca_dosage           │
+  │                                                                    │
+  └────────────────────────────┬───────────────────────────────────────┘
+                               │
+                               ▼
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  CLUSTER 2 — VOTING (5 scripts + 1 orchestrator)                   │
+  │                                                                    │
+  │  For each band-subset of each seed (focal):                        │
+  │    project onto every target window (projection.js)                │
+  │    collect votes per target (vote_evidence + band_voters)          │
+  │    enumerate set-partitions of K target bands (partition_enumerate)│
+  │    pick best partition + consensus_class (partition_consensus)     │
+  │  Wrapper: breadth_voting.js                                        │
+  │                                                                    │
+  └────────────────────────────┬───────────────────────────────────────┘
+                               │
+                               ▼
+  ┌────────────────────────────────────────────────────────────────────┐
+  │  CLUSTER 3 — POST-VOTING                                           │
+  │                                                                    │
+  │  Dosage overlay + per-sample karyotype call                        │
+  │  Karyotype-model verdict (BIALLELIC / MULTI / COMPLEX / AMBIGUOUS) │
+  │  Within-regime arrangement-identity (haplotype_regime.js)          │
+  │  Cross-regime topology (regime_topology)                           │
+  │  Mendelian + pedigree + linkage + dyad annotation                  │
+  │  Positional + structural annotation                                │
+  │  Genome-scale wiring                                               │
+  │  Serializer + UI panels                                            │
+  │                                                                    │
+  └────────────────────────────────────────────────────────────────────┘
 ```
 
-The user's reconstructed-from-memory order: **per-window K-means → het.js (skeleton) → contingency + cramers_v_merge (V-seeds) → for each band: 2-direction voting → long-range/short-range haplotype regimes.** That maps to: Layer 0 → Layer 1b → (skip 1c-1f or run them, depending on whether per-sample calls are needed) → Layer 2 Stage 4 (breadth voting = "every window votes for us; we vote for every window") → Layer 3 (`haplotype_regime.refineRegimesFromIntervals`).
+---
 
-The two readings (the index.js layer order vs. the user's execution order) are not in conflict — they are the same chain viewed by **organizational grouping** vs. **what-feeds-what**.
+## CLUSTER 1 — pre-voting (build seeds + bands + voter universe)
+
+The cluster has **three alternative entry paths** that all produce the same downstream shape: seeds with K-sample-set bands plus an enumeration of band-subset focal sets.
+
+### Path A — V-walker (the current "Run pipeline" path)
+
+Bruteforce auto-discovery using band_quality + Cramér's V walking.
+
+| File | Layer | Role |
+|---|---|---|
+| `band_tracking/banding_pipeline.js` | orchestrator | `runStage1` + `runStage2` + `runStage3` + `runStage4` + `runBandingPipeline`. Stages 1-4 unified driver. |
+| `band_tracking/seed_discovery.js` | Stage 1 | Coarse anchor sweep → band_quality refinement → V/H_off walker with hysteresis → local-radius extension → dedup. **Anchor gate**: `band_quality ≥ 0.50`. |
+| `band_tracking/anchor_signals.js` | Stage 1 support | Per-window Cramér's V + H_off vs a tracked anchor labeling. **Per-window resolution, NEVER L2-broadcast** — that's the rule in the band_tracking/index.js header. |
+| `band_tracking/window_classification.js` | Stage 1 support | Per-window 3-way classifier `INTERIOR / CROSSOVER / REGIME_END / UNRELIABLE` from V(w), H_off(w), band_quality(w). The walker break/extend signal. |
+| `band_tracking/band_quality.js` | Stage 1 + Stage 3 gate | `min(silhouette_norm, size_balance, eig_ratio_norm) ∈ [0,1]`. Gates anchor selection (default 0.50) + chain extension (default 0.40). |
+| `band_tracking/cross_seed_voting.js` | Stage 2 | Every seed votes on every other via Hungarian-aligned contingency → `pattern_class` matrix + reliability verdict (`VALID / NOISE / UNDETERMINED`) + linkage groups. |
+| `band_tracking/locus_construction.js` | Stage 3 | Per-seed classifier-gated chain walk → per-band sample sets via `locusBandSampleSets` (intersection) or `locusBandSampleSetsMajority` (majority vote). |
+
+**Output of Path A**: array of seeds, each with `{anchor_w, s_window, e_window, K, per_band_samples: Set[], classifications, ...}`.
+
+### Path B — Het-skeleton (the user's reconstructed path)
+
+Skeleton-first; no band_quality gate, no V-walker.
+
+| File | Role |
+|---|---|
+| `shared/kmeans.js` | `kmeans1D` / `adaptiveK1D`: per-window K-means from `data.windows[w].pc1`. The PER-WINDOW labels every downstream consumer needs. |
+| `band_tracking/single_band.js` | `single_band_track_from_seed`: extract one band as a sample set and Jaccard-walk it across windows. The "take each band separately" atomic operation. |
+| `band_tracking/het.js` | `het_detect_candidate_band` (intermediate-PC1 band per window) → `het_track_skeleton` (Jaccard-walk a HET seed forward+backward) → `het_define_interval` (bp coords) → `iv_merge_het_tracks` (optional pre-merge). |
+| `band_tracking/hom.js` | `hom_anchor_in_window` + `hom_anchor_to_het`: HOM_A (low-PC1) / HOM_B (high-PC1) anchors from each het skeleton; consensus via fraction-above-threshold voting. |
+| `shared/contingency.js` | `buildContingency` + `cramersV` + `chiSquare` + ARI/NMI/fusion-event detectors. Atomic L3 currency. |
+| `shared/hungarian.js` | `alignLabels`: K! permutation enumeration to align two label sets so contingency diagonal is maximized. |
+| `shared/cramers_v_merge.js` | `computeAdjacentSeedMerges` / `runCramersVMergeLocal`: walk adjacent intervals → MERGE/SEPARATE/INSUFFICIENT verdicts → fuse consecutive MERGEs into chains → seeds. |
+
+**Output of Path B**: array of intervals with bp coords + `{hom_a_consensus, hom_b_consensus, het_core, K bands}`.
+
+### Path C — Curated candidate list (the existing short-range mode)
+
+User-promoted candidates from the local_pca_dosage page.
+
+| File | Role |
+|---|---|
+| `_local_pca_dosage_state.candidateList` (state) | User-drawn candidates with `{start_w, end_w, K, locked_labels}`. |
+| `haplotype_regimes.js::_buildShortRangeResult` | Converts candidates into the same shape Path A / Path B produce. |
+
+### Band-subset combo enumerator (shared by all three paths)
+
+For each seed with K bands, the voter universe is `2^K - 1` non-empty subsets. The page builds these masks:
+
+| File | Role |
+|---|---|
+| `haplotype_regimes/regimes_page.js` | `enumerateBandSubsets(K)`, `maskToBands(mask, K)`, `maskLabel(mask, K)`. K=3 → 7 combos. |
+
+Once Cluster 1 finishes, every focal is a `(seed_id, band_mask, sample_set)` triple ready to feed Cluster 2.
 
 ---
 
-## Layer 0 — L3 primitive foundation (`shared/`, not in band_tracking/)
+## CLUSTER 2 — voting (the 5-script middle + orchestrator)
 
-These live one level up because they are reused across the atlas (PCA panels, dosage chunks, etc.), not exclusive to band_tracking. The pipeline is built on top of them.
+For each focal `(seed_id, band_mask)`, project onto every target window/seed in the genome, aggregate the votes, and emit a per-focal consensus + classification.
 
-| File | Role | Top exports | Inputs | Outputs | Consumed by |
-|------|------|-------------|--------|---------|-------------|
-| `shared/contingency.js` | K×K contingency table + Cramér's V / χ² / ARI / NMI. The atomic currency of band-tracking. | `buildContingency`, `cramersV`, `chiSquare`, `chiSqSurvival`, `detectFuseEvents`, `detectSplitEvents` | two label arrays + K | M[KA×KB], V, χ² p, fusion/split events | anchor_signals, cross_seed_voting, cramers_v_merge, regime_linkage, regime_dyad_mendelian |
-| `shared/hungarian.js` | Brute K! permutation to maximize contingency diagonal. K ≤ 8 (atlas uses K=3,6). | `alignLabels`, `LINEAGE_CHAIN_BREAK_AGREEMENT` | two label arrays + K | aligned contingency + permutation | anchor_signals, locus_construction, cross_seed_voting, cramers_v_merge, projection |
-| `shared/kmeans.js` | 1D/2D K-means + silhouette + adaptive K. | `kmeans1D`, `kmeans2D`, `silhouette1D`, `adaptiveK1D`, `adaptiveK2D` | PC1 (and PC2) + K | labels Int8Array + centers | per_l2_cluster + everything downstream via getLabels callbacks |
-| `shared/per_l2_cluster.js` | Per-L2-envelope aggregation + K-means. **Per the band_tracking/index.js header, the pipeline must NOT use L2-broadcast labels — getLabels(w) must return per-window K-means.** Keep this module for visualization consumers; the pipeline replaces its labels source with per-window kmeans1D. | `contextFromState`, `aggregateL2`, `clusterL2`, `getL2Cluster`, `clusterL2AtK` | L2 envelope PC1/PC2 + knobs | cached per-L2 labels + silhouette | legacy visualization (L3 pairs panel) |
-| `shared/cramers_v_merge.js` | Adjacent-seed Cramér's V pair walk → MERGE / SEPARATE / INSUFFICIENT verdicts → chains into candidate regions. Already wired to a UI button (`_runAutoMergeCramersV`). | `computeAdjacentSeedMerges`, `CRAMERS_V_MERGE_DEFAULTS`, `runCramersVMergeLocal` | seeds[] + getLabels + getK | per-pair {v, χ², p, verdict} + multi-seed chains | UI auto-merge button; **could feed Layer 2 Stage 2 instead of cross_seed_voting if we want V-only seeding** |
-| `shared/regimes_registry.js` | UI persistence (localStorage) of user-authored regime labels + axis topology. **Not part of the detection pipeline.** | regimes registry exports | state | hydrated regimes for the page UI | haplotype_regimes UI |
+| File | Role |
+|---|---|
+| `band_tracking/projection.js` | `classifyProjection(focal_samples, target_labels, K_target)` → `{visited_bands, excluded_bands, pattern_class, purity_vector}`. Pattern class ∈ {SINGLE, SUBSET, SUBSET_SPLIT, SPLIT_TWO, COHERENT_SPLIT, RANDOM_FAN, SCATTER, EMPTY}. Also `classifyProjectionWithStability` for multi-window daughter-stability check. |
+| `band_tracking/vote_evidence.js` | `extract_votes` / `build_coassociation_matrix` / `build_per_band_vote_index` / `voteRecords_from_projections`. Pattern-class weights (default SINGLE/SUBSET = 1.0, SUBSET_SPLIT = 0.7, SPLIT_TWO = 0.5, FAN/SCATTER/EMPTY = 0). |
+| `band_tracking/band_voters.js` | Band-centric inversion of the voter graph: `collect_voters_for_band` / `compute_partner_affinities` / `derive_partner_sets` / `compute_voter_consensus` / `compute_overlap_conflict`. **This is "every other band votes for us" — visitors, excluders, partners, conflicts per focal band.** |
+| `band_tracking/partition_enumerate.js` | `enumerate_partitions_as_blocks` + `score_partition_against_coassoc` + `select_top_partitions_adaptive`. Brute Bell(K) partitions of K bands scored by pair-weighted agreement. |
+| `band_tracking/partition_consensus.js` | `consensus_partition`: ties vote_evidence + band_voters + partition_enumerate into one call → top-N partitions, `consensus_class ∈ {CLEAN_PARTITION, SOFT_PARTITION, AMBIGUOUS_BAND, OVERLAPPING_VOTES, MULTI_LAYER_STRUCTURE, NO_CLEAN_CONSENSUS}`, `resolving_power_class`. |
+
+**Orchestrator**:
+
+| File | Role |
+|---|---|
+| `band_tracking/breadth_voting.js` | `runBreadthVoting` + helpers (`buildVotersFromSeedLoci`, `buildTargetsFromWindows`, `buildTargetsFromStage3Loci`). The for-loop wrapper: N_voters × K × N_targets → calls projection per pair, hands the vote stream to partition_consensus per target. Outputs `{per_target: [{consensus, voteRecords, n_voters}], summary: {n_targets, n_stability_upgraded}}`. |
+
+**Output of Cluster 2**: per-target consensus partition + classification = the long-range segregation pattern in the population. "This focal band always traverses these samples; this band never crosses us; this region splits in this way."
 
 ---
 
-## Layer 1 — single-band trajectory, HET / HOM, per-sample call
+## CLUSTER 3 — post-voting (annotate, refine, review, export)
 
-### 1a — Single-band trajectory
-
-| File | Role |
-|------|------|
-| `band_tracking/single_band.js` | Atomic unit of band identity. Jaccard-walking forward/backward from a seed window+band, emits a track of band-membership-by-window with continuity scores. |
-
-Exports: `SINGLE_BAND_DEFAULTS`, `bandMembers`, `bandJaccard`, `single_band_track_from_seed`, `single_band_score_continuity`.
-Inputs: `getLabels(w)`, `getK(w)`, seed (w, k), chr range.
-Outputs: `{ok, seed_w, seed_k, s_window, e_window, windows:[{w,k,members,jaccard}], continuity}`.
-Consumed by: **het.js, trajectory.js, haplotype_regime.js.**
-
-### 1b — HET detection + skeleton (interval seed)
+### 3a — Dosage overlay + per-sample karyotype call (Stage C5-C7)
 
 | File | Role |
-|------|------|
-| `band_tracking/het.js` | Detect the HET band at each window (mid-PC1 OR mean-dosage ≈ 1.0). Stitch a forward+backward skeleton via single_band_track from a het seed. Define the bp interval. |
+|---|---|
+| `band_tracking/dosage_overlay.js` | Stage C5-C6. For each macro-band emitted by Cluster 2's consensus partition: mean polarized dosage → class `HOM_REF / HET / HOM_INV / AMBIGUOUS`. Polarity check (one HET per arrangement axis). HET-disjointness count = number of independent arrangement axes. |
+| `band_tracking/karyotype_caller.js` | Stage C7. Per-axis per-sample state_pc1 vs state_dosage → concordance ∈ `{AGREE, DISAGREE, AMBIGUOUS}` → final call `HOM_REF / HET / HOM_INV / FLAGGED / NA` + confidence. DISAGREE goes to Mendelian gates for resolution. |
+| `band_tracking/iv.js` | Per-sample karyotype call from het skeleton + HOM anchors (the simpler version of karyotype_caller that uses only Layer 1b/1c outputs, before breadth voting). Useful when Path B is the seed source. |
 
-Exports: `meanSignalPerBand`, `meanPc1PerBand`, `meanDosagePerBand`, `het_detect_candidate_band`, `het_detect_candidate_band_by_signal`, `het_track_skeleton`, `het_track_skeleton_by_signal`, `het_define_interval`, `iv_merge_het_tracks`, `HET_DEFAULTS`.
-Inputs: per-window getLabels/getPc1/getK/getBpFor + seed_w; mean signal per band.
-Outputs: skeleton (windows + het_span_fracs + continuity) and interval (start_bp / end_bp / n_windows).
-Consumed by: **hom.js, iv.js, haplotype_regime.js.**
-
-### 1c — HOM_A / HOM_B anchors
+### 3b — Karyotype-model verdict combiner (Layer 1f)
 
 | File | Role |
-|------|------|
-| `band_tracking/hom.js` | Walk the het skeleton; at each window pick the low-PC1 band as HOM_A and the high-PC1 band as HOM_B; consensus via fraction-above-threshold voting. |
+|---|---|
+| `band_tracking/trajectory.js` | PC1 sign anchoring (resolve flip ambiguity via reference-sample pool) + per-band PC1 trajectory time series + pairwise Pearson + `band_group_by_trajectory_similarity`. **All exports use the per-window callback contract; NEVER L2-broadcast.** |
+| `band_tracking/karyotype_model.js` | `kt_combine_trajectory_and_projection_evidence` + `kt_infer_macro_band_groups` + `kt_resolve_karyotype_model`. Fold three evidence streams (trajectory grouping + projection pattern_class + vote consensus class) into per-band agreement → macro-band assignment → candidate-level verdict `BIALLELIC / MULTI_ALLELIC / COMPLEX / AMBIGUOUS`. |
 
-Exports: `HOM_DEFAULTS`, `hom_anchor_in_window`, `hom_anchor_to_het`.
-Outputs: `{ok, n_windows, hom_a_per_window, hom_b_per_window, hom_a_consensus, hom_b_consensus, scores}`.
-Consumed by: **iv.js, haplotype_regime.js.**
-
-### 1d — Per-sample karyotype caller (Layer 1 tail)
+### 3c — Within-regime arrangement-identity (the *corrected* role of `haplotype_regime.js`)
 
 | File | Role |
-|------|------|
-| `band_tracking/iv.js` | For each sample, walk the het skeleton; tally het / hom_a / hom_b membership; emit `STD/STD | HET | INV/INV | AMBIGUOUS | UNCALLED`. |
+|---|---|
+| `band_tracking/haplotype_regime.js` | `intervalSampleCore` + `relateIntervals` + `buildHaplotypeRegimeGraph` + `clusterHaplotypeRegimes` + `refineRegimesFromIntervals`. Given intervals that the voting pass has identified as part of the segregation pattern, decide whether two intervals represent the **same physical inversion arrangement**: EXTENSION (same arrangement) / NESTED (one contains other) / SHARED_HET (same heterozygotes, different homozygote pools) / SWAPPED (same arrangement with PC1-sign flip) / UNRELATED (different biology). It's arrangement-identity resolution, **not** the source of the long-range segregation signal — that comes from Cluster 2. |
 
-Exports: `IV_CALLS`, `IV_CALL_DEFAULTS`, `iv_call_samples_from_skeleton`.
-Consumed by: **karyotype_model.js (Layer 1f), regime_mendelian.js.**
-
-### 1e — PC1 sign anchoring + per-band trajectory grouping
+### 3d — Cross-regime topology + Mendelian + pedigree + linkage + dyad
 
 | File | Role |
-|------|------|
-| `band_tracking/trajectory.js` | Resolve PC1 sign ambiguity (reference-sample pool), extract per-band trajectory time series, pairwise Pearson, group bands by trajectory similarity (coherent signal = same arrangement). |
+|---|---|
+| `band_tracking/regime_topology.js` | `regimePairwiseTopology` / `buildRegimeTopologyGraph` / `findChromosomeRegimeChains` / `serializeRegimesToJson`. Per-chromosome cross-regime relationships: NESTED / ADJACENT / CHAINED / OVERLAPPING_CONFLICT / INDEPENDENT. Walks CHAINED edges into multi-inversion lineage chains. |
+| `band_tracking/regime_mendelian.js` | Method A (trio contradiction counting) + Method B (per-family χ² goodness-of-fit). Per-regime `support_status ∈ {SUPPORTED, INCONCLUSIVE, CONTRADICTED}` + per-(regime, family) `segregation_status` (6 states) + `effect_direction` (7 tags). |
+| `band_tracking/regime_pedigree.js` | Inverse direction: cross-regime co-membership → pairwise relatedness verdicts (DUPLICATE / FIRST_DEGREE / SECOND_DEGREE / UNRELATED / INSUFFICIENT_DATA). Cross-checks ngsPedigree pair calls. |
+| `band_tracking/regime_linkage.js` | Cohort LD between regimes (3×3 karyotype contingency + Cramér's V across all samples) + family-level recombination test (doubly-het parents → offspring → r̂). Pairwise verdict: LINKED / WEAKLY_LINKED / INDEPENDENT / INSUFFICIENT_DATA. |
+| `band_tracking/regime_dyad_mendelian.js` | Dyad (single-parent) gates + pooled-dyad binomial transmission test + meiotic-drive classification: MENDELIAN / MILD_DRIVE / STRONG_DRIVE / INVIABILITY / INSUFFICIENT_DATA. |
 
-Exports: `TRAJECTORY_DEFAULTS`, `pickPc1OrientationReferenceSamples`, `computePc1SignAnchors`, `band_compute_pc1_trajectory`, `band_pairwise_trajectory_correlation`, `band_group_by_trajectory_similarity`.
-Consumed by: **karyotype_model.js.**
-
-### 1f — Karyotype-model combiner
+### 3e — Positional + structural annotation
 
 | File | Role |
-|------|------|
-| `band_tracking/karyotype_model.js` | Fold trajectory grouping + projection pattern_class + vote consensus class into per-band agreement → macro-band assignment → candidate-level verdict: `BIALLELIC / MULTI_ALLELIC / COMPLEX / AMBIGUOUS`. |
+|---|---|
+| `shared/regime_annotation/index.js` | Public API for the annotation layer (`SPEC_regime_annotation_v34.md` Stage 5.5). |
+| `shared/regime_annotation/positional.js` | `annotateRegimePosition` / `annotateRegimePositions`: per-regime chromosome-position context. Label ∈ {CENTROMERIC, PERICENTROMERIC, SUBTELOMERIC, ARM_SCALE, INTERSTITIAL} + distance to centromere/telomeres + arm scale. |
+| `shared/regime_annotation/structure.js` | `annotateRegimeStructure` / `annotateRegimeStructures`: per-regime structural label ∈ {SIMPLE_HAPLOTYPE_SPLIT, INVERSION_DOSAGE_LIKE, NESTED_OR_COMPOUND, NOISE_OR_RECOMBINANT, ...} from M / K / boundary sharpness / internal nesting. |
 
-Exports: `KARYOTYPE_MODEL_VERDICTS`, `KT_AGREEMENT_FLAGS`, `KT_DEFAULTS`, `kt_combine_trajectory_and_projection_evidence`, `kt_infer_macro_band_groups`, `kt_resolve_karyotype_model`.
+### 3f — Genome-scale integration hub
+
+| File | Role |
+|---|---|
+| `band_tracking/genome_scale.js` | `mergePerChromosomeRegimes` (per-chrom outputs → flat array with chrom + regime_uid) + `crossChromosomeRegimeLinks` (CHAINED links across chromosomes with min_shared HOM samples) + `genomeWidePedigreeFromRegimes` + `genomeWideRegimeReport`. **The single-call top-level orchestrator for Layers 4-5.** |
+
+### 3g — Catalogue serializer + UI persistence
+
+| File | Role |
+|---|---|
+| `band_tracking/regime_catalogue.js` | `buildCatalogue` + `computeKnobHash` + `serializeCatalogue`. In-memory output → on-disk JSON triple (`manifest.json` + `knobs.json` + `catalogue.json`). Content-addressed by knob_hash (SHA-1 prefix). |
+| `shared/regimes_registry.js` | UI-side persistence (localStorage) of user-authored regime labels + axis topology. **Not part of the detection pipeline** — passenger module the page uses for editable annotations. |
+
+### 3h — Atlas-page review panels
+
+| File | Role |
+|---|---|
+| `haplotype_regimes.js` (the page) | Mounts the page, builds the pipeline ctx, dispatches Run-pipeline button to the right Cluster 1 path. Wires the L3 pairs table, auto-merge V button, promote-seed button. |
+| `haplotype_regimes/regimes_page.js` | 4-canvas 2×2 grid layout. Focal-voter selector + arrow-key navigation. Houses `enumerateBandSubsets` + `maskToBands` + `maskLabel` (the band-combo enumerator). |
+| `haplotype_regimes/regimes_panel.js` | Target-band-lanes panel (chrom + genome scope). Per-window pattern_class strip on top; per-sample lane jumps below. `_dosageClassColour` palette. |
+| `haplotype_regimes/regimes_pc1_panel.js` | PC1-lines panel (chrom + genome scope). Per-sample lines coloured by voter-band membership. "You are here" rectangle over the seed window range with dosage-tinted K stripes. |
 
 ---
 
-## Layer 2 — Stages 1–4 unified V-walker (`banding_pipeline.js`)
+## Module API surfaces (not pipeline steps)
 
-### 2a — Per-window signal primitives
-
-| File | Role |
-|------|------|
-| `band_tracking/band_quality.js` | Per-window stability score `min(silhouette_norm, size_balance, eig_ratio_norm) ∈ [0,1]`. Gate for chain extension + seed-discovery anchor validation. Default threshold 0.40 (chain) / 0.50 (anchor). |
-| `band_tracking/anchor_signals.js` | Per-window Cramér's V + off-diagonal entropy (H_off) vs. a tracked-anchor labeling. **The header is explicit: per-window resolution, NOT L2-broadcast.** Replaces legacy `recomputeAnchorConcord`. |
-| `band_tracking/window_classification.js` | Per-window 3-way classification `INTERIOR / CROSSOVER / REGIME_END / UNRELIABLE` from V(w), H_off(w), band_quality. The load-bearing walker break/extend signal. |
-
-### 2b — Stage 1: seed discovery
-
-| File | Role |
-|------|------|
-| `band_tracking/seed_discovery.js` | Coarse-grid anchor sweep → neighborhood refinement on band_quality → V/H_off walk over [anchor-R, anchor+R] with hysteresis → local-radius extension → dedup. **This is where the 0-seeds bug bites if band_quality is missing.** |
-
-Exports: `discoverSeedsOnChromosome`, `SEED_DISCOVERY_DEFAULTS`.
-
-### 2c — Stage 2: cross-seed voting
-
-| File | Role |
-|------|------|
-| `band_tracking/cross_seed_voting.js` | Every seed votes on every other via Hungarian-aligned contingency; per-row purity → `pattern_class ∈ {SINGLE, SUBSET, SUBSET_SPLIT, SPLIT_TWO, FAN, SCATTER, EMPTY}`; reliability + linkage groups (mutual-SUBSET connected components). |
-
-Exports: `runStage2`, `CROSS_SEED_VOTING_DEFAULTS`.
-
-### 2d — Stage 3: locus construction
-
-| File | Role |
-|------|------|
-| `band_tracking/locus_construction.js` | Chain walk inside each seed footprint in classifier mode (gated by getClassification). Per-band sample-set aggregation (majority or intersection). Emits loci. **L2-gap merge step exists but is unreachable when getClassification is provided** — matches the L2-free design. |
-
-Exports: `chainWalkOneChromosome`, `locusBandSampleSets`, `locusBandSampleSetsMajority`, `LOCUS_CONSTRUCTION_DEFAULTS`.
-
-### 2e — Stage 4: breadth voting + partition consensus
-
-Five files, one orchestrator (`breadth_voting.js`):
-
-| File | Role |
-|------|------|
-| `band_tracking/projection.js` | Focal sample-set → target window K bands → purity → `pattern_class`. Daughter-stability via `classifyProjectionWithStability` (multi-window neighbour stability). **This is "we vote for every window".** |
-| `band_tracking/vote_evidence.js` | Vote tuple extraction + co-association matrix + per-band vote indices. Pattern-class weights (default SINGLE/SUBSET = 1.0, SUBSET_SPLIT = 0.7, SPLIT_TWO = 0.5, FAN/SCATTER/EMPTY = 0). |
-| `band_tracking/band_voters.js` | Band-centric view: "standing on band b, who votes for us?" Visitor / excluder sets + partner-set affinity + conflict scoring. **This is "every window votes for us".** |
-| `band_tracking/partition_enumerate.js` | Brute-enumerate all set-partitions of K bands (Bell(K), K ≤ 10), score by pair-weighted agreement with coassoc matrix, adaptive top-N. |
-| `band_tracking/partition_consensus.js` | Stage-4 orchestrator: ties vote_evidence + band_voters + partition_enumerate. Outputs per-target consensus + 6-class consensus_class + resolving_power_class. |
-| `band_tracking/breadth_voting.js` | **Stage C2-C4 driver.** N_voters × K_voter × N_targets vote tensor → per-target consensus partition. Bruteforce as designed. |
-
-Stage-4 exit point: per-target `{consensus, voteRecords, n_voters}` + summary counts.
-
-### Stage orchestrator
-
-| File | Role |
-|------|------|
-| `band_tracking/banding_pipeline.js` | **Stages 1-4 entry point.** `runBandingPipeline(ctx, opts)`. The page already calls this; it's not the only path the page should call. |
-
-Exports: `runStage1`, `runStage2`, `runStage3`, `runStage4`, `runBandingPipeline`, `BANDING_PIPELINE_DEFAULTS`.
-**Currently called from**: `haplotype_regimes.js` line 367 (long-range "Run pipeline" button).
+| File | Status |
+|---|---|
+| `band_tracking/index.js` | Public API re-export aggregator. Imported by the haplotype_regimes page + tests. No execution. |
+| `band_tracking/index_min.js` | **Diagnostic-only** re-export for Option-B `consensus_partition` drivers (LG28 harness). Skips Layer 1 entirely. NOT production. |
 
 ---
 
-## Layer 3 — long-range haplotype regime refinement
-
-| File | Role |
-|------|------|
-| `band_tracking/haplotype_regime.js` | Consumes het-skeleton intervals + HOM consensus. Pairwise interval relationships via Jaccard scoring: `EXTENSION / NESTED / SHARED_HET / SWAPPED / UNRELATED`. Union-find clustering of EXTENSION + SWAPPED edges → REGIMES (chains of related intervals across a larger range than any single skeleton). Per-regime consensus cores. |
-
-Exports: `HAPLOTYPE_REGIME_RELATIONSHIPS`, `HAPLOTYPE_REGIME_DEFAULTS`, `intervalSampleCore`, `relateIntervals`, `buildHaplotypeRegimeGraph`, `clusterHaplotypeRegimes`, `refineRegimesFromIntervals`.
-
-**This is the entry point the user keeps gesturing at.** It does not currently get called by the page — that's the gap to close in the next-turn wiring.
-
----
-
-## Layer 4 — cross-regime annotation
-
-### 4a — Cross-regime topology (intra-chromosome)
-
-| File | Role |
-|------|------|
-| `band_tracking/regime_topology.js` | Per-chrom cross-regime relationships: `NESTED / ADJACENT / CHAINED / OVERLAPPING_CONFLICT / INDEPENDENT`. Chromosome-scale chain walker (CHAINED edges → multi-inversion lineage chains). JSON serializer. |
-
-Exports: `REGIME_TOPOLOGY_RELATIONSHIPS`, `REGIME_TOPOLOGY_DEFAULTS`, `regimeBpFootprint`, `regimePairwiseTopology`, `buildRegimeTopologyGraph`, `findChromosomeRegimeChains`, `serializeRegimesToJson`.
-
-### 4b — Mendelian per regime
-
-| File | Role |
-|------|------|
-| `band_tracking/regime_mendelian.js` | Method A (trio contradiction counting) + Method B (per-family χ² goodness-of-fit). Per-regime support_status + per-regime/per-family segregation_status + effect_direction. Runs both when inputs available. |
-
-Exports: `REGIME_KARYOTYPE_STATES`, `REGIME_EXPECTED`, `TRIO_SUPPORT_STATUS`, `TRIO_SUPPORT_THRESHOLDS`, `REGIME_MENDELIAN_DEFAULTS`, `FAMILY_RELIABILITY_TIERS`, `FAMILY_RELIABILITY_DEFAULTS`, `regimeKaryotypeForSample`, `annotateRegimeWithTrios`, `annotateRegimeWithFamilies`, `annotateRegimesWithMendelian`, `computeFamilyReliabilityTier`, `rollupEffectDirection`, `annotateRegimeMendelianAll`.
-
-### 4c — Inverse pedigree from regimes
-
-| File | Role |
-|------|------|
-| `band_tracking/regime_pedigree.js` | "Scan genomes → find inversions → use regime co-membership to find who is parent/offspring." Pairwise same-class fraction across many regimes → `DUPLICATE / FIRST_DEGREE / SECOND_DEGREE / UNRELATED / INSUFFICIENT_DATA`. Cross-checks ngsPedigree. |
-
-Exports: `REGIME_PEDIGREE_DEFAULTS`, `REGIME_PEDIGREE_VERDICTS`, `regimePairCoMembership`, `classifyRegimeRelatedness`, `inferRelatednessFromRegimes`, `crossCheckPedigreeWithRegimes`, `calibratePedigreeThresholdsFromKnownPairs`.
-
-### 4c — Regime LD
-
-| File | Role |
-|------|------|
-| `band_tracking/regime_linkage.js` | Cohort-level LD: 3×3 karyotype contingency + Cramér's V across all samples. Family-level recombination test: doubly-het parents → offspring ratio → r̂. Verdict: `LINKED / WEAKLY_LINKED / INDEPENDENT / INSUFFICIENT_DATA`. |
-
-Exports: `buildSampleRegimeMatrix`, `pairwiseRegimeContingency`, `regimeLD`, `regimeLinkageMatrix`, `familyRegimeRecombination`, `REGIME_LINKAGE_VERDICTS`, `REGIME_LINKAGE_DEFAULTS`.
-
-### 4d — Dyad Mendelian + meiotic drive
-
-| File | Role |
-|------|------|
-| `band_tracking/regime_dyad_mendelian.js` | Dyad-level (single-parent) Mendelian check + pooled-dyad binomial transmission test + meiotic-drive verdict (`MENDELIAN / MILD_DRIVE / STRONG_DRIVE / INVIABILITY / INSUFFICIENT_DATA`). |
-
-Exports: `estimateAlleleFrequency`, `expectedDyadPMF`, `assessDyadConsistency`, `estimateTransmissionRatio`, `classifyMeioticDrive`, `annotateRegimeWithDyads`, `MEIOTIC_DRIVE_VERDICTS`, `MEIOTIC_DRIVE_DEFAULTS`.
-
----
-
-## Layer 5 — chromosome-scale wiring
-
-| File | Role |
-|------|------|
-| `band_tracking/genome_scale.js` | Per-chrom regime maps → flat array with `chrom + regime_uid`. Cross-chrom CHAINED links (min_shared HOM_A/B samples). Genome-wide pedigree inference (many regimes → robust co-membership). Optional Mendelian + linkage + dyad annotation. **Integration hub for Layers 2-4.** |
-
-Exports: `GENOME_SCALE_LINKS`, `GENOME_SCALE_DEFAULTS`, `mergePerChromosomeRegimes`, `crossChromosomeRegimeLinks`, `genomeWidePedigreeFromRegimes`, `genomeWideRegimeReport`.
-
----
-
-## Post-detection annotation
-
-### `band_tracking/dosage_overlay.js`
-
-Stage C5-C6: mean polarized dosage per macro-band → `HOM_REF / HET / HOM_INV / AMBIGUOUS`. Polarity check (one HET per axis). HET-disjointness count (number of independent arrangement axes).
-Exports: `DOSAGE_CLASS`, `POLARITY_CHECK`, `classifyDosageMean`, `macroBandDosage`, `checkPolarityAndGetAxes`, `DOSAGE_DEFAULTS`.
-
-### `band_tracking/karyotype_caller.js`
-
-Stage C7: per-axis per-sample state_pc1 vs state_dosage → concordance → final call `HOM_REF / HET / HOM_INV / FLAGGED / NA` + confidence.
-Exports: `KARYOTYPE_STATE`, `CONCORDANCE`, `CONFIDENCE`, `dosageClassToKaryotype`, `resolveAxisMembership`, `callAxisKaryotype`.
-
-### `band_tracking/regime_catalogue.js`
-
-Serializer: in-memory output → on-disk JSON (manifest + knobs + catalogue). Content-addressed by knob_hash (SHA-1 prefix).
-Exports: `buildCatalogue`, `computeKnobHash`, `serializeCatalogue`.
-
-### `shared/regime_annotation/positional.js`
-
-Per-regime positional context: `CENTROMERIC / PERICENTROMERIC / SUBTELOMERIC / ARM_SCALE / INTERSTITIAL`. Distance to centromere / telomeres / arm scale.
-
-### `shared/regime_annotation/structure.js`
-
-Per-regime structural label: `SIMPLE_HAPLOTYPE_SPLIT / INVERSION_DOSAGE_LIKE / NESTED_OR_COMPOUND / NOISE_OR_RECOMBINANT / ...`. Summarizes M, K, boundary sharpness, internal nesting.
-
-### `shared/regime_annotation/index.js`
-
-Public API for the post-detection annotation layer.
-
----
-
-## Module API surfaces (entry-helpers, not pipeline stages)
-
-### `band_tracking/index.js`
-
-Public re-export aggregator. Imported by the haplotype_regimes page + tests. No execution.
-
-### `band_tracking/index_min.js`
-
-Diagnostic re-export for the Option-B `consensus_partition` driver (skips Layer 1). **Not production** — keep for legacy diagnostic harnesses.
-
----
-
-## Flagged anomalies
-
-### Files that look legacy / duplicate
+## Flagged anomalies — files NOT in the live pipeline
 
 | File | Status | Notes |
-|------|--------|-------|
-| `band_tracking/projection_STUB.js` | Stub — production `projection.js` overwrites this | Exists to satisfy vote_evidence imports during minimal Stage-4 tests. Verify the production projection.js lands on top in any deployment. |
-| `band_tracking/index_min.js` | Diagnostic surface | Minimal re-export for Option-B drivers. Production uses `index.js`. |
-| `band_tracking/_kmeans_imported.js` | Duplicate import artifact | Copy of `shared/kmeans.js` relocated into band_tracking/ during initial integration. Canonical file is `shared/kmeans.js`. One of these should be deleted in a cleanup pass. |
+|---|---|---|
+| `band_tracking/_kmeans_imported.js` | **Duplicate** of `shared/kmeans.js` (same `// shared/kmeans.js` header on line 1). Relocated copy. One of the two should be deleted in a cleanup pass. |
+| `band_tracking/projection_STUB.js` | **Stub**. Exists to satisfy `vote_evidence` imports during minimal Stage-4 tests. Production `projection.js` overwrites it. Verify production lands on top in any deployment. |
+| `band_tracking/index_min.js` | **Diagnostic surface**. Production uses `index.js`. |
 
-### Gaps in the connection graph
-
-1. **`banding_pipeline.js` is not re-exported by `index.js`** — only reachable from outside band_tracking/, which is fine but worth noting.
-2. **`iv.js` has no downstream consumer inside band_tracking/.** Its output feeds `regime_mendelian.js` indirectly (via an external call). Intentional separation of concerns, but means it's a leaf node unless explicitly invoked.
-3. **`regime_catalogue.js` (the serializer) has no in-code consumer inside band_tracking/.** Outputs are written to disk for cross-cohort aggregation / paper data — that's by design.
-4. **Page-side gap (the one the user is fixing).** The haplotype_regimes page currently calls only `runBandingPipeline` (Stages 1-4). The Layer 3 entry (`refineRegimesFromIntervals`) and Layer 5 entry (`genomeWideRegimeReport`) are not yet wired. Closing this is the next-turn task.
-
-### Mislocations (cosmetic)
-
-- `regimes_registry.js` is UI persistence, not pipeline logic. Lives in `shared/`. Could move under `shared/ui/` but it's defensible where it is because the page that consumes it (haplotype_regimes) is also under shared scope.
-- L3 primitives (`contingency`, `hungarian`, `kmeans`, `per_l2_cluster`) live in `shared/`, not band_tracking. Correct, because they are reused by `pca_panel`, `dosage_chunks`, etc.
+These three files are real, but should not be invoked by the live pipeline.
 
 ---
 
-## Documented order vs. user's reconstructed order
+## Gaps in the connection graph (today)
 
-- The `band_tracking/index.js` header lists a **logical-grouping** order (Layer 1a → 1b → … → Layer 5).
-- The user's reconstructed-from-memory order is an **execution-flow** order ("per-window K-means → het.js → contingency/merge → 2-direction voting → long-range/short-range regimes").
-
-These are not in conflict. The same chain viewed from two angles. The mapping doc above is organized by the layer order; the wiring doc (next turn) will be organized by the execution flow.
+1. **`banding_pipeline.js` is not re-exported by `index.js`** — reachable only from outside band_tracking/. The haplotype_regimes page calls it directly. Fine but worth noting.
+2. **`iv.js` has no downstream consumer inside band_tracking/.** Its output feeds `regime_mendelian.js` via the page's explicit invocation. Intentional separation of concerns.
+3. **`regime_catalogue.js` (the serializer) has no in-code consumer inside band_tracking/.** Output is disk JSON for cross-cohort aggregation. By design.
+4. **Page-side gap (the one the next-turn commit closes)**: the page currently calls only Cluster 1 Path A (`runBandingPipeline`) + the per-pair Cramér's V table for `_renderL3PairsTable`. **Cluster 1 Path B (het-skeleton via `het.js` → `hom.js` → `cramers_v_merge`), all of Cluster 3 from §3a onward, and the genome_scale integration hub are not yet wired.**
+5. **The page passes L2-broadcast labels to the pipeline.** `_wireCtxCallbacks` currently routes through `per_l2_cluster.clusterL2` which returns the same labels for every window in an L2 envelope. The band_tracking/index.js header is explicit: **"per-window K-means labels via getLabels/getK callbacks, NEVER L2-broadcast."** Fix: per-window `kmeans1D` from `data.windows[w].pc1`.
 
 ---
 
-## Three load-bearing entry points (for the next-turn wiring)
+## What `haplotype_regime.js` actually is (the user's correction)
 
-The haplotype_regimes page should chain these:
+Previously this doc placed `haplotype_regime.js` as Layer 3 ("the long-range haplotype regime detector"). That was wrong. The long-range *segregation* signal comes from **Cluster 2 (voting)** — every band of every seed projected onto every target window, aggregated via partition consensus.
 
-1. **`banding_pipeline.runBandingPipeline(ctx, opts)`** — Stages 1-4 bruteforce. Currently the only entry the page calls. **Requires per-window K-means in `ctx.getLabels`**, not L2-broadcast.
-2. **`haplotype_regime.refineRegimesFromIntervals(intervals, opts)`** — Layer 3. Consumes het-skeleton intervals (from Layer 1b `het_define_interval`) plus HOM consensus (from Layer 1c). Outputs per-chromosome regimes.
-3. **`genome_scale.genomeWideRegimeReport(perChromMap, opts)`** — Layer 5 integration hub. Optionally runs Layers 4a-4d internally.
+`haplotype_regime.js`'s actual role is **within-regime arrangement-identity refinement**: given intervals that have *already been identified as part of a long-range segregation pattern by the voting pass*, decide whether two of those intervals represent the same physical inversion arrangement (EXTENSION), opposite-strand version of the same arrangement (SWAPPED), one nested inside the other (NESTED), shared heterozygotes but different homozygote pools (SHARED_HET), or different biology (UNRELATED). It's an arrangement-identity resolution step, not a pattern-discovery step.
 
-**Optional fourth**: `regime_topology.buildRegimeTopologyGraph(regimes, opts)` + `findChromosomeRegimeChains(...)` between (2) and (3) when the page wants intra-chromosome topology visible.
+The script's own header still describes itself as "long-range regimes — chains of intervals that share haplotype identity." That's literally what `clusterHaplotypeRegimes` does (union-find over EXTENSION+SWAPPED edges), but in the user's mental model this is *refinement on top of* the segregation patterns Cluster 2 has already discovered, not the source of the long-range signal.
+
+---
+
+## What "long-range segregation pattern" means in the user's flow
+
+The voting cluster (Cluster 2) operates per-focal-band-subset and asks: across the entire genome, who votes for me visited, who votes excluded, who fans? This is "long-range" because the **voter set spans the whole genome** — every other seed, every other band, every other window. The result tells us "this band of this seed always travels with this sample-set across the genome" (long-range = many distant voters agree). That's the segregation pattern: who segregates with whom across the population, supported by genome-wide co-presence evidence.
+
+This is distinct from:
+- "Long" in the V-walker sense (a seed footprint can be many windows wide) — that's Path A's `s_window..e_window` extent.
+- "Long-range" in `haplotype_regime.js` (intervals fused across skeleton breaks) — that's Cluster 3c's interval-identity resolution.
+
+Three different "long-range" meanings; the user's primary one is the voting one.
+
+---
+
+## Three load-bearing entry points for the haplotype_regimes page
+
+The page's "Run pipeline" button should chain (per mode):
+
+**Mode 1 — V-walker (current default)**
+1. Cluster 1 Path A: `runBandingPipeline(ctx, opts)` — Stages 1-4.
+2. Cluster 3 from §3a onward: dosage_overlay → karyotype_caller → karyotype_model → haplotype_regime (refine arrangement identity) → regime_topology → optional 4b-4d → genome_scale.
+3. Render via `initRegimesPage` (already wired) + post-render annotations.
+
+**Mode 2 — Curated candidates (short-range, existing)**
+1. Cluster 1 Path C: `_buildShortRangeResult(state)` — seeds from candidate list.
+2. Same Cluster 2 + Cluster 3 tail as Mode 1.
+
+**Mode 3 — Het-skeleton (NEW, matches user's reconstructed pipeline)**
+1. Cluster 1 Path B: per-window `kmeans1D` → `het_detect_candidate_band` per window → `het_track_skeleton` from each HET seed → `het_define_interval` → `hom_anchor_to_het` per skeleton → `computeAdjacentSeedMerges` between adjacent intervals → fuse into Cramér's V seeds.
+2. Same Cluster 2 + Cluster 3 tail as Modes 1 and 2.
+
+All three modes share Clusters 2 and 3 verbatim — they differ only in how Cluster 1 produces seeds.
 
 ---
 
@@ -356,26 +290,52 @@ The haplotype_regimes page should chain these:
 The band_tracking/index.js header is explicit:
 > "per-window K-means labels via getLabels/getK callbacks, NEVER L2-broadcast — same per-window upgrade noted in anchor_signals.js header"
 
-The current `haplotype_regimes.js::_wireCtxCallbacks` routes through `per_l2_cluster.clusterL2`, which returns the same labels for every window inside an L2 envelope. That's the L2-broadcast pattern the header forbids. Adjacent-window contingencies (the L3 table) become trivially 1.0 inside an L2 envelope, killing the V-signal.
+Current `haplotype_regimes.js::_wireCtxCallbacks` violates this (routes through `per_l2_cluster.clusterL2`). The next-turn commit replaces the L2 routing with per-window `kmeans1D` / `adaptiveK1D` from `data.windows[w].pc1`, caches the labels in a `perWinLabels[w]` array, and stubs `getL2Idx = () => 0` (the legacy L2 branch is unreachable in classifier mode anyway, per `locus_construction.js`).
 
-**Fix is small and local**: compute `kmeans1D` (or `adaptiveK1D`) per window from `data.windows[w].pc1`, cache in arrays, return from `getLabels(w)`. `getK(w)` reads the cached K. Drop the `getL2Idx` routing (stub to `() => 0` per `STAGE_B_v3_NOTES.md §2`).
-
-This single change unblocks every layer above — the V-walker (Layer 2), the het skeleton (Layer 1b), and the long-range regime (Layer 3) all consume per-window labels through the same callback.
+This single change unblocks Cluster 1 Path A (V-walker sees non-degenerate adjacent-window contingencies), Path B (het.js can detect HET bands per window), and Cluster 3b (trajectory.js needs per-window labels for sign anchoring).
 
 ---
 
 ## Next-turn wiring plan (preview, not yet implemented)
 
-1. Replace `_wireCtxCallbacks` per-window K-means cache (per-window `kmeans1D`, drop L2 routing, stub `getL2Idx`). Keep band_quality computation against the new labels.
-2. After `runBandingPipeline` returns, build het-skeleton intervals from Stage 3 loci (or invoke `het_define_interval` directly on the per-window labels).
-3. Call `refineRegimesFromIntervals` (Layer 3) → per-chromosome regimes.
-4. Call `buildRegimeTopologyGraph` + `findChromosomeRegimeChains` (Layer 4a) → cross-regime topology.
-5. If trios/families/dyads are available, call the Mendelian + pedigree + linkage + dyad annotation passes (Layers 4b–4d).
-6. Call `genomeWideRegimeReport` (Layer 5) once we have per-chrom maps — initially this will be single-chrom, but the entry point is the same.
-7. Render the result into the existing regime panels.
+1. **Replace `_wireCtxCallbacks` body**:
+   - Per-window `kmeans1D` / `adaptiveK1D` cache → `getLabels(w)` / `getK(w)` callbacks
+   - Drop L2 routing; stub `getL2Idx = () => 0`
+   - Keep band_quality computation (now uses per-window labels — correct)
+   - Drop synthetic-L2 hack (no longer needed)
 
-The two prior commits on this branch (band_quality wiring, synthetic-L2 fallback) get superseded by step (1) — the per-window labels also drive band_quality correctly, and the synthetic L2 disappears entirely. Net change vs. current branch is a clean rewrite of `_wireCtxCallbacks` plus the Layer 3 → Layer 5 chain after the existing `runBandingPipeline` call.
+2. **Add mode 3 toggle** to `rgModeBar`. Persist to localStorage like modes 1+2.
+
+3. **Implement Mode 3 entry path** (Cluster 1 Path B):
+   - Loop per window: `het_detect_candidate_band`
+   - For each HET seed: `het_track_skeleton` (forward + backward via Jaccard)
+   - `het_define_interval` → bp coords
+   - `hom_anchor_to_het` per skeleton → HOM_A / HOM_B
+   - `computeAdjacentSeedMerges` between adjacent intervals → fuse chains
+   - Output: same seed-with-bands shape Mode 1's `runStage3` produces
+
+4. **Implement the shared Cluster 2 + Cluster 3 tail** (called by all three modes):
+   - `breadth_voting.runBreadthVoting` (Cluster 2 — already inside `runBandingPipeline` for Mode 1, called explicitly for Modes 2+3)
+   - `dosage_overlay.classifyMacroBands` + `dosage_overlay.countAxesByHetDisjointness`
+   - `karyotype_caller.callAxisKaryotype` per axis per sample
+   - `karyotype_model.kt_resolve_karyotype_model` for the verdict
+   - `haplotype_regime.refineRegimesFromIntervals` for arrangement identity
+   - `regime_topology.buildRegimeTopologyGraph` + `findChromosomeRegimeChains`
+   - Optional 4b-4d (Mendelian/pedigree/linkage/dyad) when trios/families/dyads supplied
+   - `genome_scale.genomeWideRegimeReport` — single-call hub that can take all the above
+   - `regime_annotation/positional.annotateRegimePositions` + `regime_annotation/structure.annotateRegimeStructures`
+   - `regime_catalogue.serializeCatalogue` for the export button
+
+5. **Diagnostics**:
+   - band_quality stats (mean, max, n_pass_default, first 10)
+   - Per-window K-means provenance (n_computed, n_skipped)
+   - Per-cluster timing breakdown (`heat_detect: 120ms, skeleton_track: 340ms, breadth_vote: 1800ms, refine_regimes: 80ms, ...`)
+   - Surface 0-seeds reason in status bar
+
+6. **Render**: feed the final Cluster 3 output into the existing 4-panel `initRegimesPage` shell + any new panels for positional/structural annotations.
+
+The two prior commits on this branch (band_quality wiring `476459d`, synthetic-L2 fallback `1891155`) are subsumed naturally — the new per-window K-means path computes band_quality against real labels, and the synthetic-L2 hack disappears entirely.
 
 ---
 
-*End of mapping doc. Wiring lives in the next commit.*
+*End of mapping doc. The wiring lives in the next-turn commit.*
