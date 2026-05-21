@@ -446,7 +446,36 @@ export function drawPCA(state) {
   // for "no data yet".
   if (_PCA_RAMP_MODES.has(state.colorMode)) {
     try {
-      const vals = perSampleValuesForMode(state, state.colorMode, { startW: cur, endW: cur });
+      // 2026-05-20: range widens for chunk-backed modes (het / dosage).
+      // A single-window range is ~5-20 SNPs per sample → noisy means
+      // (mostly 0 / 1 / 0.5 with no gradient) AND a dosage-chunk LRU
+      // key that almost never matches a previously-fetched chunk
+      // (lines panel typically fetches at L2 or Mb-visible granularity).
+      // Quentin: "dosage in the tracked samples doesnt appear the
+      // points are grey, normally it should show the mean dosage from
+      // snps". Widen to the current L2 envelope when inside one;
+      // otherwise ±20 windows around cur. Result: stable per-sample
+      // mean that matches what the L3 contingency chips compute, and
+      // the chunk lookup hits a cached chunk almost every time. Other
+      // ramp modes (theta_pi / ghsl / froh / confounder_alert) keep
+      // the single-window range — they're point evaluators.
+      let rangeStartW = cur, rangeEndW = cur;
+      if (state.colorMode === 'het' || state.colorMode === 'dosage') {
+        const curL2 = state.windowToL2 ? state.windowToL2[cur] : -1;
+        if (curL2 >= 0 && state.data.l2_envelopes
+            && state.data.l2_envelopes[curL2]) {
+          const env = state.data.l2_envelopes[curL2];
+          rangeStartW = (env._s0 != null) ? env._s0 : (env.start_w - 1);
+          rangeEndW   = (env._e0 != null) ? env._e0 : (env.end_w - 1);
+        } else {
+          // Fallback when cursor is between L2 envelopes: ±20 windows.
+          const slabHalf = 20;
+          rangeStartW = Math.max(0, cur - slabHalf);
+          rangeEndW   = Math.min((d.n_windows | 0) - 1, cur + slabHalf);
+        }
+      }
+      const vals = perSampleValuesForMode(state, state.colorMode,
+        { startW: rangeStartW, endW: rangeEndW });
       state._pcaModePsVals = vals ? { mode: state.colorMode, vals } : null;
     } catch (e) {
       state._pcaModePsVals = null;
