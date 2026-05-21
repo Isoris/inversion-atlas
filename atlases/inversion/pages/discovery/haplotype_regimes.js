@@ -2187,8 +2187,35 @@ function _buildHetSkeletonResult(state) {
   } catch (e) {
     console.warn('[het-skeleton] cramers_v_merge threw', e);
   }
-  const chains = (mergeResult && Array.isArray(mergeResult.chains)) ? mergeResult.chains
+  let chains = (mergeResult && Array.isArray(mergeResult.chains)) ? mergeResult.chains
                 : skSeeds.map((s, i) => ({ start_i: i, end_i: i, length: 1 }));
+
+  // 2026-05-21: cap the het-skeleton output to the top-N longest chains
+  // (window-span). Quentin reported the page "computes and crashes
+  // almost and its so slow" with 456 chains — each chain → seed chip in
+  // the strip + locus row in initRegimesPage state, which inflates the
+  // render budget linearly. Cap default 50. Tunable via state.hetMaxSeeds
+  // so dev-console can bump it without a rebuild. Stash the original
+  // count on summary so the user sees how many were dropped.
+  const HET_MAX_SEEDS = (Number.isFinite(state.hetMaxSeeds) && state.hetMaxSeeds > 0)
+    ? (state.hetMaxSeeds | 0) : 50;
+  const n_chains_total = chains.length;
+  if (chains.length > HET_MAX_SEEDS) {
+    const enriched = chains.map((ch) => {
+      const sStart = skSeeds[ch.start_i] ? skSeeds[ch.start_i].s_window : 0;
+      const sEnd   = skSeeds[ch.end_i]   ? skSeeds[ch.end_i].e_window   : 0;
+      return { ch, span: Math.max(0, sEnd - sStart + 1) };
+    });
+    enriched.sort((a, b) => b.span - a.span);
+    chains = enriched.slice(0, HET_MAX_SEEDS).map(e => e.ch);
+    // Re-sort the kept chains by start_w so the seed strip walks left
+    // to right along the chromosome.
+    chains.sort((a, b) => {
+      const sa = skSeeds[a.start_i] ? skSeeds[a.start_i].s_window : 0;
+      const sb = skSeeds[b.start_i] ? skSeeds[b.start_i].s_window : 0;
+      return sa - sb;
+    });
+  }
 
   // Each chain becomes one seed + one locus. per_band_samples come from
   // the skeleton's anchor window's K-means labels (the canonical band
@@ -2276,6 +2303,12 @@ function _buildHetSkeletonResult(state) {
       n_anchors_tried:       nAnchorsTried,
       n_skeletons_raw:       nSkeletonsAccepted,
       n_chains:              chains.length,
+      // 2026-05-21: pre/post-cap counts so the status bar can show
+      // "456 chains → top 50 by span" when the user runs het-skeleton
+      // on a busy chromosome.
+      n_chains_before_cap:   n_chains_total,
+      n_chains_capped:       Math.max(0, n_chains_total - chains.length),
+      het_max_seeds:         HET_MAX_SEEDS,
     },
   };
 }
@@ -2436,9 +2469,18 @@ function _runPostSeedingTail(root, state, result, modeLabel, msSoFar) {
   const nRegimes = refined && refined.regimes ? refined.regimes.length : 0;
   const nChains  = topology && topology.chains ? topology.chains.length : 0;
   const timingStr = Object.entries(timing).map(([k, v]) => `${k}=${v}`).join(' · ');
+  // 2026-05-21: when het-skeleton's chain-cap kicked in, surface
+  // "N → top M by span" so the user knows the strip isn't showing
+  // everything the pipeline found.
+  let capNote = '';
+  const sm = result.summary || {};
+  if (Number.isFinite(sm.n_chains_capped) && sm.n_chains_capped > 0) {
+    capNote = ` · capped ${sm.n_chains_before_cap} chains → top ${sm.het_max_seeds} by span`;
+  }
   _setStatus(root,
     `${modeLabel} mode ran in ${msSoFar}ms · ` +
     `${nSeeds} seeds · ${nLoci} loci · ${nRegimes} regimes · ${nChains} chains` +
+    capNote +
     (timingStr ? ` · ${timingStr}` : ''));
 
   console.log('[post-seeding] cluster 2+3 summary:', {

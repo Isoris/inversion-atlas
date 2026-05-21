@@ -73,7 +73,10 @@ export function drawRegimesPC1Panel(state) {
   }
   const container = document.getElementById('regimesPC1CanvasContainer');
   if (!container || typeof container.querySelector !== 'function') return;
-  const sub = container.querySelector('.regimes-pc1-subpanel');
+  // 2026-05-21: also match the genome subpanel class so the alias-routed
+  // genome paint actually finds its subpanel (regimes-genome-pc1-subpanel).
+  const sub = container.querySelector(
+    '.regimes-pc1-subpanel, .regimes-genome-pc1-subpanel');
   if (!sub) return;
   const cv = sub.querySelector('canvas');
   if (!cv) return;

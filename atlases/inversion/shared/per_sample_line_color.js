@@ -369,11 +369,47 @@ function _perSampleMeanByWindowPanel(panel, nS, startW, endW, data) {
  *                          normalisation in sequential modes)
  * @returns {string | null}
  */
+// 2026-05-20: cache vMin/vMax on the array so repeated calls
+// (perSampleColorFor fires once per sample × per draw) don't re-walk.
+// Stashes a `__vMinMax` property on the array; safe for Array and
+// TypedArray. Callers that mutate the array in place should clear it.
+function _cohortRange(valuesArr) {
+  if (!valuesArr) return null;
+  if (valuesArr.__vMinMax) return valuesArr.__vMinMax;
+  let vMin = Infinity, vMax = -Infinity;
+  for (let i = 0; i < valuesArr.length; i++) {
+    const v = valuesArr[i];
+    if (!Number.isFinite(v)) continue;
+    if (v < vMin) vMin = v;
+    if (v > vMax) vMax = v;
+  }
+  const out = isFinite(vMin) ? { vMin, vMax } : null;
+  try { valuesArr.__vMinMax = out; } catch (_) { /* frozen array */ }
+  return out;
+}
+
 export function perSampleColorFor(mode, value, valuesArr) {
   if (!Number.isFinite(value)) return null;
 
   if (mode === 'het') {
-    // hetRateColor handles its own normalization (0..1 rate).
+    // 2026-05-20: was `hetRateColor(value)` which fixed-normalizes to
+    // [0, 1] around 0.5. Real per-sample het rates over a typical L2
+    // envelope sit at ~0.001–0.05 — every sample landed at t ≈ 0.01
+    // on the RdBu ramp = all the same dark blue, invisible against
+    // the dark canvas background, reads as grey. Quentin: "the dosage
+    // in the tracked samples doesnt appear the points are grey ...
+    // maybe its a problem of color palette or smth?".
+    //
+    // Fix: same auto-scale-to-data pattern theta_pi/ghsl already use.
+    // Normalize each window's value to the actual [vMin, vMax] across
+    // the cohort so the colour spread fills the ramp regardless of
+    // the absolute rate. Range cached on the array so this is O(N)
+    // amortized across all samples in the same draw.
+    const r = _cohortRange(valuesArr);
+    if (r && r.vMin !== r.vMax) {
+      const t = (value - r.vMin) / (r.vMax - r.vMin);
+      return _sequentialBlueToYellow(t);
+    }
     return hetRateColor(value);
   }
 
@@ -393,24 +429,24 @@ export function perSampleColorFor(mode, value, valuesArr) {
 
   if (mode === 'theta_pi' || mode === 'ghsl') {
     // Sequential ramp normalized to the array's [min, max].
-    if (!valuesArr) return null;
-    let vMin = Infinity, vMax = -Infinity;
-    for (let i = 0; i < valuesArr.length; i++) {
-      const v = valuesArr[i];
-      if (!Number.isFinite(v)) continue;
-      if (v < vMin) vMin = v;
-      if (v > vMax) vMax = v;
-    }
-    if (!isFinite(vMin) || vMin === vMax) return null;
-    const t = (value - vMin) / (vMax - vMin);
+    const r = _cohortRange(valuesArr);
+    if (!r || r.vMin === r.vMax) return null;
+    const t = (value - r.vMin) / (r.vMax - r.vMin);
     return _sequentialBlueToYellow(t);
   }
 
   if (mode === 'dosage') {
-    // Diploid dosage on [0, 2] scale: 0 = HOMO_REF, 1 = HET, 2 = HOMO_ALT.
-    // Use a divergent ramp so 1 (het) sits at the visual midpoint and
-    // 0 / 2 stand out at opposite ends. Cool teal → grey → warm red.
-    const t = Math.max(0, Math.min(1, value / 2));   // 0..1
+    // 2026-05-20: same fix as het — fixed [0, 2] mapping wastes the
+    // ramp when the cohort's mean dosages cluster (e.g. all ≈ 0.05
+    // for a near-monomorphic site). Auto-scale to the cohort's
+    // [vMin, vMax] for visible spread; fall back to the fixed [0, 2]
+    // mapping when no valuesArr is supplied or the range collapses.
+    const r = _cohortRange(valuesArr);
+    if (r && r.vMin !== r.vMax) {
+      const t = (value - r.vMin) / (r.vMax - r.vMin);
+      return _divergentTealRedThroughGrey(t);
+    }
+    const t = Math.max(0, Math.min(1, value / 2));
     return _divergentTealRedThroughGrey(t);
   }
 

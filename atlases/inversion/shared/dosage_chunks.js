@@ -151,6 +151,33 @@ function _buildSampleIdMap(state, chunkSamples) {
       if (c && !map.has(c)) map.set(c, ci);
     }
   }
+  // Pass 3: positional fallback. The beagle (which the server reads as
+  // the dosage matrix's column order) often ships placeholder IDs like
+  // "Ind", "Ind1", "Ind2" OR even all-literal "Ind" duplicates, while
+  // the cohort precomp uses real names like "CGA001". Quentin: "maybe
+  // because in the beagle its Ind Ind Ind and in the samples its CGA".
+  // The columns ARE ordered the same way (beagle column order is
+  // preserved through both pipelines), so chunk.samples[i] corresponds
+  // to cohort.samples[i] — that's the bamlist-to-Ind mapping the
+  // catfish-inversion-analysis precomp documents as the canonical
+  // identity binding.
+  //
+  // We DON'T stuff positional aliases into `map` because if the chunk
+  // ships duplicate strings (e.g. all literal "Ind"), the first
+  // map.set("Ind", 0) wins and every chunk index >0 still misses.
+  // Instead we attach a parallel `_byPos` table the lookup wrapper
+  // walks AFTER all string-based passes fail. Only safe when lengths
+  // agree — different cohort sizes would mis-align.
+  if (chunkSamples && chunkSamples.length === cohortSamples.length
+      && cohortSamples.length > 0) {
+    map._byPos = new Array(chunkSamples.length);
+    for (let i = 0; i < chunkSamples.length; i++) map._byPos[i] = i;
+    // Pre-compute name-rate to decide whether positional should ALSO
+    // win on per-cell misses. If name matching has any hits at all,
+    // positional is only used for samples that didn't string-match.
+    // If name matching has zero hits (beagle-placeholder case), every
+    // sample resolves positionally.
+  }
   // One-shot diagnostic per page load. Always logs the first match so
   // there's evidence whether the matcher is finding samples or not.
   // After the first log, only re-logs when window.__dosageDbg is true
@@ -163,8 +190,8 @@ function _buildSampleIdMap(state, chunkSamples) {
       && state && (!state.__dosageMatchRateLogged
                    || (typeof window !== 'undefined' && window.__dosageDbg === true))) {
     let matched = 0;
-    for (const cid of chunkSamples) {
-      if (_lookupCohortIdx(map, cid) >= 0) matched++;
+    for (let i = 0; i < chunkSamples.length; i++) {
+      if (_lookupCohortIdx(map, chunkSamples[i], i) >= 0) matched++;
     }
     const rate = matched / chunkSamples.length;
     const cohortSample = cohortSamples[0];
@@ -183,20 +210,31 @@ function _buildSampleIdMap(state, chunkSamples) {
 }
 
 // Wrapper so chunk.samples lookups go through the canonicalisation +
-// prefix-strip fallbacks when the exact-string lookup misses. Match
-// order: exact → exact-without-prefix → canonical → canonical-without-prefix.
-function _lookupCohortIdx(map, chunkId) {
-  if (chunkId == null) return -1;
-  const key = _normId(chunkId);
-  if (map.has(key)) return map.get(key);
-  for (const stripped of _stripPrefixes(key)) {
-    if (map.has(stripped)) return map.get(stripped);
+// prefix-strip + positional fallbacks when the exact-string lookup
+// misses. Match order: exact → exact-without-prefix → canonical →
+// canonical-without-prefix → positional (chunk index === cohort index).
+// Positional only fires when map._byPos was set (lengths agree) so
+// mis-sized cohorts don't get aligned to the wrong rows.
+function _lookupCohortIdx(map, chunkId, chunkIdx) {
+  if (chunkId != null) {
+    const key = _normId(chunkId);
+    if (map.has(key)) return map.get(key);
+    for (const stripped of _stripPrefixes(key)) {
+      if (map.has(stripped)) return map.get(stripped);
+    }
+    const canon = _normIdCanon(key);
+    if (map.has(canon)) return map.get(canon);
+    for (const stripped of _stripPrefixes(key)) {
+      const c = _normIdCanon(stripped);
+      if (c && map.has(c)) return map.get(c);
+    }
   }
-  const canon = _normIdCanon(key);
-  if (map.has(canon)) return map.get(canon);
-  for (const stripped of _stripPrefixes(key)) {
-    const c = _normIdCanon(stripped);
-    if (c && map.has(c)) return map.get(c);
+  // Positional last-resort. Handles the beagle-placeholder case
+  // (chunk samples are all literal "Ind") + any other shape where
+  // name-based binding fails but column order is trusted.
+  if (map._byPos && Number.isFinite(chunkIdx)
+      && chunkIdx >= 0 && chunkIdx < map._byPos.length) {
+    return map._byPos[chunkIdx];
   }
   return -1;
 }
@@ -306,7 +344,7 @@ export function computeHetRateForRange(state, startBp, endBp, opts) {
   // canonicalised (alphanumeric-lowercase) fallbacks so prefix /
   // separator / case variants still match.
   for (let ci = 0; ci < nChunkS; ci++) {
-    const cohortIdx = _lookupCohortIdx(idToCohort, chunk.samples[ci]);
+    const cohortIdx = _lookupCohortIdx(idToCohort, chunk.samples[ci], ci);
     if (cohortIdx < 0 || cohortIdx >= nS) continue;
     out[cohortIdx] = (nonNaCounts[ci] === 0)
       ? NaN
@@ -457,7 +495,7 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
   // canonicalised (alphanumeric-lowercase) fallbacks so prefix /
   // separator / case variants still match.
   for (let ci = 0; ci < nChunkS; ci++) {
-    const cohortIdx = _lookupCohortIdx(idToCohort, chunk.samples[ci]);
+    const cohortIdx = _lookupCohortIdx(idToCohort, chunk.samples[ci], ci);
     if (cohortIdx < 0 || cohortIdx >= nS) continue;
     out[cohortIdx] = (nNonNa[ci] === 0)
       ? NaN
