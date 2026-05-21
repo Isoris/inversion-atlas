@@ -800,7 +800,11 @@ export function drawZ(state) {
   if (state.zCollapsed) {
     const pad = { l: 44, r: 16, t: 2, b: 1 };
     const zoneH = 14;
-    const peaksH = 5;
+    // 2026-05-20: 5 → 8. Same clear-zone reason as the expanded-mode
+    // bump (peaksH ≈ 13 below). Compact mode has tight vertical budget,
+    // so only +3 px — enough to lift the triangles off the top of the
+    // |z| scatter without crowding the next band.
+    const peaksH = 8;
     // v3.99 t14e+ continue: candidate bar above L1/L2 (was below boundaries
     // in old strip placement). Slightly thinner here than in non-collapsed
     // mode since vertical space is constrained; ★ glyph still fits at h=5.
@@ -979,7 +983,12 @@ export function drawZ(state) {
   // the dashed yellow line). Putting them just under the zone bars makes them
   // read as "boundary markers tied to the L1/L2 envelope coloring above"
   // rather than getting confused with the z-score scatter.
-  const peaksH = 8;
+  // 2026-05-20: bumped 8 → 13. Earlier the triangles sat flush against the
+  // top of the |z| plot area, so points at |z|≈zMax painted INTO the
+  // triangle band — visually the triangles overlapped the highest data
+  // points. The extra 5 px gives the boundary-status row its own clear
+  // lane between the L2 zone bar and the |z| scatter.
+  const peaksH = 13;
   // v3.99 t14e+ continue: reserve a band ABOVE the L1/L2 zone bars for the
   // candidate bar (drawCandidateBar). Pending candidates render grey here,
   // confirmed candidates render shiny gold + ★. 2 px gap separates this

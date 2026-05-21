@@ -239,7 +239,11 @@ function _buildGenomeLanesPanel(state) {
   sub.style.cssText = 'position: relative; flex: 1 1 0; min-height: 0; ' +
                       'border-bottom: 1px solid var(--rule, #2a3242);';
   const cv = document.createElement('canvas');
-  cv.style.cssText = 'display: block; width: 100%; height: 100%; cursor: crosshair;';
+  // 2026-05-20: position:absolute + inset:0 anchors the canvas to the
+  // relative sub directly. width/height:100% relies on the parent
+  // resolving a definite height — which a flex-basis:0 parent doesn't
+  // always do, hence the empty-canvas bug.
+  cv.style.cssText = 'display: block; position: absolute; inset: 0; cursor: crosshair;';
   cv.tabIndex = 0;
   sub.appendChild(cv);
   container.appendChild(sub);
@@ -260,7 +264,11 @@ function _buildGenomePC1Panel(state) {
   sub.style.cssText = 'position: relative; flex: 1 1 0; min-height: 0; ' +
                       'border-bottom: 1px solid var(--rule, #2a3242);';
   const cv = document.createElement('canvas');
-  cv.style.cssText = 'display: block; width: 100%; height: 100%; cursor: crosshair;';
+  // 2026-05-20: position:absolute + inset:0 anchors the canvas to the
+  // relative sub directly. width/height:100% relies on the parent
+  // resolving a definite height — which a flex-basis:0 parent doesn't
+  // always do, hence the empty-canvas bug.
+  cv.style.cssText = 'display: block; position: absolute; inset: 0; cursor: crosshair;';
   cv.tabIndex = 0;
   sub.appendChild(cv);
   container.appendChild(sub);

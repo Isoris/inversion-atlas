@@ -455,6 +455,11 @@ export function drawPCA(state) {
   } else {
     state._pcaModePsVals = null;
   }
+  // 2026-05-20: refresh the ramp-legend strip so the gradient bar +
+  // min/max value labels match the active ramp mode. Quentin: "for
+  // GHSL and dosage we need a little bit of the scale". Always runs
+  // (the helper hides itself when no ramp mode is active).
+  try { _refreshRampLegend(state); } catch (_) {}
 
   // v3.25: which two PCs to plot (default PC1×PC2). PC1 keeps its sign-flip
   // rule (signX); other PCs render in raw orientation. The analytics path
@@ -1137,6 +1142,66 @@ export function togglePlay(state) {
       setCur(state, next);
     }, 80);
   }
+}
+
+// --- _refreshRampLegend(state) — 2026-05-20 ---
+// Paints the gradient-swatch + min/max labels in #pcaAxisRampLegend so
+// the user can read what blue → yellow means under the active ramp.
+// Hides itself when state.colorMode is not a ramp mode, or when the
+// pre-computed per-sample values are missing (e.g. chunk in flight).
+function _refreshRampLegend(state) {
+  if (typeof document === 'undefined') return;
+  const wrap = document.getElementById('pcaAxisRampLegend');
+  if (!wrap) return;
+  const ramp = (state && _PCA_RAMP_MODES.has(state.colorMode)) ? state.colorMode : null;
+  if (!ramp) {
+    wrap.style.display = 'none';
+    return;
+  }
+  // Compute the data-driven min/max for sequential modes; the
+  // divergent / binary modes have fixed semantic ranges (see
+  // perSampleColorFor in shared/per_sample_line_color.js).
+  const psv = (state && state._pcaModePsVals && state._pcaModePsVals.mode === ramp)
+    ? state._pcaModePsVals.vals : null;
+  let vMin = NaN, vMax = NaN;
+  if (psv && psv.length) {
+    for (let i = 0; i < psv.length; i++) {
+      const v = psv[i];
+      if (!Number.isFinite(v)) continue;
+      if (!(vMin <= vMin) || v < vMin) vMin = v;
+      if (!(vMax <= vMax) || v > vMax) vMax = v;
+    }
+  }
+  // Mode-specific gradient + label format.
+  let gradientCss = null, minLbl = '', maxLbl = '';
+  if (ramp === 'het') {
+    gradientCss = 'linear-gradient(to right, #4a90ff, #cccccc, #d94f4f)';
+    minLbl = '0'; maxLbl = '1';
+  } else if (ramp === 'dosage') {
+    gradientCss = 'linear-gradient(to right, #2c8fa1, #9aa1a8, #d94f4f)';
+    minLbl = '0'; maxLbl = '2';
+  } else if (ramp === 'theta_pi' || ramp === 'ghsl') {
+    gradientCss = 'linear-gradient(to right, #2b6ca8, #f0c14b)';
+    minLbl = Number.isFinite(vMin) ? vMin.toFixed(3) : '—';
+    maxLbl = Number.isFinite(vMax) ? vMax.toFixed(3) : '—';
+  } else if (ramp === 'froh') {
+    gradientCss = 'linear-gradient(to right, #8c96aa, #d94f4f)';
+    minLbl = '0'; maxLbl = '1';
+  } else if (ramp === 'confounder_alert') {
+    gradientCss = 'linear-gradient(to right, #8c96aa 50%, #d94f4f 50%)';
+    minLbl = '≤0.05'; maxLbl = '>0.05';
+  }
+  if (!gradientCss) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = 'inline-flex';
+  const bar = wrap.querySelector('.pca-axis-ramp-legend-bar');
+  const minEl = wrap.querySelector('.pca-axis-ramp-legend-min');
+  const maxEl = wrap.querySelector('.pca-axis-ramp-legend-max');
+  if (bar) bar.style.background = gradientCss;
+  if (minEl) minEl.textContent = minLbl;
+  if (maxEl) maxEl.textContent = maxLbl;
 }
 
 // --- cycleKAside() — legacy lines 56537-56565 ---

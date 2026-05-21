@@ -85,6 +85,19 @@ export function perSampleValuesForMode(state, mode, range) {
     if (tpw && Array.isArray(tpw.values)) {
       return _perSampleMeanFrom2D(tpw.values, nS, startW, endW);
     }
+    // 2026-05-20: when theta_pi_per_window.values isn't populated, fall
+    // back to theta_pi_local_pca.pc_loadings_aligned[0] (PC1 across all
+    // windows × samples — the same shape ghsl_local_pca uses). For
+    // single-window evaluation this gives the per-sample θπ-derived PC1
+    // value at the cursor, which is the right thing to color the
+    // tracked-samples PCA by when only the theta-pi-PCA precomp is on
+    // disk. Quentin reported θπ stayed grey because only the legacy
+    // tpw.values path was checked.
+    const tpLp = d.theta_pi_local_pca;
+    if (tpLp && Array.isArray(tpLp.pc_loadings_aligned) &&
+        Array.isArray(tpLp.pc_loadings_aligned[0])) {
+      return _perSamplePcMeanFromAligned(tpLp.pc_loadings_aligned[0], nS, startW, endW);
+    }
     // Legacy fallback: panel-style div_roll.
     const panel = d.theta_pi_panel || d.per_sample_theta_pi || null;
     if (!panel) return null;

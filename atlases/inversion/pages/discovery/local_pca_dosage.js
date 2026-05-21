@@ -576,6 +576,17 @@ export async function mount(root, atlasState, registry) {
         // calls computeHetRateForRange with cacheKey, which now returns
         // real values instead of the NaN-filled placeholder.
         try { renderL3Panel(legacyState); } catch (_) {}
+        // 2026-05-20 (later): when the user picked "het" or "dosage"
+        // on the tracked-samples PCA color ramp, drawPCA pre-computes
+        // a per-sample value array via computeHet/DosageMeanForRange.
+        // On the first paint the chunk wasn't loaded yet → all-NaN →
+        // every sample falls back to grey. After the chunk lands we
+        // need to repaint the PCA scatter so the ramp colors show up.
+        // Without this call, het / dosage stayed grey until the user
+        // clicked the ramp button again. Quentin: "when we color by
+        // het in the tracked samples can we have like the color. here
+        // its all grey."
+        try { drawPCA(legacyState); } catch (_) {}
       },
     });
   } catch (e) { console.warn('installDosageChunkFetcher:', e); }

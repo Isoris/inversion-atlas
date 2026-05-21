@@ -443,8 +443,15 @@ export function _winNavBand(layoutCtx) {
 }
 
 // --- _drawWRow / _drawWinNavLane — drawZ-side helpers ---
-// _drawWRow stays stubbed for now — it only matters in candidate-mode
-// editing and the W-row band is null otherwise (no reserved space).
+// 2026-05-20: _drawWRow now paints the in-progress candidate draft
+// span (state.l3Draft) when in candidate mode. Without this painter
+// the W-row band was reserved but invisible — the user could still
+// click in the band to extend the draft (_wRowHandleClick handles
+// the gesture) but had no visual feedback for where the draft's
+// edges actually sit. With it: a horizontal amber bar runs from
+// draft.start_w to draft.end_w inside the reserved band, with thin
+// vertical handles at each end. _drawWinNavLane below already
+// closes the visual gap below the L2 zone bar.
 //
 // 2026-05-20: _drawWinNavLane IS implemented now. Quentin's report:
 // "the red arrow boundaries are too far from the L2 thats because
@@ -460,7 +467,68 @@ export function _winNavBand(layoutCtx) {
 // Net effect: closes the visual gap between L2 zone bar and the
 // boundary triangles AND surfaces the per-L2 dominant microgroup so
 // the reader can read "which band wins here" at a glance.
-export function _drawWRow() { return; }
+export function _drawWRow(ctx, d, toX, _xOfWin, band) {
+  if (!band || !ctx || !d || typeof toX !== 'function') return;
+  const state = _pageState;
+  if (!state || !state.candidateMode) return;
+  const draft = state.l3Draft;
+  const wins = d.windows;
+  if (!Array.isArray(wins) || wins.length === 0) return;
+  const nWin = wins.length;
+
+  const y = band.y0 | 0;
+  const h = Math.max(1, band.h | 0);
+
+  // Backing band — faint slate so the W-row is visible even when no
+  // draft exists (signals "this band is for candidate-draft editing").
+  ctx.save();
+  ctx.fillStyle = 'rgba(80,92,112,0.18)';
+  const xStart = toX(wins[0].center_mb);
+  const xEnd   = toX(wins[nWin - 1].center_mb);
+  if (Number.isFinite(xStart) && Number.isFinite(xEnd)) {
+    ctx.fillRect(Math.min(xStart, xEnd), y, Math.abs(xEnd - xStart), h);
+  }
+
+  // Draft span (if any). draft.start_w / draft.end_w are 0-indexed
+  // window indices per _wRowHandleClick. resolution='W' means user
+  // already entered window-mode editing; before that, draft spans an
+  // L2 range — paint that too so the user sees the L2 footprint that
+  // would become the W-mode starting point.
+  if (draft) {
+    let sw = -1, ew = -1;
+    if (draft.resolution === 'W'
+        && Number.isFinite(draft.start_w) && Number.isFinite(draft.end_w)) {
+      sw = draft.start_w | 0;
+      ew = draft.end_w | 0;
+    } else if (Number.isFinite(draft.l2_left) && Number.isFinite(draft.l2_right)
+               && Array.isArray(d.l2_envelopes)) {
+      const lo = d.l2_envelopes[draft.l2_left | 0];
+      const hi = d.l2_envelopes[draft.l2_right | 0];
+      if (lo && hi) {
+        sw = (lo._s0 != null) ? lo._s0 : (lo.start_w - 1);
+        ew = (hi._e0 != null) ? hi._e0 : (hi.end_w - 1);
+      }
+    }
+    if (sw >= 0 && ew >= sw && sw < nWin && ew < nWin) {
+      const xL = toX(wins[sw].center_mb);
+      const xR = toX(wins[ew].center_mb);
+      if (Number.isFinite(xL) && Number.isFinite(xR)) {
+        const x0 = Math.min(xL, xR);
+        const x1 = Math.max(xL, xR);
+        // Amber fill at 55% — bright enough to read but not so loud
+        // it competes with the |Z| dots below.
+        ctx.fillStyle = 'rgba(245,165,36,0.55)';
+        ctx.fillRect(x0, y, Math.max(1, x1 - x0), h);
+        // Edge handles — 1.5 px vertical bars so the reader can
+        // see exactly where the draft starts and ends.
+        ctx.fillStyle = '#f5a524';
+        ctx.fillRect(x0 - 0.5, y - 1, 1.5, h + 2);
+        ctx.fillRect(x1 - 0.5, y - 1, 1.5, h + 2);
+      }
+    }
+  }
+  ctx.restore();
+}
 export function _drawWinNavLane(ctx, d, toX, _xOfWin, band, padL) {
   if (!band || !ctx || !d || typeof toX !== 'function') return;
   const state = _pageState;

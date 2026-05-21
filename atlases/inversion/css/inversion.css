@@ -6087,6 +6087,15 @@ body:not([data-l3-layout="dual"]) #cusumPanel #cusumPaneRight {
   color: var(--bg);
   border-color: var(--accent);
 }
+/* 2026-05-20: 3-state ramp cycle. data-l3-active="1" marks "scatter +
+   L3" (the cycle's second stop) — a darker fill + extra ring makes
+   the two on-states visually distinguishable. data-l3-active="0" (or
+   absent) keeps the original .active styling. */
+.pca-axis-bar .pca-axis-ramp button.active[data-l3-active="1"] {
+  background: linear-gradient(180deg, var(--accent), rgba(245,165,36,0.6));
+  box-shadow: 0 0 0 1px rgba(245,165,36,0.85), inset 0 0 4px rgba(255,255,255,0.20);
+  color: var(--bg);
+}
 .pca-axis-bar .pca-axis-ramp button:disabled {
   opacity: 0.45;
   cursor: not-allowed;

@@ -2267,8 +2267,15 @@ function _wireDisplay(state) {
     // 2026-05-20: third surface — per-sample ramp buttons in the scatter
     // axes header (#pcaAxisColorRamp). They expose continuous-ramp modes
     // (het / theta_pi / ghsl) that the cluster-only sidebar bar doesn't.
+    // data-l3-active="1" lights when the cycle has advanced to the
+    // "scatter + L3" stage (state.l3RampMode === button's mode) so the
+    // user sees a distinct visual between "ramp on scatter only" and
+    // "ramp on scatter + L3 panes".
     document.querySelectorAll('#pcaAxisColorRamp button').forEach(b => {
-      b.classList.toggle('active', b.dataset.modeRamp === newMode);
+      const m = b.dataset.modeRamp;
+      b.classList.toggle('active', m === newMode);
+      const l3on = state && state.l3RampMode === m;
+      b.dataset.l3Active = l3on ? '1' : '0';
     });
     // v4 turn 86: show/hide Q-ancestry sub-controls when mode toggles
     // to/from q_ancestry. Refresh the K dropdown options from the
@@ -2319,19 +2326,43 @@ function _wireDisplay(state) {
   });
 
   // --- #pcaAxisColorRamp button click (2026-05-20) ---
-  // Third surface: continuous-ramp color modes (het / theta_pi / ghsl)
-  // exposed as buttons in the scatter axes header, next to the link
-  // checkbox. Clicking an already-active ramp button reverts to
-  // 'cluster' so a single click toggles the override on/off.
+  // Continuous-ramp color modes (het / theta_pi / ghsl / dosage)
+  // exposed as buttons in the scatter axes header. 2026-05-20: each
+  // button cycles through THREE states on repeated clicks
+  // (Quentin: "for each 3 buttons we can have like 2 modes. single
+  // push color tracked samples PCA, second push = also color the L3
+  // contingency tables PCA 3 panels data, third push back to normal"):
+  //   1st click (off       → scatter-only)  : state.colorMode = mode
+  //   2nd click (scatter-only → scatter+L3) : also state.l3RampMode = mode
+  //   3rd click (scatter+L3 → off)          : revert both to defaults
+  // The L3 painter consults state.l3RampMode (or the legacy
+  // state.l3HetColoring slot for backward compat); both surfaces
+  // re-render via the existing applyColorMode chain.
   document.querySelectorAll('#pcaAxisColorRamp button').forEach(btn => {
     if (btn.dataset.wired === '1') return;
     btn.addEventListener('click', () => {
       if (btn.disabled) return;
       const mode = btn.dataset.modeRamp;
       if (!mode) return;
-      // Toggle: if this ramp mode is already active, revert to cluster.
-      const next = (state.colorMode === mode) ? 'cluster' : mode;
-      applyColorMode(next);
+      const isScatterActive = state.colorMode === mode;
+      const isL3Active = state.l3RampMode === mode;
+      if (!isScatterActive && !isL3Active) {
+        // off → scatter-only
+        state.l3RampMode = null;
+        applyColorMode(mode);
+      } else if (isScatterActive && !isL3Active) {
+        // scatter-only → scatter + L3
+        state.l3RampMode = mode;
+        // Legacy slot kept in sync so the existing het-coloring path
+        // in L3 panes still fires when the user picks 'het'.
+        if (mode === 'het') state.l3HetColoring = true;
+        applyColorMode(mode);
+      } else {
+        // scatter+L3 (or any other state with isL3Active) → off
+        state.l3RampMode = null;
+        if (mode === 'het') state.l3HetColoring = false;
+        applyColorMode('cluster');
+      }
     });
     btn.dataset.wired = '1';
   });

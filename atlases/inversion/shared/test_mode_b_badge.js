@@ -14,9 +14,30 @@ import {
 } from '../../../core/mode_b_badge.js';
 
 // ----- fake DOM ---------------------------------------------------------
+// 2026-05-20: extended for the click-to-expand-card wiring renderModeBBadge
+// now installs on first render (see diversity-atlas's matching test for the
+// shared fake-DOM rationale).
 const _domElements = new Map();
 function _makeSlot(id) {
-  const el = { id, className: '', textContent: '', title: '' };
+  const attrs = {};
+  const el = {
+    id,
+    className: '',
+    textContent: '',
+    title: '',
+    dataset: {},
+    style: {},
+    _handlers: {},
+    setAttribute(k, v) { attrs[k] = String(v); },
+    getAttribute(k)    { return Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null; },
+    addEventListener(type, fn) { (this._handlers[type] ||= []).push(fn); },
+    removeEventListener(type, fn) {
+      const list = this._handlers[type];
+      if (!list) return;
+      const i = list.indexOf(fn);
+      if (i >= 0) list.splice(i, 1);
+    },
+  };
   _domElements.set(id, el);
   return el;
 }

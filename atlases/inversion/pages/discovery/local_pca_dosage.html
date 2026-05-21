@@ -952,13 +952,29 @@
              (#colorModeBarCompact / data-mode-compact) bars. -->
         <span class="pca-axis-sep" aria-hidden="true"></span>
         <span id="pcaAxisColorRamp" class="pca-axis-ramp"
-              title="Color samples by a per-sample ramp value (yellow → purple). Click an active button to revert to cluster colors.">
+              title="Per-sample ramp coloring (3-click cycle): click 1 = color the tracked PCA only · click 2 = also color the L3 contingency mini-PCAs (the button gets a darker fill + glow when L3 is also on) · click 3 = back to cluster colors.">
           <button data-mode-ramp="het" type="button"
-                  title="Color each sample by its regional dosage-derived heterozygosity at this locus. Bright yellow = high het (likely Het carrier); dark purple = low het (likely Homo carrier).">het</button>
+                  title="het — per-sample heterozygosity rate at this locus, computed from the dosage chunk fetcher. 3-click cycle: 1st = color tracked PCA; 2nd = also color the L3 panes; 3rd = back to cluster.">het</button>
           <button data-mode-ramp="ghsl" type="button"
-                  title="Color each sample by its per-sample GHSL value (haplotype-divergence signal) at this locus. Greys out until the GHSL precomp ships per-sample values.">GHSL</button>
+                  title="GHSL — per-sample PC1 from the GHSL haplotype-divergence local PCA at this locus. 3-click cycle: 1st = tracked PCA only; 2nd = also L3 panes; 3rd = cluster.">GHSL</button>
           <button data-mode-ramp="theta_pi" type="button"
-                  title="Color each sample by its per-sample θπ value (diversity) at this locus. Greys out until the θπ precomp ships per-sample values.">θπ</button>
+                  title="θπ — per-sample θπ-derived PC1 at this locus (falls back to the θπ local PCA loadings). 3-click cycle: 1st = tracked PCA only; 2nd = also L3 panes; 3rd = cluster.">θπ</button>
+        </span>
+        <!-- 2026-05-20: color-scale legend strip. Shows the gradient
+             swatch + min/max value labels whenever the active colorMode
+             is one of the ramp modes (het / ghsl / theta_pi / dosage /
+             froh). Hidden when no ramp is active. Painted by
+             pca_panel.js#_refreshRampLegend (called from drawPCA). -->
+        <span id="pcaAxisRampLegend" class="pca-axis-ramp-legend"
+              style="display: none; align-items: center; gap: 5px;
+                     margin-left: 8px; font: 9.5px ui-monospace, monospace;
+                     color: var(--ink-dim);"
+              title="Color scale for the active per-sample ramp mode.">
+          <span class="pca-axis-ramp-legend-min"></span>
+          <span class="pca-axis-ramp-legend-bar"
+                style="display: inline-block; width: 72px; height: 9px;
+                       border-radius: 2px; border: 1px solid var(--rule);"></span>
+          <span class="pca-axis-ramp-legend-max"></span>
         </span>
         <span id="pcaAxisAvailNote" class="pca-axis-avail"></span>
         <button id="pcaCollapseBtn" class="pca-axis-collapse"

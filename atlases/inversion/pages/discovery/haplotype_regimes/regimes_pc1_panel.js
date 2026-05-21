@@ -420,7 +420,10 @@ export function buildRegimesPC1Panel(state) {
   sub.style.cssText = 'position: relative; flex: 1 1 0; min-height: 0; ' +
                       'border-bottom: 1px solid var(--rule, #2a3242);';
   const cv = document.createElement('canvas');
-  cv.style.cssText = 'display: block; width: 100%; height: 100%; cursor: crosshair;';
+  // 2026-05-20: position:absolute + inset:0 (same fix as regimes_panel.js).
+  // height:100% on a flex-basis-0 parent resolves to 0 in some browsers,
+  // which trips fitCanvas() → "bail: zero plot area" in drawRegimesPC1Panel.
+  cv.style.cssText = 'display: block; position: absolute; inset: 0; cursor: crosshair;';
   cv.tabIndex = 0;
   sub.appendChild(cv);
   container.appendChild(sub);
