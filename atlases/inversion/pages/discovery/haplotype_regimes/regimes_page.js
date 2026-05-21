@@ -521,7 +521,8 @@ function _renderHeader(state) {
 // placeholder).
 // ---------------------------------------------------------------------
 
-function _redrawAll(state) {
+// Synchronous all-panel paint. Caller's responsibility to coalesce.
+function _redrawAllSync(state) {
   drawRegimesPanel(state);
   drawRegimesPC1Panel(state);
   if (state._regimesEnableGenome && state._regimesGenomeComputed
@@ -541,6 +542,20 @@ function _redrawAll(state) {
         ['regimesPC1Panel',           'regimesPC1GenomePanel'],
       ],
       () => drawRegimesPC1Panel(state._regimesGenomeState));
+  }
+}
+
+// 2026-05-20: rAF-coalesced front-door. The keyboard handler and any
+// other rapid-fire repaint trigger should go through this so multiple
+// scrubs in a tick collapse to one paint per frame. The full coalescing
+// machinery (including the skip-same-focal cache + force-redraw escape)
+// lives in the window._refreshRegimesPanels installer at the bottom of
+// the file; this helper just delegates to it.
+function _redrawAll(state) {
+  if (typeof window !== 'undefined' && typeof window._refreshRegimesPanels === 'function') {
+    window._refreshRegimesPanels(state);
+  } else {
+    _redrawAllSync(state);
   }
 }
 
@@ -675,14 +690,64 @@ if (typeof window !== 'undefined') {
   // haplotype_regimes.js. After mutating state.regimesPanel.focal.*
   // (e.g. on a chip click) the strip calls this to redraw the 4 panels
   // without going through the full initRegimesPage rebuild.
+  //
+  // Coalesced via requestAnimationFrame so rapid arrow-key scrubs collapse
+  // to one paint per frame instead of N paints per tick. The original
+  // un-coalesced form did ~2M canvas operations per call (see decimation
+  // note in regimes_panel.js) and stacking those at 60+ keypresses/sec
+  // hung the tab. Multiple calls within the same frame keep only the
+  // latest state reference, so the user always sees the freshest focal.
+  let _pendingState = null;
+  let _rafHandle    = 0;
+  // 2026-05-20: skip-same-focal cache. Key on the four state slots that
+  // actually affect the painted pixels: focal.seed_index, focal.band_mask,
+  // current_chromosome_idx, and the genome-state existence flag (since
+  // showing the right column is itself a layout change). Any other
+  // mutation that triggers _refreshRegimesPanels (e.g. side-effect calls
+  // in the chip-click handler) collapses to a no-op when those four are
+  // unchanged. Reset on every mount via clearFingerprint() below.
+  let _lastFp = null;
+  function _renderFp(state) {
+    const rp = state.regimesPanel;
+    if (!rp || !rp.focal) return '';
+    return `${rp.focal.seed_index | 0}:${rp.focal.band_mask | 0}:`
+      + `${rp.current_chromosome_idx | 0}:${state._regimesGenomeState ? 1 : 0}`;
+  }
+  function _flushRefresh() {
+    _rafHandle = 0;
+    const state = _pendingState;
+    _pendingState = null;
+    if (!state || !state.regimesPanel) return;
+    const fp = _renderFp(state);
+    if (fp && fp === _lastFp && state.__regimesForceRedraw !== true) return;
+    _lastFp = fp;
+    state.__regimesForceRedraw = false;
+    try { _renderHeader(state); } catch (_) {}
+    // _redrawAllSync paints both chrom-scope canvases AND, when genome
+    // view is enabled + computed, the two genome-scope canvases via the
+    // _withDOMAliases hack (so drawRegimesPanel reads from the genome
+    // container instead of the chrom one). The previous flush bypassed
+    // that hack and painted genome data into the chrom canvas — visible
+    // as flicker or "wrong panel" repaints. Going through _redrawAllSync
+    // matches what the keyboard handler used to do directly.
+    try { _redrawAllSync(state); } catch (_) {}
+  }
   window._refreshRegimesPanels = function _refreshRegimesPanels(state) {
     if (!state || !state.regimesPanel) return;
-    try { _renderHeader(state); } catch (_) {}
-    try { drawRegimesPanel(state); } catch (_) {}
-    try { drawRegimesPC1Panel(state); } catch (_) {}
-    if (state._regimesGenomeState) {
-      try { drawRegimesPanel(state._regimesGenomeState); } catch (_) {}
-      try { drawRegimesPC1Panel(state._regimesGenomeState); } catch (_) {}
-    }
+    _pendingState = state;
+    if (_rafHandle) return;
+    _rafHandle = (typeof requestAnimationFrame === 'function')
+      ? requestAnimationFrame(_flushRefresh)
+      : setTimeout(_flushRefresh, 16);
+  };
+  // Escape hatch for callers (e.g. pipeline re-run, chrom switch) that
+  // need a guaranteed repaint regardless of the fingerprint cache. The
+  // refresh runs on the next rAF tick as usual; only the cache check is
+  // skipped for this one call.
+  window._refreshRegimesPanelsForce = function _refreshRegimesPanelsForce(state) {
+    if (!state || !state.regimesPanel) return;
+    state.__regimesForceRedraw = true;
+    _lastFp = null;
+    window._refreshRegimesPanels(state);
   };
 }

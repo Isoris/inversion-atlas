@@ -3095,26 +3095,20 @@ function _applySidebarState(state, collapsed) {
 }
 
 function _wireSidebarToggle(state) {
-  // 2026-05-20: default-collapse the parameters pane on first load. The
-  // sidebar carries 20+ controls but most users land on the page wanting
-  // to see the canvases, not the knobs (Quentin: "close the settings
-  // panel on the left ... too messy"). The wheel button on the sidebar
-  // header stays as the toggle. Returning users get whatever they last
-  // saved — only the unset / fresh-install case flips to collapsed.
-  let savedCollapsed = true;
-  try {
-    const v = localStorage.getItem(_SIDEBAR_STORAGE_KEY);
-    if (v === 'false') savedCollapsed = false;
-    else if (v === 'true') savedCollapsed = true;
-    // null / undefined → keep the new default (true).
-  } catch (e) {}
-  _applySidebarState(state, savedCollapsed);
-  // 2026-05-20: when the sidebar boots collapsed, the sim_mat minimap
-  // sits inside that collapsed sidebar — invisible. Auto-restore sim
-  // to the main panel area so the heatmap is always visible. The
-  // user can move it back to minimap later (after opening the
-  // sidebar manually). Quentin: "the sim_mat has disappeared".
-  if (savedCollapsed && state.simInMinimap && typeof state._setSimInMinimap === 'function') {
+  // 2026-05-21: force-collapse the parameters pane on every page entry,
+  // ignoring any prior localStorage value (Quentin: "when we open the
+  // atlas it has the settings left page open ... can it be collapsed
+  // by default"). The toggle button still works during the session, but
+  // the choice is not persisted across reloads — every fresh mount
+  // starts collapsed. Previously (2026-05-20) we respected the saved
+  // value so returning users kept their preference, but in practice it
+  // led to the sidebar drifting back open after one stray click.
+  _applySidebarState(state, true);
+  // When the sidebar boots collapsed, the sim_mat minimap sits inside
+  // that collapsed sidebar — invisible. Auto-restore sim to the main
+  // panel area so the heatmap is always visible. The user can move it
+  // back to minimap later (after opening the sidebar manually).
+  if (state.simInMinimap && typeof state._setSimInMinimap === 'function') {
     requestAnimationFrame(() => {
       try { state._setSimInMinimap(false); } catch (_) {}
     });

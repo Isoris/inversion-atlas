@@ -603,16 +603,31 @@ export function drawRegimesPanel(state) {
   }
   const yMatrix = track._yMatrix;
 
+  // 2026-05-20 perf: X-axis decimation. At 9192 windows × 226 samples × N
+  // panels × every cursor scrub, the un-decimated loop did ~2M lineTo()
+  // calls per repaint → tab hangs after a few arrow presses. Cap segments
+  // at ~2 per CSS pixel of plot width — sub-pixel detail is invisible
+  // anyway. _stride = max(1, floor(nGrid / (plotW * 2))). With nGrid=9192
+  // and plotW=706, stride ≈ 6 → 6× fewer ops + visually identical lines.
+  const _stride = Math.max(1, Math.floor(nGrid / Math.max(plotW * 2, 1)));
   function strokePath(si) {
     const ys = yMatrix[si];
     let started = false;
     ctx.beginPath();
-    for (let gi = 0; gi < nGrid; gi++) {
+    for (let gi = 0; gi < nGrid; gi += _stride) {
       const y = ys[gi];
       if (!isFinite(y)) { started = false; continue; }
       const x = xByGi[gi];
       if (!started) { ctx.moveTo(x, y); started = true; }
       else { ctx.lineTo(x, y); }
+    }
+    // Always include the last sample so the line reaches the right edge.
+    if ((nGrid - 1) % _stride !== 0) {
+      const yLast = ys[nGrid - 1];
+      if (isFinite(yLast)) {
+        const xLast = xByGi[nGrid - 1];
+        if (!started) ctx.moveTo(xLast, yLast); else ctx.lineTo(xLast, yLast);
+      }
     }
     ctx.stroke();
   }

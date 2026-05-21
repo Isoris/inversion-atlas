@@ -50,6 +50,39 @@ import { _pageState, _setActiveState } from './annotation_cockpit/_state.js';
 // with ES-module exports below; otherwise the body is unchanged.)
 // ---------------------------------------------------------------------------
 
+// 2026-05-20: shim for _gatherActiveCandidatesForInheritance (legacy line
+// 41196). The original lives in the Inversion_atlas monolith and reads
+// state.candidates_detailed + state.candidates (a per-mode candidate map)
+// plus _isAutoCandidate. Neither has been ported to the new shell, so the
+// renderer was throwing `ReferenceError: _gatherActiveCandidatesForInheritance
+// is not defined` on every annotation_cockpit.mount(). This shim iterates
+// state.candidateList directly (the modern slot) so the page renders
+// instead of bailing on mount. Slightly broader than the legacy (includes
+// auto candidates — the legacy filtered those out until promoted), but the
+// downstream Jaccard / inheritance math handles both cases. Replace with a
+// faithful port once candidates_detailed + _isAutoCandidate land.
+function _gatherActiveCandidatesForInheritance() {
+  const state = _pageState;
+  if (!state) return [];
+  const src = Array.isArray(state.candidateList) ? state.candidateList : [];
+  const out = [];
+  for (const c of src) {
+    if (!c || !c.locked_labels || !c.locked_labels.length) continue;
+    if (typeof c.start_bp !== 'number' || typeof c.end_bp !== 'number') continue;
+    out.push({
+      id:       String(c.id),
+      labels:   c.locked_labels,
+      K:        c.K || c.K_used || state.k || 3,
+      start_bp: c.start_bp,
+      end_bp:   c.end_bp,
+      meta:     { source: c.source, parent_l2: c.parent_l2 },
+    });
+  }
+  out.sort((a, b) => a.start_bp - b.start_bp);
+  for (let i = 0; i < out.length; i++) out[i].seq_num = i + 1;
+  return out;
+}
+
 const _ACK_PAD = { l: 60, r: 30, t: 30, b: 50 };
 const _ACK_LINE_ALPHA = 0.35;
 const _ACK_HIGHLIGHT_ALPHA = 0.85;

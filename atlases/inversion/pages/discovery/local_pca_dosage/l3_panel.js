@@ -85,6 +85,240 @@ function compareUnitHalfW() {
 }
 
 // =============================================================================
+// _paneScope — unified L2/slab scope abstraction (2026-05-20)
+// =============================================================================
+// Step 3 of the L2/slab render unification. Returns a uniform "pane scope"
+// object for a given offset, hiding whether the underlying mode is L2 or
+// slab. Step 4 will collapse renderL3PanelSlab into a thin call site that
+// builds scopes and delegates to renderL3Panel.
+//
+// scope shape:
+//   kind          : 'l2' | 'slab'
+//   isOutOfRange  : boolean  (when offset has no valid envelope/slab)
+//   l2idx         : number | null  — L2 envelope index (null for slab)
+//   env           : object | null  — L2 envelope object (null for slab)
+//   range         : [s, e]   — 0-indexed inclusive window range
+//   sWindow       : number   — alias for range[0]
+//   eWindow       : number   — alias for range[1]
+//   wMid          : number   — midpoint window (for axis annotations)
+//   nWindows      : number   — e - s + 1
+//   label         : string   — bold "name" in pane title
+//                              ("C_gar_LG01.L2_..." or "w1069" / "w1069–w1073")
+//   metaSuffix    : string   — dim suffix in pane title
+//                              ("75W · sim 0.961" or "5w slab · sim 0.94")
+//   jumpCenter    : number   — window idx to jump to on neighbor click
+//   getCluster(K) : (K) => cluster object backed by getL2Cluster /
+//                            getL2ClusterAt for L2 mode, or
+//                            getSlabClusterAt for slab mode.
+function _paneScope(state, offset) {
+  if (!state || !state.data) return { isOutOfRange: true };
+  const d = getActiveModeView(state) || state.data;
+  if (!d) return { isOutOfRange: true };
+  const isL2Mode = !state.compareUnit || state.compareUnit === 'L2';
+  if (isL2Mode) {
+    const curL2 = state.windowToL2 ? state.windowToL2[state.cur] : -1;
+    const l2idx = curL2 + offset;
+    const nEnvs = (d.l2_envelopes && d.l2_envelopes.length) || 0;
+    if (l2idx < 0 || l2idx >= nEnvs) {
+      return { kind: 'l2', isOutOfRange: true, l2idx };
+    }
+    const env = d.l2_envelopes[l2idx];
+    if (!env) return { kind: 'l2', isOutOfRange: true, l2idx };
+    const s = Number.isFinite(env._s0) ? env._s0 : ((env.start_w | 0) - 1);
+    const e = Number.isFinite(env._e0) ? env._e0 : ((env.end_w   | 0) - 1);
+    const wMid = Math.round((s + e) / 2);
+    return {
+      kind: 'l2',
+      isOutOfRange: false,
+      l2idx, env,
+      range: [s, e], sWindow: s, eWindow: e,
+      wMid, nWindows: e - s + 1,
+      label: (typeof shortId === 'function') ? shortId(env.candidate_id) : String(env.candidate_id || '?'),
+      metaSuffix: `${env.n_windows}W` +
+                  (env.mean_sim != null ? ` · sim ${(typeof fmt === 'function' ? fmt(env.mean_sim) : env.mean_sim.toFixed(3))}` : ''),
+      jumpCenter: wMid,
+      getCluster: (K) => (K === state.k)
+        ? getL2Cluster(state, l2idx)
+        : (typeof getL2ClusterAt === 'function' ? getL2ClusterAt(state, l2idx, K) : getL2Cluster(state, l2idx)),
+    };
+  }
+  // Slab mode
+  const halfW = compareUnitHalfW();
+  if (halfW == null) return { kind: 'slab', isOutOfRange: true };
+  const cur = state.cur;
+  const range = (offset === 0)
+    ? slabRange(cur, halfW)
+    : slabRangeOffset(cur, halfW, offset);
+  if (!range) return { kind: 'slab', isOutOfRange: true };
+  const s = range[0], e = range[1];
+  const W = e - s + 1;
+  const wMid = (s + e) >> 1;
+  const rangeName = (s === e) ? `w${s + 1}` : `w${s + 1}–w${e + 1}`;
+  let simStr = '';
+  try {
+    const win = d.windows;
+    if (Array.isArray(win)) {
+      let n = 0, sum = 0;
+      for (let w = s; w <= e; w++) {
+        const v = win[w] && (win[w].mean_sim != null ? win[w].mean_sim
+                          : win[w].sim != null ? win[w].sim : null);
+        if (Number.isFinite(v)) { sum += v; n++; }
+      }
+      if (n > 0) simStr = ` · sim ${typeof fmt === 'function' ? fmt(sum / n) : (sum / n).toFixed(3)}`;
+    }
+  } catch (_) {}
+  return {
+    kind: 'slab',
+    isOutOfRange: false,
+    l2idx: null, env: null,
+    range: [s, e], sWindow: s, eWindow: e,
+    wMid, nWindows: W,
+    label: rangeName,
+    metaSuffix: `${W}w slab${simStr}`,
+    jumpCenter: wMid,
+    getCluster: (K) => getSlabClusterAt(s, e, K),
+  };
+}
+
+// =============================================================================
+// _l3PaneFrame / _l3PaneAxisLabels / _l3PaneLegend — shared pure-render
+// helpers (2026-05-20). drawMiniPCA (L2 mode) and drawSlabMiniPCA (slab
+// mode) used to inline these three blocks separately, ~150 LOC of
+// duplication. The data extraction (single-window PC vs aggregated slab
+// PC) stays in each painter because the semantics differ; but the
+// downstream rendering is identical and lives here.
+// =============================================================================
+
+// Frame + "wXXX (PC1 flipped)?" annotation. Caller provides geometry +
+// metadata; helper writes onto the given ctx.
+function _l3PaneFrame(ctx, pad, plotW, plotH, wMid, sign, paneOffset) {
+  ctx.strokeStyle = themeColor('rule');
+  ctx.strokeRect(pad.l + 0.5, pad.t + 0.5, plotW, plotH);
+  ctx.fillStyle = themeColor('ink-dimmer');
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.textAlign = 'left';
+  const winTag = `w${wMid + 1}` +
+    ((sign < 0 && paneOffset !== 0) ? ' (PC1 flipped)' : '');
+  ctx.fillText(winTag, pad.l + 2, pad.t - 2);
+}
+
+// Focal-pane axis labels (PC1 / PC2 with λ values when available).
+// Caller supplies the data envelope `d` so this helper can read
+// d.windows[wMid].lam1 / lam2 — no other state coupling.
+function _l3PaneAxisLabels(ctx, pad, plotW, plotH, wMid, sign, paneOffset, d) {
+  if (paneOffset !== 0) return;
+  const wObj = d && d.windows && d.windows[wMid];
+  const lam1 = wObj && wObj.lam1;
+  const lam2 = wObj && wObj.lam2;
+  ctx.fillStyle = themeColor('ink-dim');
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const xLab = (lam1 != null && isFinite(lam1))
+    ? `PC1 · λ₁=${fmt(lam1)}${sign < 0 ? ' (flipped)' : ''}`
+    : `PC1${sign < 0 ? ' (flipped)' : ''}`;
+  ctx.fillText(xLab, pad.l + plotW / 2, pad.t + plotH + 2);
+  ctx.save();
+  ctx.translate(pad.l - 4, pad.t + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  const yLab = (lam2 != null && isFinite(lam2))
+    ? `PC2 · λ₂=${fmt(lam2)}`
+    : 'PC2';
+  ctx.fillText(yLab, 0, 0);
+  ctx.restore();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+}
+
+// Per-band legend with counts (g0 (n=N) rows). Top-right of the plot,
+// inside the frame. Hidden when no labels or ramp coloring is on.
+function _l3PaneLegend(ctx, pad, plotW, labels, paneOffset, colorMode) {
+  if (!labels) return;
+  let K = 0;
+  for (let i = 0; i < labels.length; i++) {
+    if (labels[i] != null && labels[i] >= 0 && labels[i] + 1 > K) K = labels[i] + 1;
+  }
+  K = Math.min(K, 6);
+  if (K === 0) return;
+  const counts = new Array(K).fill(0);
+  for (let i = 0; i < labels.length; i++) {
+    const lk = labels[i];
+    if (lk != null && lk >= 0 && lk < K) counts[lk]++;
+  }
+  const swH = 7, swW = 7, rowH = 10;
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.textBaseline = 'top';
+  const legendLabelFor = (k) => 'g' + k + ' (n=' + counts[k] + ')';
+  let widest = 0;
+  for (let k = 0; k < K; k++) {
+    const t = legendLabelFor(k);
+    const tw = ctx.measureText(t).width;
+    if (tw > widest) widest = tw;
+  }
+  const legendW = swW + 4 + widest + 2;
+  const lx = pad.l + plotW - legendW - 3;
+  const ly = pad.t + 3;
+  ctx.fillStyle = withAlpha(themeColor('bg'), 0.94);
+  ctx.fillRect(lx - 2, ly - 1, legendW + 4, K * rowH + 2);
+  ctx.strokeStyle = withAlpha(themeColor('rule'), 0.6);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(lx - 2 + 0.5, ly - 1 + 0.5, legendW + 4 - 1, K * rowH + 2 - 1);
+  for (let k = 0; k < K; k++) {
+    const ry = ly + k * rowH;
+    ctx.fillStyle = paneClusterColor(paneOffset, k, colorMode);
+    ctx.fillRect(lx, ry + 1, swW, swH);
+    ctx.fillStyle = themeColor('ink-dim');
+    ctx.fillText(legendLabelFor(k), lx + swW + 4, ry);
+  }
+  ctx.textBaseline = 'alphabetic';
+}
+
+// =============================================================================
+// _l3PaneHead — shared L3 pane-title <h3> builder (2026-05-20)
+// =============================================================================
+// Both L2 mode (renderL3Panel) and slab mode (renderL3PanelSlab) used to
+// have their own hand-rolled head element with subtly different markup,
+// padding, and font weight. The user flagged the divergence: "we have 2
+// PCA panels or 2 stylings". This shared builder produces one canonical
+// <h3>.focal element so the two render paths emit identical head DOM.
+//
+// Returns the constructed <h3> element (caller appends to its column).
+// opts shape:
+//   isFocal      : boolean  — focal pane gets .focal class
+//   prefix       : string   — '◆' / '←' / '→' / '←←' / '→→'
+//   name         : string   — bold "name" (L2 envelope candidate_id, or
+//                              slab window range like "w1069")
+//   meta         : string   — dim suffix text (e.g. "75W · sim 0.961 · K=3"
+//                              or "1w slab · sim 0.95 · K=3")
+//   isEmpty      : boolean  — when true, render an em-dash + dim parenthetical
+//                              instead of the standard name/meta pair (used
+//                              for out-of-range neighbors)
+//   emptyNote    : string   — dim parenthetical to show when isEmpty
+//   paneToolsHtml: string   — appended after the title span (per-pane toolbar)
+function _l3PaneHead(opts) {
+  if (typeof document === 'undefined') return null;
+  const o = opts || {};
+  const h3 = document.createElement('h3');
+  if (o.isFocal) h3.classList.add('focal');
+  const prefix = o.prefix || '';
+  const paneToolsHtml = o.paneToolsHtml || '';
+  if (o.isEmpty) {
+    h3.innerHTML =
+      `<span class="l3-pane-title">${prefix} <b>—</b>` +
+      (o.emptyNote ? ` <span class="dim" style="font-weight:400;">${o.emptyNote}</span>` : '') +
+      `</span>${paneToolsHtml}`;
+  } else {
+    h3.innerHTML =
+      `<span class="l3-pane-title">${prefix} <b>${o.name || ''}</b> ` +
+      `<span class="dim" style="font-weight:400;">${o.meta || ''}</span></span>` +
+      paneToolsHtml;
+  }
+  return h3;
+}
+
+// =============================================================================
 // refreshPinUI(state) — legacy lines 70130-70161
 // =============================================================================
 // Updates the 📌 pin-2nd-L2 button label + accent + enables/disables the
@@ -555,8 +789,6 @@ export function renderL3Panel(state) {
       });
     }
 
-    const h3 = document.createElement('h3');
-    if (isFocal) h3.classList.add('focal');
     let titlePrefix = '';
     if (offset < 0) titlePrefix = (offset === -1 ? '←' : '←←');
     else if (offset > 0) titlePrefix = (offset === +1 ? '→' : '→→');
@@ -566,8 +798,11 @@ export function renderL3Panel(state) {
     // empty panes (l2idx == null) so layout stays stable across panes.
     const paneToolsHtml = (typeof _l3PaneHeaderToolsHtml === 'function')
       ? _l3PaneHeaderToolsHtml() : '';
+    // 2026-05-20: unified via _l3PaneHead so the L2 and slab paths emit
+    // identical title markup. Quentin: "why do we keep 2 modes".
+    let h3;
     if (l2idx == null) {
-      h3.innerHTML = `<span class="l3-pane-title">${titlePrefix} <b>—</b></span>${paneToolsHtml}`;
+      h3 = _l3PaneHead({ isFocal, prefix: titlePrefix, isEmpty: true, paneToolsHtml });
     } else {
       // 2026-05-19: env may be undefined when switching activeMode
       // (dosage ↔ θπ ↔ GHSL) and the focal L2 index from the previous
@@ -576,9 +811,19 @@ export function renderL3Panel(state) {
       // a TypeError on env.candidate_id.
       const env = d.l2_envelopes && d.l2_envelopes[l2idx];
       if (!env) {
-        h3.innerHTML = `<span class="l3-pane-title">${titlePrefix} <b>—</b> <span class="dim" style="font-weight:400;">(no envelope at idx ${l2idx} in ${state.activeMode || 'current'} mode)</span></span>${paneToolsHtml}`;
+        h3 = _l3PaneHead({
+          isFocal, prefix: titlePrefix, isEmpty: true,
+          emptyNote: `(no envelope at idx ${l2idx} in ${state.activeMode || 'current'} mode)`,
+          paneToolsHtml,
+        });
       } else {
-        h3.innerHTML = `<span class="l3-pane-title">${titlePrefix} <b>${shortId(env.candidate_id)}</b> <span class="dim" style="font-weight:400;">${env.n_windows}W · sim ${fmt(env.mean_sim)}</span></span>${paneToolsHtml}`;
+        h3 = _l3PaneHead({
+          isFocal,
+          prefix: titlePrefix,
+          name: shortId(env.candidate_id),
+          meta: `${env.n_windows}W · sim ${fmt(env.mean_sim)}`,
+          paneToolsHtml,
+        });
       }
     }
     col.appendChild(h3);
@@ -861,11 +1106,14 @@ export function renderL3PanelSlab(state) {
     const col = document.createElement('div');
     col.className = 'l3-col';
 
-    // Pane header (one per pane, K-agnostic)
-    const head = document.createElement('div');
-    head.style.cssText = 'padding: 6px 10px; font-family: var(--mono); font-size: 11px;' +
-                        ' display: flex; gap: 8px; align-items: center;' +
-                        ' border-bottom: 1px solid var(--rule);';
+    // Pane header (one per pane, K-agnostic).
+    // 2026-05-20: use the same <h3> + .focal markup the L2 mode uses
+    // (drawn from line 558) so the slab pane head picks up the same
+    // page-wide L3 CSS (font, padding, dividers). Eliminates a visual
+    // styling diff Quentin flagged: "in L2 scale its like the polished
+    // one and in all other scales its the old version one".
+    const head = document.createElement('h3');
+    if (isFocal) head.classList.add('focal');
     let offsetSlab = null;
     // Click-to-jump: in slab mode, clicking a neighbor pane jumps the cursor
     // to the center of that offset slab. Bound on the column itself; the
@@ -887,23 +1135,73 @@ export function renderL3PanelSlab(state) {
     // on out-of-range panes so layout stays stable across panes.
     const paneToolsHtml = (typeof _l3PaneHeaderToolsHtml === 'function')
       ? _l3PaneHeaderToolsHtml() : '';
+    // 2026-05-20: restructure slab pane titles to match L2-mode format
+    // exactly. L2 mode renders `[prefix] <b>{name}</b> <dim>{meta}</dim>`
+    // (prefix OUTSIDE the bold, candidate_id INSIDE). Slab mode used to
+    // bold the whole "◆ slab focal" prefix which made the two visually
+    // distinct. Now: prefix outside, the slab range itself is the bold
+    // "name", and {Nw} slab · K=N · sim X.XXX goes into the dim suffix.
+    // mean_sim across the slab is approximated by averaging window
+    // sim values from data.windows[w].mean_sim when present (the same
+    // field L2 envelopes use). Falls back gracefully when absent.
+    const _slabMeanSim = (s, e) => {
+      const win = d.windows;
+      if (!Array.isArray(win)) return null;
+      let n = 0, sum = 0;
+      for (let w = s; w <= e; w++) {
+        const v = win[w] && (win[w].mean_sim != null ? win[w].mean_sim
+                          : win[w].sim != null ? win[w].sim : null);
+        if (Number.isFinite(v)) { sum += v; n++; }
+      }
+      return n > 0 ? (sum / n) : null;
+    };
+    // 2026-05-20: unified via _l3PaneHead so the L2 and slab paths emit
+    // identical title markup. The only divergence now is the data —
+    // slab scope produces a window-range name + "Nw slab" meta; L2
+    // scope produces the candidate_id name + "Nw · sim X.XXX" meta.
+    const kSuffix = (ksToRender.length === 1) ? ` · K=${ksToRender[0]}` : '';
+    let headOpts;
     if (isFocal) {
-      // Inline K=N suffix when single-K (v3.53 convention)
-      const kSuffix = (ksToRender.length === 1) ? ` · K=${ksToRender[0]}` : '';
-      head.innerHTML = `<span class="l3-pane-title" style="font-weight: 600;">◆ slab focal` +
-                       ` <span class="dim" style="font-weight:400;">w${range[0]+1}–w${range[1]+1} (${W}w)${kSuffix}</span></span>` +
-                       paneToolsHtml;
+      const rangeName = (range[0] === range[1])
+        ? `w${range[0] + 1}`
+        : `w${range[0] + 1}–w${range[1] + 1}`;
+      const mSim = _slabMeanSim(range[0], range[1]);
+      const simStr = (mSim != null && typeof fmt === 'function') ? ` · sim ${fmt(mSim)}` : '';
+      headOpts = {
+        isFocal: true, prefix: '◆',
+        name: rangeName,
+        meta: `${W}w slab${simStr}${kSuffix}`,
+        paneToolsHtml,
+      };
     } else {
       const arrow = offset < 0 ? '←' : '→';
       offsetSlab = slabRangeOffset(cur, halfW, offset);
-      const kSuffix = (ksToRender.length === 1) ? ` · K=${ksToRender[0]}` : '';
-      const lblText = offsetSlab
-        ? `slab ${offset > 0 ? '+' : ''}${offset} · w${offsetSlab[0]+1}–w${offsetSlab[1]+1}${kSuffix}`
-        : `slab ${offset} · out of range`;
-      head.innerHTML = `<span class="l3-pane-title"><span class="dim">${arrow}</span> ` +
-                       `<span style="font-weight: 500;">${lblText}</span></span>` +
-                       paneToolsHtml;
+      if (!offsetSlab) {
+        headOpts = {
+          isFocal: false, prefix: arrow, isEmpty: true,
+          emptyNote: `slab ${offset > 0 ? '+' : ''}${offset} · out of range`,
+          paneToolsHtml,
+        };
+      } else {
+        const rangeName = (offsetSlab[0] === offsetSlab[1])
+          ? `w${offsetSlab[0] + 1}`
+          : `w${offsetSlab[0] + 1}–w${offsetSlab[1] + 1}`;
+        const sW = offsetSlab[1] - offsetSlab[0] + 1;
+        const mSim = _slabMeanSim(offsetSlab[0], offsetSlab[1]);
+        const simStr = (mSim != null && typeof fmt === 'function') ? ` · sim ${fmt(mSim)}` : '';
+        headOpts = {
+          isFocal: false, prefix: arrow,
+          name: rangeName,
+          meta: `${sW}w slab${simStr}${kSuffix}`,
+          paneToolsHtml,
+        };
+      }
     }
+    const _newHead = _l3PaneHead(headOpts);
+    // Copy the newly-built h3 props onto the existing `head` variable so
+    // the surrounding code that references `head` keeps working.
+    head.classList.add(...(_newHead.classList || []));
+    head.innerHTML = _newHead.innerHTML;
     col.appendChild(head);
 
     // Edge cases (neighbor only) — handle once before the K loop
@@ -960,13 +1258,14 @@ export function renderL3PanelSlab(state) {
         }
       }
 
-      // Mini-PCA canvas
-      const miniWrap = document.createElement('div');
-      miniWrap.style.cssText = 'padding: 6px;';
+      // Mini-PCA canvas — 2026-05-20 use the SAME .mini-pca class L2
+      // mode uses (drawMiniPCA caller at line 588). The class carries
+      // the page-wide L3 mini-PCA styling (background, height, cursor,
+      // padding). Drops the slab-specific inline overrides so the two
+      // modes share the same visual base.
       const mini = document.createElement('canvas');
-      mini.style.cssText = 'display: block; width: 100%; height: 110px; cursor: crosshair; background: var(--panel-2);';
-      miniWrap.appendChild(mini);
-      col.appendChild(miniWrap);
+      mini.className = 'mini-pca';
+      col.appendChild(mini);
       // turn 148: spotlight click — fires after drawSlabMiniPCA has populated
       // canvas.__l3_render. Same handler as L2 mode (parity with line 44707).
       if (typeof _setupL3MiniClick === 'function') _setupL3MiniClick(mini);
@@ -2540,17 +2839,8 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
     cssW: w, cssH: h,
   };
 
-  // Frame
-  ctx.strokeStyle = themeColor('rule');
-  ctx.strokeRect(pad.l + 0.5, pad.t + 0.5, plotW, plotH);
-
-  // Annotate window index used + PC1 sign
-  ctx.fillStyle = themeColor('ink-dimmer');
-  ctx.font = '9px ui-monospace, monospace';
-  ctx.textAlign = 'left';
-  const winTag = `w${wMid + 1}` +
-    ((sign < 0 && paneOffset !== 0) ? ' (PC1 flipped)' : '');
-  ctx.fillText(winTag, pad.l + 2, pad.t - 2);
+  // Frame + window tag (shared helper).
+  _l3PaneFrame(ctx, pad, plotW, plotH, wMid, sign, paneOffset);
 
   // Determine which labels to use for coloring
   // Priority: (a) Hungarian-aligned-to-focal labels from caller, else (b) own cluster
@@ -2687,83 +2977,16 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
   }
 
   // Axis labels (focal pane only): PC1 / PC2 with eigenvalue context.
-  if (paneOffset === 0) {
-    const wObj = d.windows[wMid];
-    const lam1 = wObj && wObj.lam1;
-    const lam2 = wObj && wObj.lam2;
-    ctx.fillStyle = themeColor('ink-dim');
-    ctx.font = '9px ui-monospace, monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    const xLab = (lam1 != null && isFinite(lam1))
-      ? `PC1 · λ₁=${fmt(lam1)}${sign < 0 ? ' (flipped)' : ''}`
-      : `PC1${sign < 0 ? ' (flipped)' : ''}`;
-    ctx.fillText(xLab, pad.l + plotW / 2, pad.t + plotH + 2);
-    ctx.save();
-    ctx.translate(pad.l - 4, pad.t + plotH / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    const yLab = (lam2 != null && isFinite(lam2))
-      ? `PC2 · λ₂=${fmt(lam2)}`
-      : 'PC2';
-    ctx.fillText(yLab, 0, 0);
-    ctx.restore();
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-  }
+  _l3PaneAxisLabels(ctx, pad, plotW, plotH, wMid, sign, paneOffset, d);
 
   // TODO_MISSING (legacy 51484-51528): het-coloring legend swatch. Skipped.
   // TODO_MISSING (legacy 51545-51628): q-ancestry legend layout. Skipped.
 
-  // Per-band legend with counts (paper-style: g0 (n=N) etc.). Stacks
-  // vertically in the top-right inside the plot frame.
-  // 2026-05-20: show the legend whenever the L3 panes are painting
-  // CLUSTER colors — that includes the case where state.colorMode is a
-  // ramp but state.l3RampMode is null (the "ramp on scatter only" 1st
-  // click of the 3-state cycle). Hide it only when L3 dots themselves
-  // are coloured by a ramp (no longer cluster-keyed).
-  if (drawSwatch && labels && !_l3RampActive &&
+  // Per-band legend (shared helper). Show whenever L3 panes paint
+  // CLUSTER colors — gated to skip when ramp coloring is active.
+  if (drawSwatch && !_l3RampActive &&
       (state.colorMode === 'cluster' || state.l3RampMode == null)) {
-    let K = 0;
-    for (let i = 0; i < labels.length; i++) {
-      if (labels[i] != null && labels[i] >= 0 && labels[i] + 1 > K) K = labels[i] + 1;
-    }
-    K = Math.min(K, 6);
-    const counts = new Array(K).fill(0);
-    for (let i = 0; i < labels.length; i++) {
-      const lk = labels[i];
-      if (lk != null && lk >= 0 && lk < K) counts[lk]++;
-    }
-
-    const swH = 7, swW = 7, rowH = 10;
-    ctx.font = '9px ui-monospace, monospace';
-    ctx.textBaseline = 'top';
-    // First-pass: simple 'g<k> (n=N)' labels. TODO_MISSING: vocab-aware
-    // detailed labels (H1/H1 etc.) via _karyoLabelEnsureVocab + getKaryotypeLabel.
-    const legendLabelFor = (k) => 'g' + k + ' (n=' + counts[k] + ')';
-    let widest = 0;
-    for (let k = 0; k < K; k++) {
-      const t = legendLabelFor(k);
-      const tw = ctx.measureText(t).width;
-      if (tw > widest) widest = tw;
-    }
-    const legendW = swW + 4 + widest + 2;
-    const lx = pad.l + plotW - legendW - 3;
-    const ly = pad.t + 3;
-    ctx.fillStyle = withAlpha(themeColor('bg'), 0.94);
-    ctx.fillRect(lx - 2, ly - 1, legendW + 4, K * rowH + 2);
-    ctx.strokeStyle = withAlpha(themeColor('rule'), 0.6);
-    ctx.lineWidth = 1;
-    ctx.strokeRect(lx - 2 + 0.5, ly - 1 + 0.5, legendW + 4 - 1, K * rowH + 2 - 1);
-    for (let k = 0; k < K; k++) {
-      const ry = ly + k * rowH;
-      ctx.fillStyle = paneClusterColor(paneOffset, k, colorMode);
-      ctx.fillRect(lx, ry + 1, swW, swH);
-      ctx.fillStyle = themeColor('ink-dim');
-      ctx.fillText(legendLabelFor(k), lx + swW + 4, ry);
-    }
-    ctx.textBaseline = 'alphabetic';
+    _l3PaneLegend(ctx, pad, plotW, labels, paneOffset, colorMode);
   }
 }
 
@@ -2835,16 +3058,8 @@ function drawSlabMiniPCA(canvas, range, labels, opts) {
     xMin, xMax, yMin, yMax,
     cssW: w, cssH: h,
   };
-  // Frame
-  ctx.strokeStyle = themeColor('rule');
-  ctx.strokeRect(pad.l + 0.5, pad.t + 0.5, plotW, plotH);
-  // Window tag — slab midpoint + "(PC1 flipped)" when applicable.
-  ctx.fillStyle = themeColor('ink-dimmer');
-  ctx.font = '9px ui-monospace, monospace';
-  ctx.textAlign = 'left';
-  const winTag = `w${wMid + 1}` +
-    ((sign < 0 && paneOffset !== 0) ? ' (PC1 flipped)' : '');
-  ctx.fillText(winTag, pad.l + 2, pad.t - 2);
+  // Frame + window tag (shared helper).
+  _l3PaneFrame(ctx, pad, plotW, plotH, wMid, sign, paneOffset);
   // Ramp-coloring mode (matches L2 path).
   const _L3_RAMP_MODES = new Set(['het', 'dosage', 'theta_pi', 'ghsl', 'froh']);
   const _l3RampActive = (state.l3RampMode && _L3_RAMP_MODES.has(state.l3RampMode))
@@ -2938,69 +3153,10 @@ function drawSlabMiniPCA(canvas, range, labels, opts) {
     ctx.fillText(name, x + 8, y + 3);
   }
   // Axis labels (focal pane only): PC1 / PC2 with λ context.
-  if (paneOffset === 0) {
-    const wObj = d.windows[wMid];
-    const lam1 = wObj && wObj.lam1;
-    const lam2 = wObj && wObj.lam2;
-    ctx.fillStyle = themeColor('ink-dim');
-    ctx.font = '9px ui-monospace, monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    const xLab = (lam1 != null && isFinite(lam1))
-      ? `PC1 · λ₁=${fmt(lam1)}${sign < 0 ? ' (flipped)' : ''}`
-      : `PC1 (slab mean)${sign < 0 ? ' (flipped)' : ''}`;
-    ctx.fillText(xLab, pad.l + plotW / 2, pad.t + plotH + 2);
-    ctx.save();
-    ctx.translate(pad.l - 4, pad.t + plotH / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    const yLab = (lam2 != null && isFinite(lam2))
-      ? `PC2 · λ₂=${fmt(lam2)}`
-      : 'PC2';
-    ctx.fillText(yLab, 0, 0);
-    ctx.restore();
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-  }
-  // Per-band legend with counts (g0 (n=N)). Matches L2 mode visual.
+  _l3PaneAxisLabels(ctx, pad, plotW, plotH, wMid, sign, paneOffset, d);
+  // Per-band legend (shared helper). Matches L2 mode visual.
   if (drawSwatch && !_l3RampActive && labels) {
-    let K = 0;
-    for (let i = 0; i < labels.length; i++) {
-      if (labels[i] != null && labels[i] >= 0 && labels[i] + 1 > K) K = labels[i] + 1;
-    }
-    K = Math.min(K, 6);
-    const counts = new Array(K).fill(0);
-    for (let i = 0; i < labels.length; i++) {
-      const lk = labels[i];
-      if (lk != null && lk >= 0 && lk < K) counts[lk]++;
-    }
-    const swH = 7, swW = 7, rowH = 10;
-    ctx.font = '9px ui-monospace, monospace';
-    ctx.textBaseline = 'top';
-    const legendLabelFor = (k) => 'g' + k + ' (n=' + counts[k] + ')';
-    let widest = 0;
-    for (let k = 0; k < K; k++) {
-      const t = legendLabelFor(k);
-      const tw = ctx.measureText(t).width;
-      if (tw > widest) widest = tw;
-    }
-    const legendW = swW + 4 + widest + 2;
-    const lx = pad.l + plotW - legendW - 3;
-    const ly = pad.t + 3;
-    ctx.fillStyle = withAlpha(themeColor('bg'), 0.94);
-    ctx.fillRect(lx - 2, ly - 1, legendW + 4, K * rowH + 2);
-    ctx.strokeStyle = withAlpha(themeColor('rule'), 0.6);
-    ctx.lineWidth = 1;
-    ctx.strokeRect(lx - 2 + 0.5, ly - 1 + 0.5, legendW + 4 - 1, K * rowH + 2 - 1);
-    for (let k = 0; k < K; k++) {
-      const ry = ly + k * rowH;
-      ctx.fillStyle = paneClusterColor(paneOffset, k, colorMode);
-      ctx.fillRect(lx, ry + 1, swW, swH);
-      ctx.fillStyle = themeColor('ink-dim');
-      ctx.fillText(legendLabelFor(k), lx + swW + 4, ry);
-    }
-    ctx.textBaseline = 'alphabetic';
+    _l3PaneLegend(ctx, pad, plotW, labels, paneOffset, colorMode);
   }
 }
 

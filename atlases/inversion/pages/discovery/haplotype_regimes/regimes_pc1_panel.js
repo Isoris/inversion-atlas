@@ -222,17 +222,29 @@ export function drawRegimesPC1Panel(state) {
     ? state.tracked : new Set(state.tracked || []);
   const voterSet = voter.samples;
 
+  // 2026-05-20 perf: X-axis decimation. See the matching note in
+  // regimes_panel.js — at 9192 × 226 the un-decimated loop hangs the tab.
+  const _stride = Math.max(1, Math.floor(nGrid / Math.max(plotW * 2, 1)));
   function strokePath(si) {
     const ys = M[si];
     let started = false;
     ctx.beginPath();
-    for (let gi = 0; gi < nGrid; gi++) {
+    for (let gi = 0; gi < nGrid; gi += _stride) {
       const v = ys[gi];
       if (!Number.isFinite(v)) { started = false; continue; }
       const x = xByGi[gi];
       const y = toY(v);
       if (!started) { ctx.moveTo(x, y); started = true; }
       else { ctx.lineTo(x, y); }
+    }
+    // Always include the last sample so the line reaches the right edge.
+    if ((nGrid - 1) % _stride !== 0) {
+      const vLast = ys[nGrid - 1];
+      if (Number.isFinite(vLast)) {
+        const xLast = xByGi[nGrid - 1];
+        const yLast = toY(vLast);
+        if (!started) ctx.moveTo(xLast, yLast); else ctx.lineTo(xLast, yLast);
+      }
     }
     ctx.stroke();
   }
