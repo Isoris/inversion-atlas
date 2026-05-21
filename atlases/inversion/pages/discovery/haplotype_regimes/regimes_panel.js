@@ -461,15 +461,23 @@ export function drawRegimesPanel(state) {
     console.warn(DBG, 'bail: #regimesCanvasContainer missing in DOM');
     return;
   }
-  const sub = container.querySelector('.regimes-subpanel');
+  // 2026-05-21: was querySelector('.regimes-subpanel'), but _withDOMAliases
+  // routes this call to the GENOME container when painting the genome view,
+  // and the genome subpanel uses class 'regimes-genome-lanes-subpanel'. The
+  // class-name mismatch made every genome-panel draw bail with
+  // "no .regimes-subpanel child", leaving the genome canvas stuck on the
+  // placeholder text. Query for any subpanel div directly under the
+  // container instead — there's only one in either layout.
+  const sub = container.querySelector(
+    '.regimes-subpanel, .regimes-genome-lanes-subpanel');
   if (!sub) {
-    console.warn(DBG, 'bail: no .regimes-subpanel child — buildRegimesPanel did not run or early-returned.',
+    console.warn(DBG, 'bail: no subpanel child under container — build step did not run or early-returned.',
       'stage3_loci.length=', (rp.stage3_loci && rp.stage3_loci.length) || 0);
     return;
   }
   const cv = sub.querySelector('canvas');
   if (!cv) {
-    console.warn(DBG, 'bail: no <canvas> inside .regimes-subpanel');
+    console.warn(DBG, 'bail: no <canvas> inside subpanel');
     return;
   }
   const { ctx, w, h } = fitCanvas(cv);
