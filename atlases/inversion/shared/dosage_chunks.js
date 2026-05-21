@@ -75,6 +75,37 @@ function _normIdCanon(s) {
   return _normId(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+// Strip common species/dataset prefixes both directions so e.g.
+// "C_gar_CGA001" ↔ "CGA001" / "CGA-001" / "cga001" all match.
+// Examples of prefixes seen in the wild: "C_gar_", "Cgar_",
+// "C_mac_", "INV_", "SAM_", "1_" (digits).
+const _PREFIX_PATTERNS = [
+  /^[A-Za-z]+_[A-Za-z]+_/,   // species_subset_ (e.g. "C_gar_")
+  /^[A-Za-z]+_/,             // single_token_ (e.g. "INV_", "SAM_")
+  /^\d+_/,                   // numeric_ (e.g. "1_")
+];
+
+function _stripPrefixes(id) {
+  // Apply each prefix pattern at most once and collect every reachable
+  // intermediate form so any of them can match the chunk side.
+  const out = new Set([id]);
+  const stack = [id];
+  while (stack.length) {
+    const cur = stack.pop();
+    for (const re of _PREFIX_PATTERNS) {
+      const m = re.exec(cur);
+      if (m) {
+        const next = cur.slice(m[0].length);
+        if (next && !out.has(next)) {
+          out.add(next);
+          stack.push(next);
+        }
+      }
+    }
+  }
+  return Array.from(out);
+}
+
 function _aliasesForCohortEntry(s, fallbackIdx) {
   const out = [];
   if (s == null) {
@@ -82,26 +113,20 @@ function _aliasesForCohortEntry(s, fallbackIdx) {
     return out;
   }
   if (typeof s === 'string' || typeof s === 'number') {
-    out.push(_normId(s));
+    for (const v of _stripPrefixes(_normId(s))) out.push(v);
     return out;
   }
   // Object — pull every plausible identifier field.
   const fields = ['id', 'cga', 'ind', 'sample', 'sample_id',
                   'name', 'label', 'ID', 'IND', 'CGA',
                   'sampleId', 'sampleID', 'individual', 'idx'];
+  const seen = new Set();
   for (const f of fields) {
     const v = s[f];
-    if (v != null && v !== '') out.push(_normId(v));
-  }
-  // Variants: strip leading "N_" prefix (e.g. "1_CGA001" → "CGA001")
-  // and prepend "N_" stripped values so both directions match.
-  const variants = [];
-  for (const id of out) {
-    const m = /^\d+_(.+)$/.exec(id);
-    if (m) variants.push(m[1]);
-  }
-  for (const v of variants) {
-    if (!out.includes(v)) out.push(v);
+    if (v == null || v === '') continue;
+    for (const a of _stripPrefixes(_normId(v))) {
+      if (!seen.has(a)) { seen.add(a); out.push(a); }
+    }
   }
   if (out.length === 0) out.push('S' + fallbackIdx);
   return out;
@@ -126,43 +151,53 @@ function _buildSampleIdMap(state, chunkSamples) {
       if (c && !map.has(c)) map.set(c, ci);
     }
   }
-  // One-shot diagnostic: when window.__dosageDbg is true OR match-rate is
-  // 0% on a non-empty chunk, log enough to diagnose the mismatch.
+  // One-shot diagnostic per page load. Always logs the first match so
+  // there's evidence whether the matcher is finding samples or not.
+  // After the first log, only re-logs when window.__dosageDbg is true
+  // (so the console isn't spammed once we know the rate). The match-rate
+  // count uses the same lookup path as the per-marker projection so the
+  // printed number is the actually-achieved rate.
   if (chunkSamples && chunkSamples.length > 0
-      && (typeof window === 'undefined' ? false : window.__dosageDbg === true
-          || !state || !state.__dosageMatchRateLogged)) {
+      && cohortSamples.length > 0
+      && typeof console !== 'undefined'
+      && state && (!state.__dosageMatchRateLogged
+                   || (typeof window !== 'undefined' && window.__dosageDbg === true))) {
     let matched = 0;
     for (const cid of chunkSamples) {
-      const key = _normId(cid);
-      if (map.has(key) || map.has(_normIdCanon(key))) matched++;
+      if (_lookupCohortIdx(map, cid) >= 0) matched++;
     }
     const rate = matched / chunkSamples.length;
-    const shouldLog = (typeof window !== 'undefined' && window.__dosageDbg === true)
-                  || (rate === 0 && cohortSamples.length > 0);
-    if (shouldLog && typeof console !== 'undefined') {
-      const cohortSample = cohortSamples[0];
-      const cohortPreview = (typeof cohortSample === 'string' || typeof cohortSample === 'number')
-        ? cohortSample
-        : JSON.stringify(cohortSample);
-      console.warn('[dosage_chunks] sample-id match:',
-        `${matched}/${chunkSamples.length} = ${(rate * 100).toFixed(0)}%`,
-        '· chunk ID example:', chunkSamples[0],
-        '· cohort entry example:', cohortPreview,
-        '· cohort aliases for [0]:', _aliasesForCohortEntry(cohortSample, 0));
-      if (state) state.__dosageMatchRateLogged = true;
-    }
+    const cohortSample = cohortSamples[0];
+    const cohortPreview = (typeof cohortSample === 'string' || typeof cohortSample === 'number')
+      ? cohortSample
+      : JSON.stringify(cohortSample);
+    const fn = rate === 0 ? 'warn' : 'log';
+    console[fn]('[dosage_chunks] sample-id match:',
+      `${matched}/${chunkSamples.length} = ${(rate * 100).toFixed(0)}%`,
+      '· chunk ID example:', JSON.stringify(chunkSamples[0]),
+      '· cohort entry example:', cohortPreview,
+      '· cohort aliases for [0]:', _aliasesForCohortEntry(cohortSample, 0));
+    state.__dosageMatchRateLogged = true;
   }
   return map;
 }
 
-// Wrapper so chunk.samples lookups go through the canonicalisation
-// fallback when the exact-string lookup misses. Both Maps are checked.
+// Wrapper so chunk.samples lookups go through the canonicalisation +
+// prefix-strip fallbacks when the exact-string lookup misses. Match
+// order: exact → exact-without-prefix → canonical → canonical-without-prefix.
 function _lookupCohortIdx(map, chunkId) {
   if (chunkId == null) return -1;
   const key = _normId(chunkId);
   if (map.has(key)) return map.get(key);
+  for (const stripped of _stripPrefixes(key)) {
+    if (map.has(stripped)) return map.get(stripped);
+  }
   const canon = _normIdCanon(key);
   if (map.has(canon)) return map.get(canon);
+  for (const stripped of _stripPrefixes(key)) {
+    const c = _normIdCanon(stripped);
+    if (c && map.has(c)) return map.get(c);
+  }
   return -1;
 }
 
