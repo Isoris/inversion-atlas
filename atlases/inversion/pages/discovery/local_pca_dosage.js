@@ -58,7 +58,10 @@ import { drawSim, drawSimMini } from './local_pca_dosage/sim_panel.js';
 import { drawZ } from './local_pca_dosage/z_panel.js';
 import { attachLinesLasso, buildLinesPanel, buildLinesPanelCheckboxes, drawLinesPanel, refreshLinesColorMode, setLinesPanelCandidateBands } from './local_pca_dosage/lines_panel.js';
 import { autoPickRadial, cycleKAside, drawAnchorStrip, drawPCA, refreshColorModeBar, refreshLockBtn, refreshPcaAxisBar, renderManualGroupsList, renderTrackedList, togglePlay } from './local_pca_dosage/pca_panel.js';
-import { _l3CacheInvalidate, refreshPinUI, renderL3Panel, renderL3PanelScaleStability, renderL3PanelSlab } from './local_pca_dosage/l3_panel.js';
+// 2026-05-20: renderL3PanelSlab is no longer a separate public function.
+// renderL3Panel dispatches internally to the slab body via its own
+// state.compareUnit check, so callers only need the single entry point.
+import { _l3CacheInvalidate, refreshPinUI, renderL3Panel, renderL3PanelScaleStability } from './local_pca_dosage/l3_panel.js';
 import { loadCandidateList, refreshBandPickBar, refreshCandidateUI } from './local_pca_dosage/candidates.js';
 import { buildTrackPanels, drawTracks, onPCAClick, onSimClick, onZClick, setCur, updateWinLabel } from './local_pca_dosage/events.js';
 import { attachSidebarHandlers } from './local_pca_dosage/sidebar.js';
@@ -92,7 +95,7 @@ export { drawSim, drawSimMini } from './local_pca_dosage/sim_panel.js';
 export { drawZ } from './local_pca_dosage/z_panel.js';
 export { buildLinesPanel, buildLinesPanelCheckboxes, drawLinesPanel, refreshLinesColorMode, setLinesPanelCandidateBands } from './local_pca_dosage/lines_panel.js';
 export { autoPickRadial, cycleKAside, drawAnchorStrip, drawPCA, renderManualGroupsList, renderTrackedList, togglePlay } from './local_pca_dosage/pca_panel.js';
-export { renderL3Panel, renderL3PanelScaleStability, renderL3PanelSlab } from './local_pca_dosage/l3_panel.js';
+export { renderL3Panel, renderL3PanelScaleStability } from './local_pca_dosage/l3_panel.js';
 export { buildTrackPanels, drawTracks, onPCAClick, onSimClick, onZClick, setCur, updateWinLabel } from './local_pca_dosage/events.js';
 
 // --- applyData() — legacy lines 54476-54690 ---

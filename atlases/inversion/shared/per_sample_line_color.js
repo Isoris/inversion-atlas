@@ -78,12 +78,21 @@ export function perSampleValuesForMode(state, mode, range) {
   }
 
   if (mode === 'theta_pi') {
-    // 2026-05-19 — canonical field is theta_pi_per_window.values[si][w]
-    // (per-sample × per-window 2D array). Old paths (theta_pi_panel /
-    // per_sample_theta_pi with .div_roll) are pre-schema-2.18 drafts.
+    // 2026-05-19 — canonical field is theta_pi_per_window.values
+    // (per-sample × per-window). 2026-05-20: handle the three real-world
+    // shapes (matches the same shape-detection logic in
+    // band_diagnostics.js):
+    //   a) flat row-major Float32Array of length nS*nW (atlas-canonical)
+    //   b) nested per-sample [[…], […]] (legacy R output)
+    //   c) per-sample objects samples[i].theta_pi (older shape)
+    // Old check `Array.isArray(tpw.values)` returned false for the flat
+    // typed array → silently fell through to legacy fallbacks → grey
+    // lines.
     const tpw = d.theta_pi_per_window;
-    if (tpw && Array.isArray(tpw.values)) {
-      return _perSampleMeanFrom2D(tpw.values, nS, startW, endW);
+    if (tpw && Array.isArray(tpw.windows) && tpw.windows.length > 0) {
+      const nW = tpw.windows.length;
+      const M = _toNested2D(tpw.values, tpw.samples, nS, nW);
+      if (M) return _perSampleMeanFrom2D(M, nS, startW, endW);
     }
     // 2026-05-20: when theta_pi_per_window.values isn't populated, fall
     // back to theta_pi_local_pca.pc_loadings_aligned[0] (PC1 across all
@@ -156,6 +165,55 @@ export function perSampleValuesForMode(state, mode, range) {
     });
   }
 
+  return null;
+}
+
+// 2026-05-20: shape-tolerant adapter for theta_pi_per_window.values.
+// Returns a nested 2D matrix (Array<Float32Array|Array>) the downstream
+// _perSampleMeanFrom2D walker understands. Mirrors the same logic in
+// band_diagnostics.js — both surfaces (lines panel + L3 chips) need to
+// read the same field, so the same shape-detection logic applies.
+//   a) flat row-major (TypedArray or plain Array of numbers) of length
+//      nS*nW → reshaped to nested
+//   b) already-nested → returned as-is
+//   c) per-sample samples[i].theta_pi arrays → wrapped into nested
+// Returns null when none of the shapes resolve.
+function _toNested2D(vals, samples, nS, nW) {
+  if (Array.isArray(vals) || ArrayBuffer.isView(vals)) {
+    if (vals.length > 0) {
+      const first = vals[0];
+      if (typeof first === 'number' || ArrayBuffer.isView(vals)) {
+        // Flat row-major. Determine n_samples from length / nW.
+        if (vals.length === nS * nW) {
+          const out = new Array(nS);
+          for (let s = 0; s < nS; s++) {
+            const row = new Float32Array(nW);
+            const off = s * nW;
+            for (let w = 0; w < nW; w++) row[w] = +vals[off + w];
+            out[s] = row;
+          }
+          return out;
+        }
+      } else if (Array.isArray(first) || ArrayBuffer.isView(first)) {
+        // Already nested.
+        return vals;
+      }
+    }
+  }
+  if (Array.isArray(samples) && samples.length > 0) {
+    const out = new Array(samples.length);
+    for (let s = 0; s < samples.length; s++) {
+      const row = samples[s] && (samples[s].theta_pi || samples[s].values);
+      if (Array.isArray(row) || ArrayBuffer.isView(row)) {
+        out[s] = row;
+      } else {
+        const r = new Float32Array(nW);
+        r.fill(NaN);
+        out[s] = r;
+      }
+    }
+    return out;
+  }
   return null;
 }
 

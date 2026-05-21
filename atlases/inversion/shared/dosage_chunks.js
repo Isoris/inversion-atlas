@@ -41,6 +41,131 @@ function _emptyNaN(nS) {
   return out;
 }
 
+// =====================================================================
+// 2026-05-20: sample-id alias matching.
+//
+// The chunk fetcher returns `chunk.samples` as the raw lines of the
+// server-side samples.tsv (one ID per line, first column). The atlas
+// cohort `state.data.samples` ships from a precomp JSON and can be
+// any of:
+//   - plain string: "CGA001"
+//   - object: { id: "CGA001" }
+//   - object: { cga: "CGA001", ind: "1_CGA001" }
+//   - object with prefixes / suffixes / underscores
+//
+// The pre-2026-05-20 matcher tried `s.id || s.cga || s.ind || s.sample`.
+// Real-world precomps have shipped with `s.name`, `s.sample_id`, `s.ID`,
+// plain strings, and prefixed IDs ("1_CGA001"). The matcher returned
+// nothing → 0 samples matched → every cohort cell stayed NaN → grey.
+//
+// New strategy: build aliases per cohort sample (multiple keys map to
+// the same cohort idx) so the chunk's IDs hit on at least one. Also
+// log a one-shot diagnostic when the match-rate is poor so the
+// console makes the cause obvious instead of "everything is silently
+// grey".
+// =====================================================================
+
+function _normId(s) {
+  return String(s == null ? '' : s).trim();
+}
+
+function _normIdCanon(s) {
+  // Lowercase + strip non-alphanum so "CGA-001" / "cga_001" / "CGA001"
+  // all collapse to "cga001". Use as a last-chance fuzzy match.
+  return _normId(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function _aliasesForCohortEntry(s, fallbackIdx) {
+  const out = [];
+  if (s == null) {
+    out.push('S' + fallbackIdx);
+    return out;
+  }
+  if (typeof s === 'string' || typeof s === 'number') {
+    out.push(_normId(s));
+    return out;
+  }
+  // Object — pull every plausible identifier field.
+  const fields = ['id', 'cga', 'ind', 'sample', 'sample_id',
+                  'name', 'label', 'ID', 'IND', 'CGA',
+                  'sampleId', 'sampleID', 'individual', 'idx'];
+  for (const f of fields) {
+    const v = s[f];
+    if (v != null && v !== '') out.push(_normId(v));
+  }
+  // Variants: strip leading "N_" prefix (e.g. "1_CGA001" → "CGA001")
+  // and prepend "N_" stripped values so both directions match.
+  const variants = [];
+  for (const id of out) {
+    const m = /^\d+_(.+)$/.exec(id);
+    if (m) variants.push(m[1]);
+  }
+  for (const v of variants) {
+    if (!out.includes(v)) out.push(v);
+  }
+  if (out.length === 0) out.push('S' + fallbackIdx);
+  return out;
+}
+
+function _buildSampleIdMap(state, chunkSamples) {
+  const cohortSamples = (state && state.data && state.data.samples) || [];
+  const map = new Map();
+  // Pass 1: exact + variant aliases per cohort sample.
+  for (let ci = 0; ci < cohortSamples.length; ci++) {
+    const aliases = _aliasesForCohortEntry(cohortSamples[ci], ci);
+    for (const a of aliases) {
+      if (!map.has(a)) map.set(a, ci);
+    }
+  }
+  // Pass 2: canonicalised form as a fallback. Only filled when the
+  // canonical key isn't already taken by an exact alias.
+  for (let ci = 0; ci < cohortSamples.length; ci++) {
+    const aliases = _aliasesForCohortEntry(cohortSamples[ci], ci);
+    for (const a of aliases) {
+      const c = _normIdCanon(a);
+      if (c && !map.has(c)) map.set(c, ci);
+    }
+  }
+  // One-shot diagnostic: when window.__dosageDbg is true OR match-rate is
+  // 0% on a non-empty chunk, log enough to diagnose the mismatch.
+  if (chunkSamples && chunkSamples.length > 0
+      && (typeof window === 'undefined' ? false : window.__dosageDbg === true
+          || !state || !state.__dosageMatchRateLogged)) {
+    let matched = 0;
+    for (const cid of chunkSamples) {
+      const key = _normId(cid);
+      if (map.has(key) || map.has(_normIdCanon(key))) matched++;
+    }
+    const rate = matched / chunkSamples.length;
+    const shouldLog = (typeof window !== 'undefined' && window.__dosageDbg === true)
+                  || (rate === 0 && cohortSamples.length > 0);
+    if (shouldLog && typeof console !== 'undefined') {
+      const cohortSample = cohortSamples[0];
+      const cohortPreview = (typeof cohortSample === 'string' || typeof cohortSample === 'number')
+        ? cohortSample
+        : JSON.stringify(cohortSample);
+      console.warn('[dosage_chunks] sample-id match:',
+        `${matched}/${chunkSamples.length} = ${(rate * 100).toFixed(0)}%`,
+        '· chunk ID example:', chunkSamples[0],
+        '· cohort entry example:', cohortPreview,
+        '· cohort aliases for [0]:', _aliasesForCohortEntry(cohortSample, 0));
+      if (state) state.__dosageMatchRateLogged = true;
+    }
+  }
+  return map;
+}
+
+// Wrapper so chunk.samples lookups go through the canonicalisation
+// fallback when the exact-string lookup misses. Both Maps are checked.
+function _lookupCohortIdx(map, chunkId) {
+  if (chunkId == null) return -1;
+  const key = _normId(chunkId);
+  if (map.has(key)) return map.get(key);
+  const canon = _normIdCanon(key);
+  if (map.has(canon)) return map.get(canon);
+  return -1;
+}
+
 function _ensureHetRateCache(state) {
   if (!state.__hetRateCache || !(state.__hetRateCache instanceof Map)) {
     state.__hetRateCache = new Map();
@@ -111,14 +236,9 @@ export function computeHetRateForRange(state, startBp, endBp, opts) {
     return out;
   }
 
-  // chunk-sample-id → cohort-index lookup
-  const cohortSamples = (state && state.data && state.data.samples) || [];
-  const idToCohort = new Map();
-  for (let ci = 0; ci < cohortSamples.length; ci++) {
-    const s = cohortSamples[ci];
-    const id = (s && (s.id || s.cga || s.ind || s.sample)) || ('S' + ci);
-    idToCohort.set(id, ci);
-  }
+  // chunk-sample-id → cohort-index lookup. Robust matcher: see
+  // _buildSampleIdMap for the multi-pass alias strategy.
+  const idToCohort = _buildSampleIdMap(state, chunk.samples);
 
   // Filter markers to bp span
   const inRange = [];
@@ -147,10 +267,11 @@ export function computeHetRateForRange(state, startBp, endBp, opts) {
     }
   }
 
-  // Project to cohort space
+  // Project to cohort space — _lookupCohortIdx handles exact and
+  // canonicalised (alphanumeric-lowercase) fallbacks so prefix /
+  // separator / case variants still match.
   for (let ci = 0; ci < nChunkS; ci++) {
-    const cohortIdx = idToCohort.has(chunk.samples[ci])
-      ? idToCohort.get(chunk.samples[ci]) : -1;
+    const cohortIdx = _lookupCohortIdx(idToCohort, chunk.samples[ci]);
     if (cohortIdx < 0 || cohortIdx >= nS) continue;
     out[cohortIdx] = (nonNaCounts[ci] === 0)
       ? NaN
@@ -266,14 +387,9 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
     return out;
   }
 
-  // chunk-sample-id → cohort-index lookup
-  const cohortSamples = (state && state.data && state.data.samples) || [];
-  const idToCohort = new Map();
-  for (let ci = 0; ci < cohortSamples.length; ci++) {
-    const s = cohortSamples[ci];
-    const id = (s && (s.id || s.cga || s.ind || s.sample)) || ('S' + ci);
-    idToCohort.set(id, ci);
-  }
+  // chunk-sample-id → cohort-index lookup. Robust matcher: see
+  // _buildSampleIdMap for the multi-pass alias strategy.
+  const idToCohort = _buildSampleIdMap(state, chunk.samples);
 
   // Filter markers to bp span
   const inRange = [];
@@ -302,10 +418,11 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
     }
   }
 
-  // Project to cohort space
+  // Project to cohort space — _lookupCohortIdx handles exact and
+  // canonicalised (alphanumeric-lowercase) fallbacks so prefix /
+  // separator / case variants still match.
   for (let ci = 0; ci < nChunkS; ci++) {
-    const cohortIdx = idToCohort.has(chunk.samples[ci])
-      ? idToCohort.get(chunk.samples[ci]) : -1;
+    const cohortIdx = _lookupCohortIdx(idToCohort, chunk.samples[ci]);
     if (cohortIdx < 0 || cohortIdx >= nS) continue;
     out[cohortIdx] = (nNonNa[ci] === 0)
       ? NaN
@@ -377,6 +494,34 @@ export function installDosageChunkFetcher(state, opts) {
     const lru = _ensureChunkLru(state);
     const key = _chunkKey(chrom, startBp, endBp);
     if (lru.has(key)) return lru.get(key);
+    // 2026-05-20: covering-chunk fallback. Before this, the LRU was
+    // strict exact-key match — a chunk fetched at (1.0M, 1.5M) couldn't
+    // satisfy a request for (1.1M, 1.2M), even though the bigger chunk
+    // contains every marker the caller would filter to. Result: every
+    // size-mismatched caller (PCA single-window color, L3 chips with
+    // L2 ranges that happened to differ from the lines panel's visible
+    // Mb range) refired a new fetch instead of reusing what was already
+    // cached, and every visit showed grey points/`?` chips until the
+    // second fetch landed. With the fallback, computeHetRateForRange /
+    // computeDosageMeanForRange filter markers by their own startBp/
+    // endBp predicate, so a wider-chunk return is functionally identical
+    // to the exact-fit chunk would have been.
+    // O(_DOSAGE_LRU_SIZE) — bounded at 12, negligible.
+    for (const [k, chunk] of lru) {
+      if (!chunk || typeof chunk !== 'object') continue;
+      // Key shape: 'chrom:start-end'. Parse + verify same chrom.
+      const sep = k.indexOf(':');
+      if (sep < 0) continue;
+      if (k.slice(0, sep) !== chrom) continue;
+      const dash = k.indexOf('-', sep + 1);
+      if (dash < 0) continue;
+      const kStart = +k.slice(sep + 1, dash);
+      const kEnd   = +k.slice(dash + 1);
+      if (kStart <= startBp && kEnd >= endBp) {
+        // Cached chunk's bp span fully covers the requested range.
+        return chunk;
+      }
+    }
     if (inflight.has(key)) return null;
     const url = _templateUrl(template, chrom, startBp, endBp, cap);
     const pr = fetch(url)
@@ -391,6 +536,16 @@ export function installDosageChunkFetcher(state, opts) {
           const firstKey = lru.keys().next().value;
           if (!firstKey) break;
           lru.delete(firstKey);
+        }
+        // 2026-05-20: one-time landing breadcrumb so the user can tell
+        // the fetch loop is healthy when colors stay grey. Opt-in via
+        // window.__dosageDbg = true; otherwise prints once per LRU
+        // lifetime so there's some evidence chunks are arriving.
+        if (typeof window !== 'undefined' && window.__dosageDbg === true) {
+          console.log('[dosage_chunks] chunk landed:',
+            `${chunk.markers ? chunk.markers.length : 0} markers ·`,
+            `${chunk.samples ? chunk.samples.length : 0} samples ·`,
+            `bp ${chunk.start_bp}–${chunk.end_bp}`);
         }
         // The per-sample lines panel caches its computed mean/het by
         // (mode, startW-endW) — invalidate so the next paint recomputes

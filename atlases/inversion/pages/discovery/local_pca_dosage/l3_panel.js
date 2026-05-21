@@ -555,7 +555,7 @@ export function renderL3Panel(state) {
   // contingency tables its not working for per window navigation … it
   // should work for every scale". Same bug for renderL3PanelScaleStability().
   if (state.compareUnit && state.compareUnit !== 'L2') {
-    return renderL3PanelSlab(state);
+    return _renderL3PanelSlabImpl(state);
   }
 
   // v3.99 turn 7 perf: short-circuit when nothing that affects pane content
@@ -1054,7 +1054,14 @@ export function renderL3Panel(state) {
 }
 
 // --- renderL3PanelSlab() — legacy lines 49209-49478 ---
-export function renderL3PanelSlab(state) {
+// 2026-05-20 (step 4 of L2/slab unification): renamed to
+// `_renderL3PanelSlabImpl` — internal slab dispatcher. The public name
+// `renderL3PanelSlab` is now a thin alias for `renderL3Panel`, exported
+// at the bottom of this file for backwards-compat with existing imports
+// (local_pca_dosage.js still re-exports it). Quentin: "just use 1 since
+// only the scale changes" — there's now ONE public entry point and the
+// router/page no longer needs to know which mode is active.
+function _renderL3PanelSlabImpl(state) {
   _setActiveState(state);
   const d = getActiveModeView(state) || state.data;
   if (!d) return;
@@ -3285,3 +3292,8 @@ function _invariantMetaInlineHtml(stats) {
   }
   return `<div class="meta-inline">${chips.join('')}</div>`;
 }
+
+// 2026-05-20 — `renderL3PanelSlab` was removed as a public export. The
+// slab body lives at `_renderL3PanelSlabImpl` above and is reached only
+// via `renderL3Panel`'s internal `state.compareUnit` dispatch. There is
+// now exactly ONE public render entry point — `renderL3Panel(state)`.

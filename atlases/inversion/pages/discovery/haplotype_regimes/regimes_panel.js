@@ -669,11 +669,19 @@ export function drawRegimesPanel(state) {
     const b = voter.bands[bi];
     for (const si of locus.per_band_samples[b]) siToFocalBand.set(si, bi);
   }
+  // 2026-05-21: voter lines at alpha 0.45 (was 1.0). With 27+ voter samples
+  // each striking a ~1.4px path across 9000 windows, full-opacity hue
+  // (especially band 0's orange) saturates the canvas into a solid blob
+  // that obscures any actual signal. Alpha 0.45 lets dense regions remain
+  // bright while sparse trails fade — same convention as the tracked-but-
+  // not-voter lines above (alpha 0.45) and the lasso colouring in
+  // lines_panel.js. Density still surfaces (overlap stacks alpha).
+  const voterAlpha = voterSet.size > 8 ? 0.45 : 0.85;
   for (const si of voterSet) {
     const bi = siToFocalBand.get(si);
     const col = bandHues[(bi >= 0 ? bi : 0) % bandHues.length];
-    ctx.lineWidth = 1.4;
-    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = withAlpha(col, voterAlpha);
     strokePath(si);
   }
 
@@ -728,6 +736,13 @@ export function drawRegimesPanel(state) {
       seedGiEnd = gi;
     }
   }
+  // Skip when the rect would cover ≥85% of the plot width: nothing to
+  // localize, and the orange tint just drowns out the per-sample lines.
+  // (Common in chrom scope when the focal seed IS the candidate spanning
+  // the whole chromosome.) In that case we keep just the dashed border so
+  // the user knows "the seed is everywhere here".
+  const _rectCoversPlot = seedGiStart >= 0 && seedGiEnd >= seedGiStart
+    && (xByGi[seedGiEnd] - xByGi[seedGiStart]) >= 0.85 * plotW;
   if (seedGiStart >= 0 && seedGiEnd >= seedGiStart) {
     const x0 = xByGi[seedGiStart] - 0.5 * cellW;
     const x1 = xByGi[seedGiEnd] + 0.5 * cellW;
@@ -736,10 +751,10 @@ export function drawRegimesPanel(state) {
     const getMacroDosage = (rp.ctx_callbacks && rp.ctx_callbacks.getMacroDosage) || null;
     const activeBandsSet = new Set(voter.bands);
     ctx.save();
-    for (let b = 0; b < seedK; b++) {
+    if (!_rectCoversPlot) for (let b = 0; b < seedK; b++) {
       const yTop = pad.t + b * stripeH;
       const isActive = activeBandsSet.has(b);
-      const baseAlpha = isActive ? 0.18 : 0.10;   // softer for inactive
+      const baseAlpha = isActive ? 0.09 : 0.05;   // softer overall + softer for inactive
       let fillCol = `rgba(245, 165, 36, ${baseAlpha})`;   // legacy gold
       if (getMacroDosage) {
         try {
@@ -755,7 +770,7 @@ export function drawRegimesPanel(state) {
       // 0.95. We achieve this with globalAlpha rather than baking into
       // the rgba above, so the dosage hue stays correct while the
       // contrast cue lives in the alpha channel.
-      ctx.globalAlpha = isActive ? 1.0 : 0.95;
+      ctx.globalAlpha = isActive ? 0.85 : 0.55;
       ctx.fillRect(x0, yTop, x1 - x0, stripeH);
     }
     ctx.globalAlpha = 1.0;
@@ -765,10 +780,12 @@ export function drawRegimesPanel(state) {
     ctx.setLineDash([4, 3]);
     ctx.strokeRect(x0 + 0.5, pad.t + 0.5, x1 - x0 - 1, plotH - 1);
     ctx.setLineDash([]);
-    // Per-band thin lane separators inside the rectangle
+    // Per-band thin lane separators inside the rectangle (skip when the
+    // rect covers the plot — they'd just be horizontal lines spanning
+    // everything, indistinguishable from the band-lane gridlines).
     ctx.strokeStyle = 'rgba(245, 165, 36, 0.30)';
     ctx.lineWidth = 0.5;
-    for (let b = 1; b < seedK; b++) {
+    if (!_rectCoversPlot) for (let b = 1; b < seedK; b++) {
       const ySep = pad.t + b * stripeH + 0.5;
       ctx.beginPath();
       ctx.moveTo(x0, ySep);

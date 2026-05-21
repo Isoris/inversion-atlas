@@ -188,29 +188,67 @@ export function confounderAlertColor(state, si) {
 }
 
 /**
- * Color a sample by its θπ value at the current window. Reads:
- *   state.data.theta_pi_per_window.values[si][cur]
- * Cold = low π (low diversity, possibly inversion-suppressed);
- * warm = high π (high diversity).
+ * Color a sample by its θπ value at the current window.
+ *
+ * 2026-05-20: handles all three real-world shapes of
+ * theta_pi_per_window.values (matches the same detection in
+ * band_diagnostics.js + per_sample_line_color.js):
+ *   a) flat row-major TypedArray / Array of numbers (atlas-canonical)
+ *      → values[si * nW + cur]
+ *   b) nested [sample][window] → values[si][cur]
+ *   c) per-sample samples[i].theta_pi array → samples[si].theta_pi[cur]
+ *
+ * Old check `Array.isArray(tpw.values)` returned false for the flat
+ * Float32Array shape → null return → grey. Cold = low π (low diversity,
+ * possibly inversion-suppressed); warm = high π (high diversity).
  */
+function _readTpiAt(tpw, si, cur) {
+  if (!tpw) return NaN;
+  const vals = tpw.values;
+  const wins = Array.isArray(tpw.windows) ? tpw.windows : null;
+  const nW = wins ? wins.length : 0;
+  if (vals && (Array.isArray(vals) || ArrayBuffer.isView(vals)) && vals.length > 0) {
+    const first = vals[0];
+    if (typeof first === 'number' || ArrayBuffer.isView(vals)) {
+      if (nW > 0) {
+        const v = vals[si * nW + cur];
+        return Number.isFinite(v) ? v : NaN;
+      }
+      return NaN;
+    }
+    if (Array.isArray(first) || ArrayBuffer.isView(first)) {
+      const row = vals[si];
+      if (!row) return NaN;
+      const v = row[cur];
+      return Number.isFinite(v) ? v : NaN;
+    }
+  }
+  if (Array.isArray(tpw.samples) && tpw.samples[si]) {
+    const row = tpw.samples[si].theta_pi || tpw.samples[si].values;
+    if ((Array.isArray(row) || ArrayBuffer.isView(row)) && row.length > cur) {
+      const v = row[cur];
+      return Number.isFinite(v) ? v : NaN;
+    }
+  }
+  return NaN;
+}
+
 export function thetaPiColor(state, si) {
   if (!state || !state.data || !state.data.theta_pi_per_window) return null;
   const tpw = state.data.theta_pi_per_window;
-  if (!Array.isArray(tpw.values)) return null;
-  const row = tpw.values[si];
-  if (!row) return null;
   const cur = (state.cur | 0) || 0;
-  const v = row[cur];
+  const v = _readTpiAt(tpw, si, cur);
   if (!Number.isFinite(v)) return null;
   const scale = _getColorScale(state, 'theta_pi', s => {
     const tp = s.data && s.data.theta_pi_per_window;
-    if (!tp || !Array.isArray(tp.values)) return null;
+    if (!tp) return null;
     const c = (s.cur | 0) || 0;
-    const n = tp.values.length;
-    const out = new Array(n);
-    for (let i = 0; i < n; i++) {
-      const r = tp.values[i];
-      out[i] = (r && Number.isFinite(r[c])) ? r[c] : NaN;
+    const nS = (s.data && s.data.n_samples) | 0;
+    if (nS <= 0) return null;
+    const out = new Array(nS);
+    for (let i = 0; i < nS; i++) {
+      const x = _readTpiAt(tp, i, c);
+      out[i] = Number.isFinite(x) ? x : NaN;
     }
     return out;
   });
@@ -225,23 +263,32 @@ export function thetaPiColor(state, si) {
  * The sign+magnitude of PC1 separates karyotype groups in GHSL space;
  * cold/warm maps to the two arms of the PC1 axis.
  */
+// 2026-05-20: TypedArray-tolerant row predicate. The precomp emits
+// pc_loadings_aligned with either plain-Array rows or Float32Array
+// rows depending on the R writer version. `Array.isArray(row)` returned
+// false for the typed-array case → ghslColor returned null → grey
+// dots. Same `Array.isArray` blind spot as the theta_pi fixes above.
+function _isArrayLike(v) {
+  return Array.isArray(v) || ArrayBuffer.isView(v);
+}
+
 export function ghslColor(state, si) {
   if (!state || !state.data || !state.data.ghsl_local_pca) return null;
   const lp = state.data.ghsl_local_pca;
   const a = lp.pc_loadings_aligned;
-  if (!Array.isArray(a) || !Array.isArray(a[0])) return null;
+  if (!_isArrayLike(a) || !_isArrayLike(a[0])) return null;
   const cur = (state.cur | 0) || 0;
   const row = a[0][cur];
-  if (!Array.isArray(row)) return null;
+  if (!_isArrayLike(row)) return null;
   const v = row[si];
   if (!Number.isFinite(v)) return null;
   const scale = _getColorScale(state, 'ghsl', s => {
     const _lp = s.data && s.data.ghsl_local_pca;
     const _a  = _lp && _lp.pc_loadings_aligned;
-    if (!Array.isArray(_a) || !Array.isArray(_a[0])) return null;
+    if (!_isArrayLike(_a) || !_isArrayLike(_a[0])) return null;
     const c = (s.cur | 0) || 0;
     const r = _a[0][c];
-    return Array.isArray(r) ? r : null;
+    return _isArrayLike(r) ? r : null;
   });
   if (!scale) return null;
   return _vColorRamp((v - scale.lo) / (scale.hi - scale.lo));

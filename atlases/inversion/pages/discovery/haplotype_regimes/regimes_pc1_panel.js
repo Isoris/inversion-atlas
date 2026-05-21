@@ -281,11 +281,14 @@ export function drawRegimesPC1Panel(state) {
     if (!bandSamples) continue;
     for (const si of bandSamples) siToFocalBand.set(si, bi);
   }
+  // Match regimes_panel.js: alpha 0.45 when voter has >8 samples so dense
+  // overlap doesn't saturate into a solid orange wash.
+  const voterAlpha = voterSet.size > 8 ? 0.45 : 0.85;
   for (const si of voterSet) {
     const bi = siToFocalBand.get(si);
     const col = bandHues[(bi >= 0 ? bi : 0) % bandHues.length];
-    ctx.lineWidth = 1.4;
-    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = withAlpha(col, voterAlpha);
     strokePath(si);
   }
 
@@ -309,6 +312,11 @@ export function drawRegimesPC1Panel(state) {
       seedGiEnd = gi;
     }
   }
+  // Skip stripe fills when the rect would cover ≥85% of the plot width —
+  // see regimes_panel.js for the rationale (orange tint drowns out the
+  // PC1 traces when the seed IS the chromosome).
+  const _rectCoversPlot = seedGiStart >= 0 && seedGiEnd >= seedGiStart
+    && (xByGi[seedGiEnd] - xByGi[seedGiStart]) >= 0.85 * plotW;
   if (seedGiStart >= 0 && seedGiEnd >= seedGiStart) {
     const x0 = xByGi[seedGiStart] - 0.5 * cellW;
     const x1 = xByGi[seedGiEnd] + 0.5 * cellW;
@@ -317,10 +325,10 @@ export function drawRegimesPC1Panel(state) {
     const getMacroDosage = cb.getMacroDosage || null;
     const activeBandsSet = new Set(voter.bands);
     ctx.save();
-    for (let b = 0; b < seedK; b++) {
+    if (!_rectCoversPlot) for (let b = 0; b < seedK; b++) {
       const yTop = pad.t + b * stripeH;
       const isActive = activeBandsSet.has(b);
-      const baseAlpha = isActive ? 0.18 : 0.10;
+      const baseAlpha = isActive ? 0.09 : 0.05;
       let fillCol = `rgba(245, 165, 36, ${baseAlpha})`;
       if (getMacroDosage) {
         try {
@@ -332,7 +340,7 @@ export function drawRegimesPC1Panel(state) {
         } catch (_) { /* fall through to gold */ }
       }
       ctx.fillStyle = fillCol;
-      ctx.globalAlpha = isActive ? 1.0 : 0.95;
+      ctx.globalAlpha = isActive ? 0.85 : 0.55;
       ctx.fillRect(x0, yTop, x1 - x0, stripeH);
     }
     ctx.globalAlpha = 1.0;
@@ -343,7 +351,7 @@ export function drawRegimesPC1Panel(state) {
     ctx.setLineDash([]);
     ctx.strokeStyle = 'rgba(245, 165, 36, 0.30)';
     ctx.lineWidth = 0.5;
-    for (let b = 1; b < seedK; b++) {
+    if (!_rectCoversPlot) for (let b = 1; b < seedK; b++) {
       const ySep = pad.t + b * stripeH + 0.5;
       ctx.beginPath();
       ctx.moveTo(x0, ySep);
