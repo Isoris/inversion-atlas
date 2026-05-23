@@ -41,8 +41,9 @@
 // imported from `../inversion_comparative/multi_species_cockpit.js` (pre-migration
 // path) and was a parse-check + content-scan stub.
 
-import * as multi_species_cockpit from '../atlases/inversion/pages/comparative/multi_species_cockpit.js';
-import * as state from '../atlases/inversion/pages/comparative/multi_species_cockpit/_state.js';
+// 2026-05-23 Phase 1b: multi_species_cockpit moved from inversion to cross-species atlas.
+import * as multi_species_cockpit from '../atlases/cross-species/pages/breakpoints/multi_species_cockpit.js';
+import * as state from '../atlases/cross-species/pages/breakpoints/multi_species_cockpit/_state.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

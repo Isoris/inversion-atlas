@@ -2,7 +2,7 @@
 import {
   carrierOverlap, classifyPairRelationships, ageRank, buildEventTree,
   MGL_EVENT_TREE_DEFAULTS,
-} from '../atlases/inversion/shared/mgl_event_tree.js';
+} from '../atlases/evolution/shared/mgl_event_tree.js';
 
 let pass=0, fail=0;
 function check(l,c){ if (c) {pass++; console.log('  ✓',l);} else {fail++; console.log('  ✗',l);} }

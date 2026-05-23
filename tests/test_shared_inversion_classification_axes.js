@@ -15,7 +15,7 @@ import {
 import {
   DIVERGENCE_FST_WEAK_THRESHOLD,
   DIVERGENCE_FST_STRONG_THRESHOLD,
-} from '../atlases/inversion/shared/divergence_network.js';
+} from '../atlases/cross-species/shared/divergence_network.js';
 import {
   storeXpehhPerWindow,
 } from '../atlases/inversion/shared/xpehh_per_window.js';

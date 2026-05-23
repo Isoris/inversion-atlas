@@ -10,7 +10,7 @@ import {
   buildSampleCovariance,
   pcaForWindow,
   computePcaForWindowList,
-} from '../atlases/inversion/shared/mgl_pca_compute.js';
+} from '../atlases/cross-species/shared/mgl_pca_compute.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

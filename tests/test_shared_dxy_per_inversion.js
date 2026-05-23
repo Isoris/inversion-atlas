@@ -1,6 +1,6 @@
 // tests/test_shared_dxy_per_inversion.js
 //
-// Unit tests for atlases/inversion/shared/dxy_per_inversion.js.
+// Unit tests for atlases/cross-species/shared/dxy_per_inversion.js.
 
 class MockLS {
   constructor() { this.store = new Map(); }
@@ -22,7 +22,7 @@ const {
   restoreDxyPerInversion,
   clearDxyPerInversion,
   getDxyForBreakpoint,
-} = await import('../atlases/inversion/shared/dxy_per_inversion.js');
+} = await import('../atlases/cross-species/shared/dxy_per_inversion.js');
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

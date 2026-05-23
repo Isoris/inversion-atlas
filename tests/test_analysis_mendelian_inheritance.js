@@ -12,7 +12,7 @@ import {
   DEFAULT_THRESHOLDS,
   computeDependencyHash,
   runMendelianInheritance,
-} from '../atlases/inversion/analysis/mendelian_inheritance.js';
+} from '../atlases/popstats/analysis/mendelian_inheritance.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

@@ -19,7 +19,7 @@ const {
   persistDotplotMashmap,
   restoreDotplotMashmap,
   clearDotplotMashmap,
-} = await import('../atlases/inversion/shared/dotplot_mashmap.js');
+} = await import('../atlases/cross-species/shared/dotplot_mashmap.js');
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

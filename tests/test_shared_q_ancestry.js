@@ -1,6 +1,6 @@
 // tests/test_shared_q_ancestry.js
 //
-// Unit tests for atlases/inversion/shared/q_ancestry.js — the
+// Unit tests for atlases/popstats/shared/q_ancestry.js — the
 // Q-association ancestry coloring + legend bars module.
 
 import {
@@ -14,7 +14,7 @@ import {
   qaResolveSample,
   qaSampleColor,
   qaProportionBars,
-} from '../atlases/inversion/shared/q_ancestry.js';
+} from '../atlases/popstats/shared/q_ancestry.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

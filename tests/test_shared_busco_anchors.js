@@ -18,7 +18,7 @@ import {
   buscoDepletionVsFlank,
   buscoSyntenyScore,
   suggestArchitectureClass,
-} from '../atlases/inversion/shared/busco_anchors.js';
+} from '../atlases/cross-species/shared/busco_anchors.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

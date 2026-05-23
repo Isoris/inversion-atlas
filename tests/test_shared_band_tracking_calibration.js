@@ -7,14 +7,14 @@
 import { percentile } from '../atlases/inversion/shared/stats_helpers.js';
 import {
   calibrateMeioticDriveBands,
-} from '../atlases/inversion/shared/band_tracking/regime_dyad_mendelian.js';
+} from '../atlases/popstats/shared/band_tracking/regime_dyad_mendelian.js';
 import {
   calibrateLinkageThresholdsFromCrossChrom,
-} from '../atlases/inversion/shared/band_tracking/regime_linkage.js';
+} from '../atlases/popstats/shared/band_tracking/regime_linkage.js';
 import {
   calibratePedigreeThresholdsFromKnownPairs,
   REGIME_PEDIGREE_DEFAULTS,
-} from '../atlases/inversion/shared/band_tracking/regime_pedigree.js';
+} from '../atlases/popstats/shared/band_tracking/regime_pedigree.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

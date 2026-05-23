@@ -3,7 +3,7 @@
 // Unit coverage for shared/sample_spread.js — per-sample σ of
 // sign-aligned PC1 across a window range (legacy lines 10294-10330).
 
-import * as SS from '../atlases/inversion/shared/sample_spread.js';
+import * as SS from '../atlases/popstats/shared/sample_spread.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

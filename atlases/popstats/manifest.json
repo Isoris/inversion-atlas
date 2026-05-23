@@ -1,0 +1,37 @@
+{
+  "atlas_id": "popstats",
+  "atlas_name": "Population Statistics + Relatedness Atlas",
+  "atlas_version": "2026-05-23-phase3",
+  "atlas_description": "Cohort-level population statistics, relatedness, Mendelian + dyad/trio gates, pedigree inference from regimes, ancestry painting. Hosts Cluster 4 of the haplotype-regimes pipeline (regime_mendelian, regime_dyad_mendelian, regime_pedigree, regime_linkage) and the MSMC demographic validation SPEC. Reads inversion.candidates_v1 + inversion.regime_catalogue_v1 (read-only) via cross_atlas_imports.",
+  "cohorts": ["cgar_hatchery_226"],
+  "reference_id": "fClaHyb_Gar_LG",
+  "pages": [
+    {
+      "id": "popstats",
+      "slug": "popstats",
+      "label": "popstats",
+      "stage": "synthesis",
+      "fragment": "atlases/popstats/pages/review/popstats.html",
+      "module":   "atlases/popstats/pages/review/popstats.js",
+      "tooltip": "Per-candidate cohort statistics: π, FST, dXY, HWE, F_IS, allele-frequency drift, private/fixed counts. Consumes inversion.candidates_v1."
+    },
+    {
+      "id": "ancestry_per_window",
+      "slug": "ancestry_per_window",
+      "label": "ancestry per window",
+      "stage": "evolution",
+      "fragment": "atlases/popstats/pages/review/ancestry_per_window.html",
+      "module":   "atlases/popstats/pages/review/ancestry_per_window.js",
+      "tooltip": "Per-window ancestry painting across the chromosome."
+    },
+    {
+      "id": "fish_ancestry_scroller",
+      "slug": "fish_ancestry_scroller",
+      "label": "fish ancestry",
+      "stage": "evolution",
+      "fragment": "atlases/popstats/pages/review/fish_ancestry_scroller.html",
+      "module":   "atlases/popstats/pages/review/fish_ancestry_scroller.js",
+      "tooltip": "Per-fish ancestry painting across one inversion candidate. Headline metric: mean |ΔQ| (global vs local). See specs_done/SPEC_fish_ancestry_scroller.md."
+    }
+  ]
+}

@@ -13,7 +13,7 @@ import {
   buildBricksForFish,
   attachBrickMetrics,
   buildAndAnnotateBricks,
-} from '../atlases/inversion/shared/ancestry_bricks.js';
+} from '../atlases/popstats/shared/ancestry_bricks.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

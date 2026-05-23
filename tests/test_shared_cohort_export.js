@@ -3,7 +3,7 @@
 // Unit coverage for shared/cohort_export.js — cohort-level sample
 // metadata helpers (legacy lines 61038-61108).
 
-import * as CE from '../atlases/inversion/shared/cohort_export.js';
+import * as CE from '../atlases/popstats/shared/cohort_export.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

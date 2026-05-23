@@ -4,7 +4,7 @@ import {
   perWindowLeakage,
   integrityVerdict,
   MGL_MOSAICISM_DEFAULTS,
-} from '../atlases/inversion/shared/mgl_mosaicism_detector.js';
+} from '../atlases/evolution/shared/mgl_mosaicism_detector.js';
 
 let pass=0, fail=0;
 function check(l,c){ if (c) {pass++; console.log('  ✓',l);} else {fail++; console.log('  ✗',l);} }

@@ -14,7 +14,7 @@
 import {
   runMendelianTest,
   MODULE_VERSION,
-} from '../atlases/inversion/analysis/mendelian.js';
+} from '../atlases/popstats/analysis/mendelian.js';
 import { chiSqSurvival } from '../atlases/inversion/shared/contingency.js';
 
 let pass = 0, fail = 0;

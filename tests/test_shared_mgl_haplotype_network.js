@@ -9,7 +9,7 @@ import {
   forceLayout,
   buildHaplotypeNetwork,
   MGL_HAPNET_DEFAULTS,
-} from '../atlases/inversion/shared/mgl_haplotype_network.js';
+} from '../atlases/evolution/shared/mgl_haplotype_network.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

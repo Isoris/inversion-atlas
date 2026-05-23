@@ -13,7 +13,7 @@ import {
 } from '../atlases/inversion/shared/band_tracking/genome_scale.js';
 import {
   REGIME_PEDIGREE_VERDICTS,
-} from '../atlases/inversion/shared/band_tracking/regime_pedigree.js';
+} from '../atlases/popstats/shared/band_tracking/regime_pedigree.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

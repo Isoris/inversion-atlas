@@ -51,7 +51,7 @@ import {
 } from '../../../shared/sample_color.js';
 import { diagSampleColor } from './diag_residuals.js';
 import { xpSampleColor } from '../../../shared/cross_page_clusters.js';
-import { qaSampleColor } from '../../../shared/q_ancestry.js';
+import { qaSampleColor } from '../../../../popstats/shared/q_ancestry.js';
 import { perSampleColorFor } from '../../../shared/per_sample_line_color.js';
 
 // =====================================================================

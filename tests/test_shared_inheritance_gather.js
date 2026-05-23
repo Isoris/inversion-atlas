@@ -3,7 +3,7 @@
 // Unit coverage for shared/inheritance_gather.js — gather active
 // candidate set for inheritance compute (legacy lines 41196-41245).
 
-import * as G from '../atlases/inversion/shared/inheritance_gather.js';
+import * as G from '../atlases/popstats/shared/inheritance_gather.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

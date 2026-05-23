@@ -1,0 +1,6 @@
+haplotype_id	species	source	qc_tier	fasta_path	notes
+Cmac_h1	Cmac	F1_hybrid_Mac_subgenome	A	/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04/MODULE_BPATLAS/00_input/fastas/Cmac_h1__fClaHyb_Mac_LG.fa	Mac subgenome of haplotype-resolved F1 hybrid; LG-renamed
+Cgar_h1	Cgar	F1_hybrid_Gar_subgenome	A	/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04/MODULE_BPATLAS/00_input/fastas/Cgar_h1__fClaHyb_Gar_LG.fa	Gar subgenome of haplotype-resolved F1 hybrid; LG-renamed; PRIMARY anchor
+Cmac_h2	Cmac	public_fClaMac1_hap1	A	/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04/MODULE_BPATLAS/00_input/fastas/Cmac_h2__GCA_048544425_hap1.fna	public C. macrocephalus hap1 GCA_048544425
+Cmac_h3	Cmac	public_fClaMac1_hap2	A	/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04/MODULE_BPATLAS/00_input/fastas/Cmac_h3__GCA_048544435_hap2.fna	public C. macrocephalus hap2 GCA_048544435
+Cgar_DE_primary	Cgar	German_CGARprim_GCA_024256425	C	/scratch/lt200308-agbsci/Quentin_project_KEEP_2026-02-04/MODULE_BPATLAS/00_input/fastas/Cgar_h3_DE__GCA_024256425_CGARprim.fna	German Gar CGARprim_01v2 primary assembly; fragmented; SUPPORT-ONLY tier

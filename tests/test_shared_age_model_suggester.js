@@ -9,7 +9,7 @@ import {
   LINEAGE_KARYO_VERDICTS,
   deriveAgeSignals,
   suggestAgeModel,
-} from '../atlases/inversion/shared/age_model_suggester.js';
+} from '../atlases/evolution/shared/age_model_suggester.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

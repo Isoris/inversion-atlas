@@ -29,8 +29,9 @@
 //   }
 // =====================================================================
 
+// 2026-05-23 Phase 1c: mgl_pca_compute moved to cross-species atlas.
 import { centerDosageOnSubset, applyPolarityFlipsFromRefPC1 }
-  from './mgl_pca_compute.js';
+  from '../../cross-species/shared/mgl_pca_compute.js';
 
 // =====================================================================
 // Vocab

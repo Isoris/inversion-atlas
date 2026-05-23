@@ -9,7 +9,7 @@ import {
   buildBandFishMask,
   jaccardDistance,
   inheritanceGroupClustering,
-} from '../atlases/inversion/shared/inheritance_groups.js';
+} from '../atlases/popstats/shared/inheritance_groups.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

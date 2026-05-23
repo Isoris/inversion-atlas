@@ -7,7 +7,7 @@ import {
   relSampleMap,
   getHubIdAt,
   getNumHubsAt,
-} from '../atlases/inversion/shared/relatedness.js';
+} from '../atlases/popstats/shared/relatedness.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

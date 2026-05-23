@@ -1,6 +1,6 @@
 // tests/test_shared_cross_species.js
 //
-// Unit tests for atlases/inversion/shared/cross_species.js — the
+// Unit tests for atlases/cross-species/shared/cross_species.js — the
 // cs_breakpoints_v1 data layer.
 
 class MockLS {
@@ -27,7 +27,7 @@ const {
   clearCrossSpecies,
   getCrossSpeciesBreakpointById,
   getCsEventDef,
-} = await import('../atlases/inversion/shared/cross_species.js');
+} = await import('../atlases/cross-species/shared/cross_species.js');
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

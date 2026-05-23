@@ -17,7 +17,7 @@ import {
   verifyAgeMatchesDxy,
   formatBuscoAgeBracketsTaskText,
   formatBuscoAgeBracketsEmptyText,
-} from '../atlases/inversion/shared/busco_4d_age.js';
+} from '../atlases/evolution/shared/busco_4d_age.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

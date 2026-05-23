@@ -2,7 +2,7 @@
 import {
   kinshipWeights, familyWeights, computeSampleWeights, weightsSummary,
   MGL_KINSHIP_DEFAULTS,
-} from '../atlases/inversion/shared/mgl_kinship_downweight.js';
+} from '../atlases/evolution/shared/mgl_kinship_downweight.js';
 
 let pass=0, fail=0;
 function check(l,c){ if (c) {pass++; console.log('  ✓',l);} else {fail++; console.log('  ✗',l);} }

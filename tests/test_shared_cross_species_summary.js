@@ -7,7 +7,7 @@ import {
   FISSION_FUSION_EVENT_TYPES,
   deriveFusionFission,
   countByEventType,
-} from '../atlases/inversion/shared/cross_species_summary.js';
+} from '../atlases/cross-species/shared/cross_species_summary.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

@@ -34,12 +34,14 @@
 import {
   SEGREGATION_STATUS,
 } from './mendelian_family_test.js';
+// 2026-05-23 Phase 1c: recombination_suppression + phylogenetic_confound
+// moved to cross-species atlas. Cross-atlas relative paths.
 import {
   classifyRecombinationSuppression,
-} from './recombination_suppression.js';
+} from '../../cross-species/shared/recombination_suppression.js';
 import {
   summariseConfoundForCandidate,
-} from './phylogenetic_confound.js';
+} from '../../cross-species/shared/phylogenetic_confound.js';
 
 // =====================================================================
 // Schema

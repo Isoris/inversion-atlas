@@ -28,7 +28,7 @@ const {
   getEffectiveTargetsForCell,
   summarizeRefinement,
   adjustConfidenceForRefinement,
-} = await import('../atlases/inversion/shared/karyotype_lineage.js');
+} = await import('../atlases/popstats/shared/karyotype_lineage.js');
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

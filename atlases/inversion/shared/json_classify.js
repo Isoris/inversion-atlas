@@ -15,14 +15,20 @@
 // schemas so any tool-tagged JSON wins over the generic
 // {n_windows, windows[]} chromosome shape.
 
-import { isCrossSpeciesJSON }       from './cross_species.js';
+// 2026-05-23 Phase 1c: cross-species schema classifiers moved to
+// atlases/cross-species/shared/. json_classify stays in inversion
+// because it ALSO recognises inversion-side schemas (cohort_diversity).
+// Cross-atlas relative paths until atlas-core's
+// cross_atlas_imports.resolveCrossAtlasRead() ships (currently in
+// docs/atlas-core-proposals/).
+import { isCrossSpeciesJSON }       from '../../cross-species/shared/cross_species.js';
 import { isCohortDiversityJSON }    from './cohort_diversity.js';
-import { isDotplotMashmapJSON }     from './dotplot_mashmap.js';
+import { isDotplotMashmapJSON }     from '../../cross-species/shared/dotplot_mashmap.js';
 import {
   isSyntenyMultispeciesJSON,
   isPhyloTreeJSON,
-}                                   from './synteny_multispecies.js';
-import { isDxyPerInversionJSON }    from './dxy_per_inversion.js';
+}                                   from '../../cross-species/shared/synteny_multispecies.js';
+import { isDxyPerInversionJSON }    from '../../cross-species/shared/dxy_per_inversion.js';
 import { isTEFragilityJSON }        from './te_fragility.js';
 import { isKaryotypeLineageJSON }   from './karyotype_lineage.js';
 import { isNcRNADensityJSON }       from './ncrna_density.js';

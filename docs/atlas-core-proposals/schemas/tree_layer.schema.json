@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atlas-core/schemas/tree_layer.schema.json",
+  "title": "Tree-layer family extension to layers.registry.json v1",
+  "description": "A layer entry whose value is a directory tree of typed leaves, not a single file. Authored as part of Phase 0 of the 4-atlas split. See SPEC_tree_layers_v1.md.",
+  "type": "object",
+  "required": ["layer_id", "kind", "label", "version", "cohort_id", "root", "tree"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema":  { "type": "string" },
+    "layer_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,63}$"
+    },
+    "kind": {
+      "type": "string",
+      "const": "tree",
+      "description": "Discriminator. layers.registry.json may contain mixed scalar + tree layers."
+    },
+    "label":         { "type": "string", "minLength": 1, "maxLength": 200 },
+    "description":   { "type": "string", "maxLength": 2000 },
+    "version":       { "type": "integer", "minimum": 1 },
+    "cohort_id":     { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$" },
+    "reference_id":  { "type": "string" },
+    "produced_by":   { "type": "string", "description": "workflow_id from workflows.registry.json" },
+    "root":          { "type": "string", "description": "Atlas-relative directory path containing the tree root." },
+    "tree": {
+      "type": "object",
+      "description": "Map of child-name -> node spec at the root level.",
+      "additionalProperties": { "$ref": "#/$defs/node" }
+    }
+  },
+  "$defs": {
+    "node": {
+      "oneOf": [
+        { "$ref": "#/$defs/dir_explicit" },
+        { "$ref": "#/$defs/dir_fanout"  },
+        { "$ref": "#/$defs/leaf"        }
+      ]
+    },
+    "dir_explicit": {
+      "type": "object",
+      "required": ["kind", "children"],
+      "additionalProperties": false,
+      "properties": {
+        "kind":      { "type": "string", "const": "dir" },
+        "label":     { "type": "string" },
+        "children": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/node" }
+        }
+      }
+    },
+    "dir_fanout": {
+      "type": "object",
+      "required": ["kind", "children_pattern", "leaf_kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind":             { "type": "string", "const": "dir" },
+        "label":            { "type": "string" },
+        "children_pattern": { "type": "string", "description": "Glob pattern matched against directory entries." },
+        "leaf_kind":        { "$ref": "#/$defs/leaf_kind_enum" }
+      }
+    },
+    "leaf": {
+      "type": "object",
+      "required": ["kind", "leaf_kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind":      { "type": "string", "const": "leaf" },
+        "label":     { "type": "string" },
+        "leaf_kind": { "$ref": "#/$defs/leaf_kind_enum" }
+      }
+    },
+    "leaf_kind_enum": {
+      "type": "string",
+      "enum": [
+        "tsv",
+        "csv",
+        "json",
+        "jsonl",
+        "paf",
+        "bed",
+        "fasta",
+        "fai",
+        "vcf",
+        "vcfgz",
+        "gff",
+        "bin"
+      ],
+      "description": "Parser registered in the layer router. New kinds added via parser-plugin registration."
+    }
+  }
+}

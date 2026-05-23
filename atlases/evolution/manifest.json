@@ -1,0 +1,91 @@
+{
+  "atlas_id": "evolution",
+  "atlas_name": "Inversion Evolution Atlas",
+  "atlas_version": "2026-05-23-phase2",
+  "atlas_description": "When and where on the catfish phylogeny did each inversion arise? Age estimation (BUSCO 4D + age-model suggester), polarisation (synteny vote + MSA stacked), ancestry layer cleaning, mosaicism leakage, internal substructure, haplotype networks, event-tree relative ordering, archaeology synthesis card. Consumes inversion.candidates_v1 (read-only, 226-Cgar hatchery cohort) + crossSpecies.synteny_18sp_v1 / breakpoints_consolidated_v1 (read-only, F1-hybrid comparative cohort) through cross_reference_handoffs declared in atlas-core's cohorts.registry.json.",
+  "cohorts": ["cgar_hatchery_226"],
+  "reference_id": "fClaHyb_Gar_LG",
+  "pages": [
+    {
+      "id": "age_divergence",
+      "slug": "age_divergence",
+      "label": "age divergence",
+      "stage": "evolution",
+      "fragment": "atlases/evolution/pages/evolution/age_divergence.html",
+      "module":   "atlases/evolution/pages/evolution/age_divergence.js",
+      "tooltip": "Per-inversion age estimation via BUSCO 4D + age-model suggester."
+    },
+    {
+      "id": "polarize_synteny_vote",
+      "slug": "polarize_synteny_vote",
+      "label": "polarise (synteny)",
+      "stage": "evolution",
+      "fragment": "atlases/evolution/pages/evolution/polarize_synteny_vote.html",
+      "module":   "atlases/evolution/pages/evolution/polarize_synteny_vote.js",
+      "tooltip": "Polarisation via outgroup synteny vote. Consumes crossSpecies.synteny_18sp_v1."
+    },
+    {
+      "id": "polarize_msa_stacked",
+      "slug": "polarize_msa_stacked",
+      "label": "polarise (MSA)",
+      "stage": "evolution",
+      "fragment": "atlases/evolution/pages/evolution/polarize_msa_stacked.html",
+      "module":   "atlases/evolution/pages/evolution/polarize_msa_stacked.js",
+      "tooltip": "Polarisation via stacked MSA + founder consensus + doubleton SFS clusters."
+    },
+    {
+      "id": "haplotype_network",
+      "slug": "haplotype_network",
+      "label": "haplotype network",
+      "stage": "evolution",
+      "fragment": "atlases/evolution/pages/evolution/haplotype_network.html",
+      "module":   "atlases/evolution/pages/evolution/haplotype_network.js",
+      "tooltip": "Per-inversion haplotype network (multi-genome list visualisation)."
+    },
+    {
+      "id": "inv_internal_substructure",
+      "slug": "inv_internal_substructure",
+      "label": "internal substructure",
+      "stage": "evolution",
+      "fragment": "atlases/evolution/pages/evolution/inv_internal_substructure.html",
+      "module":   "atlases/evolution/pages/evolution/inv_internal_substructure.js",
+      "tooltip": "Sub-structure within an inversion — per-window PCA. Cross-atlas reads crossSpecies.mgl_pca_compute helpers."
+    },
+    {
+      "id": "layer_cleaning",
+      "slug": "layer_cleaning",
+      "label": "layer cleaning",
+      "stage": "evolution",
+      "fragment": "atlases/evolution/pages/evolution/layer_cleaning.html",
+      "module":   "atlases/evolution/pages/evolution/layer_cleaning.js",
+      "tooltip": "Ancestry-layer cleaning via kinship downweighting."
+    },
+    {
+      "id": "mosaicism_leakage",
+      "slug": "mosaicism_leakage",
+      "label": "mosaicism leakage",
+      "stage": "evolution",
+      "fragment": "atlases/evolution/pages/evolution/mosaicism_leakage.html",
+      "module":   "atlases/evolution/pages/evolution/mosaicism_leakage.js",
+      "tooltip": "Per-window mosaicism leakage + integrity verdict."
+    },
+    {
+      "id": "event_tree_relative_ordering",
+      "slug": "event_tree_relative_ordering",
+      "label": "event tree",
+      "stage": "evolution",
+      "fragment": "atlases/evolution/pages/evolution/event_tree_relative_ordering.html",
+      "module":   "atlases/evolution/pages/evolution/event_tree_relative_ordering.js",
+      "tooltip": "Relative ordering of inversion events on the phylogeny."
+    },
+    {
+      "id": "archaeology_synthesis_card",
+      "slug": "archaeology_synthesis_card",
+      "label": "archaeology card",
+      "stage": "evolution",
+      "fragment": "atlases/evolution/pages/evolution/archaeology_synthesis_card.html",
+      "module":   "atlases/evolution/pages/evolution/archaeology_synthesis_card.js",
+      "tooltip": "Per-candidate archaeology synthesis card (lineage + age + polarity)."
+    }
+  ]
+}

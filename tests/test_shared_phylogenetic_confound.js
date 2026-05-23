@@ -12,7 +12,7 @@ import {
   classifyPhylogeneticConfound,
   interpretConfoundResult,
   summariseConfoundForCandidate,
-} from '../atlases/inversion/shared/phylogenetic_confound.js';
+} from '../atlases/cross-species/shared/phylogenetic_confound.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

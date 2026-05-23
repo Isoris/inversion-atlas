@@ -49,10 +49,10 @@
 
 import {
   inferRelatednessFromRegimes,
-} from './regime_pedigree.js';
+} from '../../../popstats/shared/band_tracking/regime_pedigree.js';
 import {
   annotateRegimesWithMendelian,
-} from './regime_mendelian.js';
+} from '../../../popstats/shared/band_tracking/regime_mendelian.js';
 
 // =====================================================================
 // Vocab + defaults

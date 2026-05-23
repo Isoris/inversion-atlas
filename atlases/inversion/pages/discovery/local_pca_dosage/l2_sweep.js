@@ -31,7 +31,7 @@ import { addCandidateToList } from './candidates.js';
 import {
   inheritanceGroupClustering,
   IGC_MIN_BANDS_FOR_CLUSTERING,
-} from '../../../shared/inheritance_groups.js';
+} from '../../../../popstats/shared/inheritance_groups.js';
 import { inheritanceCacheKey } from './inheritance.js';
 // 2026-05-20 (SPEC_macrostripe_microgroup_hierarchy.md Phase 2): the
 // L2-sweep auto-promote pipeline should accept on macrostripe purity
