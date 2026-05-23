@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "atlases/inversion/analysis/anchor_track_cache/schema_out.json",
+  "title": "Anchor V/H_off track precompute — output",
+  "type": "object",
+  "required": ["tracks", "n_anchors", "n_windows", "s_window", "e_window", "source"],
+  "properties": {
+    "chrom":     { "type": ["string", "null"] },
+    "s_window":  { "type": "integer", "minimum": 0 },
+    "e_window":  { "type": "integer", "minimum": 0 },
+    "n_windows": { "type": "integer", "minimum": 0 },
+    "n_anchors": { "type": "integer", "minimum": 0 },
+    "source":    { "type": "string", "enum": ["compute", "insufficient"] },
+    "tracks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["anchor_w", "v_track", "h_off_track", "k_w_track", "disabled"],
+        "properties": {
+          "anchor_w":     { "type": "integer", "minimum": 0 },
+          "K_a":          { "type": ["integer", "null"] },
+          "disabled":     { "type": "boolean", "description": "true → anchor had no labels or K<2 at the anchor window; tracks are null." },
+          "v_track":      { "type": ["array", "null"], "items": { "type": ["number", "null"] } },
+          "h_off_track":  { "type": ["array", "null"], "items": { "type": ["number", "null"] } },
+          "k_w_track":    { "type": ["array", "null"], "items": { "type": "integer" } }
+        }
+      }
+    },
+    "input_layer_ids": { "type": "array", "items": { "type": "string" } },
+    "params_used":     { "type": "object" }
+  }
+}
