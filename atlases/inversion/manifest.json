@@ -222,25 +222,6 @@
       "_was_id": "page_ancestry_scroller"
     },
     {
-      "id": "cross_species_breakpoints",
-      "slug": "cross_species_breakpoints",
-      "label": "cross-species breakpoints",
-      "stage": "evolution",
-      "fragment": "atlases/inversion/pages/comparative/cross_species_breakpoints.html",
-      "module": "atlases/inversion/pages/comparative/cross_species_breakpoints.js",
-      "_was_id": "page16"
-    },
-    {
-      "id": "multi_species_cockpit",
-      "slug": "multi_species_cockpit",
-      "label": "multi-species",
-      "stage": "evolution",
-      "fragment": "atlases/inversion/pages/comparative/multi_species_cockpit.html",
-      "module": "atlases/inversion/pages/comparative/multi_species_cockpit.js",
-      "tooltip": "Multi-species comparative atlas page (per HANDOFF_SUPPLEMENT).",
-      "_was_id": "page16b"
-    },
-    {
       "id": "polarize_msa_stacked",
       "slug": "polarize_msa_stacked",
       "label": "polarize · MSA",

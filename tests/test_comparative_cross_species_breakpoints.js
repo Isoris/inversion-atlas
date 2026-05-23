@@ -16,8 +16,9 @@
 // explicitly so a follow-up round can promote stats_profile's guards to
 // imports.
 
-import * as cross_species_breakpoints from '../atlases/inversion/pages/comparative/cross_species_breakpoints.js';
-import * as state  from '../atlases/inversion/pages/comparative/cross_species_breakpoints/_state.js';
+// 2026-05-23 Phase 1b: cross_species_breakpoints moved from inversion to cross-species atlas.
+import * as cross_species_breakpoints from '../atlases/cross-species/pages/breakpoints/cross_species_breakpoints.js';
+import * as state  from '../atlases/cross-species/pages/breakpoints/cross_species_breakpoints/_state.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

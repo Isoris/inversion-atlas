@@ -43,8 +43,13 @@ import { _setActiveState as _setPage18State } from './marker_readiness/_state.js
 // (typeof X === 'function') to explicit imports now that cross_species_breakpoints exports
 // them. The mount() function bridges legacyState into cross_species_breakpoints's _pageState
 // so these helpers see live data without cross_species_breakpoints needing to be mounted.
-import { _csGetSyntenyBlocks, _csPermutationTest } from '../comparative/cross_species_breakpoints.js';
-import { _setActiveState as _setPage16State } from '../comparative/cross_species_breakpoints/_state.js';
+// 2026-05-23 Phase 1b: cross_species_breakpoints moved from
+// atlases/inversion/pages/comparative/ to atlases/cross-species/pages/breakpoints/.
+// These imports are now cross-atlas relative paths. A follow-up Phase 1c
+// will replace them with atlas-core's cross_atlas_imports.resolveCrossAtlasRead()
+// for cohort-discipline enforcement (per docs/atlas-core-proposals/SPEC_cohorts_v1.md).
+import { _csGetSyntenyBlocks, _csPermutationTest } from '../../../cross-species/pages/breakpoints/cross_species_breakpoints.js';
+import { _setActiveState as _setPage16State } from '../../../cross-species/pages/breakpoints/cross_species_breakpoints/_state.js';
 
 // ---------------------------------------------------------------------------
 // VERBATIM extraction from legacy lines 28445–29306. Only modification: the

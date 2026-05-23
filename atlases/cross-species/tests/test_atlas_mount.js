@@ -46,7 +46,8 @@ check('atlas_id is cross-species', manifest.atlas_id === 'cross-species');
 check('reference_id is fClaHyb_Gar_LG', manifest.reference_id === 'fClaHyb_Gar_LG');
 check('cohorts includes f1_hybrid_cga_cma',
       Array.isArray(manifest.cohorts) && manifest.cohorts.includes('f1_hybrid_cga_cma'));
-check('manifest declares 3 pages', Array.isArray(manifest.pages) && manifest.pages.length === 3);
+check('manifest declares 5 pages (3 new + 2 Phase-1b-migrated)',
+      Array.isArray(manifest.pages) && manifest.pages.length === 5);
 for (const p of manifest.pages || []) {
   check(`page '${p.id}' fragment exists`,
         await exists(p.fragment.replace(/^atlases\/cross-species\//, '')),
@@ -66,7 +67,7 @@ const files      = await readJson('registries/data/files.registry.json');
 const slots      = await readJson('registries/data/slots.registry.json');
 check('layers.registry has 15 layers',     Array.isArray(layers.layers)    && layers.layers.length === 15);
 check('workflows.registry has 2 workflows', Array.isArray(workflows.workflows) && workflows.workflows.length === 2);
-check('pages.registry has 3 pages',        Array.isArray(pages.pages)      && pages.pages.length === 3);
+check('pages.registry has 5 pages',        Array.isArray(pages.pages)      && pages.pages.length === 5);
 check('operations.registry parses',        Array.isArray(ops.operations));
 check('files.registry parses',             Array.isArray(files.files));
 check('slots.registry has 1 slot',         Array.isArray(slots.slots)      && slots.slots.length === 1);

@@ -32,6 +32,28 @@
       "fragment": "atlases/cross-species/pages/breakpoints/bp_atlas_arcs.html",
       "module":   "atlases/cross-species/pages/breakpoints/bp_atlas_arcs.js",
       "tooltip": "BP5 figure-style PAF arc visualisation. Reads atlas_paf_arcs.json + atlas_data.json."
+    },
+    {
+      "id": "cross_species_breakpoints",
+      "slug": "cross_species_breakpoints",
+      "label": "Cgar × Cmac dashboard",
+      "stage": "breakpoints",
+      "fragment": "atlases/cross-species/pages/breakpoints/cross_species_breakpoints.html",
+      "module":   "atlases/cross-species/pages/breakpoints/cross_species_breakpoints.js",
+      "tooltip": "Pair dashboard for the Cgar × Cmac wfmash 1-to-1 alignment (cs_breakpoints_v1 schema): toolbar + catalogue + focus card + synteny + dotplot + focal-vs-bg permutation test. Migrated 2026-05-23 from atlases/inversion/pages/comparative/ (Phase 1b).",
+      "_was_id": "page16",
+      "_phase_1b_migrated_from": "atlases/inversion/pages/comparative/cross_species_breakpoints"
+    },
+    {
+      "id": "multi_species_cockpit",
+      "slug": "multi_species_cockpit",
+      "label": "multi-species cockpit",
+      "stage": "breakpoints",
+      "fragment": "atlases/cross-species/pages/breakpoints/multi_species_cockpit.html",
+      "module":   "atlases/cross-species/pages/breakpoints/multi_species_cockpit.js",
+      "tooltip": "Phylogenetic placement of each Cgar↔Cmac breakpoint on the catfish phylogeny; click species → homologous-region detail; auto-suggests architecture class A-F from lineage distribution. Currently 1-pair (Cgar × Cmac); Phase 2 extends to 18 species via the BP_ATLAS workflow.",
+      "_was_id": "page16b",
+      "_phase_1b_migrated_from": "atlases/inversion/pages/comparative/multi_species_cockpit"
     }
   ]
 }

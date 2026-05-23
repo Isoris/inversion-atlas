@@ -31,6 +31,18 @@
         { "layer": "cross-species.bp_atlas_arcs_v1" }
       ],
       "requires_workflow": ["bp_atlas_pipeline"]
+    },
+    {
+      "page_id": "cross_species_breakpoints",
+      "stage": "breakpoints",
+      "reads": [],
+      "_phase_1b_note": "Pre-existing page migrated from atlases/inversion/pages/comparative/. Reads the legacy cs_breakpoints_v1 schema via state.crossSpecies (loaded by the data-loader pipeline at mount). Layer registration is Phase 1c work — promote cs_breakpoints_v1 to a registry layer + replace _setActiveState bridge with cross_atlas_imports.resolveCrossAtlasRead()."
+    },
+    {
+      "page_id": "multi_species_cockpit",
+      "stage": "breakpoints",
+      "reads": [],
+      "_phase_1b_note": "Pre-existing page migrated from atlases/inversion/pages/comparative/. Currently reads state.crossSpecies populated by cross_species_breakpoints' data-loader. Phase 2 extends from 1-pair to 18-species and declares reads on the new BP_ATLAS layers."
     }
   ]
 }

@@ -18,8 +18,11 @@
 import * as stats_profile from '../atlases/inversion/pages/catalogue/stats_profile.js';
 import * as state  from '../atlases/inversion/pages/catalogue/stats_profile/_state.js';
 import * as marker_readiness from '../atlases/inversion/pages/catalogue/marker_readiness.js';
-import * as cross_species_breakpoints from '../atlases/inversion/pages/comparative/cross_species_breakpoints.js';
-import * as page16state from '../atlases/inversion/pages/comparative/cross_species_breakpoints/_state.js';
+// 2026-05-23 Phase 1b: cross_species_breakpoints moved to cross-species atlas;
+// stats_profile (still in inversion-atlas/pages/catalogue/) now imports across
+// the atlas boundary via relative path. The test mirrors that path.
+import * as cross_species_breakpoints from '../atlases/cross-species/pages/breakpoints/cross_species_breakpoints.js';
+import * as page16state from '../atlases/cross-species/pages/breakpoints/cross_species_breakpoints/_state.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {
