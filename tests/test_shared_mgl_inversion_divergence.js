@@ -6,7 +6,7 @@ import {
   ageClass,
   computeDivergence,
   MGL_DIVERGENCE_DEFAULTS,
-} from '../atlases/inversion/shared/mgl_inversion_divergence.js';
+} from '../atlases/evolution/shared/mgl_inversion_divergence.js';
 
 let pass=0, fail=0;
 function check(l, c) { if (c) { pass++; console.log('  ✓', l); } else { fail++; console.log('  ✗', l); } }

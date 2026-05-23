@@ -4,22 +4,22 @@
 // Renderer + builder + selection + verdict are pure; mount/unmount
 // lifecycle is exercised in the smoke.
 
-import * as page from '../atlases/inversion/pages/evolution/polarize_msa_stacked.js';
-import * as state from '../atlases/inversion/pages/evolution/polarize_msa_stacked/_state.js';
+import * as page from '../atlases/evolution/pages/evolution/polarize_msa_stacked.js';
+import * as state from '../atlases/evolution/pages/evolution/polarize_msa_stacked/_state.js';
 import {
   buildPolarizeMsaRows,
   polarizationVerdict,
   ROW_TAG,
-} from '../atlases/inversion/pages/evolution/polarize_msa_stacked/builder.js';
+} from '../atlases/evolution/pages/evolution/polarize_msa_stacked/builder.js';
 import {
   paintTierStripe,
   rowTagColor,
   tierLabel,
-} from '../atlases/inversion/pages/evolution/polarize_msa_stacked/renderer.js';
+} from '../atlases/evolution/pages/evolution/polarize_msa_stacked/renderer.js';
 import {
   createPolarizeMsaSelection,
   summariseHover,
-} from '../atlases/inversion/pages/evolution/polarize_msa_stacked/selection.js';
+} from '../atlases/evolution/pages/evolution/polarize_msa_stacked/selection.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

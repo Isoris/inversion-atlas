@@ -10,7 +10,7 @@ import {
   clusterInvByDoubletonSharing,
   perClusterMeanDosage,
   MGL_DOUBLETON_DEFAULTS,
-} from '../atlases/inversion/shared/mgl_doubleton_sfs_clusters.js';
+} from '../atlases/evolution/shared/mgl_doubleton_sfs_clusters.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

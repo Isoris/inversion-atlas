@@ -2,7 +2,8 @@
   "_doc": "Index of atlas folders. Written by the assembly script (see README_PAIRING.md §10). The browser cannot list directories, so this file is the authoritative answer to 'what atlases are installed?'. atlas_discovery.js reads this at startup.",
   "atlases": [
     "inversion",
-    "cross-species"
+    "cross-species",
+    "evolution"
   ],
   "_assembled_from": [
     "atlas-core",

@@ -2,7 +2,7 @@
 import {
   normaliseMetrics, classifyArchaeology, buildArchaeologyCard,
   MGL_ARCHAEOLOGY_VERDICTS, MGL_ARCHAEOLOGY_DEFAULTS,
-} from '../atlases/inversion/shared/mgl_archaeology_classifier.js';
+} from '../atlases/evolution/shared/mgl_archaeology_classifier.js';
 
 let pass=0, fail=0;
 function check(l,c){ if (c) {pass++; console.log('  ✓',l);} else {fail++; console.log('  ✗',l);} }

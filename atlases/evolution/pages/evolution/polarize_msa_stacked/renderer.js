@@ -5,8 +5,15 @@
 // the top.
 // =====================================================================
 
+// 2026-05-23 Phase 2: polarize_msa_stacked moved from inversion-atlas to
+// evolution-atlas. dosage_heatmap stays in inversion (page-1 discovery
+// infrastructure). Cross-atlas relative path from depth
+// atlases/evolution/pages/evolution/polarize_msa_stacked/ →
+// atlases/inversion/pages/discovery/dosage_heatmap/.
+// Phase 1d / Phase 5 task: switch to cross_atlas_imports.resolveCrossAtlasRead()
+// once atlas-core ships the proposal package (docs/atlas-core-proposals/).
 import { paintDosageHeatmap, findCellAtPixel }
-  from '../../discovery/dosage_heatmap/renderer.js';
+  from '../../../../inversion/pages/discovery/dosage_heatmap/renderer.js';
 
 // Re-export the dosage-heatmap painter so the cartridge's import
 // graph stays explicit about the canonical-adapter reuse:

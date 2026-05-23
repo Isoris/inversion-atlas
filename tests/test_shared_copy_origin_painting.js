@@ -15,7 +15,7 @@ import {
   partitionPaintingByArrangement,
   interpretCopyOriginPattern,
   summarizeArrangementCopyOrigin,
-} from '../atlases/inversion/shared/copy_origin_painting.js';
+} from '../atlases/evolution/shared/copy_origin_painting.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

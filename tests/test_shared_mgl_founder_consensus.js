@@ -11,7 +11,7 @@ import {
   MGL_FOUNDER_TIERS,
   MGL_FOUNDER_REASONS,
   MGL_FOUNDER_DEFAULTS,
-} from '../atlases/inversion/shared/mgl_founder_consensus.js';
+} from '../atlases/evolution/shared/mgl_founder_consensus.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {
