@@ -1,12 +1,14 @@
 {
   "_doc": "Index of atlas folders. Written by the assembly script (see README_PAIRING.md §10). The browser cannot list directories, so this file is the authoritative answer to 'what atlases are installed?'. atlas_discovery.js reads this at startup.",
   "atlases": [
-    "inversion"
+    "inversion",
+    "cross-species"
   ],
   "_assembled_from": [
     "atlas-core",
     "inversion-atlas"
   ],
-  "_assembled_at": "2026-05-06T22:00:00Z",
-  "_assembly_version": "v1-draft"
+  "_assembled_at": "2026-05-23T00:00:00Z",
+  "_assembly_version": "v1-draft",
+  "_notes_2026_05_23": "Added 'cross-species' atlas as Phase 1a of the 4-atlas split per docs/MIGRATION_4_ATLASES.md. Phase 1b (move existing comparative + mgl_* + cross-species shared modules from inversion-atlas) is the next step."
 }

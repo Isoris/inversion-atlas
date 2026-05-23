@@ -1,0 +1,3 @@
+focal_chrom	focal_start	focal_end	query_species	query_chrom	sign
+fClaHyb_african_F1_LG_04	1	16450000	C_fuscus	7	+
+fClaHyb_african_F1_LG_04	16460000	21400000	C_fuscus	12	-

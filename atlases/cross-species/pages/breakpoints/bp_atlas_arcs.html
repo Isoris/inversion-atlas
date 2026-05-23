@@ -1,0 +1,27 @@
+  <div id="bp_atlas_arcs" class="page" style="display: flex; flex-direction: column; height: 100%;">
+    <header style="display: flex; align-items: center; justify-content: space-between;
+                   padding: 6px 14px; border-bottom: 1px solid var(--rule);
+                   font-family: var(--mono); font-size: 11px;">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <span style="font-size: 13px; font-weight: 600;">BP atlas arcs (BP5 figure view)</span>
+        <span id="bpArcsStatus" style="color: var(--ink-dim);">—</span>
+      </div>
+    </header>
+    <div style="flex: 1 1 auto; min-height: 0; position: relative;">
+      <canvas id="bpArcsCanvas" style="width: 100%; height: 100%; background: #0b0e13;"></canvas>
+      <div id="bpArcsEmpty"
+           style="position: absolute; inset: 0; display: none;
+                  align-items: center; justify-content: center;
+                  text-align: center; padding: 20px;
+                  color: var(--ink-dimmer, #5a6472); font-family: var(--mono);
+                  font-size: 11px; line-height: 1.6;"></div>
+    </div>
+    <footer style="padding: 6px 14px; border-top: 1px solid var(--rule);
+                   font-family: var(--mono); font-size: 10px; color: var(--ink-dim);">
+      Source: <code>cross-species.atlas_paf_arcs_v1</code> +
+      <code>cross-species.atlas_data_v1</code>. Produced by
+      <code>bp_atlas_pipeline</code> stage BP5. Phase 1a: minimal canvas
+      stub — full BP5 ribbons / dotplots / montage figures live in
+      <code>engines/figures/bp_atlas/STEP_BP5*.R</code>.
+    </footer>
+  </div>

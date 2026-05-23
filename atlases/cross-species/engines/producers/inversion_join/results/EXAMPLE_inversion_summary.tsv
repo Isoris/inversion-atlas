@@ -1,0 +1,5 @@
+inv_id	n_breakpoint_hits	edges_hit	n_query_species	query_species	bp_classes	suggested_class	interpretation
+INV_LG04a	2	start	2	C_apus,C_fuscus	interchrom,orientation	E	hatchery inversion edge coincides with a recurrent cross-species breakpoint (2 comparison species, incl. chrom fusion/fission): NOT conservation of the polymorphism, but a phylogenetically labile region (Class E)
+INV_LG13	1	start	1	C_fuscus	orientation	B	hatchery inversion edge coincides with a recurrent cross-species breakpoint (1 comparison species): NOT conservation of the polymorphism, but a phylogenetically labile region (Class B)
+INV_LG27	2	end,start	2	C_fuscus,N_graeffei	block_gap,interchrom	E	hatchery inversion edge coincides with a recurrent cross-species breakpoint (2 comparison species, incl. chrom fusion/fission): NOT conservation of the polymorphism, but a phylogenetically labile region (Class E)
+INV_LG09	0	-	0	-	-	A	no cross-species breakpoint at either edge: ordinary polymorphic inversion (Class A)

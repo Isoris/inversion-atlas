@@ -1,0 +1,36 @@
+{
+  "_doc": "Page declarations for the cross-species atlas. Each page lists which layers it reads (cross-validated against layers.registry.json + atlas-core's cross_atlas_imports resolver).",
+  "atlas_id": "cross-species",
+  "version": "1.0",
+  "pages": [
+    {
+      "page_id": "bp_catalogue",
+      "stage": "breakpoints",
+      "reads": [
+        { "layer": "cross-species.breakpoints_consolidated_v1" },
+        { "layer": "cross-species.pairwise_summary_v1" },
+        { "layer": "cross-species.tolerance_sweep_v1" }
+      ],
+      "requires_workflow": ["gene_order_consolidation"]
+    },
+    {
+      "page_id": "bp_atlas_reciprocity",
+      "stage": "breakpoints",
+      "reads": [
+        { "layer": "cross-species.bp_atlas_reciprocity_v1" },
+        { "layer": "cross-species.bp_atlas_zones_v1" },
+        { "layer": "cross-species.joint_candidates_v1" }
+      ],
+      "requires_workflow": ["bp_atlas_pipeline"]
+    },
+    {
+      "page_id": "bp_atlas_arcs",
+      "stage": "breakpoints",
+      "reads": [
+        { "layer": "cross-species.atlas_data_v1" },
+        { "layer": "cross-species.bp_atlas_arcs_v1" }
+      ],
+      "requires_workflow": ["bp_atlas_pipeline"]
+    }
+  ]
+}
