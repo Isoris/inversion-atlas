@@ -50,24 +50,29 @@ analysis workflow:
 
 ## 2. Proposed 24 → 5 mapping
 
-### Page 1: Local PCA (10 current pages → 1 host page with tabs/panels)
+### Page 1: Local PCA (no consolidation — stays as `local_pca_dosage`)
 
-The workbench for per-window PCA + dosage exploration. `local_pca_dosage`
-is the obvious host because it's already the biggest page (the
-"page1" anchor in the legacy port).
+**2026-05-23 user revision**: Page 1 is too crowded with 10 absorbed
+panels. The 9 utility pages listed below stay STANDALONE, not folded
+into Page 1.
 
-| Current page | Becomes |
+| Current page | Status |
 |---|---|
-| `local_pca_dosage` | **HOST** — kept as the master page |
-| `pca_comparator` | inline tab: "3-axis comparator" (already collapsible) |
-| `dosage_heatmap` | inline tab: "dosage heatmap" |
-| `pca_scatter_per_window` | inline tab: "per-window PCA scatter" |
-| `similarity_matrix` | inline tab: "sample × sample similarity" |
-| `fingerprint_track` | side panel: "fingerprint track" |
-| `nested_inversion_detector` | panel: "nested-inversion detector" (collapsible) |
-| `dosage_cluster_adaptive_k` | inline toggle on the existing K-means panel |
-| `candidate_focus` | full-page mode when a candidate is active |
-| `boundary_refinement` | side panel: "boundary refinement" (active candidate only) |
+| `local_pca_dosage` | **Page 1** — already a big page on its own; no absorption |
+| `pca_comparator` | **stays standalone** |
+| `dosage_heatmap` | **stays standalone** |
+| `pca_scatter_per_window` | **stays standalone** |
+| `similarity_matrix` | **stays standalone** |
+| `fingerprint_track` | **stays standalone** |
+| `nested_inversion_detector` | **stays standalone** |
+| `dosage_cluster_adaptive_k` | **stays standalone** |
+| `candidate_focus` | **stays standalone** |
+| `boundary_refinement` | **stays standalone** |
+
+These 9 utility pages are kept as a separate `tools` stage in the
+manifest — accessible from the chrome's top nav but not the main
+5-page workflow. They're focused inspectors that benefit from being
+their own page (no tab-clutter on Page 1).
 
 ### Page 2: Short-range haplotype blocs (3 current pages → 1)
 
@@ -266,28 +271,29 @@ tab), delete the JS + HTML in Phase 5 cleanup.
 
 ---
 
-## 7. After Phase 4 — atlas summary
+## 7. After Phase 4 — atlas summary (revised 2026-05-23)
 
 ```
 atlases/
-├── inversion/       ~5 user-facing pages (this consolidation),
-│                     ~150 shared modules (cluster 1-3 of pipeline)
+├── inversion/       5 main workflow pages + 9 standalone tools
+│                     = 14 pages, ~150 shared modules
 ├── cross-species/   5 pages, 14 shared
 ├── evolution/       9 pages → 3 user-facing after its own future
 │                     consolidation, 12 shared
-└── popstats/        3 pages → 3 user-facing (already tight),
-                     22 shared + 2 analysis
+└── popstats/        3 pages, 22 shared + 2 analysis
 ```
 
 The total atlas is then:
-- inversion: 5 pages
+- inversion: **5 main + 9 tools = 14 pages** (was 38; the 9 tools
+  cluster under their own "tools" nav, separate from the main
+  workflow nav)
 - cross-species: 5 pages (may itself collapse to 3 after its own
   Phase-4-style review)
 - evolution: 9 pages (may collapse to 3 — already partitioned by topic)
 - popstats: 3 pages (already tight)
 
-= 22 → ~16 user-facing pages across 4 atlases. Far below the 38 the
-single atlas was carrying.
+= 31 → ~25 user-facing pages across 4 atlases. The main-workflow
+total is 5+5+3+3 = 16; the rest are standalone tools/utilities.
 
 ---
 
