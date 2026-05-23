@@ -73,7 +73,9 @@
 // =============================================================================
 
 import { _pageState, _setActiveState } from './multi_species_cockpit/_state.js';
-import { _esc } from '../../shared/page1_data_helpers.js';
+// 2026-05-23 Phase 1b: page moved from atlases/inversion/pages/comparative/ to here.
+// See cross_species_breakpoints.js for the _esc-relocation rationale.
+import { _esc } from '../../shared/_utils.js';
 
 
 // =============================================================================
@@ -2679,6 +2681,13 @@ export function renderMultiSpeciesPage(state) {
   if (state) _setActiveState(state);
   return _renderMultiSpeciesPage();
 }
+
+/**
+ * Standard page-contract alias for renderMultiSpeciesPage. Added
+ * 2026-05-23 Phase 1b so atlas-core's uniform mount/unmount/refresh
+ * dispatch sees a `refresh` export on every page across all atlases.
+ */
+export const refresh = renderMultiSpeciesPage;
 
 /**
  * Mount: called by atlas_router when the user navigates to multi_species_cockpit.

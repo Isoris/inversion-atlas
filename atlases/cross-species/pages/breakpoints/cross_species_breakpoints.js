@@ -61,7 +61,11 @@
 //
 
 import { _pageState, _setActiveState } from './cross_species_breakpoints/_state.js';
-import { _esc } from '../../shared/page1_data_helpers.js';
+// 2026-05-23 Phase 1b: page moved from atlases/inversion/pages/comparative/ to here.
+// _esc was imported from '../../shared/page1_data_helpers.js' in inversion;
+// duplicated into atlases/cross-species/shared/_utils.js to avoid cross-atlas
+// import of a 7-line trivial helper through a large legacy module.
+import { _esc } from '../../shared/_utils.js';
 
 // =============================================================================
 // BLOCK A — section header + constants + IO/state functions (legacy 20971-21114)
@@ -2684,6 +2688,13 @@ export function renderCrossSpeciesPage(state) {
   if (state) _setActiveState(state);
   return _renderCrossSpeciesPage();
 }
+
+/**
+ * Standard page-contract alias for renderCrossSpeciesPage. Added
+ * 2026-05-23 Phase 1b so atlas-core's uniform mount/unmount/refresh
+ * dispatch sees a `refresh` export on every page across all atlases.
+ */
+export const refresh = renderCrossSpeciesPage;
 
 /**
  * Mount: called by atlas_router when the user navigates to cross_species_breakpoints.
