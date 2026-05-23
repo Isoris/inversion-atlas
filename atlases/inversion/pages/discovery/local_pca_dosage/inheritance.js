@@ -22,7 +22,7 @@
 import {
   inheritanceGroupClustering,
   IGC_DEFAULT_DIST_THRESHOLD,
-} from '../../../shared/inheritance_groups.js';
+} from '../../../../popstats/shared/inheritance_groups.js';
 import { isAutoCandidate } from '../../../shared/candidate_predicates.js';
 
 // Re-export the shared predicate at this module's URL too, so the

@@ -20,7 +20,7 @@ import {
   testFamilyCandidate,
   cohortParaPeriContingency,
   cohortEffectDirectionBreakdown,
-} from '../atlases/inversion/shared/mendelian_para_vs_peri.js';
+} from '../atlases/popstats/shared/mendelian_para_vs_peri.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

@@ -15,7 +15,7 @@ import {
   classifyAncestryAlignmentStatus,
   alignPerRFAncestry,
   applyRegimeAwareSmoothing,
-} from '../atlases/inversion/shared/ancestry_alignment.js';
+} from '../atlases/popstats/shared/ancestry_alignment.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

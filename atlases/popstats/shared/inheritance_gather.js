@@ -11,7 +11,7 @@
 // linkage projection, the I·g pills on candidate_focus, and the
 // inheritance-cache-key hashing pipeline.
 
-import { isAutoCandidate } from './candidate_predicates.js';
+import { isAutoCandidate } from '../../inversion/shared/candidate_predicates.js';
 
 /**
  * Gather candidates eligible for inheritance compute. Returns

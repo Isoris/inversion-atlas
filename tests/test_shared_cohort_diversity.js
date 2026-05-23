@@ -1,6 +1,6 @@
 // tests/test_shared_cohort_diversity.js
 //
-// Unit tests for atlases/inversion/shared/cohort_diversity.js — the
+// Unit tests for atlases/popstats/shared/cohort_diversity.js — the
 // F_ROH / π / F_HOM cohort-level diversity data layer.
 
 class MockLS {
@@ -30,7 +30,7 @@ const {
   diversityForSampleIdx,
   diversityForCGA,
   cohortDiversityCoverageOnCurrentChrom,
-} = await import('../atlases/inversion/shared/cohort_diversity.js');
+} = await import('../atlases/popstats/shared/cohort_diversity.js');
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

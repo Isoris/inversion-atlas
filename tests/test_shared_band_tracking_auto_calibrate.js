@@ -7,14 +7,14 @@
 
 import {
   regimeLinkageMatrix,
-} from '../atlases/inversion/shared/band_tracking/regime_linkage.js';
+} from '../atlases/popstats/shared/band_tracking/regime_linkage.js';
 import {
   inferRelatednessFromRegimes,
-} from '../atlases/inversion/shared/band_tracking/regime_pedigree.js';
+} from '../atlases/popstats/shared/band_tracking/regime_pedigree.js';
 import {
   annotateRegimesWithDyadsAuto,
   MEIOTIC_DRIVE_VERDICTS,
-} from '../atlases/inversion/shared/band_tracking/regime_dyad_mendelian.js';
+} from '../atlases/popstats/shared/band_tracking/regime_dyad_mendelian.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

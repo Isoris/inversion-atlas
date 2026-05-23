@@ -12,7 +12,7 @@ import {
   annotateRegimeWithTrios,
   annotateRegimeWithFamilies,
   annotateRegimesWithMendelian,
-} from '../atlases/inversion/shared/band_tracking/regime_mendelian.js';
+} from '../atlases/popstats/shared/band_tracking/regime_mendelian.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

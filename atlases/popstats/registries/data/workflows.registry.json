@@ -1,0 +1,6 @@
+{
+  "_doc": "Phase 3 stub. MSMC demographic validation (per specs_todo/SPEC_msmc_per_founder_background.md) will be the first declared workflow when its producer ships — it's SPEC ONLY today.",
+  "atlas_id": "popstats",
+  "version": "1.0",
+  "workflows": []
+}

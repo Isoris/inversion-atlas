@@ -11,7 +11,7 @@ import {
   regimeLD,
   regimeLinkageMatrix,
   familyRegimeRecombination,
-} from '../atlases/inversion/shared/band_tracking/regime_linkage.js';
+} from '../atlases/popstats/shared/band_tracking/regime_linkage.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

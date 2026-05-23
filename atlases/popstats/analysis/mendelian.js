@@ -34,7 +34,7 @@
 //
 // =====================================================================
 
-import { chiSqSurvival } from '../shared/contingency.js';
+import { chiSqSurvival } from '../../inversion/shared/contingency.js';
 
 // --------------------------------------------------------------------
 // Module-private constants. Not visible outside this file.

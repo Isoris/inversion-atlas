@@ -27,8 +27,8 @@
 // from `../inversion_review/ancestry_per_window.js` (pre-migration path) and was
 // not run by the harness.
 
-import * as ancestry_per_window from '../atlases/inversion/pages/review/ancestry_per_window.js';
-import * as state from '../atlases/inversion/pages/review/ancestry_per_window/_state.js';
+import * as ancestry_per_window from '../atlases/popstats/pages/review/ancestry_per_window.js';
+import * as state from '../atlases/popstats/pages/review/ancestry_per_window/_state.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

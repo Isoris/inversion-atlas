@@ -18,7 +18,7 @@
 // passed explicitly. p-values use chiSqSurvival() from contingency.js
 // (Lanczos gamma, ~10-digit accuracy for df up to ~200).
 
-import { chiSqSurvival } from './contingency.js';
+import { chiSqSurvival } from '../../inversion/shared/contingency.js';
 
 // =====================================================================
 // Vocab — Mendelian ratios + segregation-status enum

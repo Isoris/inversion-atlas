@@ -15,7 +15,7 @@
 // (the "I1·3g" annotations on the lines panel) and by candidate_focus's
 // inheritance-group rendering.
 
-import { agglomerativeAverageLinkage, cutDendrogram } from './clustering.js';
+import { agglomerativeAverageLinkage, cutDendrogram } from '../../inversion/shared/clustering.js';
 
 // =====================================================================
 // Constants (legacy lines 38785-38786)

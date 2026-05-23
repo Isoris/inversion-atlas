@@ -22,7 +22,7 @@ import {
   INVERSION_TYPES,
   RELIABILITY_TIERS,
 } from './mendelian_family_test.js';
-import { fisher2x2, chiSquare } from './contingency.js';
+import { fisher2x2, chiSquare } from '../../inversion/shared/contingency.js';
 
 // =====================================================================
 // Re-exports (back-compat for callers expecting these here)

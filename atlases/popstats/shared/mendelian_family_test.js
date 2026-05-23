@@ -21,7 +21,7 @@
 //  signal worth labeling explicitly" (spec §5).
 // =====================================================================
 
-import { chiSqSurvival } from './contingency.js';
+import { chiSqSurvival } from '../../inversion/shared/contingency.js';
 
 // =====================================================================
 // Vocabularies (frozen)

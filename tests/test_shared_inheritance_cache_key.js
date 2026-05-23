@@ -3,8 +3,8 @@
 // Unit coverage for shared/inheritance_cache_key.js — cache-key +
 // label-fingerprint helpers (legacy lines 41257-41304).
 
-import * as CK from '../atlases/inversion/shared/inheritance_cache_key.js';
-import { IGC_DEFAULT_DIST_THRESHOLD } from '../atlases/inversion/shared/inheritance_groups.js';
+import * as CK from '../atlases/popstats/shared/inheritance_cache_key.js';
+import { IGC_DEFAULT_DIST_THRESHOLD } from '../atlases/popstats/shared/inheritance_groups.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

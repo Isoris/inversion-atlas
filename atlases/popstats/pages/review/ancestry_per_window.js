@@ -74,7 +74,7 @@
 
 
 import { _pageState, _setActiveState } from './ancestry_per_window/_state.js';
-import { renderCandidateNavInline } from '../../shared/candidate_nav.js';
+import { renderCandidateNavInline } from '../../../inversion/shared/candidate_nav.js';
 
 // -----------------------------------------------------------------------------
 // External-file deps

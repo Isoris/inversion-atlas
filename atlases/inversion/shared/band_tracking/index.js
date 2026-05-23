@@ -164,7 +164,7 @@ export {
   computeFamilyReliabilityTier,
   rollupEffectDirection,
   annotateRegimeMendelianAll,
-} from './regime_mendelian.js';
+} from '../../../popstats/shared/band_tracking/regime_mendelian.js';
 
 // ---------------------------------------------------------------------
 // LAYER 4b — INVERSE-direction pedigree inference. Derives pairwise
@@ -182,7 +182,7 @@ export {
   inferRelatednessFromRegimes,
   crossCheckPedigreeWithRegimes,
   calibratePedigreeThresholdsFromKnownPairs,
-} from './regime_pedigree.js';
+} from '../../../popstats/shared/band_tracking/regime_pedigree.js';
 
 // ---------------------------------------------------------------------
 // LAYER 5 — chromosome-scale wiring. Per-chromosome regime
@@ -225,7 +225,7 @@ export {
   regimeLinkageMatrix,
   familyRegimeRecombination,
   calibrateLinkageThresholdsFromCrossChrom,
-} from './regime_linkage.js';
+} from '../../../popstats/shared/band_tracking/regime_linkage.js';
 
 // ---------------------------------------------------------------------
 // LAYER 4d — DYAD-aware Mendelian + meiotic-drive classification.
@@ -251,7 +251,7 @@ export {
   annotateRegimeWithDyads,
   calibrateMeioticDriveBands,
   annotateRegimesWithDyadsAuto,
-} from './regime_dyad_mendelian.js';
+} from '../../../popstats/shared/band_tracking/regime_dyad_mendelian.js';
 
 // ---------------------------------------------------------------------
 // LAYER 2 — BandSet Projection (set-based authority)

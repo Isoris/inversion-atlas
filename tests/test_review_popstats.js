@@ -15,10 +15,10 @@
 //   - Sub-module helpers (collectTracks / loadView / saveView / categoryOf)
 //     are pure and Node-friendly.
 
-import * as popstats   from '../atlases/inversion/pages/review/popstats.js';
-import * as state      from '../atlases/inversion/pages/review/popstats/_state.js';
-import * as tracksMod  from '../atlases/inversion/pages/review/popstats/_tracks.js';
-import * as viewMod    from '../atlases/inversion/pages/review/popstats/_view.js';
+import * as popstats   from '../atlases/popstats/pages/review/popstats.js';
+import * as state      from '../atlases/popstats/pages/review/popstats/_state.js';
+import * as tracksMod  from '../atlases/popstats/pages/review/popstats/_tracks.js';
+import * as viewMod    from '../atlases/popstats/pages/review/popstats/_view.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

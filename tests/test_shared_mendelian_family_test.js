@@ -19,7 +19,7 @@ import {
   classifyReliabilityTier,
   classifySegregationStatus,
   testFamilyCandidate,
-} from '../atlases/inversion/shared/mendelian_family_test.js';
+} from '../atlases/popstats/shared/mendelian_family_test.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

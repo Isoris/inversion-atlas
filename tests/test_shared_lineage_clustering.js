@@ -3,7 +3,7 @@
 // Unit coverage for shared/lineage_clustering.js (legacy lines
 // 39260-39296).
 
-import * as LC from '../atlases/inversion/shared/lineage_clustering.js';
+import * as LC from '../atlases/popstats/shared/lineage_clustering.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

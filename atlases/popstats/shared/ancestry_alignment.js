@@ -26,7 +26,7 @@
 //
 // Pure JS — no DOM, no fetch.
 
-import { permutations } from './hungarian.js';
+import { permutations } from '../../inversion/shared/hungarian.js';
 
 // =====================================================================
 // Vocab + defaults

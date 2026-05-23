@@ -31,7 +31,7 @@ import { addCandidateToList } from './candidates.js';
 import {
   inheritanceGroupClustering,
   IGC_MIN_BANDS_FOR_CLUSTERING,
-} from '../../../shared/inheritance_groups.js';
+} from '../../../../popstats/shared/inheritance_groups.js';
 import { inheritanceCacheKey } from './inheritance.js';
 
 // =====================================================================

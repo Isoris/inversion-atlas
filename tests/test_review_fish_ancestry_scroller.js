@@ -14,21 +14,21 @@
 //   - cohort summary math (Layer 3) on a fixture
 //   - context-card vocab + brick-status icon table
 
-import * as page from '../atlases/inversion/pages/review/fish_ancestry_scroller.js';
-import * as state from '../atlases/inversion/pages/review/fish_ancestry_scroller/_state.js';
+import * as page from '../atlases/popstats/pages/review/fish_ancestry_scroller.js';
+import * as state from '../atlases/popstats/pages/review/fish_ancestry_scroller/_state.js';
 import {
   paintLayer1, paintLayer2, paintMetrics, paintLayer3,
   brickFillForMode, computeBrickSummary,
   PC1_BAND_COLORS, ANCESTRY_K_COLORS, METRIC_ROWS,
-} from '../atlases/inversion/pages/review/fish_ancestry_scroller/layers.js';
+} from '../atlases/popstats/pages/review/fish_ancestry_scroller/layers.js';
 import {
   CONTEXT_CARD_ITEMS, BRICK_STATUS_ICONS,
   renderContextCard, formatSelectedBrickFields, formatSelectedBrickStatus,
   renderKLegend,
-} from '../atlases/inversion/pages/review/fish_ancestry_scroller/right_panel.js';
+} from '../atlases/popstats/pages/review/fish_ancestry_scroller/right_panel.js';
 import {
   resolveClick, createSelectionStore,
-} from '../atlases/inversion/pages/review/fish_ancestry_scroller/selection.js';
+} from '../atlases/popstats/pages/review/fish_ancestry_scroller/selection.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

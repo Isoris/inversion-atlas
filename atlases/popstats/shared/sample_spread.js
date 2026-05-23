@@ -9,7 +9,7 @@
 // Pure: caller passes state explicitly. Uses the shared getPC accessor
 // from pc_accessors.js, which respects state.flipPC1 + state.pc1Sign.
 
-import { getPC, getPCByAxis } from './pc_accessors.js';
+import { getPC, getPCByAxis } from '../../inversion/shared/pc_accessors.js';
 
 /**
  * Compute per-sample σ of sign-aligned PC1 across the inclusive

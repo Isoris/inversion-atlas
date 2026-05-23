@@ -20,7 +20,7 @@ import {
   ancGetSnpSupport,
   ancAlignLabels,
   ancRunSampleTest,
-} from '../atlases/inversion/shared/ancestry_confound.js';
+} from '../atlases/popstats/shared/ancestry_confound.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

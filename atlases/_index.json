@@ -3,7 +3,8 @@
   "atlases": [
     "inversion",
     "cross-species",
-    "evolution"
+    "evolution",
+    "popstats"
   ],
   "_assembled_from": [
     "atlas-core",

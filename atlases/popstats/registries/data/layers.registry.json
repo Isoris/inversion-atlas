@@ -1,0 +1,6 @@
+{
+  "_doc": "Layers produced by popstats workflows. Phase 3: stub — Phase 5 lands full layers (per-regime Mendelian verdict, per-pair relatedness from regimes, cohort-level π/FST/dXY summaries, etc).",
+  "atlas_id": "popstats",
+  "version": "1.0",
+  "layers": []
+}

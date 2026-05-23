@@ -33,7 +33,7 @@
 
 import { _pageState, _setActiveState } from './popstats/_state.js';
 import { renderPopstatsPage } from './popstats/_render.js';
-import { renderCandidateNavInline } from '../../shared/candidate_nav.js';
+import { renderCandidateNavInline } from '../../../inversion/shared/candidate_nav.js';
 
 export async function mount(root, atlasState, registry) {
   const chrom = atlasState.shared && atlasState.shared.activeChrom;

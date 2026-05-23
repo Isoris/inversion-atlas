@@ -203,34 +203,6 @@
       "_was_id": "page18"
     },
     {
-      "id": "ancestry_per_window",
-      "slug": "ancestry_per_window",
-      "label": "ancestry",
-      "stage": "evolution",
-      "fragment": "atlases/inversion/pages/review/ancestry_per_window.html",
-      "module": "atlases/inversion/pages/review/ancestry_per_window.js",
-      "_was_id": "page7"
-    },
-    {
-      "id": "fish_ancestry_scroller",
-      "slug": "fish_ancestry_scroller",
-      "label": "ancestry scroller",
-      "stage": "evolution",
-      "fragment": "atlases/inversion/pages/review/fish_ancestry_scroller.html",
-      "module": "atlases/inversion/pages/review/fish_ancestry_scroller.js",
-      "tooltip": "Fish Ancestry Scroller — per-fish ancestry painting across one selected inversion candidate (one chromosome viewport). Three numbered layers (PC1 Band / Ancestry Bricks / Brick summary cohort) + 5-row brick-metrics heatmap + tab strip. Headline metric: mean |ΔQ| (global vs local). Consumes shared/ancestry_alignment.js (F-based label-switching alignment) + shared/ancestry_bricks.js (per-fish bricks + flags). See specs_todo/SPEC_fish_ancestry_scroller.md for UI layout v2.",
-      "_was_id": "page_ancestry_scroller"
-    },
-    {
-      "id": "popstats",
-      "slug": "popstats",
-      "label": "popstats",
-      "stage": "synthesis",
-      "fragment": "atlases/inversion/pages/review/popstats.html",
-      "module": "atlases/inversion/pages/review/popstats.js",
-      "_was_id": "page6"
-    },
-    {
       "id": "stats_profile",
       "slug": "stats_profile",
       "label": "stats profile",

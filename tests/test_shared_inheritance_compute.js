@@ -6,8 +6,8 @@
 import {
   runInheritanceCompute,
   invalidateInheritanceCache,
-} from '../atlases/inversion/shared/inheritance_compute.js';
-import { IGC_DEFAULT_DIST_THRESHOLD } from '../atlases/inversion/shared/inheritance_groups.js';
+} from '../atlases/popstats/shared/inheritance_compute.js';
+import { IGC_DEFAULT_DIST_THRESHOLD } from '../atlases/popstats/shared/inheritance_groups.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

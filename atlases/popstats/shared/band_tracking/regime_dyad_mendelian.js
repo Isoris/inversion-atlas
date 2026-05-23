@@ -46,8 +46,8 @@
 //
 // Pure JS — no DOM, no fetch.
 
-import { chiSqSurvival } from '../contingency.js';
-import { percentile } from '../stats_helpers.js';
+import { chiSqSurvival } from '../../../inversion/shared/contingency.js';
+import { percentile } from '../../../inversion/shared/stats_helpers.js';
 import { regimeKaryotypeForSample } from './regime_mendelian.js';
 
 // =====================================================================

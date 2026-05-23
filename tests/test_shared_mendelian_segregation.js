@@ -17,7 +17,7 @@ import {
   effectDirection,
   assessSegregation,
   buildParaPeriContingency,
-} from '../atlases/inversion/shared/mendelian_segregation.js';
+} from '../atlases/popstats/shared/mendelian_segregation.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

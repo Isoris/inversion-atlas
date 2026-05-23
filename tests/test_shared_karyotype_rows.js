@@ -8,7 +8,7 @@ import {
   karyoBandToTrackMap,
   buildKaryotypeRows,
   sortKaryoRows,
-} from '../atlases/inversion/shared/karyotype_rows.js';
+} from '../atlases/popstats/shared/karyotype_rows.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

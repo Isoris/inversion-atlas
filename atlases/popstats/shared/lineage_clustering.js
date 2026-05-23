@@ -9,7 +9,7 @@
 // `state.lineageResult.lineage_id_per_sample[si]` to color each fish
 // trajectory. This module produces that result without any state-globals.
 
-import { agglomerativeAverageLinkage, cutDendrogram } from './clustering.js';
+import { agglomerativeAverageLinkage, cutDendrogram } from '../../inversion/shared/clustering.js';
 
 /** Default (1 - concordance) distance cut threshold. */
 export const LINEAGE_DEFAULT_THRESHOLD = 0.50;
