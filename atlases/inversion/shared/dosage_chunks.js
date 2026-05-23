@@ -41,6 +41,204 @@ function _emptyNaN(nS) {
   return out;
 }
 
+// =====================================================================
+// 2026-05-20: sample-id alias matching.
+//
+// The chunk fetcher returns `chunk.samples` as the raw lines of the
+// server-side samples.tsv (one ID per line, first column). The atlas
+// cohort `state.data.samples` ships from a precomp JSON and can be
+// any of:
+//   - plain string: "CGA001"
+//   - object: { id: "CGA001" }
+//   - object: { cga: "CGA001", ind: "1_CGA001" }
+//   - object with prefixes / suffixes / underscores
+//
+// The pre-2026-05-20 matcher tried `s.id || s.cga || s.ind || s.sample`.
+// Real-world precomps have shipped with `s.name`, `s.sample_id`, `s.ID`,
+// plain strings, and prefixed IDs ("1_CGA001"). The matcher returned
+// nothing → 0 samples matched → every cohort cell stayed NaN → grey.
+//
+// New strategy: build aliases per cohort sample (multiple keys map to
+// the same cohort idx) so the chunk's IDs hit on at least one. Also
+// log a one-shot diagnostic when the match-rate is poor so the
+// console makes the cause obvious instead of "everything is silently
+// grey".
+// =====================================================================
+
+function _normId(s) {
+  return String(s == null ? '' : s).trim();
+}
+
+function _normIdCanon(s) {
+  // Lowercase + strip non-alphanum so "CGA-001" / "cga_001" / "CGA001"
+  // all collapse to "cga001". Use as a last-chance fuzzy match.
+  return _normId(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+// Strip common species/dataset prefixes both directions so e.g.
+// "C_gar_CGA001" ↔ "CGA001" / "CGA-001" / "cga001" all match.
+// Examples of prefixes seen in the wild: "C_gar_", "Cgar_",
+// "C_mac_", "INV_", "SAM_", "1_" (digits).
+const _PREFIX_PATTERNS = [
+  /^[A-Za-z]+_[A-Za-z]+_/,   // species_subset_ (e.g. "C_gar_")
+  /^[A-Za-z]+_/,             // single_token_ (e.g. "INV_", "SAM_")
+  /^\d+_/,                   // numeric_ (e.g. "1_")
+];
+
+function _stripPrefixes(id) {
+  // Apply each prefix pattern at most once and collect every reachable
+  // intermediate form so any of them can match the chunk side.
+  const out = new Set([id]);
+  const stack = [id];
+  while (stack.length) {
+    const cur = stack.pop();
+    for (const re of _PREFIX_PATTERNS) {
+      const m = re.exec(cur);
+      if (m) {
+        const next = cur.slice(m[0].length);
+        if (next && !out.has(next)) {
+          out.add(next);
+          stack.push(next);
+        }
+      }
+    }
+  }
+  return Array.from(out);
+}
+
+function _aliasesForCohortEntry(s, fallbackIdx) {
+  const out = [];
+  if (s == null) {
+    out.push('S' + fallbackIdx);
+    return out;
+  }
+  if (typeof s === 'string' || typeof s === 'number') {
+    for (const v of _stripPrefixes(_normId(s))) out.push(v);
+    return out;
+  }
+  // Object — pull every plausible identifier field.
+  const fields = ['id', 'cga', 'ind', 'sample', 'sample_id',
+                  'name', 'label', 'ID', 'IND', 'CGA',
+                  'sampleId', 'sampleID', 'individual', 'idx'];
+  const seen = new Set();
+  for (const f of fields) {
+    const v = s[f];
+    if (v == null || v === '') continue;
+    for (const a of _stripPrefixes(_normId(v))) {
+      if (!seen.has(a)) { seen.add(a); out.push(a); }
+    }
+  }
+  if (out.length === 0) out.push('S' + fallbackIdx);
+  return out;
+}
+
+function _buildSampleIdMap(state, chunkSamples) {
+  const cohortSamples = (state && state.data && state.data.samples) || [];
+  const map = new Map();
+  // Pass 1: exact + variant aliases per cohort sample.
+  for (let ci = 0; ci < cohortSamples.length; ci++) {
+    const aliases = _aliasesForCohortEntry(cohortSamples[ci], ci);
+    for (const a of aliases) {
+      if (!map.has(a)) map.set(a, ci);
+    }
+  }
+  // Pass 2: canonicalised form as a fallback. Only filled when the
+  // canonical key isn't already taken by an exact alias.
+  for (let ci = 0; ci < cohortSamples.length; ci++) {
+    const aliases = _aliasesForCohortEntry(cohortSamples[ci], ci);
+    for (const a of aliases) {
+      const c = _normIdCanon(a);
+      if (c && !map.has(c)) map.set(c, ci);
+    }
+  }
+  // Pass 3: positional fallback. The beagle (which the server reads as
+  // the dosage matrix's column order) often ships placeholder IDs like
+  // "Ind", "Ind1", "Ind2" OR even all-literal "Ind" duplicates, while
+  // the cohort precomp uses real names like "CGA001". Quentin: "maybe
+  // because in the beagle its Ind Ind Ind and in the samples its CGA".
+  // The columns ARE ordered the same way (beagle column order is
+  // preserved through both pipelines), so chunk.samples[i] corresponds
+  // to cohort.samples[i] — that's the bamlist-to-Ind mapping the
+  // catfish-inversion-analysis precomp documents as the canonical
+  // identity binding.
+  //
+  // We DON'T stuff positional aliases into `map` because if the chunk
+  // ships duplicate strings (e.g. all literal "Ind"), the first
+  // map.set("Ind", 0) wins and every chunk index >0 still misses.
+  // Instead we attach a parallel `_byPos` table the lookup wrapper
+  // walks AFTER all string-based passes fail. Only safe when lengths
+  // agree — different cohort sizes would mis-align.
+  if (chunkSamples && chunkSamples.length === cohortSamples.length
+      && cohortSamples.length > 0) {
+    map._byPos = new Array(chunkSamples.length);
+    for (let i = 0; i < chunkSamples.length; i++) map._byPos[i] = i;
+    // Pre-compute name-rate to decide whether positional should ALSO
+    // win on per-cell misses. If name matching has any hits at all,
+    // positional is only used for samples that didn't string-match.
+    // If name matching has zero hits (beagle-placeholder case), every
+    // sample resolves positionally.
+  }
+  // One-shot diagnostic per page load. Always logs the first match so
+  // there's evidence whether the matcher is finding samples or not.
+  // After the first log, only re-logs when window.__dosageDbg is true
+  // (so the console isn't spammed once we know the rate). The match-rate
+  // count uses the same lookup path as the per-marker projection so the
+  // printed number is the actually-achieved rate.
+  if (chunkSamples && chunkSamples.length > 0
+      && cohortSamples.length > 0
+      && typeof console !== 'undefined'
+      && state && (!state.__dosageMatchRateLogged
+                   || (typeof window !== 'undefined' && window.__dosageDbg === true))) {
+    let matched = 0;
+    for (let i = 0; i < chunkSamples.length; i++) {
+      if (_lookupCohortIdx(map, chunkSamples[i], i) >= 0) matched++;
+    }
+    const rate = matched / chunkSamples.length;
+    const cohortSample = cohortSamples[0];
+    const cohortPreview = (typeof cohortSample === 'string' || typeof cohortSample === 'number')
+      ? cohortSample
+      : JSON.stringify(cohortSample);
+    const fn = rate === 0 ? 'warn' : 'log';
+    console[fn]('[dosage_chunks] sample-id match:',
+      `${matched}/${chunkSamples.length} = ${(rate * 100).toFixed(0)}%`,
+      '· chunk ID example:', JSON.stringify(chunkSamples[0]),
+      '· cohort entry example:', cohortPreview,
+      '· cohort aliases for [0]:', _aliasesForCohortEntry(cohortSample, 0));
+    state.__dosageMatchRateLogged = true;
+  }
+  return map;
+}
+
+// Wrapper so chunk.samples lookups go through the canonicalisation +
+// prefix-strip + positional fallbacks when the exact-string lookup
+// misses. Match order: exact → exact-without-prefix → canonical →
+// canonical-without-prefix → positional (chunk index === cohort index).
+// Positional only fires when map._byPos was set (lengths agree) so
+// mis-sized cohorts don't get aligned to the wrong rows.
+function _lookupCohortIdx(map, chunkId, chunkIdx) {
+  if (chunkId != null) {
+    const key = _normId(chunkId);
+    if (map.has(key)) return map.get(key);
+    for (const stripped of _stripPrefixes(key)) {
+      if (map.has(stripped)) return map.get(stripped);
+    }
+    const canon = _normIdCanon(key);
+    if (map.has(canon)) return map.get(canon);
+    for (const stripped of _stripPrefixes(key)) {
+      const c = _normIdCanon(stripped);
+      if (c && map.has(c)) return map.get(c);
+    }
+  }
+  // Positional last-resort. Handles the beagle-placeholder case
+  // (chunk samples are all literal "Ind") + any other shape where
+  // name-based binding fails but column order is trusted.
+  if (map._byPos && Number.isFinite(chunkIdx)
+      && chunkIdx >= 0 && chunkIdx < map._byPos.length) {
+    return map._byPos[chunkIdx];
+  }
+  return -1;
+}
+
 function _ensureHetRateCache(state) {
   if (!state.__hetRateCache || !(state.__hetRateCache instanceof Map)) {
     state.__hetRateCache = new Map();
@@ -93,8 +291,13 @@ export function computeHetRateForRange(state, startBp, endBp, opts) {
   if (cacheKey != null && cache && cache.has(cacheKey)) return cache.get(cacheKey);
 
   const out = _emptyNaN(nS);
+  // 2026-05-20: previously we cached this all-NaN placeholder under the
+  // cacheKey on invalid-bp + chunk-miss paths. That defeated the
+  // onLoad-triggered repaint loop: chunk arrives, drawLinesPanel calls
+  // computeHetRateForRange with the same cacheKey, the stale NaN array
+  // wins, lines stay grey forever. Now: only cache when we actually
+  // compute a real result. Misses re-run on the next call.
   if (!Number.isFinite(startBp) || !Number.isFinite(endBp) || endBp < startBp) {
-    if (cacheKey != null && cache) cache.set(cacheKey, out);
     return out;
   }
 
@@ -103,18 +306,12 @@ export function computeHetRateForRange(state, startBp, endBp, opts) {
     ? getCachedChunk(startBp, endBp) : null;
   if (!chunk || !Array.isArray(chunk.markers) || !Array.isArray(chunk.dosage)
       || !Array.isArray(chunk.samples)) {
-    if (cacheKey != null && cache) cache.set(cacheKey, out);
     return out;
   }
 
-  // chunk-sample-id → cohort-index lookup
-  const cohortSamples = (state && state.data && state.data.samples) || [];
-  const idToCohort = new Map();
-  for (let ci = 0; ci < cohortSamples.length; ci++) {
-    const s = cohortSamples[ci];
-    const id = (s && (s.id || s.cga || s.ind || s.sample)) || ('S' + ci);
-    idToCohort.set(id, ci);
-  }
+  // chunk-sample-id → cohort-index lookup. Robust matcher: see
+  // _buildSampleIdMap for the multi-pass alias strategy.
+  const idToCohort = _buildSampleIdMap(state, chunk.samples);
 
   // Filter markers to bp span
   const inRange = [];
@@ -125,7 +322,6 @@ export function computeHetRateForRange(state, startBp, endBp, opts) {
     inRange.push(mi);
   }
   if (inRange.length === 0) {
-    if (cacheKey != null && cache) cache.set(cacheKey, out);
     return out;
   }
 
@@ -144,10 +340,11 @@ export function computeHetRateForRange(state, startBp, endBp, opts) {
     }
   }
 
-  // Project to cohort space
+  // Project to cohort space — _lookupCohortIdx handles exact and
+  // canonicalised (alphanumeric-lowercase) fallbacks so prefix /
+  // separator / case variants still match.
   for (let ci = 0; ci < nChunkS; ci++) {
-    const cohortIdx = idToCohort.has(chunk.samples[ci])
-      ? idToCohort.get(chunk.samples[ci]) : -1;
+    const cohortIdx = _lookupCohortIdx(idToCohort, chunk.samples[ci], ci);
     if (cohortIdx < 0 || cohortIdx >= nS) continue;
     out[cohortIdx] = (nonNaCounts[ci] === 0)
       ? NaN
@@ -247,8 +444,11 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
   if (cacheKey != null && cache && cache.has(cacheKey)) return cache.get(cacheKey);
 
   const out = _emptyNaN(nS);
+  // 2026-05-20: don't cache the placeholder on chunk-miss / invalid-bp
+  // paths — see the matching note on computeHetRateForRange. Caching
+  // NaN here used to lock the lines panel into grey even after the
+  // chunk landed and onLoad fired a repaint.
   if (!Number.isFinite(startBp) || !Number.isFinite(endBp) || endBp < startBp) {
-    if (cacheKey != null && cache) cache.set(cacheKey, out);
     return out;
   }
 
@@ -257,18 +457,12 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
     ? getCachedChunk(startBp, endBp) : null;
   if (!chunk || !Array.isArray(chunk.markers) || !Array.isArray(chunk.dosage)
       || !Array.isArray(chunk.samples)) {
-    if (cacheKey != null && cache) cache.set(cacheKey, out);
     return out;
   }
 
-  // chunk-sample-id → cohort-index lookup
-  const cohortSamples = (state && state.data && state.data.samples) || [];
-  const idToCohort = new Map();
-  for (let ci = 0; ci < cohortSamples.length; ci++) {
-    const s = cohortSamples[ci];
-    const id = (s && (s.id || s.cga || s.ind || s.sample)) || ('S' + ci);
-    idToCohort.set(id, ci);
-  }
+  // chunk-sample-id → cohort-index lookup. Robust matcher: see
+  // _buildSampleIdMap for the multi-pass alias strategy.
+  const idToCohort = _buildSampleIdMap(state, chunk.samples);
 
   // Filter markers to bp span
   const inRange = [];
@@ -279,7 +473,6 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
     inRange.push(mi);
   }
   if (inRange.length === 0) {
-    if (cacheKey != null && cache) cache.set(cacheKey, out);
     return out;
   }
 
@@ -298,10 +491,11 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
     }
   }
 
-  // Project to cohort space
+  // Project to cohort space — _lookupCohortIdx handles exact and
+  // canonicalised (alphanumeric-lowercase) fallbacks so prefix /
+  // separator / case variants still match.
   for (let ci = 0; ci < nChunkS; ci++) {
-    const cohortIdx = idToCohort.has(chunk.samples[ci])
-      ? idToCohort.get(chunk.samples[ci]) : -1;
+    const cohortIdx = _lookupCohortIdx(idToCohort, chunk.samples[ci], ci);
     if (cohortIdx < 0 || cohortIdx >= nS) continue;
     out[cohortIdx] = (nNonNa[ci] === 0)
       ? NaN
@@ -373,6 +567,34 @@ export function installDosageChunkFetcher(state, opts) {
     const lru = _ensureChunkLru(state);
     const key = _chunkKey(chrom, startBp, endBp);
     if (lru.has(key)) return lru.get(key);
+    // 2026-05-20: covering-chunk fallback. Before this, the LRU was
+    // strict exact-key match — a chunk fetched at (1.0M, 1.5M) couldn't
+    // satisfy a request for (1.1M, 1.2M), even though the bigger chunk
+    // contains every marker the caller would filter to. Result: every
+    // size-mismatched caller (PCA single-window color, L3 chips with
+    // L2 ranges that happened to differ from the lines panel's visible
+    // Mb range) refired a new fetch instead of reusing what was already
+    // cached, and every visit showed grey points/`?` chips until the
+    // second fetch landed. With the fallback, computeHetRateForRange /
+    // computeDosageMeanForRange filter markers by their own startBp/
+    // endBp predicate, so a wider-chunk return is functionally identical
+    // to the exact-fit chunk would have been.
+    // O(_DOSAGE_LRU_SIZE) — bounded at 12, negligible.
+    for (const [k, chunk] of lru) {
+      if (!chunk || typeof chunk !== 'object') continue;
+      // Key shape: 'chrom:start-end'. Parse + verify same chrom.
+      const sep = k.indexOf(':');
+      if (sep < 0) continue;
+      if (k.slice(0, sep) !== chrom) continue;
+      const dash = k.indexOf('-', sep + 1);
+      if (dash < 0) continue;
+      const kStart = +k.slice(sep + 1, dash);
+      const kEnd   = +k.slice(dash + 1);
+      if (kStart <= startBp && kEnd >= endBp) {
+        // Cached chunk's bp span fully covers the requested range.
+        return chunk;
+      }
+    }
     if (inflight.has(key)) return null;
     const url = _templateUrl(template, chrom, startBp, endBp, cap);
     const pr = fetch(url)
@@ -387,6 +609,16 @@ export function installDosageChunkFetcher(state, opts) {
           const firstKey = lru.keys().next().value;
           if (!firstKey) break;
           lru.delete(firstKey);
+        }
+        // 2026-05-20: one-time landing breadcrumb so the user can tell
+        // the fetch loop is healthy when colors stay grey. Opt-in via
+        // window.__dosageDbg = true; otherwise prints once per LRU
+        // lifetime so there's some evidence chunks are arriving.
+        if (typeof window !== 'undefined' && window.__dosageDbg === true) {
+          console.log('[dosage_chunks] chunk landed:',
+            `${chunk.markers ? chunk.markers.length : 0} markers ·`,
+            `${chunk.samples ? chunk.samples.length : 0} samples ·`,
+            `bp ${chunk.start_bp}–${chunk.end_bp}`);
         }
         // The per-sample lines panel caches its computed mean/het by
         // (mode, startW-endW) — invalidate so the next paint recomputes

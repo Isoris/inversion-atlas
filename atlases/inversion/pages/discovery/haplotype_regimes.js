@@ -39,7 +39,7 @@
 import { contextFromState, ClusterCache } from '../../shared/per_l2_cluster.js';
 import { alignLabels } from '../../shared/hungarian.js';
 import { buildContingency, cramersV } from '../../shared/contingency.js';
-import { runCramersVMergeLocal, computeAdjacentSeedMerges } from '../../shared/cramers_v_merge.js';
+import { runCramersVMergeLocal, runCramersVMergeMacrostripe, computeAdjacentSeedMerges } from '../../shared/cramers_v_merge.js';
 
 // Per-window K-means primitive (Cluster 1 Path B + foundation for all paths).
 // The band_tracking/index.js header is explicit: per-window K-means via
@@ -120,6 +120,7 @@ import { buildCatalogue, computeKnobHash }
 
 // Panel modules (sibling files in haplotype_regimes/)
 import { initRegimesPage, computeGenomeView } from './haplotype_regimes/regimes_page.js';
+import { regimeGroupsFromBands } from '../../shared/candidate_groups.js';
 import { classifyProjection } from '../../shared/band_tracking/projection.js';
 import { _dosageClassColour } from './haplotype_regimes/regimes_panel.js';
 
@@ -137,6 +138,7 @@ let _pageState = null;
 export async function mount(root, atlasState, registry) {
   // Build the legacy-shape state object the panels expect.
   const state = _buildLegacyState(atlasState);
+  state._atlasState = atlasState;       // ref so _afterPipelineRun can stash
   _pageState = state;
 
   const chrom = atlasState.shared && atlasState.shared.activeChrom;
@@ -162,14 +164,54 @@ export async function mount(root, atlasState, registry) {
   // Wire the action bar buttons.
   _wireActionBar(root, state, atlasState);
 
+  // 2026-05-20: restore pipeline result from the cross-mount stash so
+  // tabbing away and back doesn't wipe the user's discovered seeds /
+  // loci / regimes. The stash lives on atlasState.inversion (shared
+  // across routes) and is keyed by chromosome. Mount → if a stash
+  // matches the active chrom, replay _afterPipelineRun synchronously
+  // with the stored result so all 4 panels + seed strip + L3 pairs
+  // table reappear without re-running the (slow) pipeline.
+  const stash = atlasState.inversion && atlasState.inversion._haplotype_regimes_stash;
+  if (stash && stash.chrom === chrom && stash.result) {
+    try {
+      // _afterPipelineRun reads from state._regimesResult downstream
+      // (seeds strip, promote-seed handler, L3 pairs table, regimes
+      // summary). The replay path bypasses the pipeline-run handler
+      // that normally sets this slot, so we must restore it here so
+      // _renderSeedsStrip + _renderRegimesSummary see the stashed
+      // seeds/loci/regimes instead of an empty result.
+      state._regimesResult = stash.result;
+      state._regimesOpts   = stash.opts || {};
+      _afterPipelineRun(root, state, stash.result, stash.opts || {});
+      _setStatus(root,
+        `restored ${chrom} · ${data.n_windows} windows · ${data.n_samples} samples ` +
+        `· cached pipeline result (re-run to refresh)`);
+      try { _renderRegimesSummary(root, state); }
+      catch (e) { console.warn('[remount] _renderRegimesSummary:', e); }
+      try { _applyViewToggle(root, state); }
+      catch (e) { console.warn('[remount] _applyViewToggle:', e); }
+      return;
+    } catch (e) {
+      console.warn('[remount] _afterPipelineRun replay threw —', e);
+    }
+  }
+
   _setStatus(root, `loaded ${chrom} · ${data.n_windows} windows · ${data.n_samples} samples · ready`);
 }
 
 export async function unmount(root) {
+  // 2026-05-20: tear down the document-level arrow-key handler that
+  // initRegimesPage installs via _installPageKeyboardNav. Without this,
+  // every mount stacks another keydown listener on document — after N
+  // tab-outs each arrow press would advance the focal seed N times.
+  // The teardown closure was stashed on state by initRegimesPage; we
+  // captured the state ref on mount as _pageState.
+  if (_pageState && typeof _pageState._regimesTeardownKeyboard === 'function') {
+    try { _pageState._regimesTeardownKeyboard(); }
+    catch (e) { console.warn('[haplotype_regimes.unmount] keyboard teardown threw —', e); }
+    _pageState._regimesTeardownKeyboard = null;
+  }
   _pageState = null;
-  // Note: arrow-key handlers attached by initRegimesPage are document-level.
-  // initRegimesPage returns a teardown closure but we don't currently
-  // capture it — TODO: capture the unsubscribe and call it here.
 }
 
 // ---------------------------------------------------------------------------
@@ -384,11 +426,12 @@ function _wireCtxCallbacks(state, atlasState) {
 }
 
 function _wireActionBar(root, state, atlasState) {
-  const runBtn       = root.querySelector('#rgRunPipelineBtn');
-  const exportBtn    = root.querySelector('#rgExportCatalogueBtn');
-  const promoteBtn   = root.querySelector('#rgPromoteSeedBtn');
-  const autoMergeBtn = root.querySelector('#rgAutoMergeBtn');
-  const statusEl     = root.querySelector('#rgStatus');
+  const runBtn            = root.querySelector('#rgRunPipelineBtn');
+  const exportBtn         = root.querySelector('#rgExportCatalogueBtn');
+  const promoteBtn        = root.querySelector('#rgPromoteSeedBtn');
+  const autoMergeBtn      = root.querySelector('#rgAutoMergeBtn');
+  const autoMergeMacroBtn = root.querySelector('#rgAutoMergeMacroBtn');
+  const statusEl          = root.querySelector('#rgStatus');
 
   // Mode toggle. Three modes:
   //   'long'  — V-walker (runBandingPipeline Stages 1-4)
@@ -499,6 +542,19 @@ function _wireActionBar(root, state, atlasState) {
       catch (e) {
         console.error('auto-merge V failed:', e);
         _setStatus(root, `auto-merge V failed: ${e.message}`);
+      }
+    });
+  }
+  // 2026-05-20: auto-merge V macrostripe button (Mode 2,
+  // post_long_range). Same chain-promote logic but the walker only
+  // compares seeds WITHIN each Stage 3 macrostripe — never crosses
+  // locus boundaries. See _runAutoMergeCramersVMacro below.
+  if (autoMergeMacroBtn) {
+    autoMergeMacroBtn.addEventListener('click', async () => {
+      try { await _runAutoMergeCramersVMacro(root, state, atlasState); }
+      catch (e) {
+        console.error('auto-merge V macrostripe failed:', e);
+        _setStatus(root, `auto-merge V macrostripe failed: ${e.message}`);
       }
     });
   }
@@ -683,23 +739,70 @@ function _afterPipelineRun(root, state, result, opts) {
   // seeds since the walker compares adjacent pairs — a single seed has
   // no neighbour to merge with.
   const autoMergeBtn = root.querySelector('#rgAutoMergeBtn');
+  const seedsArr = (result.stage1 && Array.isArray(result.stage1.seeds))
+    ? result.stage1.seeds : [];
   if (autoMergeBtn) {
-    const seeds = (result.stage1 && Array.isArray(result.stage1.seeds))
-      ? result.stage1.seeds : [];
-    autoMergeBtn.disabled = seeds.length < 2;
-    autoMergeBtn.title = seeds.length < 2
+    autoMergeBtn.disabled = seedsArr.length < 2;
+    autoMergeBtn.title = seedsArr.length < 2
       ? 'Need at least 2 Stage 1 seeds for adjacent-pair Cramér\'s V auto-merge.'
-      : `Walk ${seeds.length - 1} adjacent seed pair${seeds.length - 1 === 1 ? '' : 's'}, auto-promote MERGE chains as candidates.`;
+      : `Walk ${seedsArr.length - 1} adjacent seed pair${seedsArr.length - 1 === 1 ? '' : 's'}, auto-promote MERGE chains as candidates.`;
+  }
+  // 2026-05-20: auto-merge V macrostripe button enable state. Needs
+  // ≥ 1 Stage 3 macrostripe that contains ≥ 2 Stage 1 seeds (anchor_w
+  // ∈ [locus.s_window, locus.e_window]) — otherwise the within-locus
+  // walker has nothing to compare.
+  const autoMergeMacroBtn = root.querySelector('#rgAutoMergeMacroBtn');
+  if (autoMergeMacroBtn) {
+    const loci = (result.stage3 && Array.isArray(result.stage3.loci))
+      ? result.stage3.loci : [];
+    let nUsableLoci = 0;
+    for (const locus of loci) {
+      if (!locus) continue;
+      const s = locus.s_window | 0;
+      const e = locus.e_window | 0;
+      let nInside = 0;
+      for (const sd of seedsArr) {
+        if (!sd) continue;
+        const aw = sd.anchor_w | 0;
+        if (aw >= s && aw <= e) { nInside++; if (nInside >= 2) break; }
+      }
+      if (nInside >= 2) nUsableLoci++;
+    }
+    autoMergeMacroBtn.disabled = nUsableLoci === 0;
+    autoMergeMacroBtn.title = nUsableLoci === 0
+      ? 'Need at least 1 Stage 3 macrostripe with ≥ 2 Stage 1 seeds inside it.'
+      : `Run macrostripe-bounded V walker on ${nUsableLoci} usable locus${nUsableLoci === 1 ? '' : 'es'} (${loci.length} total).`;
   }
   try { _renderSeedsStrip(root, state); }
   catch (e) { console.warn('_renderSeedsStrip:', e); }
   _wireSeedStripFocalSync(root, state);
+
+  // Push the initial focal seed's regime partition into shared.activeGroups
+  // so popstats (and any other consumer of the groups slot) sees the
+  // partition immediately, without waiting for a promote action.
+  try { _pushFocalSeedGroups(state); } catch (_) {}
   // 2026-05-20: L3 adjacent-pair Cramér mini-table — visible only in
   // short-range mode. Computes V between every consecutive L2 pair
   // on the active chrom, then paints a table row per pair with a
   // [merge] action that builds a candidate spanning both L2s.
   try { _renderL3PairsTable(root, state); }
   catch (e) { console.warn('_renderL3PairsTable:', e); }
+
+  // 2026-05-20: stash the pipeline result on atlasState so the user can
+  // tab away and back without losing it. Keyed by chrom — switching
+  // chroms invalidates the stash (pipeline must re-run on a new dataset).
+  // result is plain JSON; getLabels/getK/getPC1 are rebuilt by
+  // _wireCtxCallbacks on every mount so we don't need to stash them.
+  try {
+    const atlas = state && state._atlasState;
+    if (atlas && atlas.inversion) {
+      atlas.inversion._haplotype_regimes_stash = {
+        chrom:  state.activeChrom,
+        result: result,
+        opts:   opts || {},
+      };
+    }
+  } catch (e) { console.warn('[stash] write failed:', e); }
 }
 
 // =========================================================================
@@ -1045,6 +1148,7 @@ function _renderSeedsStrip(root, state) {
   if (!root || typeof document === 'undefined') return;
   const wrap = root.querySelector('#rgSeedsStripWrap');
   const list = root.querySelector('#rgSeedsStripList');
+  const interpret = root.querySelector('#rgInterpretDrawer');
   if (!wrap || !list) return;
   const result = state && state._regimesResult;
   const loci   = result && result.stage3 && Array.isArray(result.stage3.loci)
@@ -1054,9 +1158,13 @@ function _renderSeedsStrip(root, state) {
   if (loci.length === 0) {
     wrap.style.display = 'none';
     list.innerHTML = '';
+    if (interpret) interpret.style.display = 'none';
     return;
   }
   wrap.style.display = 'flex';
+  // 2026-05-20: surface the interpretation drawer alongside the seeds
+  // strip — both appear/disappear in lock-step with pipeline results.
+  if (interpret) interpret.style.display = '';
   const data = state.data;
   const wins = (data && Array.isArray(data.windows)) ? data.windows : null;
   const focal = (state.regimesPanel && state.regimesPanel.focal
@@ -1112,6 +1220,56 @@ function _qualityDotColor(q) {
   return '#e0555c';
 }
 
+/**
+ * Push the focal seed's per-band partition into atlasState.shared.activeGroups.
+ *
+ * The Stage 3 locus carries `per_band_samples` — `Array<Set<sample_idx>>` —
+ * which is the canonical regime-band partition. We convert it to a flat
+ * Int8Array of band-index-per-sample (same shape candidate.locked_labels
+ * uses) and feed it through `regimeGroupsFromBands` so popstats and any
+ * other consumer of `shared.activeGroups` picks up the partition without
+ * needing to know about the regimes-pipeline internals.
+ *
+ * Fires on three entry points:
+ *   - _afterPipelineRun (initial seed becomes focal after pipeline finishes)
+ *   - _focusSeedFromChip (user clicks a different seed chip)
+ *   - _wireSeedStripFocalSync (arrow-key cycle through seeds)
+ *
+ * No-op when nothing meaningful to push (no atlasState, no result, no
+ * focal index, no per_band_samples on the locus).
+ */
+function _pushFocalSeedGroups(state) {
+  const atlasState = state && state._atlasState;
+  if (!atlasState || typeof atlasState.setActiveGroups !== 'function') return;
+  const rp = state.regimesPanel;
+  if (!rp || !rp.focal || !Number.isFinite(rp.focal.seed_index)) return;
+  const focalIdx = rp.focal.seed_index | 0;
+  const loci = state._regimesResult && state._regimesResult.stage3
+            && state._regimesResult.stage3.loci;
+  if (!Array.isArray(loci) || focalIdx < 0 || focalIdx >= loci.length) return;
+  const locus = loci[focalIdx];
+  if (!locus || !Array.isArray(locus.per_band_samples)) return;
+  const data = state.data;
+  if (!data || !Array.isArray(data.samples) || !Number.isFinite(data.n_samples)) return;
+
+  // Flatten per_band_samples (Array<Set<sample_idx>>) → Int8Array per sample.
+  // Same conversion the promote path uses (see _promoteFocalSeed); kept inline
+  // here so this helper has no side effects on the promote module.
+  const nS = data.n_samples | 0;
+  const bandPerSample = new Array(nS).fill(-1);
+  for (let b = 0; b < locus.per_band_samples.length; b++) {
+    const set = locus.per_band_samples[b];
+    if (!set || typeof set.forEach !== 'function') continue;
+    set.forEach((si) => { if (si >= 0 && si < nS) bandPerSample[si] = b; });
+  }
+
+  const derived = regimeGroupsFromBands(bandPerSample, data, { labelStyle: 'server' });
+  if (derived && derived.groups) {
+    try { atlasState.setActiveGroups(derived.groups); }
+    catch (e) { console.warn('haplotype_regimes: setActiveGroups threw —', e); }
+  }
+}
+
 function _focusSeedFromChip(state, idx) {
   if (!state || !state.regimesPanel || !state.regimesPanel.focal) return;
   const loci = state._regimesResult && state._regimesResult.stage3
@@ -1119,6 +1277,7 @@ function _focusSeedFromChip(state, idx) {
   if (!Array.isArray(loci) || idx < 0 || idx >= loci.length) return;
   const rp = state.regimesPanel;
   rp.focal.seed_index = idx;
+  _pushFocalSeedGroups(state);
   // Reset band_mask to the first available subset for the new locus.
   rp.focal.band_mask = 1;
   // If the new seed lives on a different chromosome, snap chrom panels too.
@@ -1181,6 +1340,8 @@ function _wireSeedStripFocalSync(root, state) {
         try { target.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
         catch (_) {}
       }
+      // Push the new focal seed's regime partition to shared.activeGroups.
+      try { _pushFocalSeedGroups(state); } catch (_) {}
     });
   });
 }
@@ -1510,6 +1671,191 @@ async function _runAutoMergeCramersV(root, state, atlasState) {
 }
 
 /**
+ * Auto-merge V — Mode 2 (post_long_range) driver (2026-05-20).
+ *
+ * SPEC_cramers_v_seed_merge.md Phase 1 deliverable #2 (Mode 2 UI half).
+ * Pure-compute lives in shared/cramers_v_merge.js#runCramersVMergeMacrostripe.
+ *
+ * Differences from Mode 1 (`_runAutoMergeCramersV`):
+ *   - Mode 1 walks the FULL Stage 1 seed list, calls the walker once,
+ *     gets one chain list. Insulated_local but unbounded.
+ *   - Mode 2 partitions the seed list per Stage 3 macrostripe (seed is
+ *     "inside" a locus if its anchor_w ∈ [locus.s_window, locus.e_window]),
+ *     calls the walker once per macrostripe. Chains never cross locus
+ *     boundaries — the long-range Stage 2 voting that built the
+ *     macrostripes is treated as ground truth for "where regimes split".
+ *     Mode 2 just refines the WITHIN-macrostripe boundary.
+ *
+ * Promoted candidates are tagged `source: 'auto_cramers_v_macrostripe'`
+ * so they're visually distinct from Mode 1's `auto_cramers_v_local`
+ * (different chip colour — see candidate_focus _html_builders.js).
+ */
+async function _runAutoMergeCramersVMacro(root, state, atlasState) {
+  const result = state._regimesResult;
+  if (!result || !result.stage1 || !Array.isArray(result.stage1.seeds)) {
+    _setStatus(root, 'no pipeline result — run the pipeline first');
+    return;
+  }
+  if (!result.stage3 || !Array.isArray(result.stage3.loci) || result.stage3.loci.length === 0) {
+    _setStatus(root, 'no Stage 3 macrostripes — pipeline did not produce loci');
+    return;
+  }
+  const seeds = result.stage1.seeds;
+  const loci  = result.stage3.loci;
+  const ctx = state._regimesCtx;
+  if (!ctx || typeof ctx.getLabels !== 'function') {
+    _setStatus(root, 'pipeline ctx not wired — reload the page');
+    return;
+  }
+
+  _setStatus(root, `auto-merge V macrostripe: walking ${loci.length} macrostripe${loci.length === 1 ? '' : 's'}…`);
+  await new Promise(r => setTimeout(r, 0));
+  const t0 = performance.now();
+
+  let walker;
+  try {
+    walker = runCramersVMergeMacrostripe({
+      seeds, loci,
+      getLabels: ctx.getLabels,
+      getK:      ctx.getK,
+      opts:      { emitSingletons: false },
+    });
+  } catch (e) {
+    console.error('runCramersVMergeMacrostripe threw:', e);
+    _setStatus(root, `auto-merge V macrostripe failed: ${e.message}`);
+    return;
+  }
+  const ms = (performance.now() - t0).toFixed(0);
+  const sum = walker.summary || {};
+  const multiChains = (walker.chains || []).filter(c => c && c.length > 1);
+  if (multiChains.length === 0) {
+    _setStatus(root,
+      `auto-merge V macrostripe ran in ${ms}ms · ${sum.n_loci || 0} loci · ` +
+      `${sum.n_seeds_total || 0} seeds inside · ${sum.n_pairs || 0} pairs · ` +
+      `${sum.n_merge || 0} MERGE · ${sum.n_separate || 0} SEPARATE · ` +
+      `${sum.n_insufficient || 0} INSUFFICIENT · no multi-seed chains to promote`);
+    return;
+  }
+
+  const candMod = await import('./local_pca_dosage/candidates.js').catch(() => null);
+  if (!candMod || typeof candMod.makeCandidateId !== 'function'
+      || typeof candMod.addCandidateToList !== 'function'
+      || typeof candMod.setCandidate !== 'function') {
+    _setStatus(root, 'local_pca_dosage/candidates.js helpers not available');
+    return;
+  }
+  const data = state.data;
+  const nS = data.n_samples | 0;
+  const inv = (atlasState && atlasState.inversion) || {};
+  const page1State = inv._local_pca_dosage_state || {
+    data, candidate: null, candidateList: [],
+  };
+
+  // For each flat chain, the per-locus seed indices (start_i, end_i) are
+  // INTO the inside-locus filtered seed list. Reconstruct them by
+  // walking the per_locus entry so we can pull the actual seed objects.
+  let lastCand = null;
+  let nPromoted = 0;
+  for (const chain of multiChains) {
+    const perLocusEntry = walker.per_locus[chain.locus_idx];
+    if (!perLocusEntry) continue;
+    // The walker filtered seeds by anchor_w containment; reconstruct
+    // the same filter to map start_i/end_i back to actual seeds.
+    const locus = perLocusEntry.locus;
+    const lS = locus.s_window | 0;
+    const lE = locus.e_window | 0;
+    const insideSeeds = [];
+    for (const sd of seeds) {
+      if (!sd) continue;
+      const aw = sd.anchor_w | 0;
+      if (aw >= lS && aw <= lE) insideSeeds.push(sd);
+    }
+    const seedA = insideSeeds[chain.seed_start_i];
+    const seedB = insideSeeds[chain.seed_end_i];
+    if (!seedA || !seedB) continue;
+    const start_w = seedA.s_window | 0;
+    const end_w   = seedB.e_window | 0;
+    const ref_window = Number.isFinite(seedA.anchor_w) ? seedA.anchor_w | 0
+                     : Math.round((start_w + end_w) / 2);
+    const winS = data.windows && data.windows[start_w];
+    const winE = data.windows && data.windows[end_w];
+    const start_bp = winS && Number.isFinite(winS.start_bp) ? winS.start_bp : null;
+    const end_bp   = winE && Number.isFinite(winE.end_bp)   ? winE.end_bp   : null;
+
+    const labelsA = ctx.getLabels(seedA.anchor_w | 0);
+    const K = (typeof ctx.getK === 'function' ? ctx.getK(seedA.anchor_w | 0) : 0)
+           || seedA.K_a || 0;
+    const locked = new Int8Array(nS).fill(-1);
+    if (labelsA && labelsA.length) {
+      for (let s = 0; s < Math.min(nS, labelsA.length); s++) {
+        const k = labelsA[s];
+        if (k >= 0 && k < K) locked[s] = k;
+      }
+    }
+
+    const wToL2 = state.windowToL2;
+    const ref_l2 = (wToL2 && ref_window >= 0 && ref_window < wToL2.length)
+      ? wToL2[ref_window] : null;
+    const l2_set = new Set();
+    if (wToL2) {
+      for (let w = start_w; w <= end_w; w++) {
+        const li = wToL2[w];
+        if (li >= 0) l2_set.add(li);
+      }
+    }
+    const l2_indices = [...l2_set].sort((a, b) => a - b);
+
+    // Per-pair V values within this chain (from the per-locus verdicts).
+    const chainV = [];
+    const vs = perLocusEntry.verdicts || [];
+    for (let i = chain.seed_start_i; i < chain.seed_end_i; i++) {
+      const ve = vs[i];
+      if (ve && Number.isFinite(ve.v)) chainV.push(ve.v.toFixed(3));
+    }
+    const cand = {
+      source:        'auto_cramers_v_macrostripe',
+      chrom:         data.chrom || state.activeChrom,
+      l2_indices,
+      ref_l2:        (ref_l2 != null && ref_l2 >= 0) ? ref_l2 : null,
+      ref_window,
+      K,
+      locked_labels: locked,
+      start_w, end_w,
+      start_bp, end_bp,
+      created_at:    Date.now(),
+      notes: `Auto-merged from Cramér's V walker (Mode 2 post_long_range): ` +
+             `locus ${chain.locus_idx}, seeds ${chain.seed_start_i}..${chain.seed_end_i} ` +
+             `(${chain.length} seeds, V_chain=[${chainV.join(', ')}]).`,
+      id:            candMod.makeCandidateId(),
+      _from_cramers_v_macrostripe: {
+        locus_idx:      chain.locus_idx,
+        chain_start_i:  chain.seed_start_i,
+        chain_end_i:    chain.seed_end_i,
+        chain_length:   chain.length,
+        chain_v_values: chainV.map(v => Number(v)),
+        anchor_seed_id: seedA.seed_id,
+      },
+    };
+    try { candMod.addCandidateToList(page1State, cand); nPromoted++; lastCand = cand; }
+    catch (e) { console.warn('addCandidateToList threw for chain:', chain, e); }
+  }
+  if (lastCand) {
+    try { candMod.setCandidate(page1State, lastCand); }
+    catch (e) { console.warn('setCandidate threw:', e); }
+  }
+  inv._local_pca_dosage_state = page1State;
+
+  _setStatus(root,
+    `auto-merge V macrostripe ran in ${ms}ms · ${sum.n_loci} loci · ` +
+    `${sum.n_loci_with_chains} with chains · ${sum.n_pairs} pairs · ` +
+    `${sum.n_merge} MERGE · promoted ${nPromoted} chain${nPromoted === 1 ? '' : 's'} ` +
+    `(${multiChains.reduce((a, c) => a + c.length, 0)} seeds → ${nPromoted} candidates)`);
+
+  try { _renderSeedsStrip(root, state); } catch (_) {}
+  try { _renderL3PairsTable(root, state); } catch (_) {}
+}
+
+/**
  * Serialize the in-memory pipeline result to a regime catalogue (manifest +
  * knobs + catalogue.json) and trigger a browser download for each.
  *
@@ -1739,7 +2085,11 @@ function _buildHetSkeletonResult(state) {
     if (!labels || !pc1 || K < 2) continue;
     nAnchorsTried++;
     const het = het_detect_candidate_band(labels, pc1, K);
-    if (!het || !het.ok) { nNoHetBand++; continue; }
+    // het_detect_candidate_band returns null on failure or
+    // {k_het, k_hom_low, k_hom_high, mean_pc1, het_span_frac} on success —
+    // there is no `ok` field. The earlier `!het.ok` check rejected every
+    // successful detection, producing n_no_het_band == n_anchors_tried.
+    if (!het) { nNoHetBand++; continue; }
     let sk;
     try {
       sk = het_track_skeleton({
@@ -1749,7 +2099,8 @@ function _buildHetSkeletonResult(state) {
         getBpFor,
         chr_s_window: 0,
         chr_e_window: N - 1,
-      }, w);
+        seed_w: w,
+      });
     } catch (e) {
       console.warn('[het-skeleton] track_skeleton threw at w=' + w, e);
       continue;
@@ -1836,8 +2187,35 @@ function _buildHetSkeletonResult(state) {
   } catch (e) {
     console.warn('[het-skeleton] cramers_v_merge threw', e);
   }
-  const chains = (mergeResult && Array.isArray(mergeResult.chains)) ? mergeResult.chains
+  let chains = (mergeResult && Array.isArray(mergeResult.chains)) ? mergeResult.chains
                 : skSeeds.map((s, i) => ({ start_i: i, end_i: i, length: 1 }));
+
+  // 2026-05-21: cap the het-skeleton output to the top-N longest chains
+  // (window-span). Quentin reported the page "computes and crashes
+  // almost and its so slow" with 456 chains — each chain → seed chip in
+  // the strip + locus row in initRegimesPage state, which inflates the
+  // render budget linearly. Cap default 50. Tunable via state.hetMaxSeeds
+  // so dev-console can bump it without a rebuild. Stash the original
+  // count on summary so the user sees how many were dropped.
+  const HET_MAX_SEEDS = (Number.isFinite(state.hetMaxSeeds) && state.hetMaxSeeds > 0)
+    ? (state.hetMaxSeeds | 0) : 50;
+  const n_chains_total = chains.length;
+  if (chains.length > HET_MAX_SEEDS) {
+    const enriched = chains.map((ch) => {
+      const sStart = skSeeds[ch.start_i] ? skSeeds[ch.start_i].s_window : 0;
+      const sEnd   = skSeeds[ch.end_i]   ? skSeeds[ch.end_i].e_window   : 0;
+      return { ch, span: Math.max(0, sEnd - sStart + 1) };
+    });
+    enriched.sort((a, b) => b.span - a.span);
+    chains = enriched.slice(0, HET_MAX_SEEDS).map(e => e.ch);
+    // Re-sort the kept chains by start_w so the seed strip walks left
+    // to right along the chromosome.
+    chains.sort((a, b) => {
+      const sa = skSeeds[a.start_i] ? skSeeds[a.start_i].s_window : 0;
+      const sb = skSeeds[b.start_i] ? skSeeds[b.start_i].s_window : 0;
+      return sa - sb;
+    });
+  }
 
   // Each chain becomes one seed + one locus. per_band_samples come from
   // the skeleton's anchor window's K-means labels (the canonical band
@@ -1925,6 +2303,12 @@ function _buildHetSkeletonResult(state) {
       n_anchors_tried:       nAnchorsTried,
       n_skeletons_raw:       nSkeletonsAccepted,
       n_chains:              chains.length,
+      // 2026-05-21: pre/post-cap counts so the status bar can show
+      // "456 chains → top 50 by span" when the user runs het-skeleton
+      // on a busy chromosome.
+      n_chains_before_cap:   n_chains_total,
+      n_chains_capped:       Math.max(0, n_chains_total - chains.length),
+      het_max_seeds:         HET_MAX_SEEDS,
     },
   };
 }
@@ -2085,9 +2469,18 @@ function _runPostSeedingTail(root, state, result, modeLabel, msSoFar) {
   const nRegimes = refined && refined.regimes ? refined.regimes.length : 0;
   const nChains  = topology && topology.chains ? topology.chains.length : 0;
   const timingStr = Object.entries(timing).map(([k, v]) => `${k}=${v}`).join(' · ');
+  // 2026-05-21: when het-skeleton's chain-cap kicked in, surface
+  // "N → top M by span" so the user knows the strip isn't showing
+  // everything the pipeline found.
+  let capNote = '';
+  const sm = result.summary || {};
+  if (Number.isFinite(sm.n_chains_capped) && sm.n_chains_capped > 0) {
+    capNote = ` · capped ${sm.n_chains_before_cap} chains → top ${sm.het_max_seeds} by span`;
+  }
   _setStatus(root,
     `${modeLabel} mode ran in ${msSoFar}ms · ` +
     `${nSeeds} seeds · ${nLoci} loci · ${nRegimes} regimes · ${nChains} chains` +
+    capNote +
     (timingStr ? ` · ${timingStr}` : ''));
 
   console.log('[post-seeding] cluster 2+3 summary:', {

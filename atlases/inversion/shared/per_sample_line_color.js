@@ -78,12 +78,34 @@ export function perSampleValuesForMode(state, mode, range) {
   }
 
   if (mode === 'theta_pi') {
-    // 2026-05-19 — canonical field is theta_pi_per_window.values[si][w]
-    // (per-sample × per-window 2D array). Old paths (theta_pi_panel /
-    // per_sample_theta_pi with .div_roll) are pre-schema-2.18 drafts.
+    // 2026-05-19 — canonical field is theta_pi_per_window.values
+    // (per-sample × per-window). 2026-05-20: handle the three real-world
+    // shapes (matches the same shape-detection logic in
+    // band_diagnostics.js):
+    //   a) flat row-major Float32Array of length nS*nW (atlas-canonical)
+    //   b) nested per-sample [[…], […]] (legacy R output)
+    //   c) per-sample objects samples[i].theta_pi (older shape)
+    // Old check `Array.isArray(tpw.values)` returned false for the flat
+    // typed array → silently fell through to legacy fallbacks → grey
+    // lines.
     const tpw = d.theta_pi_per_window;
-    if (tpw && Array.isArray(tpw.values)) {
-      return _perSampleMeanFrom2D(tpw.values, nS, startW, endW);
+    if (tpw && Array.isArray(tpw.windows) && tpw.windows.length > 0) {
+      const nW = tpw.windows.length;
+      const M = _toNested2D(tpw.values, tpw.samples, nS, nW);
+      if (M) return _perSampleMeanFrom2D(M, nS, startW, endW);
+    }
+    // 2026-05-20: when theta_pi_per_window.values isn't populated, fall
+    // back to theta_pi_local_pca.pc_loadings_aligned[0] (PC1 across all
+    // windows × samples — the same shape ghsl_local_pca uses). For
+    // single-window evaluation this gives the per-sample θπ-derived PC1
+    // value at the cursor, which is the right thing to color the
+    // tracked-samples PCA by when only the theta-pi-PCA precomp is on
+    // disk. Quentin reported θπ stayed grey because only the legacy
+    // tpw.values path was checked.
+    const tpLp = d.theta_pi_local_pca;
+    if (tpLp && Array.isArray(tpLp.pc_loadings_aligned) &&
+        Array.isArray(tpLp.pc_loadings_aligned[0])) {
+      return _perSamplePcMeanFromAligned(tpLp.pc_loadings_aligned[0], nS, startW, endW);
     }
     // Legacy fallback: panel-style div_roll.
     const panel = d.theta_pi_panel || d.per_sample_theta_pi || null;
@@ -146,24 +168,107 @@ export function perSampleValuesForMode(state, mode, range) {
   return null;
 }
 
-// Helper: per-sample mean across [startW, endW] inclusive when the
-// values are a flat sample-major 2D array: M[sample_idx][window_idx].
-// This is the shape theta_pi_per_window.values uses today.
+// 2026-05-20: shape-tolerant adapter for theta_pi_per_window.values.
+// Returns a nested 2D matrix (Array<Float32Array|Array>) the downstream
+// _perSampleMeanFrom2D walker understands. Mirrors the same logic in
+// band_diagnostics.js — both surfaces (lines panel + L3 chips) need to
+// read the same field, so the same shape-detection logic applies.
+//   a) flat row-major (TypedArray or plain Array of numbers) of length
+//      nS*nW → reshaped to nested
+//   b) already-nested → returned as-is
+//   c) per-sample samples[i].theta_pi arrays → wrapped into nested
+// Returns null when none of the shapes resolve.
+function _toNested2D(vals, samples, nS, nW) {
+  if (Array.isArray(vals) || ArrayBuffer.isView(vals)) {
+    if (vals.length > 0) {
+      const first = vals[0];
+      if (typeof first === 'number' || ArrayBuffer.isView(vals)) {
+        // Flat row-major. Determine n_samples from length / nW.
+        if (vals.length === nS * nW) {
+          const out = new Array(nS);
+          for (let s = 0; s < nS; s++) {
+            const row = new Float32Array(nW);
+            const off = s * nW;
+            for (let w = 0; w < nW; w++) row[w] = +vals[off + w];
+            out[s] = row;
+          }
+          return out;
+        }
+      } else if (Array.isArray(first) || ArrayBuffer.isView(first)) {
+        // Already nested.
+        return vals;
+      }
+    }
+  }
+  if (Array.isArray(samples) && samples.length > 0) {
+    const out = new Array(samples.length);
+    for (let s = 0; s < samples.length; s++) {
+      const row = samples[s] && (samples[s].theta_pi || samples[s].values);
+      if (Array.isArray(row) || ArrayBuffer.isView(row)) {
+        out[s] = row;
+      } else {
+        const r = new Float32Array(nW);
+        r.fill(NaN);
+        out[s] = r;
+      }
+    }
+    return out;
+  }
+  return null;
+}
+
+// Helper: per-sample mean across [startW, endW] inclusive. Auto-detects
+// orientation:
+//   sample-major: M[sample_idx][window_idx]   (outer.length == n_samples)
+//   window-major: M[window_idx][sample_idx]   (outer.length == n_windows)
+// 2026-05-20: previously assumed sample-major unconditionally. The user
+// reported θπ colors staying grey because theta_pi_per_window.values
+// actually ships window-major (M[w][si]) — every M[si] for si > nWin
+// was undefined → all-NaN → grey. Detection: pick whichever shape
+// makes outer.length match n_samples vs n_windows; tie-break favours
+// sample-major (legacy default).
 function _perSampleMeanFrom2D(M, nS, startW, endW) {
   if (!Array.isArray(M) || M.length === 0) return null;
+  // Inspect first non-empty row to find the inner dimension.
+  const innerLen = (M[0] && M[0].length) ? M[0].length : 0;
+  if (innerLen === 0) return null;
+  // Sample-major when outer length matches n_samples; window-major
+  // when inner length matches n_samples. If both match nS (rare —
+  // n_samples == n_windows), prefer sample-major.
+  const isSampleMajor = (M.length === nS) || (innerLen !== nS);
   const lo = Math.max(0, startW | 0);
-  const hi = Math.min((M[0] && M[0].length ? M[0].length - 1 : -1), endW | 0);
-  if (hi < lo) return null;
   const out = new Float64Array(nS);
-  for (let si = 0; si < nS; si++) {
-    const row = M[si];
-    if (!row) { out[si] = NaN; continue; }
-    let sum = 0, n = 0;
-    for (let w = lo; w <= hi; w++) {
-      const v = row[w];
-      if (Number.isFinite(v)) { sum += v; n++; }
+  if (isSampleMajor) {
+    const hi = Math.min(innerLen - 1, endW | 0);
+    if (hi < lo) return null;
+    for (let si = 0; si < nS; si++) {
+      const row = M[si];
+      if (!row) { out[si] = NaN; continue; }
+      let sum = 0, n = 0;
+      for (let w = lo; w <= hi; w++) {
+        const v = row[w];
+        if (Number.isFinite(v)) { sum += v; n++; }
+      }
+      out[si] = n > 0 ? (sum / n) : NaN;
     }
-    out[si] = n > 0 ? (sum / n) : NaN;
+    return out;
+  }
+  // Window-major: accumulate per sample by walking windows.
+  const hi = Math.min(M.length - 1, endW | 0);
+  if (hi < lo) return null;
+  const sums   = new Float64Array(nS);
+  const counts = new Int32Array(nS);
+  for (let w = lo; w <= hi; w++) {
+    const row = M[w];
+    if (!Array.isArray(row)) continue;
+    const N = Math.min(nS, row.length);
+    for (let si = 0; si < N; si++) {
+      const v = row[si];
+      if (Number.isFinite(v)) { sums[si] += v; counts[si]++; }
+    }
+  }
+  for (let si = 0; si < nS; si++) {
+    out[si] = counts[si] > 0 ? (sums[si] / counts[si]) : NaN;
   }
   return out;
 }
@@ -264,11 +369,47 @@ function _perSampleMeanByWindowPanel(panel, nS, startW, endW, data) {
  *                          normalisation in sequential modes)
  * @returns {string | null}
  */
+// 2026-05-20: cache vMin/vMax on the array so repeated calls
+// (perSampleColorFor fires once per sample × per draw) don't re-walk.
+// Stashes a `__vMinMax` property on the array; safe for Array and
+// TypedArray. Callers that mutate the array in place should clear it.
+function _cohortRange(valuesArr) {
+  if (!valuesArr) return null;
+  if (valuesArr.__vMinMax) return valuesArr.__vMinMax;
+  let vMin = Infinity, vMax = -Infinity;
+  for (let i = 0; i < valuesArr.length; i++) {
+    const v = valuesArr[i];
+    if (!Number.isFinite(v)) continue;
+    if (v < vMin) vMin = v;
+    if (v > vMax) vMax = v;
+  }
+  const out = isFinite(vMin) ? { vMin, vMax } : null;
+  try { valuesArr.__vMinMax = out; } catch (_) { /* frozen array */ }
+  return out;
+}
+
 export function perSampleColorFor(mode, value, valuesArr) {
   if (!Number.isFinite(value)) return null;
 
   if (mode === 'het') {
-    // hetRateColor handles its own normalization (0..1 rate).
+    // 2026-05-20: was `hetRateColor(value)` which fixed-normalizes to
+    // [0, 1] around 0.5. Real per-sample het rates over a typical L2
+    // envelope sit at ~0.001–0.05 — every sample landed at t ≈ 0.01
+    // on the RdBu ramp = all the same dark blue, invisible against
+    // the dark canvas background, reads as grey. Quentin: "the dosage
+    // in the tracked samples doesnt appear the points are grey ...
+    // maybe its a problem of color palette or smth?".
+    //
+    // Fix: same auto-scale-to-data pattern theta_pi/ghsl already use.
+    // Normalize each window's value to the actual [vMin, vMax] across
+    // the cohort so the colour spread fills the ramp regardless of
+    // the absolute rate. Range cached on the array so this is O(N)
+    // amortized across all samples in the same draw.
+    const r = _cohortRange(valuesArr);
+    if (r && r.vMin !== r.vMax) {
+      const t = (value - r.vMin) / (r.vMax - r.vMin);
+      return _sequentialBlueToYellow(t);
+    }
     return hetRateColor(value);
   }
 
@@ -288,24 +429,24 @@ export function perSampleColorFor(mode, value, valuesArr) {
 
   if (mode === 'theta_pi' || mode === 'ghsl') {
     // Sequential ramp normalized to the array's [min, max].
-    if (!valuesArr) return null;
-    let vMin = Infinity, vMax = -Infinity;
-    for (let i = 0; i < valuesArr.length; i++) {
-      const v = valuesArr[i];
-      if (!Number.isFinite(v)) continue;
-      if (v < vMin) vMin = v;
-      if (v > vMax) vMax = v;
-    }
-    if (!isFinite(vMin) || vMin === vMax) return null;
-    const t = (value - vMin) / (vMax - vMin);
+    const r = _cohortRange(valuesArr);
+    if (!r || r.vMin === r.vMax) return null;
+    const t = (value - r.vMin) / (r.vMax - r.vMin);
     return _sequentialBlueToYellow(t);
   }
 
   if (mode === 'dosage') {
-    // Diploid dosage on [0, 2] scale: 0 = HOMO_REF, 1 = HET, 2 = HOMO_ALT.
-    // Use a divergent ramp so 1 (het) sits at the visual midpoint and
-    // 0 / 2 stand out at opposite ends. Cool teal → grey → warm red.
-    const t = Math.max(0, Math.min(1, value / 2));   // 0..1
+    // 2026-05-20: same fix as het — fixed [0, 2] mapping wastes the
+    // ramp when the cohort's mean dosages cluster (e.g. all ≈ 0.05
+    // for a near-monomorphic site). Auto-scale to the cohort's
+    // [vMin, vMax] for visible spread; fall back to the fixed [0, 2]
+    // mapping when no valuesArr is supplied or the range collapses.
+    const r = _cohortRange(valuesArr);
+    if (r && r.vMin !== r.vMax) {
+      const t = (value - r.vMin) / (r.vMax - r.vMin);
+      return _divergentTealRedThroughGrey(t);
+    }
+    const t = Math.max(0, Math.min(1, value / 2));
     return _divergentTealRedThroughGrey(t);
   }
 

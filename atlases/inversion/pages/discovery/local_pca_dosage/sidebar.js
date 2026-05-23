@@ -174,6 +174,62 @@ function _wireL3Controls(state) {
     const saved = localStorage.getItem('pca_scrubber_v3.l3ReclusterMode');
     if (saved) state.l3ReclusterMode = saved;
   } catch (_) {}
+  // 2026-05-20: restore step/compare/sync slots so the L3↔sidebar
+  // pair stays where the user left it after a reload. The localStorage
+  // WRITE side was already wired (stepmode / compareunit /
+  // stepmodesync), but no READ existed — meaning every reload reset to
+  // the in-code defaults (`stepMode: 'l2'`, undefined compareUnit,
+  // stepModeSync: true). The UI buttons were updated on click but the
+  // state slots didn't survive reload, so the visible toolbar diverged
+  // from the actual state in subsequent sessions.
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.stepmode');
+    if (saved && (saved in _STEP_MODE_LABELS)) state.stepMode = saved;
+  } catch (_) {}
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.compareunit');
+    if (saved) state.compareUnit = saved;
+  } catch (_) {}
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.compareunitn');
+    const n = saved != null ? parseInt(saved, 10) : NaN;
+    if (Number.isFinite(n) && n >= 1) state.compareUnitN = n;
+  } catch (_) {}
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.stepmodesync');
+    if (saved === '0') state.stepModeSync = false;
+    else if (saved === '1') state.stepModeSync = true;
+  } catch (_) {}
+  // Visual mirror — the #stepModeBar HTML defaults to L2 active and
+  // #l3CompareUnit defaults to L2 active. After restoring the slots
+  // above, sync the active class so the toolbar reflects the actual
+  // state.* values. The change-event handlers further down wire the
+  // forward sync (click → state); this block does the inverse
+  // (state → DOM) after pageload.
+  try {
+    const stepBar = document.getElementById('stepModeBar');
+    if (stepBar && state.stepMode) {
+      stepBar.querySelectorAll('button[data-step]').forEach(b => {
+        b.classList.toggle('active', b.dataset.step === state.stepMode);
+      });
+    }
+    const compareBar = document.getElementById('l3CompareUnit');
+    if (compareBar && state.compareUnit) {
+      compareBar.querySelectorAll('button[data-l3unit]').forEach(b => {
+        b.classList.toggle('active', b.dataset.l3unit === state.compareUnit);
+      });
+    }
+    const cuInput = document.getElementById('l3CompareUnitN');
+    if (cuInput && Number.isFinite(state.compareUnitN)) {
+      cuInput.value = String(state.compareUnitN);
+    }
+    const sin = document.getElementById('stepModeNInput');
+    if (sin && Number.isFinite(state.stepModeN)) {
+      sin.value = String(state.stepModeN);
+    }
+    const syncCb = document.getElementById('stepModeSync');
+    if (syncCb) syncCb.checked = !!state.stepModeSync;
+  } catch (_) {}
 
   // Helper for click-bar wiring with idempotency + active-class mirror +
   // optional persist key.
@@ -247,6 +303,27 @@ function _wireL3Controls(state) {
       try { localStorage.setItem('pca_scrubber_v3.l3HetColoring', e.target.checked ? '1' : '0'); }
       catch (_) {}
       repaint();
+    });
+  }
+
+  // L3 ⋯ more disclosure (#l3MoreToggleBtn) — toggles
+  // `.l3-more-collapsed` on #l3Panel. CSS hides `.l3-more-item` children
+  // when collapsed. Persisted to localStorage so the user's choice
+  // survives reloads. Default = collapsed (toolbar stays compact).
+  const l3MoreBtn = document.getElementById('l3MoreToggleBtn');
+  const l3Panel = document.getElementById('l3Panel');
+  if (l3MoreBtn && l3Panel && l3MoreBtn.dataset.l3Wired !== '1') {
+    l3MoreBtn.dataset.l3Wired = '1';
+    let expanded = false;
+    try {
+      expanded = localStorage.getItem('pca_scrubber_v3.l3MoreExpanded') === '1';
+    } catch (_) {}
+    l3Panel.classList.toggle('l3-more-collapsed', !expanded);
+    l3MoreBtn.addEventListener('click', () => {
+      const nowExpanded = l3Panel.classList.contains('l3-more-collapsed');
+      l3Panel.classList.toggle('l3-more-collapsed', !nowExpanded);
+      try { localStorage.setItem('pca_scrubber_v3.l3MoreExpanded', nowExpanded ? '1' : '0'); }
+      catch (_) {}
     });
   }
 }
@@ -463,11 +540,24 @@ function _wireNewShellControls(state) {
   // L3 read per-sample color from shared/macrostripe.js#getMacrostripeColor.
   // When false (default) or banding absent, the existing K-means
   // microgroup coloring path stays in effect.
+  //
+  // 2026-05-20: restore persisted choice from localStorage so the
+  // toggle survives reload. Write side added in the change handler
+  // below. SPEC nominally wants default ON, but the toggle is a no-op
+  // without bandingResult so we keep code-default OFF and let the
+  // user opt in (which then persists).
+  try {
+    const saved = localStorage.getItem('pca_scrubber_v3.useMacrostripeColors');
+    if (saved === '1') state.useMacrostripeColors = true;
+    else if (saved === '0') state.useMacrostripeColors = false;
+  } catch (_) {}
   const macroEl = $('linesMacrostripeToggle');
   if (macroEl && macroEl.dataset.wired !== '1') {
     macroEl.checked = !!state.useMacrostripeColors;
     macroEl.addEventListener('change', (e) => {
       state.useMacrostripeColors = !!e.target.checked;
+      try { localStorage.setItem('pca_scrubber_v3.useMacrostripeColors',
+                                  state.useMacrostripeColors ? '1' : '0'); } catch (_) {}
       // Repaint chain — same surfaces the K-means microgroup coloring
       // touched. Wrapped in try/catch so one fail doesn't break the rest.
       try { drawPCA(state); }        catch (err) { console.warn('[macrostripeToggle] drawPCA:', err); }
@@ -740,8 +830,14 @@ function _wireSelectionModeHotkey(state) {
   document.addEventListener('keydown', (e) => {
     const tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    // 2026-05-20: gate by element-exists rather than `.classList.contains('active')`.
+    // The atlas-core router swaps `#app-root.innerHTML` per page and
+    // NEVER sets `.active` — checking for the class made this hotkey
+    // never fire (verified via memory `router_no_active_class.md`).
+    // The shell's mount/unmount manages this listener's lifetime, so
+    // checking the page element exists in the DOM is sufficient.
     const pageEl = document.getElementById('local_pca_dosage');
-    if (!pageEl || !pageEl.classList.contains('active')) return;
+    if (!pageEl) return;
     if ((e.key === 'u' || e.key === 'U')
         && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
       e.preventDefault();
@@ -1299,6 +1395,15 @@ function _refreshBandPickAsideColors(state) {
     const btn = document.getElementById(id);
     if (btn) btn.textContent = `K=${state.k}`;
   }
+  // 2026-05-20: also strip the .active class from buttons that just
+  // became invalid (k >= state.k after a K-decrease). Without this,
+  // the user sees the old band button still highlighted but disabled
+  // — clicking does nothing and there's no obvious way to "clear" the
+  // stale selection. Quentin: "we still cannot clear selection when
+  // we select like a different K on the tracked samples PCA". When we
+  // strip .active from a disabled button, also re-activate the "all"
+  // button so the picker always has a sensible default highlight.
+  let anyDisabledActive = false;
   document.querySelectorAll('[data-k-band]').forEach(b => {
     const ki = parseInt(b.dataset.kBand, 10);
     if (!isFinite(ki)) return;
@@ -1320,8 +1425,20 @@ function _refreshBandPickAsideColors(state) {
       b.style.opacity = '0.4';
       b.disabled = true;
       b.style.cursor = 'not-allowed';
+      if (b.classList.contains('active')) {
+        b.classList.remove('active');
+        anyDisabledActive = true;
+      }
     }
   });
+  // Restore "all" as the active picker when a previously-active band
+  // got knocked out by a K decrease. Targets both surfaces (the aside
+  // [data-band-aside="all"] and the compact [data-band-compact="all"]).
+  if (anyDisabledActive) {
+    document.querySelectorAll('[data-band-aside="all"], [data-band-compact="all"]').forEach(allBtn => {
+      allBtn.classList.add('active');
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1964,17 +2081,20 @@ function _wireDataSection(state) {
   // Expose the setter on state so non-sidebar code (e.g. _applyViewMode)
   // can move sim to/from the minimap without re-implementing the logic.
   state._setSimInMinimap = _setSimInMinimap;
-  // 2026-05-20: default the sim heatmap into the minimap on fresh load
-  // so the main panel area opens up. Returning users keep their saved
-  // choice; only the unset case flips to '1'. Quentin: "by default we
-  // try to toggle the minimap".
+  // 2026-05-20 (revised): sim_mat defaults to the MAIN panel, NOT the
+  // minimap. Earlier we defaulted to minimap which opened up the main
+  // panel area, but with the sidebar now also defaulting to collapsed
+  // (Quentin: "close the settings panel on the left ... too messy"),
+  // sim ended up in a closed sidebar — invisible. Quentin reported
+  // "the sim_mat has disappeared". Default it to the main panel so
+  // there's always a visible sim heatmap; returning users with an
+  // explicit '1' in localStorage still get the minimap.
   try {
     const cur = localStorage.getItem('pca_scrubber_v3.siminminimap');
-    if (cur == null) {
-      requestAnimationFrame(() => _setSimInMinimap(true));
-    } else if (cur === '1') {
+    if (cur === '1') {
       requestAnimationFrame(() => _setSimInMinimap(true));
     }
+    // null / undefined / '0' → keep main panel (no-op; default state).
   } catch (_) {}
 }
 
@@ -2144,6 +2264,19 @@ function _wireDisplay(state) {
     document.querySelectorAll('#colorModeBarCompact button').forEach(b => {
       b.classList.toggle('active', b.dataset.modeCompact === newMode);
     });
+    // 2026-05-20: third surface — per-sample ramp buttons in the scatter
+    // axes header (#pcaAxisColorRamp). They expose continuous-ramp modes
+    // (het / theta_pi / ghsl) that the cluster-only sidebar bar doesn't.
+    // data-l3-active="1" lights when the cycle has advanced to the
+    // "scatter + L3" stage (state.l3RampMode === button's mode) so the
+    // user sees a distinct visual between "ramp on scatter only" and
+    // "ramp on scatter + L3 panes".
+    document.querySelectorAll('#pcaAxisColorRamp button').forEach(b => {
+      const m = b.dataset.modeRamp;
+      b.classList.toggle('active', m === newMode);
+      const l3on = state && state.l3RampMode === m;
+      b.dataset.l3Active = l3on ? '1' : '0';
+    });
     // v4 turn 86: show/hide Q-ancestry sub-controls when mode toggles
     // to/from q_ancestry. Refresh the K dropdown options from the
     // registered set each time the panel is shown.
@@ -2188,6 +2321,48 @@ function _wireDisplay(state) {
       const mode = btn.dataset.modeCompact;
       if (!mode) return;
       applyColorMode(mode);
+    });
+    btn.dataset.wired = '1';
+  });
+
+  // --- #pcaAxisColorRamp button click (2026-05-20) ---
+  // Continuous-ramp color modes (het / theta_pi / ghsl / dosage)
+  // exposed as buttons in the scatter axes header. 2026-05-20: each
+  // button cycles through THREE states on repeated clicks
+  // (Quentin: "for each 3 buttons we can have like 2 modes. single
+  // push color tracked samples PCA, second push = also color the L3
+  // contingency tables PCA 3 panels data, third push back to normal"):
+  //   1st click (off       → scatter-only)  : state.colorMode = mode
+  //   2nd click (scatter-only → scatter+L3) : also state.l3RampMode = mode
+  //   3rd click (scatter+L3 → off)          : revert both to defaults
+  // The L3 painter consults state.l3RampMode (or the legacy
+  // state.l3HetColoring slot for backward compat); both surfaces
+  // re-render via the existing applyColorMode chain.
+  document.querySelectorAll('#pcaAxisColorRamp button').forEach(btn => {
+    if (btn.dataset.wired === '1') return;
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      const mode = btn.dataset.modeRamp;
+      if (!mode) return;
+      const isScatterActive = state.colorMode === mode;
+      const isL3Active = state.l3RampMode === mode;
+      if (!isScatterActive && !isL3Active) {
+        // off → scatter-only
+        state.l3RampMode = null;
+        applyColorMode(mode);
+      } else if (isScatterActive && !isL3Active) {
+        // scatter-only → scatter + L3
+        state.l3RampMode = mode;
+        // Legacy slot kept in sync so the existing het-coloring path
+        // in L3 panes still fires when the user picks 'het'.
+        if (mode === 'het') state.l3HetColoring = true;
+        applyColorMode(mode);
+      } else {
+        // scatter+L3 (or any other state with isL3Active) → off
+        state.l3RampMode = null;
+        if (mode === 'het') state.l3HetColoring = false;
+        applyColorMode('cluster');
+      }
     });
     btn.dataset.wired = '1';
   });
@@ -2920,20 +3095,24 @@ function _applySidebarState(state, collapsed) {
 }
 
 function _wireSidebarToggle(state) {
-  // 2026-05-20: default-collapse the parameters pane on first load. The
-  // sidebar carries 20+ controls but most users land on the page wanting
-  // to see the canvases, not the knobs (Quentin: "close the settings
-  // panel on the left ... too messy"). The wheel button on the sidebar
-  // header stays as the toggle. Returning users get whatever they last
-  // saved — only the unset / fresh-install case flips to collapsed.
-  let savedCollapsed = true;
-  try {
-    const v = localStorage.getItem(_SIDEBAR_STORAGE_KEY);
-    if (v === 'false') savedCollapsed = false;
-    else if (v === 'true') savedCollapsed = true;
-    // null / undefined → keep the new default (true).
-  } catch (e) {}
-  _applySidebarState(state, savedCollapsed);
+  // 2026-05-21: force-collapse the parameters pane on every page entry,
+  // ignoring any prior localStorage value (Quentin: "when we open the
+  // atlas it has the settings left page open ... can it be collapsed
+  // by default"). The toggle button still works during the session, but
+  // the choice is not persisted across reloads — every fresh mount
+  // starts collapsed. Previously (2026-05-20) we respected the saved
+  // value so returning users kept their preference, but in practice it
+  // led to the sidebar drifting back open after one stray click.
+  _applySidebarState(state, true);
+  // When the sidebar boots collapsed, the sim_mat minimap sits inside
+  // that collapsed sidebar — invisible. Auto-restore sim to the main
+  // panel area so the heatmap is always visible. The user can move it
+  // back to minimap later (after opening the sidebar manually).
+  if (state.simInMinimap && typeof state._setSimInMinimap === 'function') {
+    requestAnimationFrame(() => {
+      try { state._setSimInMinimap(false); } catch (_) {}
+    });
+  }
 
   // --- #sidebarToggleBtn click — legacy lines 75473-75480 ---
   const btn = $('sidebarToggleBtn');
@@ -2944,6 +3123,13 @@ function _wireSidebarToggle(state) {
       const next = !isCollapsed;
       try { localStorage.setItem(_SIDEBAR_STORAGE_KEY, String(next)); } catch (e) {}
       _applySidebarState(state, next);
+      // 2026-05-20: same rule when the user manually collapses the
+      // sidebar — restore sim to the main panel so it doesn't vanish
+      // along with the sidebar. Re-opening the sidebar does NOT auto-
+      // move sim back to minimap; the user controls that explicitly.
+      if (next && state.simInMinimap && typeof state._setSimInMinimap === 'function') {
+        try { state._setSimInMinimap(false); } catch (_) {}
+      }
     });
   }
 }

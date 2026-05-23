@@ -34,6 +34,77 @@ import {
   paintHeatmap,
   findCellAtPixel,
 } from './pca_comparator/heatmap.js';
+import { renderModeBBadge } from '../../../../core/mode_b_badge.js';
+
+// ─── Mode-B 3-axis probe (2026-05-20) ───────────────────────────────────
+// Independently resolves the three discovery layers via the registry for
+// the active chrom — bypassing local_pca_dosage's pre-merged stash so the
+// page-side data path can be cross-checked against the registry's own
+// view. Pass = all 3 axes loaded AND their window counts agree (the
+// natural definition of "the 3 pipelines are at consistent state for
+// this chrom"). Fail-soft: any axis missing → ⚠; nothing loaded → ○.
+async function _runThreeAxisProbe(atlasState, registry) {
+  const slot = (typeof document !== 'undefined')
+    ? document.getElementById('pccModeBBadge')
+    : null;
+  if (!slot) return;
+  const chrom = atlasState && atlasState.shared && atlasState.shared.activeChrom;
+  if (!chrom) {
+    renderModeBBadge('pccModeBBadge',
+      { ok: false, reason: 'empty-result' },
+      { label: '3-axis freshness', layerKey: 'scrubber_*' });
+    return;
+  }
+  if (!registry || typeof registry.resolve !== 'function') {
+    renderModeBBadge('pccModeBBadge',
+      { ok: false, reason: 'registry-not-injected' },
+      { label: '3-axis freshness', layerKey: 'scrubber_*', context: chrom });
+    return;
+  }
+  const axes = [
+    { id: 'z-blocks', layer: 'scrubber_main',    keys: ['windows'] },
+    { id: 'θπ',       layer: 'scrubber_thetapi', keys: ['theta_pi_local_pca', 'windows', 'theta_pi_per_window'] },
+    { id: 'GHSL',     layer: 'scrubber_ghsl',    keys: ['ghsl_panel', 'windows', 'ghsl_per_window'] },
+  ];
+  const results = await Promise.all(axes.map(async (a) => {
+    try {
+      const p = await Promise.resolve(registry.resolve(a.layer, { chrom }));
+      if (!p) return { axis: a.id, layer: a.layer, n: 0, present: false };
+      let arr = null;
+      for (const k of a.keys) {
+        const v = p[k];
+        if (Array.isArray(v) && v.length > 0) { arr = v; break; }
+      }
+      return { axis: a.id, layer: a.layer, n: arr ? arr.length : 0, present: !!arr };
+    } catch (_) {
+      return { axis: a.id, layer: a.layer, n: 0, present: false };
+    }
+  }));
+
+  const loaded = results.filter((r) => r.present);
+  const counts = new Set(loaded.map((r) => r.n));
+  const allAgree = counts.size === 1;
+  const pass = loaded.length === 3 && allAgree;
+  const drift = loaded.length > 0 && !pass;
+
+  const summaryParts = results.map((r) =>
+    r.present ? `${r.axis} ${r.n}w` : `${r.axis} —`);
+  const summary = `${loaded.length}/3 axes loaded · ${summaryParts.join(' · ')}` +
+    (loaded.length === 3
+      ? (allAgree ? ' · counts agree' : ' · window-count disagreement!')
+      : '');
+
+  renderModeBBadge('pccModeBBadge',
+    loaded.length > 0
+      ? { ok: true, n: loaded.length, rows: loaded, sample_keys: ['axis', 'layer', 'n', 'present'], payload: results }
+      : { ok: false, reason: 'empty-result' },
+    {
+      label:    '3-axis freshness',
+      layerKey: 'scrubber_main + scrubber_thetapi + scrubber_ghsl',
+      context:  chrom,
+      compare:  () => ({ pass: pass && !drift, summary }),
+    });
+}
 
 export async function mount(root, atlasState, registry) {
   const pageState = _buildPageState(atlasState);
@@ -56,6 +127,13 @@ export async function mount(root, atlasState, registry) {
   if (atlasState.inversion) {
     atlasState.inversion._page_pca_comparator_state = pageState;
   }
+
+  // Mode-B 3-axis probe — non-blocking. Surfaces independent per-axis
+  // resolve results for the active chrom; the page renders from the
+  // pre-merged local_pca_dosage stash regardless.
+  _runThreeAxisProbe(atlasState, registry).catch((e) => {
+    console.warn('pca_comparator.mount: 3-axis probe threw —', e);
+  });
 }
 
 export async function unmount(root) {
@@ -98,6 +176,13 @@ function _buildPageState(atlasState) {
     // 2026-05-20: cursor-unit picker (1w / 5w / 10w / 25w / L2 / Cand).
     // Drives ←/→ step size + snap behavior.
     scrubUnit: '1',
+    // 2026-05-20: heatmap scope toggle (genome / focal). 'genome' renders
+    // every window (default); 'focal' restricts to a slab matching the
+    // current scrubUnit centered on the cursor, so the heatmap shows the
+    // same interval the 3 PCAs are sampling. User-asked: "10w so 10
+    // windows by 10 windows … click focal and it would show the dosage
+    // but for 10 windows like the same interval as focal."
+    heatmapScope: 'genome',
     hoveredSample: -1,
     _teardownFns: [],
     _canvasIds: {
@@ -302,6 +387,31 @@ function _wireToolbar(state) {
         scrubBar.querySelectorAll('button[data-scrub-unit]').forEach(b => {
           b.classList.toggle('active', b === btn);
         });
+        // 2026-05-20: when in focal heatmap scope, scrubUnit change
+        // implies a different slab width — repaint so the heatmap
+        // tracks the new unit.
+        if (state.heatmapScope === 'focal') refresh(state);
+      };
+      btn.addEventListener('click', onClick);
+      state._teardownFns.push(() => btn.removeEventListener('click', onClick));
+    });
+  }
+  // 2026-05-20: heatmap scope toggle (genome / focal).
+  const scopeBar = document.getElementById('pcaCompHeatmapScopeBar');
+  if (scopeBar) {
+    try {
+      const saved = localStorage.getItem('pca_comparator.heatmapScope');
+      if (saved === 'focal' || saved === 'genome') state.heatmapScope = saved;
+    } catch (_) {}
+    scopeBar.querySelectorAll('button[data-heatmap-scope]').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.heatmapScope === state.heatmapScope);
+      const onClick = () => {
+        state.heatmapScope = btn.dataset.heatmapScope;
+        try { localStorage.setItem('pca_comparator.heatmapScope', state.heatmapScope); } catch (_) {}
+        scopeBar.querySelectorAll('button[data-heatmap-scope]').forEach(b => {
+          b.classList.toggle('active', b === btn);
+        });
+        refresh(state);
       };
       btn.addEventListener('click', onClick);
       state._teardownFns.push(() => btn.removeEventListener('click', onClick));

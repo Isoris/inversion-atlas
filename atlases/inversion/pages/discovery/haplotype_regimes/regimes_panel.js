@@ -445,38 +445,91 @@ export function _dosageClassColour(cls, alpha) {
  * @returns void
  */
 export function drawRegimesPanel(state) {
-  if (!state || !state.regimesPanel) return;
+  // 2026-05-19 debug instrumentation. The 4 panels were rendering as
+  // empty/black even when state.regimesPanel.stage3_loci was populated;
+  // every early-return below now logs WHY so the user-pasted console
+  // pinpoints the failure path. Drop the warns once the cause is fixed
+  // (see prior pattern in drawLinesPanel).
+  const DBG = '[drawRegimesPanel]';
+  if (!state || !state.regimesPanel) {
+    console.warn(DBG, 'bail: state.regimesPanel is null');
+    return;
+  }
   const rp = state.regimesPanel;
   const container = document.getElementById('regimesCanvasContainer');
-  if (!container || typeof container.querySelector !== 'function') return;
-  const sub = container.querySelector('.regimes-subpanel');
-  if (!sub) return;
+  if (!container || typeof container.querySelector !== 'function') {
+    console.warn(DBG, 'bail: #regimesCanvasContainer missing in DOM');
+    return;
+  }
+  // 2026-05-21: was querySelector('.regimes-subpanel'), but _withDOMAliases
+  // routes this call to the GENOME container when painting the genome view,
+  // and the genome subpanel uses class 'regimes-genome-lanes-subpanel'. The
+  // class-name mismatch made every genome-panel draw bail with
+  // "no .regimes-subpanel child", leaving the genome canvas stuck on the
+  // placeholder text. Query for any subpanel div directly under the
+  // container instead — there's only one in either layout.
+  const sub = container.querySelector(
+    '.regimes-subpanel, .regimes-genome-lanes-subpanel');
+  if (!sub) {
+    console.warn(DBG, 'bail: no subpanel child under container — build step did not run or early-returned.',
+      'stage3_loci.length=', (rp.stage3_loci && rp.stage3_loci.length) || 0);
+    return;
+  }
   const cv = sub.querySelector('canvas');
-  if (!cv) return;
+  if (!cv) {
+    console.warn(DBG, 'bail: no <canvas> inside subpanel');
+    return;
+  }
   const { ctx, w, h } = fitCanvas(cv);
   ctx.clearRect(0, 0, w, h);
+  // One-time visibility check: if the canvas is rendering to a zero-area
+  // box, log so the user knows it's a layout problem (parent grid row
+  // collapsed) not a data problem.
+  if (state.__regimesVisibilityDbg !== 'logged') {
+    state.__regimesVisibilityDbg = 'logged';
+    const panel = document.getElementById('regimesPanel');
+    const pRect = panel ? panel.getBoundingClientRect() : null;
+    if (!pRect || pRect.height < 4 || w < 4 || h < 4) {
+      console.warn(DBG, 'visibility: panel may be invisible.',
+        '#regimesPanel h=', pRect ? Math.round(pRect.height) : '?',
+        'canvas w/h=', w, h,
+        'parent display=', panel ? getComputedStyle(panel).display : '?');
+    }
+  }
 
   // Geometry
   const padTop_strip = 18;       // pattern-class strip height
   const pad = { l: 44, r: 16, t: 6 + padTop_strip, b: 16 };
   const plotW = w - pad.l - pad.r;
   const plotH = h - pad.t - pad.b;
-  if (plotW <= 0 || plotH <= 0) return;
+  if (plotW <= 0 || plotH <= 0) {
+    console.warn(DBG, 'bail: zero plot area. w=', w, 'h=', h,
+      'plotW=', plotW, 'plotH=', plotH);
+    return;
+  }
 
   // Resolve focal voter and ensure track is built
   const locus = rp.stage3_loci[rp.focal.seed_index];
   if (!locus) {
+    console.warn(DBG, 'bail: no locus at stage3_loci[' + rp.focal.seed_index + '].',
+      'stage3_loci.length=', (rp.stage3_loci && rp.stage3_loci.length) || 0);
     _drawEmptyMessage(ctx, w, h, '(no seed selected)');
     return;
   }
   const voter = buildFocalVoter(locus, rp.focal.band_mask);
   if (voter.n === 0) {
+    console.warn(DBG, 'bail: voter empty for seed', rp.focal.seed_index,
+      'band_mask=', rp.focal.band_mask, 'label=', voter.label);
     _drawEmptyMessage(ctx, w, h, `(seed ${rp.focal.seed_index} ${voter.label} is empty)`);
     return;
   }
   ensureRegimesTrack(state);
   const track = rp.track;
   if (!track) {
+    console.warn(DBG, 'bail: ensureRegimesTrack did not populate rp.track.',
+      'ctx_callbacks=', Object.keys(rp.ctx_callbacks || {}),
+      'has getLabels?', !!(rp.ctx_callbacks && rp.ctx_callbacks.getLabels),
+      'has getK?',      !!(rp.ctx_callbacks && rp.ctx_callbacks.getK));
     _drawEmptyMessage(ctx, w, h, '(track not built)');
     return;
   }
@@ -484,7 +537,11 @@ export function drawRegimesPanel(state) {
   // Build x-axis: flat window order across all chromosomes
   const windowList = rp.windowList || buildGenomeWindowList(rp.chromosomes);
   const nGrid = windowList.length;
-  if (nGrid < 2) return;
+  if (nGrid < 2) {
+    console.warn(DBG, 'bail: window list too short. nGrid=', nGrid,
+      'chromosomes=', (rp.chromosomes && rp.chromosomes.length) || 0);
+    return;
+  }
 
   const max_K = Math.max(track.max_K, 2);   // avoid div by 0 in y-norm
   const yLanes = max_K;          // visual lanes 0..max_K-1
@@ -554,16 +611,31 @@ export function drawRegimesPanel(state) {
   }
   const yMatrix = track._yMatrix;
 
+  // 2026-05-20 perf: X-axis decimation. At 9192 windows × 226 samples × N
+  // panels × every cursor scrub, the un-decimated loop did ~2M lineTo()
+  // calls per repaint → tab hangs after a few arrow presses. Cap segments
+  // at ~2 per CSS pixel of plot width — sub-pixel detail is invisible
+  // anyway. _stride = max(1, floor(nGrid / (plotW * 2))). With nGrid=9192
+  // and plotW=706, stride ≈ 6 → 6× fewer ops + visually identical lines.
+  const _stride = Math.max(1, Math.floor(nGrid / Math.max(plotW * 2, 1)));
   function strokePath(si) {
     const ys = yMatrix[si];
     let started = false;
     ctx.beginPath();
-    for (let gi = 0; gi < nGrid; gi++) {
+    for (let gi = 0; gi < nGrid; gi += _stride) {
       const y = ys[gi];
       if (!isFinite(y)) { started = false; continue; }
       const x = xByGi[gi];
       if (!started) { ctx.moveTo(x, y); started = true; }
       else { ctx.lineTo(x, y); }
+    }
+    // Always include the last sample so the line reaches the right edge.
+    if ((nGrid - 1) % _stride !== 0) {
+      const yLast = ys[nGrid - 1];
+      if (isFinite(yLast)) {
+        const xLast = xByGi[nGrid - 1];
+        if (!started) ctx.moveTo(xLast, yLast); else ctx.lineTo(xLast, yLast);
+      }
     }
     ctx.stroke();
   }
@@ -605,11 +677,19 @@ export function drawRegimesPanel(state) {
     const b = voter.bands[bi];
     for (const si of locus.per_band_samples[b]) siToFocalBand.set(si, bi);
   }
+  // 2026-05-21: voter lines at alpha 0.45 (was 1.0). With 27+ voter samples
+  // each striking a ~1.4px path across 9000 windows, full-opacity hue
+  // (especially band 0's orange) saturates the canvas into a solid blob
+  // that obscures any actual signal. Alpha 0.45 lets dense regions remain
+  // bright while sparse trails fade — same convention as the tracked-but-
+  // not-voter lines above (alpha 0.45) and the lasso colouring in
+  // lines_panel.js. Density still surfaces (overlap stacks alpha).
+  const voterAlpha = voterSet.size > 8 ? 0.45 : 0.85;
   for (const si of voterSet) {
     const bi = siToFocalBand.get(si);
     const col = bandHues[(bi >= 0 ? bi : 0) % bandHues.length];
-    ctx.lineWidth = 1.4;
-    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = withAlpha(col, voterAlpha);
     strokePath(si);
   }
 
@@ -664,6 +744,13 @@ export function drawRegimesPanel(state) {
       seedGiEnd = gi;
     }
   }
+  // Skip when the rect would cover ≥85% of the plot width: nothing to
+  // localize, and the orange tint just drowns out the per-sample lines.
+  // (Common in chrom scope when the focal seed IS the candidate spanning
+  // the whole chromosome.) In that case we keep just the dashed border so
+  // the user knows "the seed is everywhere here".
+  const _rectCoversPlot = seedGiStart >= 0 && seedGiEnd >= seedGiStart
+    && (xByGi[seedGiEnd] - xByGi[seedGiStart]) >= 0.85 * plotW;
   if (seedGiStart >= 0 && seedGiEnd >= seedGiStart) {
     const x0 = xByGi[seedGiStart] - 0.5 * cellW;
     const x1 = xByGi[seedGiEnd] + 0.5 * cellW;
@@ -672,10 +759,10 @@ export function drawRegimesPanel(state) {
     const getMacroDosage = (rp.ctx_callbacks && rp.ctx_callbacks.getMacroDosage) || null;
     const activeBandsSet = new Set(voter.bands);
     ctx.save();
-    for (let b = 0; b < seedK; b++) {
+    if (!_rectCoversPlot) for (let b = 0; b < seedK; b++) {
       const yTop = pad.t + b * stripeH;
       const isActive = activeBandsSet.has(b);
-      const baseAlpha = isActive ? 0.18 : 0.10;   // softer for inactive
+      const baseAlpha = isActive ? 0.09 : 0.05;   // softer overall + softer for inactive
       let fillCol = `rgba(245, 165, 36, ${baseAlpha})`;   // legacy gold
       if (getMacroDosage) {
         try {
@@ -691,7 +778,7 @@ export function drawRegimesPanel(state) {
       // 0.95. We achieve this with globalAlpha rather than baking into
       // the rgba above, so the dosage hue stays correct while the
       // contrast cue lives in the alpha channel.
-      ctx.globalAlpha = isActive ? 1.0 : 0.95;
+      ctx.globalAlpha = isActive ? 0.85 : 0.55;
       ctx.fillRect(x0, yTop, x1 - x0, stripeH);
     }
     ctx.globalAlpha = 1.0;
@@ -701,10 +788,12 @@ export function drawRegimesPanel(state) {
     ctx.setLineDash([4, 3]);
     ctx.strokeRect(x0 + 0.5, pad.t + 0.5, x1 - x0 - 1, plotH - 1);
     ctx.setLineDash([]);
-    // Per-band thin lane separators inside the rectangle
+    // Per-band thin lane separators inside the rectangle (skip when the
+    // rect covers the plot — they'd just be horizontal lines spanning
+    // everything, indistinguishable from the band-lane gridlines).
     ctx.strokeStyle = 'rgba(245, 165, 36, 0.30)';
     ctx.lineWidth = 0.5;
-    for (let b = 1; b < seedK; b++) {
+    if (!_rectCoversPlot) for (let b = 1; b < seedK; b++) {
       const ySep = pad.t + b * stripeH + 0.5;
       ctx.beginPath();
       ctx.moveTo(x0, ySep);
@@ -1043,7 +1132,14 @@ export function buildRegimesPanel(state) {
   sub.style.cssText = 'position: relative; flex: 1 1 0; min-height: 0; ' +
                       'border-bottom: 1px solid var(--rule, #2a3242);';
   const cv = document.createElement('canvas');
-  cv.style.cssText = 'display: block; width: 100%; height: 100%; cursor: crosshair;';
+  // 2026-05-20: was width:100%; height:100%. That worked in some browsers
+  // and didn't in others — when the parent's height comes from
+  // `flex: 1 1 0` (no explicit height), percentage-height children
+  // resolve to 0 in Firefox/some Chromium versions and fitCanvas() reads
+  // h=0 → "bail: zero plot area" in drawRegimesPanel + drawRegimesPC1Panel.
+  // Using position:absolute + inset:0 anchors the canvas to the relative
+  // sub's box directly, sidestepping the flex/percentage-height interaction.
+  cv.style.cssText = 'display: block; position: absolute; inset: 0; cursor: crosshair;';
   cv.tabIndex = 0;     // make it focusable so arrow keys work when the
                        // panel has focus (host page can also rely on
                        // document-level keys via installRegimesKeyboardNav)

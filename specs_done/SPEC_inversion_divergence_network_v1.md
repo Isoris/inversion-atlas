@@ -1,9 +1,22 @@
 # SPEC — inversion divergence-network overlay (v1)
 
-**Status**: drafted 2026-05-12
+**Status**: shipped 2026-05-20 (audit confirmed pre-existing implementation
+matches the v1 contract verbatim — same exports, same math, same render-hint
+shape). Promoted from `specs_todo/` after the audit. **What ships is the
+pure-data layer per §6**; panel wiring (canvas/SVG + hover + click-to-track)
+remains a follow-up.
+
+**Implemented in:**
+- [`atlases/inversion/shared/divergence_network.js`](../atlases/inversion/shared/divergence_network.js) — `computeDivergenceNetwork` + `divergenceNetworkRenderHints` + the published constants (`DIVERGENCE_NETWORK_SOURCES`, `DIVERGENCE_NETWORK_METRICS`, `DIVERGENCE_LOW_POWER_MIN_N`, `DIVERGENCE_FST_{WEAK,STRONG}_THRESHOLD`, `DIVERGENCE_EDGE_COLORS`, `DIVERGENCE_LABEL_ORDER`)
+- [`tests/test_shared_divergence_network.js`](../tests/test_shared_divergence_network.js) — 412-line smoke covering group membership, Nei FST (dosage), variance-ratio FST (pc1), Euclidean distance, low-power/weak/strong flag thresholds, circular layout positions, edge stroke selection from flag
+- Imports `XP_K_PALETTE` from [`atlases/inversion/shared/cross_page_clusters.js`](../atlases/inversion/shared/cross_page_clusters.js) for arrangement node colors (per §7)
+- Doc-referenced by [`atlases/inversion/pages/catalogue/stats_profile.js`](../atlases/inversion/pages/catalogue/stats_profile.js) (region/genome masking derivation note)
+
 **Scope**: Inversion Atlas only (overlay version)
 **Sibling spec**: a future Diversity Atlas version would extend
 this with ancestry-group nodes; this spec is intentionally narrow.
+
+**Authored**: drafted 2026-05-12.
 
 ---
 

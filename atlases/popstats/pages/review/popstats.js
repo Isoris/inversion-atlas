@@ -33,7 +33,11 @@
 
 import { _pageState, _setActiveState } from './popstats/_state.js';
 import { renderPopstatsPage } from './popstats/_render.js';
+// 2026-05-23: cross-atlas imports — candidate_nav + candidate_groups stay in inversion.
+// Phase 1d/5 follow-up: switch to cross_atlas_imports.resolveCrossAtlasRead().
 import { renderCandidateNavInline } from '../../../inversion/shared/candidate_nav.js';
+import { candidateGroupsFromLabels } from '../../../inversion/shared/candidate_groups.js';
+import { fetchPopstatsGroupwise, stitchTracksFromGroupwise } from './popstats/_live.js';
 
 export async function mount(root, atlasState, registry) {
   const chrom = atlasState.shared && atlasState.shared.activeChrom;
@@ -59,8 +63,150 @@ export async function mount(root, atlasState, registry) {
   _setActiveState(pageState);
   if (atlasState.inversion) atlasState.inversion._page6State = pageState;
 
+  // Derive shared.activeGroups from the active candidate's locked label
+  // vector. The candidate was promoted from the catalogue or the
+  // haplotype_regimes page (or local_pca_dosage's K-means lock); whichever
+  // producer it came from, the labels live on the candidate by the time
+  // popstats sees it. Pushed to the cross-page slot so future consumers
+  // (fish_ancestry_scroller, marker_readiness, …) pick up the same
+  // partition. None of this overwrites a manually-set groups dict — only
+  // fills it when null.
+  const derived = candidateGroupsFromLabels(candidate, data, { labelStyle: 'server' });
+  if (derived && derived.groups) {
+    if (!atlasState.shared.activeGroups
+        && typeof atlasState.setActiveGroups === 'function') {
+      atlasState.setActiveGroups(derived.groups);
+    }
+  }
+
   _mountCandidateNav(root, atlasState, registry);
+  _wireLiveStatusClick(root, atlasState, pageState);
   renderPopstatsPage({ root, data, candidate, cur });
+
+  // Fire the live POST /api/popstats/groupwise in the background. On
+  // success, the per-metric columns get stitched into multi-series tracks
+  // on `data.tracks.theta_invgt` / `fst_pairs` / `fst_hom1_hom2` / `dxy_pairs`
+  // / etc., then we re-render. Single in-flight per (chrom, groups) signature
+  // so navigating back to the page doesn't re-fire if the answer is already
+  // in pageState._liveTracks.
+  _maybeFetchLivePopstats(root, atlasState, pageState).catch(err =>
+    console.warn('popstats: live-groupwise fetch failed —', err));
+}
+
+/**
+ * Wire the live-status strip as a click target. When the strip is in a
+ * non-terminal state (idle / skipped / failed / served) clicking it
+ * forces a re-fetch — useful when the user just promoted a candidate or
+ * the server came back online after a failure. The `fetching` state
+ * leaves clicks as no-ops (the request is already in flight).
+ */
+function _wireLiveStatusClick(root, atlasState, pageState) {
+  const el = (root && root.querySelector) ? root.querySelector('#psLiveStatus') : null;
+  if (!el || el.__wired) return;
+  el.__wired = true;
+  el.addEventListener('click', () => {
+    const state = el.dataset.state || 'idle';
+    if (state === 'fetching') return;
+    pageState._liveSig = null;   // force the dedup check to miss
+    _maybeFetchLivePopstats(root, atlasState, pageState).catch(err =>
+      console.warn('popstats: live-groupwise refresh failed —', err));
+  });
+}
+
+async function _maybeFetchLivePopstats(root, atlasState, pageState) {
+  const sh = atlasState.shared || {};
+  const groups = sh.activeGroups;
+  if (!groups || Object.keys(groups).length < 2) {
+    _setLiveStatus(root, 'idle', 'no groups — promote a candidate to populate');
+    return;
+  }
+
+  // Server requires min_group_n=10 per group by default; skip if any group is
+  // too small (the server would 400 anyway). Caller can override the floor
+  // via a future popstats-config slot.
+  const minN = 10;
+  const tooSmall = [];
+  for (const g of Object.keys(groups)) {
+    const n = Array.isArray(groups[g]) ? groups[g].length : 0;
+    if (n < minN) tooSmall.push(`${g}: ${n}<${minN}`);
+  }
+  if (tooSmall.length > 0) {
+    _setLiveStatus(root, 'skipped', `group too small — ${tooSmall.join(' · ')}`);
+    return;
+  }
+
+  // Dedup: a previous mount with the same chrom + groups signature stashed
+  // the response on pageState._liveTracks. Skip the re-fetch.
+  const sig = `${pageState.chrom}|${_groupsSig(groups)}`;
+  if (pageState._liveSig === sig) {
+    _setLiveStatus(root, 'served', `cached · ${_groupsSig(groups)}`);
+    return;
+  }
+  pageState._liveSig = sig;
+
+  const groupNames = Object.keys(groups).join(' / ');
+  _setLiveStatus(root, 'fetching', `θπ · FST · dXY for ${groupNames}…`);
+
+  let envelope;
+  try {
+    envelope = await fetchPopstatsGroupwise({
+      serverBaseUrl: sh.serverBaseUrl || '',
+      chrom:         pageState.chrom,
+      groups,
+    });
+  } catch (e) {
+    const msg = (e && e.message) || String(e);
+    console.warn('popstats: /api/popstats/groupwise →', msg);
+    _setLiveStatus(root, 'failed', msg);
+    pageState._liveSig = null;   // allow retry on next mount
+    return;
+  }
+
+  // Splice the per-metric multi-series tracks into data.tracks. The
+  // existing auto-discover path in popstats/_tracks.js notices the new
+  // names and adopts the static placeholders (theta_invgt / fst_hom1_hom2)
+  // so their chips light up + canvases paint as multi-line.
+  const stitched = stitchTracksFromGroupwise(envelope);
+  const trackCount = Object.keys(stitched).length;
+  if (trackCount === 0) {
+    _setLiveStatus(root, 'served', 'server returned 0 metric tracks');
+    return;
+  }
+  pageState.data.tracks = Object.assign({}, pageState.data.tracks || {}, stitched);
+  pageState._liveTracks = stitched;
+
+  const nWin = (envelope && envelope.n_windows) || 0;
+  _setLiveStatus(root, 'served',
+    `${trackCount} metric${trackCount === 1 ? '' : 's'} · `
+    + `${nWin} window${nWin === 1 ? '' : 's'} · ${Object.keys(groups).length} groups`);
+
+  // Re-render with the enriched data.
+  renderPopstatsPage({
+    root, data: pageState.data, candidate: pageState.candidate, cur: pageState.cur,
+  });
+}
+
+function _setLiveStatus(root, state, text) {
+  const el = (root && root.querySelector) ? root.querySelector('#psLiveStatus') : null;
+  if (!el) return;
+  el.dataset.state = state || 'idle';
+  // Trailing ↻ on every state except `fetching` (where a spinner glyph
+  // would be more honest but the CSS handles the affordance via the
+  // [data-state="fetching"] selector). The ↻ doubles as a click hint.
+  const body = state === 'idle'
+    ? `live: ${text || 'idle'}`
+    : `live · ${state}: ${text}`;
+  const suffix = (state === 'fetching') ? ' …' : '  ↻';
+  el.textContent = body + suffix;
+  el.title = (state === 'fetching')
+    ? 'Live popstats fetch in flight…'
+    : 'Click to re-fetch /api/popstats/groupwise';
+}
+
+function _groupsSig(groups) {
+  return Object.keys(groups).sort()
+    .map(k => `${k}=${(groups[k] || []).length}`)
+    .join(',');
 }
 
 /**

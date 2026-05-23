@@ -127,7 +127,57 @@ What remains as evidence the old specs existed:
 
 ---
 
-## SPEC_* files **referenced but missing** — STATUS UPDATE 2026-05-15
+## SPEC_* files **referenced but missing** — STATUS UPDATE 2026-05-20
+
+**ALL SPEC_* GAPS NOW RESOLVED.** The 2026-05-15 audit resolved 8 of 9;
+the remaining real one — `SPEC_inversion_age_atlas_surface.md` (the
+turn-117 parent of the `_AMENDMENT`) — was authored 2026-05-20 from
+shipped code (`shared/mgl_inversion_divergence.js`,
+`shared/age_model_suggester.js`, `shared/busco_4d_age.js`,
+`pages/evolution/age_divergence.{html,js}`) and now lives at
+[`specs_done/SPEC_inversion_age_atlas_surface.md`](../specs_done/SPEC_inversion_age_atlas_surface.md).
+That SPEC carries explicit per-slice shipped/deferred status against
+the AMENDMENT's row layout — the AMENDMENT remains in `specs_todo/`
+because most of its prescribed slices are still deferred.
+
+**Re-grep on 2026-05-20** found only 3 names referenced-in-code that
+are not on disk:
+
+| name | status |
+|---|---|
+| `SPEC_inversion_age_atlas_surface.md` | **RESOLVED 2026-05-20** — authored at `specs_done/` (see above) |
+| `HANDOFF_BATCH_3.md` | **RETIRED 2026-05-20** — phantom handoff. Every citation is a corrective note (e.g. "HANDOFF_BATCH_3.md mislabels this page as 'Manual karyotype groups list' — corrected here"). The canonical record is `pages/catalogue/BATCH_3_NOTES.md`; the corrective citations stay as historical context explaining renames. |
+| `HANDOFF_BATCH_5.md` | **RETIRED 2026-05-20** — same. Canonical record: `pages/comparative/BATCH_5_NOTES.md`. Corrective citations remain as historical context flagging the `help` vs `multi_species_cockpit` mislabel. |
+
+**Notes on conventions discovered during the re-grep:**
+
+- `SPEC_DEFERRED.md` is **NOT** an individual feature SPEC and was
+  never meant to be one. Its references (in handoff docs) named a
+  *register* of deferred decisions, which the audit decided is better
+  expressed as inline `Status: deferred` annotations on the
+  individual SPECs. The references in the original audit's "missing"
+  table can be retired — no doc to author. Modern SPECs in
+  `specs_done/` carry per-slice status inline (see
+  `SPEC_inversion_age_atlas_surface.md` §3 for an example of the
+  shipped/deferred matrix).
+- `HANDOFF_BATCH_4.md` — referenced only in older audits; no citation
+  in current code. No action.
+
+How the 2026-05-20 re-grep was done:
+
+```sh
+grep -rohE "(SPEC|HANDOFF)_[A-Za-z0-9_.]+\.md" \
+  --include="*.js" --include="*.html" --include="*.css" --include="*.py" \
+  --include="*.json" --include="*.yaml" \
+  atlases/ shared/ docs/ specs_todo/ specs_done/ tests/ engines/ \
+  | sort -u
+```
+
+Cross-checked each name against `find specs_todo specs_done -name '$name'`.
+
+---
+
+## SPEC_* files **referenced but missing** — STATUS UPDATE 2026-05-15 (historical)
 
 **ALL 8 PREVIOUSLY-MISSING SPECs NOW RESOLVED.** Each was authored
 from shipped code + handoffs + legacy line citations and lives at

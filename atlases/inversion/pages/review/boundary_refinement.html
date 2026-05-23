@@ -1,4 +1,12 @@
   <div id="boundary_refinement" class="page">
+    <!-- Mode-B boundary-freshness badge (2026-05-20). Resolves
+         candidate_lineage (to find active_version_id) and
+         candidate_boundaries (to inspect the active version's stored
+         boundaries_refined.json). Surfaces what's on disk for the
+         active candidate so reviewers can see what they'd be
+         overwriting on save. Fail-soft per core/mode_b_badge.js;
+         hidden when no candidate is selected. -->
+    <div id="brModeBBadge" class="data-source-badge" style="margin: 8px 32px 0; display: none;"></div>
     <div id="page11Header" style="padding: 22px 32px 0;">
       <h2 style="margin: 0 0 4px; font-size: 16px;">Boundary zone refinement</h2>
       <div id="page11Subtitle" style="color: var(--ink-dim); font-size: 11px; font-family: var(--mono);">

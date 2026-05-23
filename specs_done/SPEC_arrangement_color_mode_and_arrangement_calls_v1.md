@@ -1,6 +1,33 @@
 # SPEC — arrangement-color mode for per-sample-lines panel + arrangement_calls_v1 JSON
 
-**Status**: drafted 2026-05-06
+**Status**: shipped 2026-05-20 (audit-sweep — atlas-side surface confirmed
+shipping). Promoted from `specs_todo/` after the per-slice audit below.
+Original SPEC body is preserved verbatim below as design archive.
+
+**Implemented in:**
+- [`atlases/inversion/shared/arrangement_calls.js`](../atlases/inversion/shared/arrangement_calls.js) — 9 exports: `ARRANGEMENT_CALLS_SCHEMA_VERSION`, `ARRANGEMENT_UNCALLED`, `ARR_PALETTE`, `ARR_COLOR_UNCALLED`, `arrangementColor()`, `decodeArrangementsFromPartition()`, `assignArrangementPerSample()` (the per-sample voting prescribed in §4), `tabulateArrangementSizes()`, `validateArrangementCallsJson()` (the JSON validator prescribed in §6)
+- [`atlases/inversion/shared/sample_color.js`](../atlases/inversion/shared/sample_color.js) — arrangement-mode dispatcher (`_resolveSampleColorByMode` / `_resolveSampleScopeColor` infrastructure from turn 130 Slice 2)
+- [`tests/test_shared_arrangement_calls.js`](../tests/test_shared_arrangement_calls.js) — unit coverage
+- Downstream consumer: [`atlases/inversion/shared/inversion_classification.js`](../atlases/inversion/shared/inversion_classification.js) (uses `decodeArrangementsFromPartition` + the palette in the inversion-classification pipeline)
+
+**Per-slice status:**
+
+| slice | status | location |
+|---|---|---|
+| arrangement_calls_v1 JSON schema | ✅ shipped | `ARRANGEMENT_CALLS_SCHEMA_VERSION = 1` + `validateArrangementCallsJson()` |
+| Per-sample voting from band-track partition | ✅ shipped | `decodeArrangementsFromPartition()` + `assignArrangementPerSample()` |
+| Palette + uncalled-color | ✅ shipped | `ARR_PALETTE` + `ARR_COLOR_UNCALLED` + `arrangementColor()` |
+| Arrangement-mode dispatcher | ✅ shipped | `sample_color.js` |
+| Size tabulation diagnostic | ✅ shipped | `tabulateArrangementSizes()` |
+| `arrangement_calls_v1.json` producer (atlas-side runner OR LANTA step per §6) | ⏳ deferred | Out of atlas-side scope; the JSON is consumed via the validator when it ships from the producer team |
+
+**Why archived now (vs kept partial):** the SPEC's atlas-side surface is
+complete — validator + palette + voting + dispatcher all ship. What's
+left (`arrangement_calls_v1.json` emission) is a *producer* task that
+§6 names as a separate deliverable. Per the SPECS_AUDIT convention,
+atlas-side scopes complete → promote with a deferred-slice annotation;
+the producer ships independently.
+
 **Depends on**: shipped `band_tracking` modules (`vote_evidence.js`,
 `band_voters.js`, `partition_enumerate.js`, `partition_consensus.js`,
 plus the 2026-05-06 patches: `band_groups` correction + best-anchored
@@ -10,6 +37,8 @@ multi-layer detection)
 `Inversion_atlas.html` (turn 130 Slice 2 era).
 **Producer**: NEW — a small atlas-side runner OR a LANTA-side step
 emitting `arrangement_calls_v1.json`. See §6.
+
+**Authored**: drafted 2026-05-06.
 
 ---
 

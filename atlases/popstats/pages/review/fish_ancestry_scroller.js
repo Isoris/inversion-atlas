@@ -161,6 +161,20 @@ function _paintAll(state) {
     paintMetrics(document.getElementById('ancScrollMetricsCanvas'), m);
   }
   paintLayer3(document.getElementById('ancScrollLayer3Canvas'), m);
+  _syncStatusLegend(vs);
+}
+
+/**
+ * Show the status-icon legend strip only when warnings are visible AND the
+ * metrics block itself is shown. The bricks layer paints these icons on the
+ * right edge of flagged bricks (spec §"Brick metrics") — the legend tells
+ * the reader what they mean.
+ */
+function _syncStatusLegend(vs) {
+  const legend = document.getElementById('ancScrollStatusLegend');
+  if (!legend) return;
+  const show = vs && vs.show_warnings !== false && vs.show_metrics !== false;
+  legend.style.display = show ? '' : 'none';
 }
 
 /**

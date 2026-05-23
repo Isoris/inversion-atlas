@@ -1,10 +1,57 @@
 # SPEC — Macrostripe + Microgroup hierarchy
 
-**Status**: design, 2026-05-18. Not yet implemented as a first-class
-label scheme. Pieces of the algorithm already exist in
-`shared/lineage_clustering.js` and `shared/band_tracking/` —
-this SPEC unifies them under a single conceptual model and proposes
-the UI / label / export surface.
+**Status**: shipped 2026-05-20 (audit-sweep — the SPEC's described
+"first-class label scheme" actually shipped via `shared/macrostripe.js`
++ supporting modules + 7 page-side consumers + test coverage; the
+SPEC's original 2026-05-18 status note "Not yet implemented as a
+first-class label scheme" was stale by the time the audit ran).
+Promoted from `specs_todo/` after the per-slice audit below. Original
+SPEC body is preserved verbatim below as design archive.
+
+**Implemented in:**
+- [`atlases/inversion/shared/macrostripe.js`](../atlases/inversion/shared/macrostripe.js) — 4 exports defining the macrostripe label scheme as a first-class state slot: `getMacrostripeIdsAtWindow(state, w)`, `getMacrostripeIdPerSample(state)` (per-sample label folded from Stage 3 band-tracking), `getMacrostripeColor(state, si)`, `invalidateMacrostripeCache(state)`
+- [`atlases/inversion/shared/lineage_clustering.js`](../atlases/inversion/shared/lineage_clustering.js) — supporting lineage algorithm: `lineageClustering(concordanceMatrix, n_samples, threshold)`, `lineageColor(lineageId)`, `drawLineageStrip()`, `lineageCacheKey()` + thresholds (`LINEAGE_DEFAULT_THRESHOLD = 0.50`, `LINEAGE_CHAIN_BREAK_AGREEMENT = 0.50`, `LINEAGE_MIN_L2_FOR_COMPUTE = 3`, `LINEAGE_MIN_FISH_PER_LINEAGE = 1`)
+- [`atlases/inversion/shared/karyotype_lineage.js`](../atlases/inversion/shared/karyotype_lineage.js) — sister module: `KARYOTYPE_LINEAGE_LS_KEY` + persistence layer (`storeKaryotypeLineage()` / `persistKaryotypeLineage()` / `restoreKaryotypeLineage()`)
+- Page-side consumers of the `microgroup_id` + `macrostripe_id` vocabulary (7 modules):
+  - [`pages/discovery/local_pca_dosage/_state.js`](../atlases/inversion/pages/discovery/local_pca_dosage/_state.js)
+  - [`pages/discovery/local_pca_dosage/l2_sweep.js`](../atlases/inversion/pages/discovery/local_pca_dosage/l2_sweep.js)
+  - [`pages/discovery/local_pca_dosage/l3_panel.js`](../atlases/inversion/pages/discovery/local_pca_dosage/l3_panel.js)
+  - [`pages/discovery/local_pca_dosage/pca_panel.js`](../atlases/inversion/pages/discovery/local_pca_dosage/pca_panel.js)
+  - [`pages/discovery/local_pca_dosage/sidebar.js`](../atlases/inversion/pages/discovery/local_pca_dosage/sidebar.js)
+  - [`pages/discovery/local_pca_dosage.js`](../atlases/inversion/pages/discovery/local_pca_dosage.js) + `local_pca_dosage.html`
+  - [`pages/discovery/candidate_focus.js`](../atlases/inversion/pages/discovery/candidate_focus.js) + `candidate_focus/_html_builders.js` (uses macrostripe_id for the group-label TSV export per SPEC_haplotype_burden_coloring Phase 1)
+- Tests: [`tests/test_shared_macrostripe.js`](../tests/test_shared_macrostripe.js), [`tests/test_shared_lineage_clustering.js`](../tests/test_shared_lineage_clustering.js), [`tests/test_shared_karyotype_lineage.js`](../tests/test_shared_karyotype_lineage.js), [`tests/test_page1_lineage.js`](../tests/test_page1_lineage.js)
+
+**Per-slice status:**
+
+| slice | status | location |
+|---|---|---|
+| `microgroup_id` (Level 1: per-candidate K-band assignment) | ✅ shipped | `cand.locked_labels` per-candidate (consumed by `getMacrostripeIdPerSample` + the candidate_focus group-label TSV export) |
+| `macrostripe_id` (Level 2: long-range haplotype regime folded from band-tracking Stage 3) | ✅ shipped | `macrostripe.js#getMacrostripeIdPerSample(state)` |
+| `regime_block_id` (Level 3: chrom-wide regime block) | ✅ shipped via band-tracking | `shared/band_tracking/` modules (`vote_evidence.js`, `partition_consensus.js`, etc.) |
+| Per-window macrostripe lookup | ✅ shipped | `getMacrostripeIdsAtWindow(state, w)` |
+| Macrostripe color resolver | ✅ shipped | `getMacrostripeColor(state, si)` |
+| Macrostripe cache invalidation hook | ✅ shipped | `invalidateMacrostripeCache(state)` |
+| Lineage clustering algorithm (Steps A–F per SPEC §Algorithm) | ✅ shipped | `lineage_clustering.js` (5 exports + 4 constants) |
+| Lineage persistence to localStorage | ✅ shipped | `karyotype_lineage.js` |
+| Default-view UI (macrostripe colours) | ✅ shipped | 7 page-side consumers in local_pca_dosage + candidate_focus |
+| Advanced-view UI (microgroup colours; toggle) | ✅ shipped | Consumed at `pca_panel.js` + `sidebar.js` |
+| "Co-travel haplogroup" badge | ⏳ partial — consumers reference the data but a dedicated badge UI may still be ad-hoc; verify per page contract |
+| Cohort-wide group export TSV (linked to `SPEC_haplotype_burden_coloring` Phase 2) | ⏳ deferred | The Phase-2 group-export companion ships under `SPEC_haplotype_burden_coloring.md` |
+
+**Why archived now:** the SPEC's central proposition — a unified
+microgroup_id / macrostripe_id / regime_block_id hierarchy as a
+first-class label scheme — ships across `macrostripe.js` +
+`lineage_clustering.js` + `karyotype_lineage.js` with 7 page-side
+consumers and 4 tests. The SPEC's own §"Algorithm — Steps A-F map to
+existing code" section already calls out the shipped modules. The
+deferred items (co-travel badge polish, cohort-wide TSV export) are
+small follow-ups, not foundational gaps.
+
+**Authored** after the user observation (chat 2026-05-18) of the
+tracked-samples trails on a candidate region: PCA scatter shows
+**three persistent columns** ("macro-stripes") at distinct PC1
+values, and the trail-lines connecting samples across windows reveal
 
 **Authored** after the user observation (chat 2026-05-18) of the
 tracked-samples trails on a candidate region: PCA scatter shows

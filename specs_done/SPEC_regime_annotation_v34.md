@@ -1,6 +1,47 @@
 # REGIME_ANNOTATION_SPEC — annotation layer for long-range haplotype regimes
 
-**Status**: SPEC ONLY. Not yet implemented. Awaiting audit.
+**Status**: PARTIAL — Layers 1 + 2 shipped 2026-05-21 (audit). Layers 3
++ 4 (POD-aware, underdominance-aware) await real cohort data to validate
+the math. SPEC body below is preserved verbatim from the 2026-05-08 chat origin.
+
+**Implemented in (Layers 1 + 2):**
+- [`atlases/inversion/shared/regime_annotation/index.js`](../atlases/inversion/shared/regime_annotation/index.js) — public re-exports
+- [`atlases/inversion/shared/regime_annotation/positional.js`](../atlases/inversion/shared/regime_annotation/positional.js) — 183 lines (Layer 1)
+- [`atlases/inversion/shared/regime_annotation/structure.js`](../atlases/inversion/shared/regime_annotation/structure.js) — 174 lines (Layer 2)
+- [`tests/test_shared_regime_annotation.js`](../tests/test_shared_regime_annotation.js) — 272-line unit-test suite
+- Consumer: [`atlases/inversion/pages/discovery/haplotype_regimes.js`](../atlases/inversion/pages/discovery/haplotype_regimes.js) calls both annotators per regime
+- Consumer: [`atlases/inversion/shared/inversion_classification.js`](../atlases/inversion/shared/inversion_classification.js) — joins the two annotation outputs into the per-candidate classification record
+
+**Public surface (shipped):**
+- `annotateRegimePosition(regime, opts)` + `annotateRegimePositions(regimes[], opts)` — emits positional labels (centromere-proximal / pericentromeric / arm-interstitial / subtelomeric / arm-scale band) using configurable telomere + centromere fractions
+- `annotateRegimeStructure(regime, opts)` + `annotateRegimeStructures(regimes[], opts)` — emits structural labels (band count, sharpness, nesting depth, M-regime kind)
+- `REGIME_POSITIONAL_LABELS`, `REGIME_POSITIONAL_DEFAULTS`, `REGIME_STRUCTURE_LABELS`, `REGIME_STRUCTURE_DEFAULTS` — frozen vocab + tunable thresholds
+
+**Per-layer status matrix:**
+
+| layer | scope                                              | status |
+|-------|----------------------------------------------------|--------|
+| 1     | Positional annotation (where on the chrom?)        | ✅ shipped — `annotateRegimePosition` |
+| 2     | Regime-structure annotation (band count + sharpness + nesting + M-regime kind) | ✅ shipped — `annotateRegimeStructure` |
+| 2b    | Biological-mechanism classification (skeleton)     | ⏳ deferred — skeleton in SPEC §"Layer 2b", consumer not yet wired |
+| 3     | POD-aware annotation (3-level evidence: variant / load / fitness) | ⏳ data-bound — needs cohort variant + load + fitness data the catfish dataset doesn't yet have |
+| 4     | Underdominance-aware annotation                     | ⏳ data-bound — same blocker as Layer 3 (needs het-fitness signal) |
+
+**Audit summary (2026-05-21):**
+
+The two pure-compute annotation layers (positional + structure) are
+fully shipped, with 272-line test coverage spanning all five positional
+labels and all four structure labels, plus tunable-threshold edge cases.
+The "discovery ≠ mechanism" / "compatible not confirmed" wording mandated
+by the SPEC §"Critical caveat" is preserved in the label vocabulary
+(`POD-compatible` / `POD-not-supported` style, not `POD-found`).
+
+Layers 3 + 4 are deferred for the same upstream reason: they need
+per-regime fitness + load + variant context that the catfish 226-sample
+cohort doesn't expose at the resolution the SPEC requires. When that
+data arrives, the existing index.js will export the new annotators
+without changing the established (regime → annotation) shape.
+
 **Source**: user-provided text, 2026-05-08 chat.
 **Position in pipeline**: Stage 5.5 — sits between the regimes-page
 visualization (Stage 5) and dosage overlay (Stage 6), or runs as a

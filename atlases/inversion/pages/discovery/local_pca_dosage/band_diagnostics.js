@@ -61,16 +61,67 @@ export function computeBandDiagnostics(state, cl, env, l2idx) {
   // calculate the values for het and so on in the contingency tables L3").
   function _tpiPanelFromPerWindow(d) {
     const tpw = d && d.theta_pi_per_window;
-    if (!tpw || !Array.isArray(tpw.values) || !Array.isArray(tpw.windows)) return null;
-    if (tpw.windows.length === 0) return null;
+    if (!tpw || !Array.isArray(tpw.windows) || tpw.windows.length === 0) return null;
     const start_bp = tpw.windows.map(w => w && Number.isFinite(w.start_bp) ? w.start_bp : NaN);
     const end_bp   = tpw.windows.map(w => w && Number.isFinite(w.end_bp)   ? w.end_bp   : NaN);
-    // Sanity: at least the first window must have valid bp; otherwise the
-    // env-overlap predicate in _perSampleMeanPanel will reject everything.
     if (!Number.isFinite(start_bp[0]) || !Number.isFinite(end_bp[0])) return null;
+    const nW = tpw.windows.length;
+
+    // 2026-05-20: theta_pi_per_window.values has THREE possible shapes in
+    // the wild (`README_theta_pi_scaling.md` for the modern spec):
+    //   a) flat row-major Float32Array/Array of length nS*nW (atlas-
+    //      canonical contract per HANDOFF_phase4 — `values[s*nW + w]`)
+    //   b) nested per-sample [[v0…vNw], [v0…vNw], …] (legacy R output)
+    //   c) absent — fall back to per-sample `samples[i].theta_pi`
+    // The previous synthesizer assumed (b) and silently broke shape (a):
+    // M[s] returned a SCALAR, the mean loop saw zero finite values, every
+    // band's theta_pi_mean came back NaN, every θπ chip rendered "?".
+    // Quentin's report 2026-05-20: "can we have dosage and theta pi
+    // values working ?". Now we detect the shape and build a proper
+    // nested matrix so _perSampleMeanPanel reads cells via M[s][w].
+    let M = null;
+    const vals = tpw.values;
+    const samples = Array.isArray(tpw.samples) ? tpw.samples : null;
+    if (Array.isArray(vals) && vals.length > 0) {
+      // Distinguish flat-row-major from nested by sampling the first cell.
+      if (typeof vals[0] === 'number' || ArrayBuffer.isView(vals)) {
+        // Flat row-major. Need nS = vals.length / nW.
+        const nS = (vals.length / nW) | 0;
+        if (nS > 0 && nS * nW === vals.length) {
+          M = new Array(nS);
+          for (let s = 0; s < nS; s++) {
+            const row = new Float32Array(nW);
+            const off = s * nW;
+            for (let w = 0; w < nW; w++) row[w] = +vals[off + w];
+            M[s] = row;
+          }
+        }
+      } else if (Array.isArray(vals[0]) || ArrayBuffer.isView(vals[0])) {
+        // Already nested per-sample [[…], […]].
+        M = vals;
+      }
+    }
+    if (!M && samples) {
+      // Per-sample shape: `samples[i].theta_pi` array per sample.
+      const nS = samples.length;
+      if (nS > 0) {
+        M = new Array(nS);
+        for (let s = 0; s < nS; s++) {
+          const row = samples[s] && (samples[s].theta_pi || samples[s].values);
+          if (Array.isArray(row) || ArrayBuffer.isView(row)) {
+            M[s] = row;
+          } else {
+            M[s] = new Float32Array(nW); // all-NaN-equivalent (zeros)
+            M[s].fill(NaN);
+          }
+        }
+      }
+    }
+    if (!M) return null;
+
     return {
       primary_scale: 'default',
-      div_roll:      { default: tpw.values },
+      div_roll:      { default: M },
       start_bp,
       end_bp,
     };

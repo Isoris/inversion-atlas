@@ -1,21 +1,41 @@
 # SPEC — Page-isolation principle (companion to SPEC_registry_v2)
 
+**Status**: shipped 2026-05-20 (audit-sweep — the SPEC is a companion
+doc to `SPEC_registry_v2.md`, not a half-shipped feature SPEC; both
+halves are accounted for elsewhere). Promoted from `specs_todo/` after
+the per-slice audit below. Original SPEC body is preserved verbatim
+below as design archive.
+
+**Implemented in:**
+- **Page-isolation discipline** (this SPEC's atlas-side scope) — enforced at the source level: cross-page imports (`from '../<other-page>/'`) are zero across the `atlases/inversion/pages/` tree. Audited 2026-05-20 by `grep -rEn "from '[\./]*pages/" atlases/inversion/pages/` → empty result. The discipline is preserved by code review + the no-grep-result smoke check; no runtime enforcement is needed because the violation is detected at refactor time.
+- **Registry.write semantics + writable-layer flag + server transport + schema validation + cache invalidation** (the SPEC's other half, explicitly deferred to the canonical reference) — see [`specs_done/SPEC_registry_v2.md`](SPEC_registry_v2.md)
+- Cartridge-side registry config: [`atlases/inversion/registries/data/*.registry.json`](../atlases/inversion/registries/data/) — declares `writable: true` on per-candidate / lineage-index layers per the v2 contract
+
+**Per-slice status:**
+
+| slice | status | location |
+|---|---|---|
+| Page-isolation discipline (zero cross-page imports) | ✅ shipped | Commit `4e695f7`; audit-confirmed 2026-05-20 by re-grep |
+| Registry.write contract semantics | ✅ shipped via reference | `specs_done/SPEC_registry_v2.md` (canonical design) |
+| `writable: true` layer flag | ✅ shipped via reference | Same |
+| Server transport for writes | ✅ shipped via reference | Same |
+| Schema validation on write | ✅ shipped via reference | Same |
+| Cache invalidation on write | ✅ shipped via reference | Same |
+
+**Why archived now:** this SPEC is *structurally* not a deferred-work
+SPEC — it's a companion design doc. It explicitly says (line 13–15) "the
+canonical reference is `specs_done/SPEC_registry_v2.md`. Read that
+first." The page-isolation discipline it adds (cartridge-side rule:
+pages may not import from each other) is enforced by commit `4e695f7`
+and verified empty by `grep`. There is no "pending half" — the
+Registry.write contract was *always* meant to live in
+`SPEC_registry_v2.md`, and that doc is already in `specs_done/`.
+
+The old `specs_todo/README.md` status "HALF SHIPPED" was a
+mis-categorisation arising from reading the SPEC as parallel-to v2
+rather than companion-to v2. The audit-sweep corrects this.
+
 **Filed:** 2026-05-12.
-**Status:** the page-isolation half is enforced in the cartridge as of
-commit `4e695f7` (zero cross-page imports). The Registry.write half
-defers to `specs_done/SPEC_registry_v2.md` which is the canonical
-design.
-**Why this file still exists:** SPEC_registry_v2.md describes the
-atlas-core Registry.write contract. This file captures the
-*cartridge-side* page-isolation discipline that lets the Registry
-swap work mechanically when v2 lands.
-
-**Canonical reference for Registry.write semantics, layer
-`writable: true` flag, server transport, schema validation, cache
-invalidation: `specs_done/SPEC_registry_v2.md`.** Read that first.
-
-This SPEC is **complementary**, not parallel. It says: regardless of
-how persistence works, pages must not import from each other.
 
 ---
 

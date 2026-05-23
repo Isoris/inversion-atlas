@@ -32,6 +32,7 @@ import { escapeHtml } from '../../shared/page1_utils.js';
 // cycle.
 import '../../shared/macrostripe.js';
 import { resolve as _registryResolve, getState as _getState } from '../../../../core/atlas_api.js';
+import { renderModeBBadge } from '../../../../core/mode_b_badge.js';
 
 import {
   _setActiveState,
@@ -57,7 +58,10 @@ import { drawSim, drawSimMini } from './local_pca_dosage/sim_panel.js';
 import { drawZ } from './local_pca_dosage/z_panel.js';
 import { attachLinesLasso, buildLinesPanel, buildLinesPanelCheckboxes, drawLinesPanel, refreshLinesColorMode, setLinesPanelCandidateBands } from './local_pca_dosage/lines_panel.js';
 import { autoPickRadial, cycleKAside, drawAnchorStrip, drawPCA, refreshColorModeBar, refreshLockBtn, refreshPcaAxisBar, renderManualGroupsList, renderTrackedList, togglePlay } from './local_pca_dosage/pca_panel.js';
-import { _l3CacheInvalidate, refreshPinUI, renderL3Panel, renderL3PanelScaleStability, renderL3PanelSlab } from './local_pca_dosage/l3_panel.js';
+// 2026-05-20: renderL3PanelSlab is no longer a separate public function.
+// renderL3Panel dispatches internally to the slab body via its own
+// state.compareUnit check, so callers only need the single entry point.
+import { _l3CacheInvalidate, refreshPinUI, renderL3Panel, renderL3PanelScaleStability } from './local_pca_dosage/l3_panel.js';
 import { loadCandidateList, refreshBandPickBar, refreshCandidateUI } from './local_pca_dosage/candidates.js';
 import { buildTrackPanels, drawTracks, onPCAClick, onSimClick, onZClick, setCur, updateWinLabel } from './local_pca_dosage/events.js';
 import { attachSidebarHandlers } from './local_pca_dosage/sidebar.js';
@@ -91,7 +95,7 @@ export { drawSim, drawSimMini } from './local_pca_dosage/sim_panel.js';
 export { drawZ } from './local_pca_dosage/z_panel.js';
 export { buildLinesPanel, buildLinesPanelCheckboxes, drawLinesPanel, refreshLinesColorMode, setLinesPanelCandidateBands } from './local_pca_dosage/lines_panel.js';
 export { autoPickRadial, cycleKAside, drawAnchorStrip, drawPCA, renderManualGroupsList, renderTrackedList, togglePlay } from './local_pca_dosage/pca_panel.js';
-export { renderL3Panel, renderL3PanelScaleStability, renderL3PanelSlab } from './local_pca_dosage/l3_panel.js';
+export { renderL3Panel, renderL3PanelScaleStability } from './local_pca_dosage/l3_panel.js';
 export { buildTrackPanels, drawTracks, onPCAClick, onSimClick, onZClick, setCur, updateWinLabel } from './local_pca_dosage/events.js';
 
 // --- applyData() — legacy lines 54476-54690 ---
@@ -497,6 +501,33 @@ export async function mount(root, atlasState, registry) {
     data.ghsl_view = ghslData;
   }
 
+  // Mode-B freshness badge — surfaces which discovery axes are loaded
+  // for this chrom. Non-blocking: `data` is already in hand (we'd have
+  // bailed at line ~419 otherwise), so this is just a render call. The
+  // probe shape ({ ok: true, n, sample_keys }) is mocked from the already-
+  // resolved `data` to reuse renderModeBBadge's verdict path.
+  try {
+    const nWindows = Array.isArray(data && data.windows) ? data.windows.length : 0;
+    const nSamples = Array.isArray(data && data.samples) ? data.samples.length : 0;
+    const axesLoaded = ['z-blocks'];
+    if (tpData)   axesLoaded.push('θπ');
+    if (ghslData) axesLoaded.push('GHSL');
+    renderModeBBadge('lpdModeBBadge',
+      { ok: true, n: nWindows, sample_keys: ['chrom', 'windows', 'samples'], rows: data.windows || [], payload: data },
+      {
+        label:    'discovery axes',
+        layerKey: 'scrubber_main',
+        context:  chrom,
+        compare:  () => ({
+          pass: nWindows > 0 && nSamples > 0,
+          summary: `${nWindows} windows · ${nSamples} samples · ` +
+                   `axes: ${axesLoaded.join(' + ')}`,
+        }),
+      });
+  } catch (e) {
+    console.warn('local_pca_dosage.mount: Mode-B badge render threw —', e);
+  }
+
   // 2026-05-18 — preserve cursor + tracked-samples across tab switches.
   // The unmount path keeps the stash alive (see unmount comment); on
   // re-mount, if the saved stash points at the SAME chromosome the
@@ -548,6 +579,17 @@ export async function mount(root, atlasState, registry) {
         // calls computeHetRateForRange with cacheKey, which now returns
         // real values instead of the NaN-filled placeholder.
         try { renderL3Panel(legacyState); } catch (_) {}
+        // 2026-05-20 (later): when the user picked "het" or "dosage"
+        // on the tracked-samples PCA color ramp, drawPCA pre-computes
+        // a per-sample value array via computeHet/DosageMeanForRange.
+        // On the first paint the chunk wasn't loaded yet → all-NaN →
+        // every sample falls back to grey. After the chunk lands we
+        // need to repaint the PCA scatter so the ramp colors show up.
+        // Without this call, het / dosage stayed grey until the user
+        // clicked the ramp button again. Quentin: "when we color by
+        // het in the tracked samples can we have like the color. here
+        // its all grey."
+        try { drawPCA(legacyState); } catch (_) {}
       },
     });
   } catch (e) { console.warn('installDosageChunkFetcher:', e); }

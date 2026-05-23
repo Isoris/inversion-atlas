@@ -73,6 +73,13 @@ export const CAT_COLUMNS = Object.freeze([
   Object.freeze({ key: 'span_kb',    label: 'span kb',    kind: 'float2', simple: true,  align: 'right' }),
   Object.freeze({ key: 'K',          label: 'K',          kind: 'int',    simple: true,  align: 'right' }),
   Object.freeze({ key: 'verdict',    label: 'verdict',    kind: 'string', simple: true,  align: 'left'  }),
+  // 2026-05-20 (SPEC_cramers_v_seed_merge.md Phase 1 deliverable #4):
+  // surface `source` so the TSV/MD/JSON export can distinguish
+  // user-curated drafts (lock_promote, seed_promote, l3_pair_merge)
+  // from auto-promoted candidates (auto_l2_sweep, auto_cramers_v_local,
+  // auto_cramers_v_macrostripe). `simple: false` keeps it out of the
+  // default narrow-table view but it's always included in exports.
+  Object.freeze({ key: 'source',     label: 'source',     kind: 'string', simple: false, align: 'left'  }),
   Object.freeze({ key: 'diamond',    label: 'Diamond',    kind: 'diamond',simple: true,  align: 'center' }),
   Object.freeze({ key: 'n_windows',  label: 'n windows',  kind: 'int',    simple: false, align: 'right' }),
   Object.freeze({ key: 'n_samples',  label: 'n samples',  kind: 'int',    simple: true,  align: 'right' }),
@@ -124,6 +131,11 @@ export function buildCatalogueRows(state) {
       span_kb:    span_bp != null ? span_bp / 1000 : null,
       K:          Number.isFinite(r.K) ? r.K : null,
       verdict:    typeof r.verdict === 'string' ? r.verdict : '',
+      // 2026-05-20: candidate provenance. L2-envelope rows (the
+      // default catalogueRows source) don't carry `source`; auto-
+      // promoted + manually-promoted candidates do. Empty string for
+      // L2-envelope rows keeps the column well-formed in the TSV.
+      source:     typeof r.source === 'string' ? r.source : '',
       n_windows:  Number.isFinite(r.n_windows) ? r.n_windows : null,
       n_samples:  Number.isFinite(r.n_samples) ? r.n_samples : null,
       silhouette: Number.isFinite(r.silhouette) ? r.silhouette : null,
@@ -151,6 +163,11 @@ export function filterCatalogueRows(rows, state) {
     ? state.catFilter.trim().toLowerCase() : '';
   const verdict = (state && typeof state.catVerdictFilter === 'string')
     ? state.catVerdictFilter : '';
+  // 2026-05-20: source filter — narrows the catalogue to candidates
+  // tagged with one provenance source (e.g. only V·local auto-merge,
+  // only manual lock_promote). Empty string = no filter.
+  const sourceF = (state && typeof state.catSourceFilter === 'string')
+    ? state.catSourceFilter : '';
   const viewMode = (state && typeof state.catViewMode === 'string')
     ? state.catViewMode : 'l2_raw';
   const favs = (state && state.catFavorites instanceof Set)
@@ -163,8 +180,9 @@ export function filterCatalogueRows(rows, state) {
       if (!favs || !favs.has(r.id)) continue;
     }
     if (verdict && r.verdict !== verdict) continue;
+    if (sourceF && r.source !== sourceF) continue;
     if (filter) {
-      const hay = [r.id, r.chr, r.verdict, r.parent_l1]
+      const hay = [r.id, r.chr, r.verdict, r.parent_l1, r.source]
         .map(s => (s == null ? '' : String(s).toLowerCase()))
         .join('\t');
       if (!hay.includes(filter)) continue;
@@ -334,6 +352,29 @@ export function renderCatBodyHtml(rows, disp, selection, favorites, diamondMode)
           + _diamondCellHtml(r, diamondMode || 'loose') + '</td>');
         continue;
       }
+      // 2026-05-20: render the `source` column as a coloured chip
+      // matching candidate_focus's .src-chip-* classes. Same visual
+      // treatment as the candidate-focus header so a user can scan
+      // the catalogue and instantly see which candidates came from
+      // L2-sweep vs Cramér V local vs Cramér V macrostripe vs the
+      // manual draft paths. Falls back to a plain "—" for rows with
+      // no source (L2-envelope rows that aren't candidates).
+      if (col.key === 'source') {
+        const raw = r[col.key];
+        if (!raw) {
+          out.push('<td style="text-align: ' + col.align + ';">' +
+                   '<span style="color: var(--ink-dimmer);">—</span></td>');
+          continue;
+        }
+        const chipClass = 'src-chip src-chip-' +
+          String(raw).replace(/[^a-z0-9_]/g, '_');
+        out.push(
+          '<td style="text-align: ' + col.align + ';">' +
+          '<span class="' + chipClass + '">' + _escape(raw) + '</span>' +
+          '</td>'
+        );
+        continue;
+      }
       const raw = r[col.key];
       const formatted = _formatCell(raw, col.kind);
       out.push(
@@ -476,6 +517,13 @@ export function promoteRowsToCandidates(rows, candidateList) {
       end_bp:      Number.isFinite(r.end_bp)   ? r.end_bp   : null,
       K:           Number.isFinite(r.K) ? r.K : null,
       verdict:     typeof r.verdict === 'string' ? r.verdict : '',
+      // 2026-05-20: preserve provenance when an existing row already
+      // had a `source` tag (auto-promoted rows surface in the catalogue
+      // via inv.catalogueRows). Falls back to the canonical
+      // 'catalogue_promote' source for rows that don't carry one —
+      // matches the existing 'promoted_from: catalogue' breadcrumb.
+      source:      typeof r.source === 'string' && r.source
+                     ? r.source : 'catalogue_promote',
       provisional: true,
       confirmed:   false,
       promoted_from: 'catalogue',
@@ -527,6 +575,7 @@ function _ensureCatalogueState(state) {
   if (!(state.catSelection instanceof Set)) state.catSelection = new Set();
   if (typeof state.catFilter !== 'string')        state.catFilter = '';
   if (typeof state.catVerdictFilter !== 'string') state.catVerdictFilter = '';
+  if (typeof state.catSourceFilter !== 'string')  state.catSourceFilter = '';
   if (typeof state.catViewMode !== 'string')      state.catViewMode = 'l2_raw';
   if (typeof state.catDispMode !== 'string')      state.catDispMode = 'detailed';
   if (typeof state.catSortKey !== 'string')       state.catSortKey = 'id';
@@ -574,9 +623,214 @@ export function renderCatalogue(state) {
       empty.style.display = 'none';
     }
   }
+  // 2026-05-20: refresh the compare-modes overlap strip on every
+  // catalogue re-render so it tracks list mutations + auto-merge
+  // promotions in real time.
+  try { _renderSourceOverlap(state); } catch (e) {
+    if (typeof console !== 'undefined') console.warn('[_renderSourceOverlap]', e);
+  }
+  // 2026-05-20: refresh #catSourceFilter option labels with per-source
+  // counts so the user sees how many candidates each source carries
+  // before clicking.
+  try { _refreshSourceFilterCounts(state); } catch (e) {
+    if (typeof console !== 'undefined') console.warn('[_refreshSourceFilterCounts]', e);
+  }
   if (selInfo) {
     const nSel = state.catSelection ? state.catSelection.size : 0;
     selInfo.textContent = nSel + ' selected of ' + sorted.length;
+  }
+}
+
+// =====================================================================
+// Compare-modes overlap strip (SPEC_cramers_v_seed_merge.md Phase 2)
+// =====================================================================
+// Reads state.candidateList, partitions by the auto / semi-auto modes
+// shipped on the haplotype_regimes + local_pca_dosage pages
+// (`l3_pair_merge` from the L3 adjacent-pair Cramér mini-table,
+// `auto_cramers_v_local` from the ↻ auto-merge V Mode 1 button,
+// `auto_cramers_v_macrostripe` from the ↻ auto-merge V macro Mode 2
+// button), and computes pairwise + triple genomic overlap. Two
+// candidates "agree" when same chrom + bp range intersects
+// (max(start) <= min(end)). Renders a single-line summary strip;
+// hidden when no candidates carry any of the tracked sources.
+//
+// 2026-05-20 (Quentin feedback): the original 3-set was
+// (auto_l2_sweep, auto_cramers_v_local, auto_cramers_v_macrostripe)
+// per the SPEC, but the legacy inheritance L2-sweep is no longer the
+// workflow — every promote path now flows through the regimes-page
+// pipeline. Replaced auto_l2_sweep with l3_pair_merge so the audit
+// strip compares the three modes the user actually runs today.
+//
+// Output shape per source bucket A:
+//   |A|      = number of candidates tagged with source A
+//   A∩B      = candidates in A with ≥1 overlapping candidate in B
+//   A∩B∩C    = candidates in A with overlap in both B and C
+//   A-only   = candidates in A with no overlap in B nor C
+//
+// (Counts are computed from each source's perspective. By symmetry,
+//  A∩B == B∩A is not guaranteed because two candidates can map 1:N —
+//  but the agreement read is the right one for the audit question.)
+// =====================================================================
+
+const _AUTO_SOURCES = [
+  { key: 'l3_pair_merge',              label: 'L3-pair',   short: 'L3p',
+    chip: 'src-chip-l3_pair_merge' },
+  { key: 'auto_cramers_v_local',       label: 'V · local', short: 'Vloc',
+    chip: 'src-chip-auto_cramers_v_local' },
+  { key: 'auto_cramers_v_macrostripe', label: 'V · macro', short: 'Vmac',
+    chip: 'src-chip-auto_cramers_v_macrostripe' },
+];
+
+function _overlapsBp(a, b) {
+  if (!a || !b) return false;
+  const sa = a.start_bp | 0, ea = a.end_bp | 0;
+  const sb = b.start_bp | 0, eb = b.end_bp | 0;
+  if (!Number.isFinite(sa) || !Number.isFinite(ea)) return false;
+  if (!Number.isFinite(sb) || !Number.isFinite(eb)) return false;
+  if (a.chrom && b.chrom && a.chrom !== b.chrom) return false;
+  return Math.max(sa, sb) <= Math.min(ea, eb);
+}
+
+function _renderSourceOverlap(state) {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById('catSourceOverlap');
+  if (!el) return;
+  const list = (state && Array.isArray(state.candidateList))
+    ? state.candidateList : [];
+  // Partition by source.
+  const buckets = _AUTO_SOURCES.map(s => ({
+    src: s, cands: list.filter(c => c && c.source === s.key),
+  }));
+  const totalAuto = buckets.reduce((acc, b) => acc + b.cands.length, 0);
+  if (totalAuto === 0) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  el.style.display = 'flex';
+
+  // Per-bucket overlap counts.
+  const stats = buckets.map((bk, bi) => {
+    const others = buckets.filter((_, j) => j !== bi);
+    let nABC = 0;          // overlap with BOTH other sources
+    let nOnly = 0;         // overlap with neither other source
+    const pairwise = others.map(() => 0);
+    for (const c of bk.cands) {
+      const hits = others.map(ob =>
+        ob.cands.some(d => d.id !== c.id && _overlapsBp(c, d)));
+      hits.forEach((h, hi) => { if (h) pairwise[hi]++; });
+      if (hits.every(Boolean)) nABC++;
+      else if (hits.every(h => !h)) nOnly++;
+    }
+    return { src: bk.src, n: bk.cands.length, pairwise, others,
+             nABC, nOnly };
+  });
+
+  // Build the HTML.
+  const parts = [];
+  parts.push('<span style="color: var(--ink); font-weight: 500;">compare modes:</span>');
+  for (const st of stats) {
+    const colour = st.src.chip;
+    parts.push(
+      '<span class="src-chip ' + colour + '" title="Candidates auto-promoted as ' +
+      _escape(st.src.label) + ' (source=' + _escape(st.src.key) + ').">' +
+      _escape(st.src.label) + ': <b>' + st.n + '</b>' +
+      '</span>'
+    );
+  }
+  // Pairwise: A∩B (count from A's perspective + count from B's perspective
+  // — we show whichever is non-zero. Two candidates can map 1:N so they
+  // can differ; the audit read is "at least N regions from A intersect B").
+  const pairLabels = [
+    [0, 1, 'L3p ∩ Vloc'],
+    [0, 2, 'L3p ∩ Vmac'],
+    [1, 2, 'Vloc ∩ Vmac'],
+  ];
+  for (const [ai, bi, lbl] of pairLabels) {
+    const A = stats[ai], B = stats[bi];
+    // A's "overlap with bucket index" — A.others matches buckets with index != ai,
+    // in original order. We need to find the slot whose .src.key matches B's key.
+    const aIdxInOthers = A.others.findIndex(o => o.src.key === B.src.key);
+    const bIdxInOthers = B.others.findIndex(o => o.src.key === A.src.key);
+    const nA = aIdxInOthers >= 0 ? A.pairwise[aIdxInOthers] : 0;
+    const nB = bIdxInOthers >= 0 ? B.pairwise[bIdxInOthers] : 0;
+    const n  = Math.max(nA, nB);
+    if (n > 0) {
+      parts.push(
+        '<span style="padding: 1px 8px; border-radius: 3px; ' +
+        'background: rgba(120,140,170,0.10); border: 1px solid var(--rule); ' +
+        'color: var(--ink);" title="Candidates from each side that overlap a candidate from the other (max of both directions).">' +
+        _escape(lbl) + ': <b>' + n + '</b></span>'
+      );
+    }
+  }
+  // Triple intersection.
+  const tripleN = stats[0].nABC;
+  if (tripleN > 0) {
+    parts.push(
+      '<span style="padding: 1px 8px; border-radius: 3px; ' +
+      'background: rgba(60,192,138,0.15); border: 1px solid var(--good); ' +
+      'color: var(--good); font-weight: 600;" title="Regions where all three auto-promote modes agree (each has a candidate that overlaps a candidate from each of the other two).">' +
+      'all 3 agree: <b>' + tripleN + '</b></span>'
+    );
+  }
+  // Per-source "only" counts.
+  const onlyParts = [];
+  for (const st of stats) {
+    if (st.nOnly > 0) {
+      onlyParts.push(_escape(st.src.short) + '-only: <b>' + st.nOnly + '</b>');
+    }
+  }
+  if (onlyParts.length) {
+    parts.push(
+      '<span style="color: var(--ink-dimmer); margin-left: 6px;" ' +
+      'title="Candidates each mode caught that no other mode caught (disagreement regions).">' +
+      onlyParts.join(' · ') + '</span>'
+    );
+  }
+  el.innerHTML = parts.join('');
+}
+
+// =====================================================================
+// Source-filter option counts (2026-05-20)
+// =====================================================================
+// Updates the labels of every #catSourceFilter <option> to include the
+// per-source candidate count: "V · local" → "V · local (8)". Hides
+// options for sources that have 0 matching candidates (so the dropdown
+// doesn't surface obsolete legacy sources). The "all sources" option
+// always shows the unfiltered count.
+function _refreshSourceFilterCounts(state) {
+  if (typeof document === 'undefined') return;
+  const sel = document.getElementById('catSourceFilter');
+  if (!sel) return;
+  const list = (state && Array.isArray(state.candidateList))
+    ? state.candidateList : [];
+  // Tally per-source counts.
+  const counts = new Map();
+  for (const c of list) {
+    if (!c) continue;
+    const key = (typeof c.source === 'string' && c.source) ? c.source : '';
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  // Walk every <option>; preserve its original (count-free) label in
+  // dataset.baseLabel so re-renders don't accumulate "(N) (N) (N)".
+  for (const opt of sel.options) {
+    if (!opt.dataset.baseLabel) {
+      opt.dataset.baseLabel = opt.textContent;
+    }
+    const base = opt.dataset.baseLabel;
+    if (!opt.value) {
+      // "all sources" — show total
+      opt.textContent = list.length > 0 ? `${base} (${list.length})` : base;
+      opt.hidden = false;
+      continue;
+    }
+    const n = counts.get(opt.value) || 0;
+    opt.textContent = n > 0 ? `${base} (${n})` : base;
+    // Hide zero-count options unless they're currently selected (so
+    // the user can still un-pick them).
+    opt.hidden = (n === 0) && (sel.value !== opt.value);
   }
 }
 
@@ -592,6 +846,7 @@ function _canListen(t) {
 
 let _filterInputHandler   = null;
 let _verdictChangeHandler = null;
+let _sourceChangeHandler  = null;
 let _headClickHandler     = null;
 let _bodyClickHandler     = null;
 let _selectAllHandler     = null;
@@ -635,6 +890,7 @@ export function wireCatalogueToolbar(state, opts) {
 
   const filterIn  = document.getElementById('catFilter');
   const verdictIn = document.getElementById('catVerdictFilter');
+  const sourceIn  = document.getElementById('catSourceFilter');
   const head      = document.getElementById('catHead');
   const body      = document.getElementById('catBody');
   const selectAll = document.getElementById('catSelectAll');
@@ -662,6 +918,11 @@ export function wireCatalogueToolbar(state, opts) {
   _verdictChangeHandler = (evt) => {
     if (!state) return;
     state.catVerdictFilter = (evt && evt.target && evt.target.value) || '';
+    refresh();
+  };
+  _sourceChangeHandler = (evt) => {
+    if (!state) return;
+    state.catSourceFilter = (evt && evt.target && evt.target.value) || '';
     refresh();
   };
   _headClickHandler = (evt) => {
@@ -780,6 +1041,8 @@ export function wireCatalogueToolbar(state, opts) {
 
   if (_canListen(filterIn))  filterIn.addEventListener('input',  _filterInputHandler);
   if (_canListen(verdictIn)) verdictIn.addEventListener('change', _verdictChangeHandler);
+  if (_canListen(sourceIn))  sourceIn.addEventListener('change',  _sourceChangeHandler);
+  if (sourceIn && state.catSourceFilter) sourceIn.value = state.catSourceFilter;
   if (_canListen(head))      head.addEventListener('click',      _headClickHandler);
   if (_canListen(body))      body.addEventListener('click',      _bodyClickHandler);
   if (_canListen(selectAll)) selectAll.addEventListener('click', _selectAllHandler);
@@ -803,6 +1066,7 @@ export function teardownCatalogueToolbar() {
   const pairs = [
     ['catFilter',        'input',  '_filterInputHandler'],
     ['catVerdictFilter', 'change', '_verdictChangeHandler'],
+    ['catSourceFilter',  'change', '_sourceChangeHandler'],
     ['catHead',          'click',  '_headClickHandler'],
     ['catBody',          'click',  '_bodyClickHandler'],
     ['catSelectAll',     'click',  '_selectAllHandler'],
@@ -820,7 +1084,8 @@ export function teardownCatalogueToolbar() {
     ['catDiamondStrict2',  'click', '_diamondStrict2Handler'],
   ];
   const handlers = {
-    _filterInputHandler,   _verdictChangeHandler, _headClickHandler, _bodyClickHandler,
+    _filterInputHandler,   _verdictChangeHandler, _sourceChangeHandler,
+    _headClickHandler, _bodyClickHandler,
     _selectAllHandler,     _clearSelHandler,      _viewFavHandler,   _viewL2Handler,
     _dispSimpleHandler,    _dispDetailedHandler,
     _exportTSVHandler,     _exportMDHandler,      _exportJSONHandler,
@@ -833,7 +1098,8 @@ export function teardownCatalogueToolbar() {
     const el = document.getElementById(id);
     if (_canListen(el)) el.removeEventListener(evt, h);
   }
-  _filterInputHandler = _verdictChangeHandler = _headClickHandler = _bodyClickHandler = null;
+  _filterInputHandler = _verdictChangeHandler = _sourceChangeHandler = null;
+  _headClickHandler = _bodyClickHandler = null;
   _selectAllHandler   = _clearSelHandler      = _viewFavHandler   = _viewL2Handler = null;
   _dispSimpleHandler  = _dispDetailedHandler  = null;
   _exportTSVHandler   = _exportMDHandler      = _exportJSONHandler = null;

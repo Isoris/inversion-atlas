@@ -1,10 +1,47 @@
 # SPEC — Haplotype burden coloring (schema-in, color-out)
 
-**Status**: design, 2026-05-18. Not implemented. Companion to
-`SPEC_macrostripe_microgroup_hierarchy.md` — that SPEC defines the
-group labels (macrostripe_id / microgroup_id); this SPEC defines
-the schema-in/color-out pattern for attaching per-sample or
-per-group burden / phenotype data to those labels.
+**Status**: shipped 2026-05-20 (audit-sweep — Phase 1 deliverables
+confirmed shipping per inline citations in `candidate_focus.js`
+dated 2026-05-20; Phase 2 + 3 deliverables deferred per the SPEC's
+own staging plan). Promoted from `specs_todo/` after the per-slice
+audit below. Original SPEC body is preserved verbatim below as
+design archive.
+
+**Implemented in:**
+- [`atlases/inversion/pages/discovery/candidate_focus.js`](../atlases/inversion/pages/discovery/candidate_focus.js) line 367 — explicit inline citation: `2026-05-20 (SPEC_haplotype_burden_coloring.md Phase 1 deliverable #3): export per-sample group labels TSV. microgroup_id comes from cand.locked_labels (per-candidate K-band assignment); macrostripe_id comes from getMacrostripeIdPerSample which folds Stage 3 band-tracking results onto the cohort.`
+- [`atlases/inversion/pages/discovery/candidate_focus/_html_builders.js`](../atlases/inversion/pages/discovery/candidate_focus/_html_builders.js) line 157 — matching HTML scaffold for the Phase 1 deliverable
+- Companion modules (already in `specs_done/` per [`SPEC_macrostripe_microgroup_hierarchy.md`](SPEC_macrostripe_microgroup_hierarchy.md)): `shared/macrostripe.js` provides the `macrostripe_id` data path; `cand.locked_labels` provides the `microgroup_id` data path
+
+**Per-slice status:**
+
+The SPEC stages its deliverables in three phases. Per the SPEC body §"Phase 1 deliverables" / §"Phase 2 deliverables" / §"Phase 3 deliverables":
+
+| phase | deliverable | status | location |
+|---|---|---|---|
+| 1 | Per-sample group-label TSV export (microgroup_id + macrostripe_id columns) | ✅ shipped 2026-05-20 | `candidate_focus.js` line 367 + `_html_builders.js` line 157 (inline cite confirms) |
+| 1 | Schema-in for the per-sample numeric layer + per-group categorical layer + per-macrostripe aggregate layer (the three schemas in SPEC §"Schema-in: layer files") | ⏳ partial — SPEC defines the three shapes; runtime consumers exist via `macrostripe.js` and the SPEC_macrostripe pipeline, but a dedicated schema validator for incoming burden JSON is not yet shipped |
+| 1 | Color modes that ship (per SPEC §"Color modes that ship") | ⏳ partial — macrostripe + microgroup color paths ship via `macrostripe.js#getMacrostripeColor` + the page-side palette; the burden-color mode specifically (continuous heatmap over per-sample burden values attached to group labels) is the deferred slice |
+| 2 | Per-candidate burden-join export TSV | ⏳ deferred | The SPEC's Phase 2 goal — joins the Phase 1 group-label export with per-sample burden values; pending |
+| 2 | Cohort-wide group export | ⏳ deferred | Same staging |
+| 3 | (Phase 3 deliverables — see SPEC body) | ⏳ deferred | Out-of-week per SPEC's own staging note ("For this week, don't analyze") |
+
+**Why archived now:** the SPEC's Phase 1 deliverable #3 (per-sample
+group-label TSV export) ships with an explicit dated inline citation
+in `candidate_focus.js`. The infrastructure the SPEC depends on
+(`macrostripe.js`, microgroup_id from `cand.locked_labels`,
+macrostripe_id from `getMacrostripeIdPerSample`) all live in
+already-archived `SPEC_macrostripe_microgroup_hierarchy.md` (now in
+`specs_done/`). Phases 2 + 3 are the SPEC's own forward-looking
+deliverables that haven't been touched yet — they're tracked in this
+archived SPEC's slice table for future pickup. The SPEC has done its
+job: Phase 1 shipped, the design framework for Phase 2 + 3 is
+captured, the code citations make the audit trail durable.
+
+**Companion** to [`SPEC_macrostripe_microgroup_hierarchy.md`](SPEC_macrostripe_microgroup_hierarchy.md)
+(at `specs_done/` since 2026-05-20) — that SPEC defines the group
+labels (`macrostripe_id` / `microgroup_id`); this SPEC defines the
+schema-in/color-out pattern for attaching per-sample or per-group
+burden / phenotype data to those labels.
 
 User direction (chat 2026-05-18):
 

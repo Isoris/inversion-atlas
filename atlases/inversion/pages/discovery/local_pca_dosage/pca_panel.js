@@ -446,7 +446,36 @@ export function drawPCA(state) {
   // for "no data yet".
   if (_PCA_RAMP_MODES.has(state.colorMode)) {
     try {
-      const vals = perSampleValuesForMode(state, state.colorMode, { startW: cur, endW: cur });
+      // 2026-05-20: range widens for chunk-backed modes (het / dosage).
+      // A single-window range is ~5-20 SNPs per sample → noisy means
+      // (mostly 0 / 1 / 0.5 with no gradient) AND a dosage-chunk LRU
+      // key that almost never matches a previously-fetched chunk
+      // (lines panel typically fetches at L2 or Mb-visible granularity).
+      // Quentin: "dosage in the tracked samples doesnt appear the
+      // points are grey, normally it should show the mean dosage from
+      // snps". Widen to the current L2 envelope when inside one;
+      // otherwise ±20 windows around cur. Result: stable per-sample
+      // mean that matches what the L3 contingency chips compute, and
+      // the chunk lookup hits a cached chunk almost every time. Other
+      // ramp modes (theta_pi / ghsl / froh / confounder_alert) keep
+      // the single-window range — they're point evaluators.
+      let rangeStartW = cur, rangeEndW = cur;
+      if (state.colorMode === 'het' || state.colorMode === 'dosage') {
+        const curL2 = state.windowToL2 ? state.windowToL2[cur] : -1;
+        if (curL2 >= 0 && state.data.l2_envelopes
+            && state.data.l2_envelopes[curL2]) {
+          const env = state.data.l2_envelopes[curL2];
+          rangeStartW = (env._s0 != null) ? env._s0 : (env.start_w - 1);
+          rangeEndW   = (env._e0 != null) ? env._e0 : (env.end_w - 1);
+        } else {
+          // Fallback when cursor is between L2 envelopes: ±20 windows.
+          const slabHalf = 20;
+          rangeStartW = Math.max(0, cur - slabHalf);
+          rangeEndW   = Math.min((d.n_windows | 0) - 1, cur + slabHalf);
+        }
+      }
+      const vals = perSampleValuesForMode(state, state.colorMode,
+        { startW: rangeStartW, endW: rangeEndW });
       state._pcaModePsVals = vals ? { mode: state.colorMode, vals } : null;
     } catch (e) {
       state._pcaModePsVals = null;
@@ -455,6 +484,11 @@ export function drawPCA(state) {
   } else {
     state._pcaModePsVals = null;
   }
+  // 2026-05-20: refresh the ramp-legend strip so the gradient bar +
+  // min/max value labels match the active ramp mode. Quentin: "for
+  // GHSL and dosage we need a little bit of the scale". Always runs
+  // (the helper hides itself when no ramp mode is active).
+  try { _refreshRampLegend(state); } catch (_) {}
 
   // v3.25: which two PCs to plot (default PC1×PC2). PC1 keeps its sign-flip
   // rule (signX); other PCs render in raw orientation. The analytics path
@@ -698,10 +732,137 @@ export function drawPCA(state) {
       && state.selectionGroup.ids.length && _pcaScreenXY) {
     _drawSelectionHalo(ctx, state.selectionGroup.ids, _pcaScreenXY);
   }
+  // 2026-05-20: K-cluster colour legend. User: "can we get a scale or
+  // smth to know a bit our colors correspond to what in the tracked
+  // samples pca". Renders a small chip row at the top-right of the
+  // scatter when kmeans labels are available, mirroring the palette
+  // used by the tracked-dot halos at line ~666 so chips + halos read
+  // the same. Cheap: one chip per K, no per-sample loop.
+  // When colorMode='cluster' but groupLabels is null, render a short
+  // "why grey" hint instead — that case fires when the cursor is
+  // between L2 envelopes (state.windowToL2[cur] === -1), and the user
+  // otherwise has no clue why points dropped from coloured to grey.
+  try {
+    if (groupLabels) {
+      _drawKLegend(ctx, groupLabels, state, pad, plotW);
+    } else if (state.colorMode === 'cluster' && curL2 < 0) {
+      _drawNoClusterHint(ctx, pad, plotW);
+    }
+  } catch (e) { /* fail-soft */ }
   // turn 120: refresh the scree inset on every PCA draw. Cheap (pure SVG
   // string write to an absolutely-positioned div, no canvas, no layout).
   // The renderer handles the off/on toggle and the empty-state internally.
   try { _refreshScreeInset(); } catch (e) { /* fail-soft */ }
+}
+
+// 2026-05-20: K-cluster legend renderer. Paints a row of small chips at
+// the top-right of the scatter showing color → cluster mapping for the
+// current K. Uses the same palette as the tracked-dot halo so the user
+// can read the scatter without scrolling to the K-bar at the bottom.
+// Mode-aware labels: in kmeans mode shows "k1, k2, k3", in macrostripe
+// or h_system mode falls back to numeric indices.
+const _K_LEGEND_PALETTE = ['#4fa3ff', '#b8b8b8', '#f5a524',
+                           '#3cc08a', '#e0555c', '#b07cf7'];
+function _drawKLegend(ctx, groupLabels, state, pad, plotW) {
+  if (!groupLabels) return;
+  // Find K = max label + 1, clipped against the palette size.
+  let K = 0;
+  for (let i = 0; i < groupLabels.length; i++) {
+    const v = groupLabels[i];
+    if (Number.isFinite(v) && v + 1 > K) K = v + 1;
+  }
+  if (K < 1) return;
+  K = Math.min(K, _K_LEGEND_PALETTE.length);
+
+  // Count samples per cluster — surfaces the per-K population.
+  const counts = new Array(K).fill(0);
+  for (let i = 0; i < groupLabels.length; i++) {
+    const v = groupLabels[i];
+    if (Number.isFinite(v) && v >= 0 && v < K) counts[v]++;
+  }
+
+  // Layout: chips along a row inside the scatter's top-right corner,
+  // each chip = "● kN (count)". Drawn over the points with a panel
+  // background so the text stays readable on top of dense clusters.
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.textBaseline = 'middle';
+  const dotR = 4;
+  const padInside = 5;
+  const gap = 10;
+  const labels = [];
+  let totalW = 0;
+  for (let k = 0; k < K; k++) {
+    const text = `k${k + 1} (${counts[k]})`;
+    const tw = ctx.measureText(text).width;
+    labels.push({ text, tw, color: _K_LEGEND_PALETTE[k] });
+    totalW += dotR * 2 + 4 + tw + gap;
+  }
+  totalW -= gap;   // no trailing gap
+  const boxW = totalW + padInside * 2;
+  const boxH = 18;
+  // Right-anchored. Reserve room for the scree inset above the scatter
+  // (it's positioned via _positionScreeInsetSmart and varies; we just
+  // dodge the very top-right corner by parking under it).
+  const boxX = pad.l + plotW - boxW - 4;
+  const boxY = pad.t + 4;
+  ctx.save();
+  ctx.fillStyle = 'rgba(14, 17, 24, 0.78)';
+  ctx.strokeStyle = themeColor('rule');
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(boxX + 0.5, boxY + 0.5, boxW, boxH, 3);
+  } else {
+    ctx.rect(boxX + 0.5, boxY + 0.5, boxW, boxH);
+  }
+  ctx.fill();
+  ctx.stroke();
+  let cx = boxX + padInside + dotR;
+  const cy = boxY + boxH / 2;
+  for (const item of labels) {
+    ctx.fillStyle = item.color;
+    ctx.beginPath();
+    ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = themeColor('ink');
+    ctx.textAlign = 'left';
+    ctx.fillText(item.text, cx + dotR + 4, cy);
+    cx += dotR * 2 + 4 + item.tw + gap;
+  }
+  ctx.restore();
+}
+
+// 2026-05-20: explanatory hint shown in the legend slot when colorMode
+// is 'cluster' but the cursor is outside any L2 envelope. Without this
+// the user sees grey dots with no explanation — the scatter falls back
+// to grey because there's nothing to colour by until the cursor enters
+// an L2.
+function _drawNoClusterHint(ctx, pad, plotW) {
+  const text = 'no cluster · cursor outside any L2 envelope';
+  ctx.save();
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.textBaseline = 'middle';
+  const tw = ctx.measureText(text).width;
+  const padInside = 8;
+  const boxW = tw + padInside * 2;
+  const boxH = 18;
+  const boxX = pad.l + plotW - boxW - 4;
+  const boxY = pad.t + 4;
+  ctx.fillStyle = 'rgba(14, 17, 24, 0.78)';
+  ctx.strokeStyle = themeColor('rule');
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(boxX + 0.5, boxY + 0.5, boxW, boxH, 3);
+  } else {
+    ctx.rect(boxX + 0.5, boxY + 0.5, boxW, boxH);
+  }
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = themeColor('ink-dim') || '#aaa';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, boxX + boxW / 2, boxY + boxH / 2);
+  ctx.restore();
 }
 
 // ---------------------------------------------------------------------------
@@ -1012,6 +1173,66 @@ export function togglePlay(state) {
   }
 }
 
+// --- _refreshRampLegend(state) — 2026-05-20 ---
+// Paints the gradient-swatch + min/max labels in #pcaAxisRampLegend so
+// the user can read what blue → yellow means under the active ramp.
+// Hides itself when state.colorMode is not a ramp mode, or when the
+// pre-computed per-sample values are missing (e.g. chunk in flight).
+function _refreshRampLegend(state) {
+  if (typeof document === 'undefined') return;
+  const wrap = document.getElementById('pcaAxisRampLegend');
+  if (!wrap) return;
+  const ramp = (state && _PCA_RAMP_MODES.has(state.colorMode)) ? state.colorMode : null;
+  if (!ramp) {
+    wrap.style.display = 'none';
+    return;
+  }
+  // Compute the data-driven min/max for sequential modes; the
+  // divergent / binary modes have fixed semantic ranges (see
+  // perSampleColorFor in shared/per_sample_line_color.js).
+  const psv = (state && state._pcaModePsVals && state._pcaModePsVals.mode === ramp)
+    ? state._pcaModePsVals.vals : null;
+  let vMin = NaN, vMax = NaN;
+  if (psv && psv.length) {
+    for (let i = 0; i < psv.length; i++) {
+      const v = psv[i];
+      if (!Number.isFinite(v)) continue;
+      if (!(vMin <= vMin) || v < vMin) vMin = v;
+      if (!(vMax <= vMax) || v > vMax) vMax = v;
+    }
+  }
+  // Mode-specific gradient + label format.
+  let gradientCss = null, minLbl = '', maxLbl = '';
+  if (ramp === 'het') {
+    gradientCss = 'linear-gradient(to right, #4a90ff, #cccccc, #d94f4f)';
+    minLbl = '0'; maxLbl = '1';
+  } else if (ramp === 'dosage') {
+    gradientCss = 'linear-gradient(to right, #2c8fa1, #9aa1a8, #d94f4f)';
+    minLbl = '0'; maxLbl = '2';
+  } else if (ramp === 'theta_pi' || ramp === 'ghsl') {
+    gradientCss = 'linear-gradient(to right, #2b6ca8, #f0c14b)';
+    minLbl = Number.isFinite(vMin) ? vMin.toFixed(3) : '—';
+    maxLbl = Number.isFinite(vMax) ? vMax.toFixed(3) : '—';
+  } else if (ramp === 'froh') {
+    gradientCss = 'linear-gradient(to right, #8c96aa, #d94f4f)';
+    minLbl = '0'; maxLbl = '1';
+  } else if (ramp === 'confounder_alert') {
+    gradientCss = 'linear-gradient(to right, #8c96aa 50%, #d94f4f 50%)';
+    minLbl = '≤0.05'; maxLbl = '>0.05';
+  }
+  if (!gradientCss) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = 'inline-flex';
+  const bar = wrap.querySelector('.pca-axis-ramp-legend-bar');
+  const minEl = wrap.querySelector('.pca-axis-ramp-legend-min');
+  const maxEl = wrap.querySelector('.pca-axis-ramp-legend-max');
+  if (bar) bar.style.background = gradientCss;
+  if (minEl) minEl.textContent = minLbl;
+  if (maxEl) maxEl.textContent = maxLbl;
+}
+
 // --- cycleKAside() — legacy lines 56537-56565 ---
 // v4 turn 3: K-cycle button on the tracked-samples aside. Click cycles
 // state.k through 3 → 4 → 5 → 6 → 2 → 3, recoloring the PCA scatter,
@@ -1026,12 +1247,28 @@ export function cycleKAside(state) {
   state.kMode = 'fixed';
   state.k = next;
   state.l2GroupCache = null; state.cacheKey = null;
+  // 2026-05-20: drop tracked samples on K-change. The K-bands at the
+  // new K don't necessarily correspond to the bands the tracked set
+  // was picked from — keeping the old picks created a confusing state
+  // where the band picker was "stuck" on a now-invalid band but the
+  // tracked PCA still rendered the previous selection. Quentin: "we
+  // still cannot clear selection when we select like a different K
+  // on the tracked samples PCA". K-cycle is a coarse mode change;
+  // resetting state.tracked matches the user's mental model of
+  // "starting fresh in the new K".
+  state.tracked = [];
+  if (state.trackingAnchor) state.trackingAnchor = null;
   // Mirror to sidebar kSelect so both UIs stay aligned
   const _kSel = document.getElementById('kSelect');
   if (_kSel) _kSel.value = String(next);
   try { refreshBandPickBar(state); } catch (_) {}
-  if (state.trackingAnchor) state.trackingAnchor = null;
   try { recomputeAnchorConcord(); } catch (_) {}
+  // 2026-05-20: renderTrackedList sweeps the sidebar + compact + popup
+  // tracked-list surfaces. Because cycleKAside above just cleared
+  // state.tracked, this call wipes the visible chip list — without it,
+  // the UI would still show the stale sample chips until the next
+  // unrelated re-render.
+  try { renderTrackedList(state); } catch (_) {}
   try { drawPCA(state); }        catch (_) {}
   try { drawLinesPanel(state); } catch (_) {}
   try { renderZoneBlock(state); }catch (_) {}

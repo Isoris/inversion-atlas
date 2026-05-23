@@ -1,15 +1,50 @@
 # SPEC — MSMC demographic validation per founder-like background
 
-**Status**: SPEC ONLY — awaiting audit before implementation.
-Authored 2026-05-19 from chat context (Chinese alligator MSMC analogy +
-the long-range regime work shipped in `pca_comparator` heatmap).
+**Status**: SPEC ONLY — confirmed unimplemented after 2026-05-21 audit.
+Stays in `specs_todo/` (no shipped code to archive). Audit findings
+below; SPEC body preserved verbatim from the 2026-05-19 chat origin.
 
-**Implemented in**: nothing yet. Closest existing primitives:
-- `atlases/inversion/pages/discovery/pca_comparator/heatmap.js`
-  (per-(sample × window) dosage K-band labels via `windowToL2[w] →
-  getL2Cluster(state, l2).labels`)
-- `atlases/inversion/shared/regimes_registry.js`
-- `atlases/inversion/shared/boundary_evidence.js`
+**Audit summary (2026-05-21):**
+
+No part of the MSMC-per-founder pipeline is implemented anywhere in the
+codebase. Grep across `inversion-atlas/`, `atlas-core/`,
+`Specs_WIP_modules/`, and `catfish-inversion-analysis/` returns zero
+hits for `founder_population` / `founder_background` / `regime_sharing_matrix`
+/ `per_founder` / `inversion_masked` / `masked_msmc` outside this SPEC's
+own text.
+
+The single MSMC-adjacent file in the repo —
+[`atlases/inversion/shared/mgl_founder_consensus.js`](../atlases/inversion/shared/mgl_founder_consensus.js)
+(265 lines) — solves a **different** problem: per-site founder-like
+allele frequency for inversion *arrangements* (dosage consensus within
+an INV class). It does not group samples by demographic background and
+does not feed MSMC. Naming overlap only.
+
+**Blockers (in build order):**
+
+| step | what it requires                                                       | status |
+|------|------------------------------------------------------------------------|--------|
+| 1    | Regime-sharing matrix (per-(sample × sample) regime-co-occurrence)    | ⏳ not shipped — upstream input the SPEC reuses from `pca_comparator/heatmap.js`'s per-window band labels |
+| 2    | Sample clustering on the regime-sharing matrix → founder-like groups   | ⏳ not started |
+| 3    | Per-founder MSMC config writer (with inversion intervals masked)       | ⏳ not started — would live producer-side in catfish-inversion-analysis |
+| 4    | MSMC runner + per-founder Ne(t) output collation                       | ⏳ not started — external tool |
+| 5    | Atlas page consumer (overlay Ne(t) curves per founder)                 | ⏳ not started |
+
+**Closest existing primitives** (would be inputs / reused machinery,
+not implementations):
+- [`atlases/inversion/pages/discovery/pca_comparator/heatmap.js`](../atlases/inversion/pages/discovery/pca_comparator/heatmap.js)
+  — per-(sample × window) dosage K-band labels via `windowToL2[w] →
+  getL2Cluster(state, l2).labels`. Step 1's regime-sharing matrix
+  would be derived from these.
+- [`atlases/inversion/shared/regimes_registry.js`](../atlases/inversion/shared/regimes_registry.js) — regime catalog
+- [`atlases/inversion/shared/boundary_evidence.js`](../atlases/inversion/shared/boundary_evidence.js) — regime-boundary primitives
+
+**Recommended sequencing**: ship Step 1 (regime-sharing matrix
+producer) FIRST as a standalone deliverable. It has standalone value
+(visualisable as a sample-similarity heatmap) and unblocks Steps 2–5
+on its own timeline. Don't start MSMC config-writing until real founder
+clusters are observable in Step 1's output — premature implementation
+would lock in a clustering choice before any data validates it.
 
 **Companion specs**:
 - `SPEC_local_pca_comparator.md` (the band-persistence heatmap is the

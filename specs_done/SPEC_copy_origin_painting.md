@@ -1,6 +1,46 @@
 # COPY_ORIGIN_PAINTING_SPEC — paralogue ancestry painting for breakpoint detection
 
-**Status**: SPEC ONLY. Not yet implemented. Awaiting audit.
+**Status**: PARTIAL — Steps D + E shipped 2026-05-21 (audit). Steps A–C
+remain data-bound and unimplemented. SPEC body below is preserved
+verbatim from the 2026-05-08 chat origin.
+
+**Implemented in (Steps D + E):**
+- [`atlases/inversion/shared/copy_origin_painting.js`](../atlases/inversion/shared/copy_origin_painting.js) — 421 lines, pure-JS primitives
+- [`tests/test_shared_copy_origin_painting.js`](../tests/test_shared_copy_origin_painting.js) — 250-line unit test suite
+- Consumer: [`atlases/inversion/shared/inversion_classification.js`](../atlases/inversion/shared/inversion_classification.js) — `origin_mechanism` + `copy_origin_verdict` fields fed by the two exports below
+
+**Public surface (shipped):**
+- `classifyBreakpointMechanism(windows, opts)` — per-window paint sequence → `NAHR-compatible` / `TE-mediated` / `NHEJ/MMEJ-compatible` / `complex paralogue mosaic` / `replication-based` / `no mosaic evidence` (vocabulary matches SPEC §"Step D")
+- `partitionPaintingByArrangement(samples, painting)` — HOM_A / HET / HOM_B copy-origin summary
+- `interpretCopyOriginPattern(perGroup)` — cross-group verdict (`arrangement-specific SD mosaic` / `no copy-origin difference` / `complex rearrangement` / `low-PSV-density uncallable`)
+- `COPY_ORIGIN_MECHANISMS` — frozen vocab table (six labels, all SPEC-compliant — "compatible" not "confirmed")
+
+**Per-step status matrix:**
+
+| step | scope                                                              | status |
+|------|--------------------------------------------------------------------|--------|
+| A    | Define paralogue copies (per-locus SD discovery)                   | ⏳ data-bound (PSV-calling pipeline upstream) |
+| B    | Find paralogue-informative SNVs (PSVs)                             | ⏳ data-bound (depends on Step A) |
+| C    | Paint reads/windows against the K paralogue copies                 | ⏳ data-bound (per-window Q vector input) |
+| D    | Mechanism classification from per-window copy calls                | ✅ shipped — `classifyBreakpointMechanism` |
+| E    | Arrangement-group partition + interpretation                       | ✅ shipped — `partitionPaintingByArrangement` + `interpretCopyOriginPattern` |
+| F    | `05_breakpoint_switches.tsv` emission (TSV writer)                  | ⏳ deferred — pure-JS code computes the rows; the file writer is producer-side and lives in a future catfish-inversion-analysis stage |
+
+**Audit summary (2026-05-21):**
+
+The two pure-compute steps (D + E) are fully shipped with a 250-line test
+suite covering the six mechanism labels, the three arrangement groups,
+and the four interpretation verdicts. The exact "NAHR-compatible" /
+"NHEJ/MMEJ-compatible" / "no mosaic evidence" wording mandated by the
+SPEC §"Wording rules" is preserved verbatim in `COPY_ORIGIN_MECHANISMS`.
+TE-mediated and replication-based refinements (caller-supplied flags)
+are also implemented, slightly extending the SPEC's six-label vocabulary.
+
+Steps A–C are upstream data-prep that depend on the catfish PSV-calling
+pipeline (not yet producing PSVs at the per-locus resolution this
+module needs). When that pipeline ships, the shared module here will
+consume its output without further change to the public surface.
+
 **Source**: user-provided text, 2026-05-08 chat.
 **Position in pipeline**: complementary to Stage 4 — it runs as a
 post-hoc per-candidate analysis on regions where the long-range

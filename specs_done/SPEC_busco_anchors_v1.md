@@ -1,8 +1,39 @@
 # SPEC — BUSCO single-copy proteins as cross-species anchors
 
-**Status**: forward-looking spec. BUSCO faa exists per Quentin, atlas integration not yet built.
+**Status**: shipped 2026-05-20 (audit-sweep — atlas-side compute surface
+confirmed shipping). Promoted from `specs_todo/` after the per-slice
+audit below. Original SPEC body is preserved verbatim below as design
+archive.
+
+**Implemented in:**
+- [`atlases/inversion/shared/busco_anchors.js`](../atlases/inversion/shared/busco_anchors.js) — 8 exported compute functions + 5 constants: `BUSCO_ANCHORS_TOOL`, `BUSCO_ANCHORS_SCHEMA_VERSION`, `BUSCO_ARCHITECTURE_CLASSES`, `BUSCO_MIN_SHARED_FOR_SUGGEST`, `BUSCO_DEFAULT_FLANK_BP`, `isBuscoAnchorsJSON()` (schema validator), `indexAnchorsBySpecies()`, `deriveHomologyPairs()`, `buscoCountInWindow()`, `buscoDensityInWindow()`, `buscoDepletionVsFlank()`, `buscoSyntenyScore()`, `suggestArchitectureClass()`
+- [`tests/test_shared_busco_anchors.js`](../tests/test_shared_busco_anchors.js) — unit coverage
+
+**Per-slice status:**
+
+| slice | status | location |
+|---|---|---|
+| `busco_anchors_v1` JSON schema + validator | ✅ shipped | `BUSCO_ANCHORS_SCHEMA_VERSION = 1` + `isBuscoAnchorsJSON()` |
+| Per-species indexing | ✅ shipped | `indexAnchorsBySpecies()` |
+| Homology-pair derivation (single-copy 1:1 anchor pairs across species) | ✅ shipped | `deriveHomologyPairs()` |
+| Window-density helpers (count / density / vs-flank depletion) | ✅ shipped | `buscoCountInWindow()` + `buscoDensityInWindow()` + `buscoDepletionVsFlank()` |
+| Cross-species synteny scoring | ✅ shipped | `buscoSyntenyScore()` |
+| Architecture-class auto-suggest (focal vs sister) | ✅ shipped | `suggestArchitectureClass()` + `BUSCO_ARCHITECTURE_CLASSES` |
+| Page-16 ribbon-plot ticks integration | ⏳ deferred | No page-side consumer yet — the compute primitives are ready; ribbon-plot wiring is its own UI task |
+| Page-14 architecture-class auto-suggest integration | ⏳ deferred | Same — `suggestArchitectureClass()` is ready to plug in when the page wires it up |
+
+**Why archived now (vs kept partial):** the SPEC's atlas-side compute
+surface ships fully — every function the SPEC names (validator,
+indexing, density/depletion/synteny, architecture suggester) exists
+with test coverage. What's left is *page-side UI integration* on
+pages 14 and 16, which are atlas-page tasks tracked by their own
+page contracts, not by this SPEC. Per the audit convention,
+atlas-side compute surfaces complete → promote with deferred-slice
+annotation for the page UI integrations.
 
 **Reading order**: this spec → `SPEC_OVERVIEW_multispecies_architecture.md` for how it composes with miniprot, wfmash, comparative TE, and the phylogenetic tree.
+
+**Authored**: forward-looking spec (date not recorded on the original).
 
 ---
 

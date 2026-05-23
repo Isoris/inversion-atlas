@@ -1287,6 +1287,21 @@ export function buildLinesPanel(state) {
         const dd = Math.abs(d.windows[i].center_mb - targetMb);
         if (dd < bestD) { bestD = dd; bestWin = i; }
       }
+      // 2026-05-20: opt-in click diagnostic. User reported "per-sample
+      // lines click doesn't work anymore". Most likely culprits: (1)
+      // bestWin === state.cur so setCur's same-cur guard returns
+      // silently; (2) lasso swallow flag stuck; (3) plotW <= 0 (panel
+      // collapsed). Toggle via window.__linesClickDbg = true.
+      if (typeof window !== 'undefined' && window.__linesClickDbg === true) {
+        console.log('[linesClick]', {
+          src: cv.dataset.linesSource,
+          x: Math.round(x), plotW: Math.round(plotW),
+          frac: frac.toFixed(3), targetMb: targetMb.toFixed(3),
+          bestWin, curBefore: state.cur,
+          lassoActive: !!state.linesLassoActive,
+          swallowFlag: !!cv.__lassoSwallowClick,
+        });
+      }
       setCur(state, bestWin);
     });
     // v4 turn 114d: cs-breakpoint hover-glow on this subpanel. Same toX
@@ -1364,9 +1379,9 @@ export function buildLinesPanel(state) {
           x1: Math.max(r.x0, r.x1), y1: Math.max(r.y0, r.y1),
         };
         state.linesLassoRect = null;
-        const lassoed = _computeLinesLassoSamples(cv, state.linesLassoCommitted);
+        const lassoed = _computeLinesLassoSamples(state, cv, state.linesLassoCommitted);
         state.linesLassoSelected = lassoed;
-        if (typeof _updateLinesLassoUI === 'function') _updateLinesLassoUI();
+        _updateLinesLassoUI(state);
         drawLinesPanel(state);
       });
       cv.addEventListener('pointercancel', () => {
@@ -1463,6 +1478,77 @@ export function setLinesPanelCandidateBands(state, b) {
   _state.linesPanelCandidateBands = !!b;
   try { localStorage.setItem(_LINES_PANEL_CAND_BANDS_KEY, b ? '1' : '0'); } catch (_) {}
   drawLinesPanel(state);
+}
+
+// --- lasso hit-test — legacy lines 33689-33750 ---
+// Map a screen-space rectangle (in PC1 sub-canvas coords) back to data
+// space and return every sample idx whose PC1 trace passes through the
+// rectangle at any window in the rect's x-range.
+//
+// The PC1 sub-canvas uses pad = { l:44, r:16, t:6, b:8 } for its plot
+// area — MUST match the pad in drawLinesPanel (line ~166), otherwise
+// the hit-test rectangle no longer aligns with the painted lines.
+//
+// 2026-05-20: this function was missing from the modular split (only
+// referenced, never defined) — every lasso pointerup threw silently
+// and returned the empty array, so the badge always showed "0 selected".
+// Ported verbatim from legacy/Inversion_atlas.html:33689-33750 with
+// state passed explicitly as the first arg.
+function _computeLinesLassoSamples(state, canvas, rect) {
+  if (!state || !state.data || !canvas || !rect) return [];
+  const d = state.data;
+  const nWin = d.n_windows;
+  const nS = d.n_samples;
+  if (nWin < 2 || nS === 0) return [];
+  const cssRect = canvas.getBoundingClientRect();
+  const w = cssRect.width, h = cssRect.height;
+  const pad = { l: 44, r: 16, t: 6, b: 8 };
+  const plotW = w - pad.l - pad.r;
+  const plotH = h - pad.t - pad.b;
+  if (plotW <= 0 || plotH <= 0) return [];
+  const mbs = d.windows.map(w0 => w0.center_mb);
+  const _mbR = currentMbRange(state);
+  const mbMin = _mbR.mbMin, mbMax = _mbR.mbMax;
+
+  // Y range: same as drawLinesPanel — span all samples × all windows for PC1.
+  let yMin = Infinity, yMax = -Infinity;
+  for (let wi = 0; wi < nWin; wi++) {
+    const vals = getLinesValuesAt(state, wi, 'pc1');
+    if (!vals) continue;
+    const sign = getLinesSignAt(state, wi, 'pc1');
+    for (let si = 0; si < nS; si++) {
+      const v = vals[si] * sign;
+      if (!isFinite(v)) continue;
+      if (v < yMin) yMin = v;
+      if (v > yMax) yMax = v;
+    }
+  }
+  if (!isFinite(yMin) || !isFinite(yMax)) return [];
+  const yPad = (yMax - yMin) * 0.05 || 0.01;
+  yMin -= yPad; yMax += yPad;
+
+  const toX = (mb) => pad.l + ((mb - mbMin) / (mbMax - mbMin)) * plotW;
+  const toY = (v)  => pad.t + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+
+  const rx0 = rect.x0, ry0 = rect.y0, rx1 = rect.x1, ry1 = rect.y1;
+  const hitMask = new Uint8Array(nS);
+  for (let wi = 0; wi < nWin; wi++) {
+    const xCanvas = toX(mbs[wi]);
+    if (xCanvas < rx0 || xCanvas > rx1) continue;
+    const vals = getLinesValuesAt(state, wi, 'pc1');
+    if (!vals) continue;
+    const sign = getLinesSignAt(state, wi, 'pc1');
+    for (let si = 0; si < nS; si++) {
+      if (hitMask[si]) continue;
+      const v = vals[si] * sign;
+      if (!isFinite(v)) continue;
+      const yCanvas = toY(v);
+      if (yCanvas >= ry0 && yCanvas <= ry1) hitMask[si] = 1;
+    }
+  }
+  const out = [];
+  for (let si = 0; si < nS; si++) if (hitMask[si]) out.push(si);
+  return out;
 }
 
 // --- lasso wiring — legacy lines 33752-33782 + 34011-34014 + 34229-34262 ---

@@ -2,6 +2,9 @@
     <div id="psToolbar" class="ps-toolbar">
       <span class="label">tracks:</span>
       <span id="psChips"></span>
+      <!-- Live-fetch status: populated by popstats.js when POST /api/popstats/groupwise
+           runs. Empty when no live fetch has been attempted (e.g. no candidate). -->
+      <span id="psLiveStatus" class="ps-live-status" data-state="idle"></span>
     </div>
     <div id="psStack" class="ps-stack"></div>
     <div id="psNoChrom" class="ps-no-chrom" style="display:none;">

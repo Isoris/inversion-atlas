@@ -1,9 +1,46 @@
 # SPEC — Page-1 candidate mode UI (HANDOFF 2)
 
+**Status**: shipped 2026-05-20 (audit-sweep — default-mode atlas-side
+infrastructure + Parallel Candidate Registry + 5 page-side consumers
+all confirmed shipping; detailed-mode UI deferred pending HANDOFF-1
+cluster producer). Promoted from `specs_todo/` after the per-slice
+audit below. Original SPEC body is preserved verbatim below as design
+archive.
+
+**Implemented in:**
+- [`atlases/inversion/shared/candidate_mode.js`](../atlases/inversion/shared/candidate_mode.js) — 9 exports: `PCR_VALID_MODES = ['default', 'detailed']` + `PCR_MODE_STORAGE_KEY = 'inversion_atlas.activeMode'` + `pcrEnsureState()` + `getActiveMode()` / `setActiveMode()` + `getActiveCandidate()` / `setActiveCandidate()` + `getActiveCandidateList()` + `getActiveCandidatesMap()` + `clearDetailedState()` (the Parallel Candidate Registry — turn 88 contract)
+- [`atlases/inversion/shared/mgl_candidate_mode.js`](../atlases/inversion/shared/mgl_candidate_mode.js) — 9 exports for the MGL-side variant: `createMglCandidateModeSlot()`, `activateForCandidate()`, `deactivate()`, `resetMglCandidateModeSlot()`, cache-key helpers (`pcaCacheKey()` / `heatmapCacheKey()` / `beagleCacheKey()`), result registration (`registerPcaResult()` / `registerHeatmapResult()` / `registerBeagleText()`)
+- Page-side consumers in local_pca_dosage: [`candidates.js`](../atlases/inversion/pages/discovery/local_pca_dosage/candidates.js), [`events.js`](../atlases/inversion/pages/discovery/local_pca_dosage/events.js), [`l3_panel.js`](../atlases/inversion/pages/discovery/local_pca_dosage/l3_panel.js), [`lines_panel.js`](../atlases/inversion/pages/discovery/local_pca_dosage/lines_panel.js), [`pca_panel.js`](../atlases/inversion/pages/discovery/local_pca_dosage/pca_panel.js), [`sidebar.js`](../atlases/inversion/pages/discovery/local_pca_dosage/sidebar.js) — 6 modules consume the candidate-mode API
+- Tests: [`tests/test_shared_candidate_mode.js`](../tests/test_shared_candidate_mode.js), [`tests/test_shared_mgl_candidate_mode.js`](../tests/test_shared_mgl_candidate_mode.js), [`tests/test_page1_active_samples.js`](../tests/test_page1_active_samples.js)
+
+**Per-slice status:**
+
+| slice | status | location |
+|---|---|---|
+| Mode enum (`default` / `detailed`) | ✅ shipped | `PCR_VALID_MODES` |
+| localStorage persistence key | ✅ shipped | `PCR_MODE_STORAGE_KEY = 'inversion_atlas.activeMode'` |
+| Mode getter / setter | ✅ shipped | `getActiveMode()` / `setActiveMode()` |
+| Active-candidate state slot getter / setter | ✅ shipped | `getActiveCandidate()` / `setActiveCandidate()` |
+| Candidate-list + candidate-map accessors | ✅ shipped | `getActiveCandidateList()` / `getActiveCandidatesMap()` |
+| Detailed-mode state-clear helper (when leaving detailed mode) | ✅ shipped | `clearDetailedState()` |
+| MGL-side per-candidate slot (PCA / heatmap / BEAGLE result registration with cache keys) | ✅ shipped | `mgl_candidate_mode.js` (9 exports) |
+| Default-mode UI integration on local_pca_dosage | ✅ shipped | 6 page-side consumers wire the candidate-mode API |
+| Detailed-mode UI (consumes the 16 PCA JSONs + 4 heatmap JSONs per candidate per HANDOFF-1) | ⏳ deferred | Requires HANDOFF-1 producer (cluster-side). The state slot + cache-key infrastructure (`mgl_candidate_mode.js`) is ready to receive the JSONs when they ship |
+| Cluster-side HANDOFF-1 producer (16 PCA + 4 heatmap JSONs per candidate) | ⏳ deferred | Cluster-side, out of atlas scope |
+
+**Why archived now:** the SPEC's atlas-side "candidate mode" contract
+ships in full — Parallel Candidate Registry (turn 88 design) with
+mode enum, persistence, state slots, MGL per-candidate cache
+infrastructure, and 6 page-side consumers. The detailed-mode UI is
+intentionally a thin layer over the existing infrastructure — it
+needs the cluster-side JSONs from HANDOFF-1 to render anything, and
+the state-slot wiring (`mgl_candidate_mode.js`) is already in place
+to receive them. Archive with deferred-slice annotation; the detailed
+mode wires up when the producer ships.
+
 **Filed:** 2026-05-12 (by Quentin; transcribed into specs_todo by Claude).
 **Pairs with:** HANDOFF 1 (the producer that emits the 16 PCA JSONs +
 4 heatmap JSONs per candidate).
-**Status:** not started.
 
 ---
 

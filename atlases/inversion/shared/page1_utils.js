@@ -145,14 +145,42 @@ export function escapeHtml(s) {
 
 // Legacy: function fitCanvas(canvas)
 // HiDPI-aware canvas sizing. Returns { ctx, w, h } in CSS pixels.
+//
+// 2026-05-21: measure the PARENT's client rect (not the canvas's own
+// boundingClientRect). Reading the canvas's own rect after a paint
+// creates a positive-feedback loop on retina displays: each paint sets
+// canvas.width = cssW * dpr, which becomes the canvas's intrinsic
+// max-content size; CSS Grid / flex containers with min-width: auto
+// honour that as the column's min-content; the column widens a
+// fraction of a pixel per paint; the canvas's `width: 100%` follows;
+// rect.width comes back larger on the next paint; backing store grows
+// further — runaway growth (Quentin: "the plots are not in their
+// panels", "the PCA panels keep increasing in width"). Reading the
+// parent's clientWidth/Height (sized by the grid/flex track, invariant
+// per layout) breaks the loop. Also pin canvas.style.width/height to
+// the measured pixel value so the canvas's intrinsic `width` attr
+// cannot leak into ancestor min-content even if the parent isn't the
+// limiting container.
 export function fitCanvas(canvas) {
   const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width  = Math.floor(rect.width  * dpr);
-  canvas.height = Math.floor(rect.height * dpr);
+  const parent = canvas.parentNode;
+  const measureW = (parent && parent.clientWidth)  || canvas.clientWidth
+                 || canvas.getBoundingClientRect().width  || 1;
+  const measureH = (parent && parent.clientHeight) || canvas.clientHeight
+                 || canvas.getBoundingClientRect().height || 1;
+  const cssW = Math.max(1, Math.floor(measureW));
+  const cssH = Math.max(1, Math.floor(measureH));
+  const targetW = Math.max(1, Math.floor(cssW * dpr));
+  const targetH = Math.max(1, Math.floor(cssH * dpr));
+  if (canvas.width  !== targetW) canvas.width  = targetW;
+  if (canvas.height !== targetH) canvas.height = targetH;
+  const pxW = cssW + 'px';
+  const pxH = cssH + 'px';
+  if (canvas.style.width  !== pxW) canvas.style.width  = pxW;
+  if (canvas.style.height !== pxH) canvas.style.height = pxH;
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { ctx, w: rect.width, h: rect.height };
+  return { ctx, w: cssW, h: cssH };
 }
 
 // ---------------------------------------------------------------------

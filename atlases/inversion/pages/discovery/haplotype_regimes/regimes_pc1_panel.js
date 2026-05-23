@@ -73,7 +73,10 @@ export function drawRegimesPC1Panel(state) {
   }
   const container = document.getElementById('regimesPC1CanvasContainer');
   if (!container || typeof container.querySelector !== 'function') return;
-  const sub = container.querySelector('.regimes-pc1-subpanel');
+  // 2026-05-21: also match the genome subpanel class so the alias-routed
+  // genome paint actually finds its subpanel (regimes-genome-pc1-subpanel).
+  const sub = container.querySelector(
+    '.regimes-pc1-subpanel, .regimes-genome-pc1-subpanel');
   if (!sub) return;
   const cv = sub.querySelector('canvas');
   if (!cv) return;
@@ -222,17 +225,29 @@ export function drawRegimesPC1Panel(state) {
     ? state.tracked : new Set(state.tracked || []);
   const voterSet = voter.samples;
 
+  // 2026-05-20 perf: X-axis decimation. See the matching note in
+  // regimes_panel.js — at 9192 × 226 the un-decimated loop hangs the tab.
+  const _stride = Math.max(1, Math.floor(nGrid / Math.max(plotW * 2, 1)));
   function strokePath(si) {
     const ys = M[si];
     let started = false;
     ctx.beginPath();
-    for (let gi = 0; gi < nGrid; gi++) {
+    for (let gi = 0; gi < nGrid; gi += _stride) {
       const v = ys[gi];
       if (!Number.isFinite(v)) { started = false; continue; }
       const x = xByGi[gi];
       const y = toY(v);
       if (!started) { ctx.moveTo(x, y); started = true; }
       else { ctx.lineTo(x, y); }
+    }
+    // Always include the last sample so the line reaches the right edge.
+    if ((nGrid - 1) % _stride !== 0) {
+      const vLast = ys[nGrid - 1];
+      if (Number.isFinite(vLast)) {
+        const xLast = xByGi[nGrid - 1];
+        const yLast = toY(vLast);
+        if (!started) ctx.moveTo(xLast, yLast); else ctx.lineTo(xLast, yLast);
+      }
     }
     ctx.stroke();
   }
@@ -269,11 +284,14 @@ export function drawRegimesPC1Panel(state) {
     if (!bandSamples) continue;
     for (const si of bandSamples) siToFocalBand.set(si, bi);
   }
+  // Match regimes_panel.js: alpha 0.45 when voter has >8 samples so dense
+  // overlap doesn't saturate into a solid orange wash.
+  const voterAlpha = voterSet.size > 8 ? 0.45 : 0.85;
   for (const si of voterSet) {
     const bi = siToFocalBand.get(si);
     const col = bandHues[(bi >= 0 ? bi : 0) % bandHues.length];
-    ctx.lineWidth = 1.4;
-    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = withAlpha(col, voterAlpha);
     strokePath(si);
   }
 
@@ -297,6 +315,11 @@ export function drawRegimesPC1Panel(state) {
       seedGiEnd = gi;
     }
   }
+  // Skip stripe fills when the rect would cover ≥85% of the plot width —
+  // see regimes_panel.js for the rationale (orange tint drowns out the
+  // PC1 traces when the seed IS the chromosome).
+  const _rectCoversPlot = seedGiStart >= 0 && seedGiEnd >= seedGiStart
+    && (xByGi[seedGiEnd] - xByGi[seedGiStart]) >= 0.85 * plotW;
   if (seedGiStart >= 0 && seedGiEnd >= seedGiStart) {
     const x0 = xByGi[seedGiStart] - 0.5 * cellW;
     const x1 = xByGi[seedGiEnd] + 0.5 * cellW;
@@ -305,10 +328,10 @@ export function drawRegimesPC1Panel(state) {
     const getMacroDosage = cb.getMacroDosage || null;
     const activeBandsSet = new Set(voter.bands);
     ctx.save();
-    for (let b = 0; b < seedK; b++) {
+    if (!_rectCoversPlot) for (let b = 0; b < seedK; b++) {
       const yTop = pad.t + b * stripeH;
       const isActive = activeBandsSet.has(b);
-      const baseAlpha = isActive ? 0.18 : 0.10;
+      const baseAlpha = isActive ? 0.09 : 0.05;
       let fillCol = `rgba(245, 165, 36, ${baseAlpha})`;
       if (getMacroDosage) {
         try {
@@ -320,7 +343,7 @@ export function drawRegimesPC1Panel(state) {
         } catch (_) { /* fall through to gold */ }
       }
       ctx.fillStyle = fillCol;
-      ctx.globalAlpha = isActive ? 1.0 : 0.95;
+      ctx.globalAlpha = isActive ? 0.85 : 0.55;
       ctx.fillRect(x0, yTop, x1 - x0, stripeH);
     }
     ctx.globalAlpha = 1.0;
@@ -331,7 +354,7 @@ export function drawRegimesPC1Panel(state) {
     ctx.setLineDash([]);
     ctx.strokeStyle = 'rgba(245, 165, 36, 0.30)';
     ctx.lineWidth = 0.5;
-    for (let b = 1; b < seedK; b++) {
+    if (!_rectCoversPlot) for (let b = 1; b < seedK; b++) {
       const ySep = pad.t + b * stripeH + 0.5;
       ctx.beginPath();
       ctx.moveTo(x0, ySep);
@@ -420,7 +443,10 @@ export function buildRegimesPC1Panel(state) {
   sub.style.cssText = 'position: relative; flex: 1 1 0; min-height: 0; ' +
                       'border-bottom: 1px solid var(--rule, #2a3242);';
   const cv = document.createElement('canvas');
-  cv.style.cssText = 'display: block; width: 100%; height: 100%; cursor: crosshair;';
+  // 2026-05-20: position:absolute + inset:0 (same fix as regimes_panel.js).
+  // height:100% on a flex-basis-0 parent resolves to 0 in some browsers,
+  // which trips fitCanvas() → "bail: zero plot area" in drawRegimesPC1Panel.
+  cv.style.cssText = 'display: block; position: absolute; inset: 0; cursor: crosshair;';
   cv.tabIndex = 0;
   sub.appendChild(cv);
   container.appendChild(sub);

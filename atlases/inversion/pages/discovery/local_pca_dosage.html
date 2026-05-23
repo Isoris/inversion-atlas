@@ -395,6 +395,11 @@
 
   <div id="pagesArea" style="overflow: hidden;">
   <main id="local_pca_dosage" class="page active">
+    <!-- Mode-B freshness badge (2026-05-20). Populated by local_pca_dosage.js
+         after applyData runs; surfaces what the registry resolved for the
+         active chrom (windows, samples) + which of the 3 discovery axes
+         are loaded today. Fail-soft per core/mode_b_badge.js. -->
+    <div id="lpdModeBBadge" class="data-source-badge" style="margin: 4px 8px;"></div>
     <div id="ctrlBar">
       <button class="play" id="playBtn">▶ Play</button>
       <input type="range" id="scrubber" min="0" max="0" value="0" step="1" disabled />
@@ -938,6 +943,39 @@
           <input type="checkbox" id="viewControlsLinked" />
           <span>link with lines panel</span>
         </label>
+        <!-- 2026-05-20: per-sample ramp-color buttons. Each maps state.colorMode
+             onto one of the continuous ramp modes (het / theta_pi / ghsl)
+             registered in pca_panel.js's _PCA_RAMP_MODES set. Clicking an
+             already-active button reverts to the default cluster mode.
+             Distinct data-mode-ramp attribute keeps the sync-loop separate
+             from the sidebar (#colorModeBar / data-mode) and compact
+             (#colorModeBarCompact / data-mode-compact) bars. -->
+        <span class="pca-axis-sep" aria-hidden="true"></span>
+        <span id="pcaAxisColorRamp" class="pca-axis-ramp"
+              title="Per-sample ramp coloring (3-click cycle): click 1 = color the tracked PCA only · click 2 = also color the L3 contingency mini-PCAs (the button gets a darker fill + glow when L3 is also on) · click 3 = back to cluster colors.">
+          <button data-mode-ramp="het" type="button"
+                  title="het — per-sample heterozygosity rate at this locus, computed from the dosage chunk fetcher. 3-click cycle: 1st = color tracked PCA; 2nd = also color the L3 panes; 3rd = back to cluster.">het</button>
+          <button data-mode-ramp="ghsl" type="button"
+                  title="GHSL — per-sample PC1 from the GHSL haplotype-divergence local PCA at this locus. 3-click cycle: 1st = tracked PCA only; 2nd = also L3 panes; 3rd = cluster.">GHSL</button>
+          <button data-mode-ramp="theta_pi" type="button"
+                  title="θπ — per-sample θπ-derived PC1 at this locus (falls back to the θπ local PCA loadings). 3-click cycle: 1st = tracked PCA only; 2nd = also L3 panes; 3rd = cluster.">θπ</button>
+        </span>
+        <!-- 2026-05-20: color-scale legend strip. Shows the gradient
+             swatch + min/max value labels whenever the active colorMode
+             is one of the ramp modes (het / ghsl / theta_pi / dosage /
+             froh). Hidden when no ramp is active. Painted by
+             pca_panel.js#_refreshRampLegend (called from drawPCA). -->
+        <span id="pcaAxisRampLegend" class="pca-axis-ramp-legend"
+              style="display: none; align-items: center; gap: 5px;
+                     margin-left: 8px; font: 9.5px ui-monospace, monospace;
+                     color: var(--ink-dim);"
+              title="Color scale for the active per-sample ramp mode.">
+          <span class="pca-axis-ramp-legend-min"></span>
+          <span class="pca-axis-ramp-legend-bar"
+                style="display: inline-block; width: 72px; height: 9px;
+                       border-radius: 2px; border: 1px solid var(--rule);"></span>
+          <span class="pca-axis-ramp-legend-max"></span>
+        </span>
         <span id="pcaAxisAvailNote" class="pca-axis-avail"></span>
         <button id="pcaCollapseBtn" class="pca-axis-collapse"
                 title="Collapse / expand the PCA panel — drag the L3 panel up to take its space">▼</button>
@@ -1265,6 +1303,59 @@
                    style="flex: 1 1 auto; min-width: 0;" />
             <span class="val" id="trackedNValPopup" style="flex: 0 0 30px; text-align: right;">10</span>
           </div>
+          <!-- 2026-05-20: color-mode picker. Relocated here from the
+               compact tracked-samples panel below the PCA — same IDs +
+               data-mode-compact attributes so the existing handler in
+               sidebar.js (#colorModeBarCompact click loop) still binds
+               without changes. Quentin: the inline placement made the
+               panel vertically scroll; moving it into the settings
+               popup keeps the styling but moves it where settings
+               actually belong. -->
+          <div style="border-top: 1px solid var(--rule); padding-top: 10px;">
+            <div style="font-size: 10px; color: var(--ink-dim); margin-bottom: 6px;">
+              color samples by
+            </div>
+            <div class="color-mode-row" id="colorModeBarCompact"
+                 style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px;">
+              <button data-mode-compact="cluster" class="active"
+                      style="font-size: 10px; padding: 3px 6px;">cluster</button>
+              <button data-mode-compact="family"
+                      style="font-size: 10px; padding: 3px 6px;">family</button>
+              <button data-mode-compact="ancestry"
+                      style="font-size: 10px; padding: 3px 6px;">ancestry</button>
+              <button data-mode-compact="manual"
+                      title="Manually-curated groups (see 'Manual groups' section below)"
+                      style="font-size: 10px; padding: 3px 6px;">manual</button>
+              <button data-mode-compact="residual"
+                      title="Diagnostic mode. Recolors PCA + L3 strip by per-fish residual_z from band centroid. Cool blue = clean homozygote; red = suspicious carrier (≥2.5σ)."
+                      style="font-size: 10px; padding: 3px 6px;">⚡ residual</button>
+              <button data-mode-compact="none"
+                      style="font-size: 10px; padding: 3px 6px;">none</button>
+            </div>
+          </div>
+          <!-- 2026-05-20: manual groups section. Relocated here from
+               the compact tracked-samples panel below the PCA — same
+               IDs as before (#manualGroupsListCompact / #mgAddBtnCompact
+               / #mgClearAllBtnCompact) so the renderer dual-writes
+               into this element without any JS change. -->
+          <div style="border-top: 1px solid var(--rule); padding-top: 10px;">
+            <div style="font-size: 10px; color: var(--ink-dim); margin-bottom: 6px;"
+                 title="Manually-curated sample groups — overrides K-means coloring when 'manual' color mode is active.">
+              manual groups
+            </div>
+            <div id="manualGroupsListCompact"
+                 style="display: flex; flex-direction: column; gap: 3px;
+                        font-size: 10.5px; max-height: 120px; overflow-y: auto;
+                        margin-bottom: 6px;"></div>
+            <div style="display: flex; gap: 4px;">
+              <button id="mgAddBtnCompact"
+                      title="Create a new manual group from the current tracked samples"
+                      style="font-size: 10px; padding: 3px 8px; flex: 1 1 auto;">+ from tracked</button>
+              <button id="mgClearAllBtnCompact"
+                      title="Delete all manual groups (cannot be undone)"
+                      style="font-size: 10px; padding: 3px 8px; flex: 0 0 auto; color: var(--bad);">×</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1478,27 +1569,15 @@
           <button id="exportKLabelsBtnCompact"></button>
         </div>
 
-        <!-- v4 turn 73c: color-mode picker. Same five buttons as sidebar. -->
-        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;">
-          <div style="font-size: 10px; color: var(--ink-dim); margin-bottom: 3px;">color samples by</div>
-          <div class="color-mode-row" id="colorModeBarCompact"
-               style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px;">
-            <button data-mode-compact="cluster" class="active"
-                    style="font-size: 9.5px; padding: 2px 4px;">cluster</button>
-            <button data-mode-compact="family"
-                    style="font-size: 9.5px; padding: 2px 4px;">family</button>
-            <button data-mode-compact="ancestry"
-                    style="font-size: 9.5px; padding: 2px 4px;">ancestry</button>
-            <button data-mode-compact="manual"
-                    title="Manually-curated groups (set in 'Manual groups' below)"
-                    style="font-size: 9.5px; padding: 2px 4px;">manual</button>
-            <button data-mode-compact="residual"
-                    title="v4 turn 83 — Diagnostic mode. Recolors PCA + L3 strip by per-fish residual_z from band centroid. Cool blue = clean homozygote; red = suspicious carrier (≥2.5σ)."
-                    style="font-size: 9.5px; padding: 2px 4px;">⚡ residual</button>
-            <button data-mode-compact="none"
-                    style="font-size: 9.5px; padding: 2px 4px;">none</button>
-          </div>
-        </div>
+        <!-- 2026-05-20: color-mode picker relocated to #tPanelOverlay
+             (the ▾ tracked-samples settings popup) per Quentin's
+             feedback that the inline panel below the PCA was
+             vertically scrolling and felt unprofessional. The picker
+             is a setting (chooses how samples are coloured) rather
+             than a main action — fits the popup's "settings" framing.
+             Inline buttons removed; the same IDs + data-mode-compact
+             attributes live in the popup body below so existing
+             handlers in sidebar.js still bind. -->
 
         <!-- v4 turn 73c: tracked-sample list. Renderer dual-writes from
              renderTrackedList → both #trackedList (sidebar) and #trackedListCompact. -->
@@ -1507,24 +1586,15 @@
           <div id="trackedListCompact" style="font-size: 10px; max-height: 140px; overflow-y: auto;"></div>
         </div>
 
-        <!-- v4 turn 73c: manual groups section. Renderer dual-writes into
-             #manualGroupsListCompact when present. -->
-        <div style="border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px;">
-          <div style="font-size: 10px; color: var(--ink-dim); margin-bottom: 3px;"
-               title="Manually-curated sample groups — overrides K-means coloring when 'manual' color mode is active.">
-            manual groups
-          </div>
-          <div id="manualGroupsListCompact"
-               style="display: flex; flex-direction: column; gap: 3px; font-size: 10px; max-height: 100px; overflow-y: auto;"></div>
-          <div style="display: flex; gap: 3px; margin-top: 4px;">
-            <button id="mgAddBtnCompact"
-                    title="Create a new manual group from the current tracked samples"
-                    style="font-size: 9.5px; padding: 2px 4px; flex: 1 1 auto;">+ from tracked</button>
-            <button id="mgClearAllBtnCompact"
-                    title="Delete all manual groups (cannot be undone)"
-                    style="font-size: 9.5px; padding: 2px 4px; flex: 0 0 auto; color: var(--bad);">×</button>
-          </div>
-        </div>
+        <!-- 2026-05-20: manual groups section relocated to
+             #tPanelOverlay (the ▾ tracked-samples settings popup),
+             same pattern as the color-mode picker move above. Manual
+             groups are a settings-like surface (curated groups +
+             create/clear actions), not main tracked-samples controls.
+             Inline placement was pushing the compact panel to vertical
+             scroll. Same IDs preserved (#manualGroupsListCompact,
+             #mgAddBtnCompact, #mgClearAllBtnCompact) so the renderer
+             in sidebar.js + manual_groups.js still finds them. -->
       </div>
     </div>
 

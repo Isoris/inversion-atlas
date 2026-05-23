@@ -85,6 +85,7 @@
 
 import { _pageState, _setActiveState } from './boundary_refinement/_state.js';
 import { renderCandidateNavInline as _renderCandidateNavInline } from '../../shared/candidate_nav.js';
+import { probeModeB, renderModeBBadge } from '../../../../core/mode_b_badge.js';
 import {
   refreshBoundariesUi,
   wireBoundariesToolbar,
@@ -425,6 +426,101 @@ export async function mount(root, atlasState, registry) {
   catch (e) { console.warn('boundary_refinement.mount: _bndAttachHotkeys threw —', e); }
 
   if (atlasState.inversion) atlasState.inversion._page11State = legacyState;
+
+  // Mode-B probe — non-blocking. Resolves lineage + active-version
+  // boundaries so the reviewer can see what they'd overwrite on save.
+  _renderBoundaryRefinementBadge(atlasState, registry).catch((e) => {
+    console.warn('boundary_refinement.mount: badge probe threw —', e);
+  });
+}
+
+async function _renderBoundaryRefinementBadge(atlasState, registry) {
+  const slot = document.getElementById('brModeBBadge');
+  if (!slot) return;
+  const cand = (atlasState && atlasState.shared && atlasState.shared.activeCandidate) || null;
+  const candidate_id = cand && (cand.candidate_id || cand.id) || null;
+  if (!candidate_id) {
+    slot.style.display = 'none';
+    return;
+  }
+  slot.style.display = 'block';
+
+  // Step 1: resolve lineage to discover active_version_id.
+  const lineageProbe = await probeModeB(registry, 'candidate_lineage', { candidate_id }, {
+    extractRows: (p) => {
+      if (!p || !p.versions || typeof p.versions !== 'object') return null;
+      return Object.entries(p.versions).map(([version_id, meta]) =>
+        Object.assign({ version_id }, meta || {}));
+    },
+  });
+
+  if (!lineageProbe.ok) {
+    renderModeBBadge('brModeBBadge', lineageProbe, {
+      label:    'boundaries on disk',
+      layerKey: 'candidate_lineage',
+      context:  candidate_id,
+    });
+    return;
+  }
+
+  const active_version_id = lineageProbe.payload && lineageProbe.payload.active_version_id;
+  if (!active_version_id) {
+    renderModeBBadge('brModeBBadge',
+      { ok: false, reason: 'empty-result' },
+      { label: 'boundaries on disk', layerKey: 'candidate_lineage', context: candidate_id });
+    return;
+  }
+
+  // Step 2: resolve candidate_boundaries for the active version. The
+  // boundaries file may not exist yet (first-time refinement); fall
+  // back to a lineage-only summary in that case.
+  const boundsProbe = await probeModeB(registry, 'candidate_boundaries',
+    { candidate_id, version_id: active_version_id },
+    { extractRows: (p) => {
+        // boundaries_refined.json shape is loosely { boundary_blocks: [{...}], ... }
+        // per toolkit_registries' boundary_refined.schema.json. Surface
+        // whichever array is present; fall through with null if neither.
+        if (!p) return null;
+        if (Array.isArray(p.boundary_blocks)) return p.boundary_blocks;
+        if (Array.isArray(p.blocks))          return p.blocks;
+        if (Array.isArray(p.zones))           return p.zones;
+        return null;
+      } });
+
+  const nVersions = lineageProbe.n;
+  const versionsList = lineageProbe.rows.map((r) => r.version_id).join(', ');
+
+  if (!boundsProbe.ok) {
+    // Lineage exists but boundaries_refined.json doesn't — a normal
+    // pre-first-save state. Render as drift (⚠) with a clear summary.
+    renderModeBBadge('brModeBBadge',
+      { ok: true, rows: lineageProbe.rows, payload: lineageProbe.payload,
+        n: nVersions, sample_keys: lineageProbe.sample_keys },
+      {
+        label:    'boundaries on disk',
+        layerKey: 'candidate_boundaries',
+        context:  candidate_id,
+        compare:  () => ({
+          pass: false,
+          summary: `lineage active = ${active_version_id} (${nVersions} version${nVersions === 1 ? '' : 's'}: ${versionsList}) · ` +
+                   `no boundaries_refined.json yet for this version — save will create one`,
+        }),
+      });
+    return;
+  }
+
+  const nBlocks = boundsProbe.n;
+  renderModeBBadge('brModeBBadge', boundsProbe, {
+    label:    'boundaries on disk',
+    layerKey: 'candidate_boundaries',
+    context:  `${candidate_id} / ${active_version_id}`,
+    compare:  () => ({
+      pass: nBlocks > 0,
+      summary: `${nBlocks} boundary block${nBlocks === 1 ? '' : 's'} in active version ` +
+               `(lineage: ${nVersions} version${nVersions === 1 ? '' : 's'}: ${versionsList}) · ` +
+               'save here writes a NEW version_id',
+    }),
+  });
 }
 
 /**

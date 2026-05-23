@@ -45,6 +45,25 @@
         <option value="NA">NA (K≤3)</option>
         <option value="UNDETERMINED">UNDETERMINED</option>
       </select>
+      <!-- 2026-05-20: source filter. Lets the user narrow the catalogue
+           to candidates from one origin (e.g. only V·local auto-merge
+           candidates, only manual lock-promote, only L3-pair merges).
+           Complements the compare-modes overlap strip below the
+           toolbar: that strip shows the counts; this dropdown drills
+           into a specific bucket. Empty value = no filter. -->
+      <select id="catSourceFilter"
+              title="Filter rows by candidate provenance. Lets you isolate one auto-promote mode (or manual path) at a time. Matches the coloured chips in the source column.">
+        <option value="">all sources</option>
+        <option value="auto_cramers_v_local">V · local</option>
+        <option value="auto_cramers_v_macrostripe">V · macro</option>
+        <option value="l3_pair_merge">L3-pair merge</option>
+        <option value="seed_promote">V-walker seed → ★ promote</option>
+        <option value="auto_l2_sweep">L2-sweep (legacy)</option>
+        <option value="lock_promote">lock_promote (manual)</option>
+        <option value="l2_single">l2_single (catalogue)</option>
+        <option value="l2_merge">l2_merge (catalogue)</option>
+        <option value="catalogue_promote">catalogue_promote (catalogue)</option>
+      </select>
       <button id="catSelectAll" title="Select all currently-visible rows (respects active filters).">select all</button>
       <button id="catClearSel" title="Clear all row selections (does not affect favorites).">clear</button>
       <button id="catRegimeRegistry" title="Open the regime registry — create, edit, or delete regime annotations (Deliverable C). Each regime is a user-curated annotation of &quot;this group of L2s belongs to inversion-system X&quot;.">🏷 regimes</button>
@@ -92,6 +111,24 @@
       </span>
       <span class="sel-info" id="catSelInfo" title="Live counts of selected rows / visible rows / total rows in the catalogue.">0 selected of 0</span>
     </div>
+    <!-- 2026-05-20 (SPEC_cramers_v_seed_merge.md Phase 2 deliverable):
+         "compare modes" overlap strip. Counts candidates from each
+         auto-promote source (L2-sweep, Cramér V local, Cramér V
+         macrostripe) plus pairwise / triple genomic-overlap. Lets the
+         user see at a glance which regions all three modes agree on
+         vs. which are caught by only one mode. Hidden when no
+         candidates carry any of those three sources. Populated by
+         _renderSourceOverlap(state) in catalogue/catalogue.js. -->
+    <div id="catSourceOverlap" style="display: none; margin: 0 0 8px 0;
+                                       padding: 6px 10px;
+                                       background: var(--panel-2);
+                                       border: 1px solid var(--rule);
+                                       border-radius: 4px;
+                                       font-family: var(--mono); font-size: 11px;
+                                       color: var(--ink-dim);
+                                       display: flex; align-items: center;
+                                       gap: 10px; flex-wrap: wrap;"
+         title="Compare-modes overlap — how do the 3 auto-promote sources agree on regions? Two candidates 'agree' if they're on the same chromosome and their bp ranges overlap."></div>
     <table class="cat" id="catTable">
       <thead><tr id="catHead"></tr></thead>
       <tbody id="catBody"></tbody>

@@ -1,6 +1,45 @@
 # SPEC — Functional burden / selection efficacy: per-inversion-candidate overlay (v1)
 
-**Status**: drafted 2026-05-12
+**Status**: shipped 2026-05-20 (audit-sweep — atlas-side compute surface
+fully shipping; per-candidate overlay-panel UI deferred). Promoted from
+`specs_todo/` after the per-slice audit below. Original SPEC body is
+preserved verbatim below as design archive.
+
+**Implemented in:**
+- [`atlases/inversion/shared/functional_burden.js`](../atlases/inversion/shared/functional_burden.js) — 15 exports covering the full per-candidate metric surface: `FUNCTIONAL_BURDEN_VERDICTS` / `FUNCTIONAL_BURDEN_TAGS` / `FUNCTIONAL_BURDEN_METRICS` / `FUNCTIONAL_BURDEN_TAG_METRICS` / `FUNCTIONAL_BURDEN_DEFAULTS` / `KARYOTYPE_GROUPS = ['STD/STD', 'HET', 'INV/INV']` / `FUNCTIONAL_BURDEN_MODULE_VERSION = 'functional_burden_per_candidate_v1.0'` (the SPEC's own version stamp), `aggregatePerSampleWithinCandidate()`, `summarizeByKaryotype()`, `pairwiseWilcoxonByKaryotype()`, `classifyMetricVerdict()`, `compositeSummaryTag()`, `summarizeCandidateFunctionalBurden()` (the SPEC's end-to-end entry point), `compareHomokaryotypePiToAll()`, `subsampleControlForHomokaryotypePi()`
+- [`atlases/inversion/shared/wilcoxon.js`](../atlases/inversion/shared/wilcoxon.js) — supporting Wilcoxon rank-sum primitive
+- [`atlases/inversion/shared/sigma_profile.js`](../atlases/inversion/shared/sigma_profile.js) — supporting σ-profile primitive
+- [`atlases/inversion/shared/inheritance_compute.js`](../atlases/inversion/shared/inheritance_compute.js) — supporting inheritance primitive
+- [`atlases/inversion/shared/contingency.js`](../atlases/inversion/shared/contingency.js) + [`atlases/inversion/shared/het_rate.js`](../atlases/inversion/shared/het_rate.js) — pre-existing dependencies
+- Tests: [`tests/test_shared_functional_burden.js`](../tests/test_shared_functional_burden.js), [`tests/test_shared_wilcoxon.js`](../tests/test_shared_wilcoxon.js), [`tests/test_shared_sigma_profile.js`](../tests/test_shared_sigma_profile.js)
+- Downstream documentation consumer: [`atlases/inversion/pages/catalogue/stats_profile.js`](../atlases/inversion/pages/catalogue/stats_profile.js) — 7 `derive_from:` references documenting which axes are computed via the functional_burden producer (the compute is wired up at the axis-definition level; a dedicated per-candidate overlay-panel UI has not shipped)
+
+**Per-slice status:**
+
+| slice | status | location |
+|---|---|---|
+| Per-sample aggregation within a candidate span | ✅ shipped | `aggregatePerSampleWithinCandidate()` |
+| Per-karyotype-group summarisation (STD/STD, HET, INV/INV) | ✅ shipped | `summarizeByKaryotype()` + `KARYOTYPE_GROUPS` |
+| Pairwise Wilcoxon rank-sum across karyotype groups | ✅ shipped | `pairwiseWilcoxonByKaryotype()` + `wilcoxon.js` |
+| Per-metric verdict classifier (STRONG / MODERATE / WEAK / NONE per the verdict enum) | ✅ shipped | `classifyMetricVerdict()` + `FUNCTIONAL_BURDEN_VERDICTS` |
+| Composite summary tag across metrics | ✅ shipped | `compositeSummaryTag()` + `FUNCTIONAL_BURDEN_TAGS` |
+| End-to-end summary entry point | ✅ shipped | `summarizeCandidateFunctionalBurden()` |
+| Homokaryotype-vs-all comparison + subsample control | ✅ shipped | `compareHomokaryotypePiToAll()` + `subsampleControlForHomokaryotypePi()` |
+| Version stamp + defaults | ✅ shipped | `FUNCTIONAL_BURDEN_MODULE_VERSION` + `FUNCTIONAL_BURDEN_DEFAULTS` |
+| Per-candidate overlay panel UI (the SPEC's title surface) | ⏳ deferred | No dedicated panel JS yet; `stats_profile.js` documents the compute hookpoints via `derive_from:` strings. The panel would call `summarizeCandidateFunctionalBurden()` and render the per-karyotype-group bars per SPEC. |
+| Per-candidate producer JSON schema (`functional_burden` layer) | ⏳ deferred | Cluster-side; the compute is invocable from in-state per-window records today |
+
+**Why archived now:** the SPEC's atlas-side compute surface ships
+end-to-end (entry point `summarizeCandidateFunctionalBurden()`, verdict
+classifier, composite tag, pairwise Wilcoxon, homokaryotype-vs-all
+comparison, subsample control). The module's own version constant
+matches the SPEC name (`functional_burden_per_candidate_v1.0`),
+confirming the SPEC's contract is what was implemented. What's left is
+a *page-side overlay panel* that invokes these primitives — and a
+*cluster-side producer* that emits the per-window records. Both are
+follow-up tasks owned by separate workstreams; this SPEC's
+compute-layer contract is done.
+
 **Scope**: per-inversion-candidate overlay panel that summarises
 functional / deleterious-mutation burden per karyotype group
 (STD/STD, HET, INV/INV). The same metric primitives also power the
@@ -11,6 +50,8 @@ this spec only defines the **inversion-side overlay**.
 `atlases/inversion/shared/het_rate.js`,
 `atlases/inversion/shared/sigma_profile.js`,
 `atlases/inversion/shared/inheritance_compute.js`.
+
+**Authored**: drafted 2026-05-12.
 
 ---
 
