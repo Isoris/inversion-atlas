@@ -5,7 +5,10 @@
 // =====================================================================
 
 import { _pageState, _setActiveState } from './inv_internal_substructure/_state.js';
-import { pcaForWindow } from '../../shared/mgl_pca_compute.js';
+// 2026-05-23 Phase 1c: mgl_pca_compute moved to cross-species atlas.
+// inv_internal_substructure will migrate to evolution atlas in Phase 2
+// — at that point this becomes evolution → cross-species cross-atlas.
+import { pcaForWindow } from '../../../cross-species/shared/mgl_pca_compute.js';
 
 export function refreshInternalHistory(state) {
   if (state) _setActiveState(state);

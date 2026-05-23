@@ -10,7 +10,7 @@ import {
   DIVERGENCE_LABEL_ORDER,
   computeDivergenceNetwork,
   divergenceNetworkRenderHints,
-} from '../atlases/inversion/shared/divergence_network.js';
+} from '../atlases/cross-species/shared/divergence_network.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

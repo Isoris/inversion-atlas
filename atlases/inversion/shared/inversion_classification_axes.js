@@ -27,10 +27,11 @@
 //   - XPEHH_SELECTION_SIGNAL: from xpehhValuesInRange within candidate bp
 // =====================================================================
 
+// 2026-05-23 Phase 1c: divergence_network moved to cross-species atlas.
 import {
   DIVERGENCE_FST_WEAK_THRESHOLD,
   DIVERGENCE_FST_STRONG_THRESHOLD,
-} from './divergence_network.js';
+} from '../../cross-species/shared/divergence_network.js';
 import {
   XPEHH_OUTLIER_Z_DEFAULT,
   xpehhValuesInRange,

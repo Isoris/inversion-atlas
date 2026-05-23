@@ -11,7 +11,10 @@
 //
 // State-as-first-arg, pure compute. No DOM, no localStorage.
 
-import { XP_K_PALETTE } from './cross_page_clusters.js';
+// 2026-05-23 Phase 1c: divergence_network moved here from inversion/shared/.
+// cross_page_clusters stays in inversion/shared/ (inversion-side cluster
+// colouring infrastructure). Cross-atlas relative path.
+import { XP_K_PALETTE } from '../../inversion/shared/cross_page_clusters.js';
 
 // =====================================================================
 // Constants

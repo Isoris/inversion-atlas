@@ -81,8 +81,11 @@
 // not a hard error).
 // =====================================================================
 
+// 2026-05-23 Phase 1c: phylogenetic_confound moved here from inversion/shared/.
+// contingency stays in inversion/shared/ as an L3 primitive used by every
+// atlas (per migration plan §1.1 + atlas-core-proposals SPEC_workflows_v1).
 import { computeARI, computeNMI, cramersV, chiSquare, chiSqSurvival }
-  from './contingency.js';
+  from '../../inversion/shared/contingency.js';
 
 // =====================================================================
 // Vocab + defaults

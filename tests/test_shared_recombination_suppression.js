@@ -11,7 +11,7 @@ import {
   mendelianCleanFraction,
   classifyRecombinationSuppression,
   summarizeRegimeLinkageMatrix,
-} from '../atlases/inversion/shared/recombination_suppression.js';
+} from '../atlases/cross-species/shared/recombination_suppression.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

@@ -11,7 +11,7 @@ import {
   medianAndMad,
   stripeQualitySummary,
   MGL_STRIPE_QUALITY_DEFAULTS,
-} from '../atlases/inversion/shared/mgl_stripe_quality.js';
+} from '../atlases/cross-species/shared/mgl_stripe_quality.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

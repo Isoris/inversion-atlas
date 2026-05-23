@@ -1,6 +1,6 @@
 // tests/test_shared_synteny_multispecies.js
 //
-// Unit tests for atlases/inversion/shared/synteny_multispecies.js
+// Unit tests for atlases/cross-species/shared/synteny_multispecies.js
 // (synteny_multispecies + phylo_tree + multi_species_ui layers).
 
 class MockLS {
@@ -36,7 +36,7 @@ const {
   msGetActiveBreakpoint,
   msGetEffectiveSpeciesList,
   msGetLineageDistribution,
-} = await import('../atlases/inversion/shared/synteny_multispecies.js');
+} = await import('../atlases/cross-species/shared/synteny_multispecies.js');
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

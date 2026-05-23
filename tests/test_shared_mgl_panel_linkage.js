@@ -10,7 +10,7 @@ import {
   bindDosageHeatmapPanelToSlot,
   bindTreePanelToSlot,
   bindAllPanelsToCandidateMode,
-} from '../atlases/inversion/shared/mgl_panel_linkage.js';
+} from '../atlases/cross-species/shared/mgl_panel_linkage.js';
 import { createTreePanelSelection } from
   '../atlases/inversion/pages/discovery/tree_panel/selection.js';
 import {

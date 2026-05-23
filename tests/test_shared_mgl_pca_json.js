@@ -15,7 +15,7 @@ import {
   sampleIndexOf,
   summariseLambdaRatios,
   pcaFilenameFor,
-} from '../atlases/inversion/shared/mgl_pca_json.js';
+} from '../atlases/cross-species/shared/mgl_pca_json.js';
 
 let pass = 0, fail = 0;
 function check(label, cond, extra) {

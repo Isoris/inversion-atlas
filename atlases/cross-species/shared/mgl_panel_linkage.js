@@ -18,11 +18,14 @@
 // Pure compute. No DOM, no fetch.
 // =====================================================================
 
+// 2026-05-23 Phase 1c: mgl_panel_linkage moved here from inversion/shared/.
+// mgl_render_state stays in inversion/shared/ (discovery-side state
+// per migration plan §4.2). Cross-atlas relative path.
 import {
   setHover,
   updateMglRenderState,
   subscribeMglRenderState,
-} from './mgl_render_state.js';
+} from '../../inversion/shared/mgl_render_state.js';
 
 // =====================================================================
 // 1. Set equality helper
