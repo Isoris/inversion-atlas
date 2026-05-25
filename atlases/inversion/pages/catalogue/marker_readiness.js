@@ -26,6 +26,7 @@
 
 import { _pageState, _setActiveState } from './marker_readiness/_state.js';
 import { _esc } from '../../shared/page1_data_helpers.js';
+import { ensureChromTracks } from '../../shared/ensure_chrom_tracks.js';
 
 // ---------------------------------------------------------------------------
 // VERBATIM extraction from legacy lines 29307–30160.
@@ -918,13 +919,23 @@ export function renderMarkerPanelPage(state) {
  * data (the chromosome precomp).
  */
 export async function mount(root, atlasState, registry) {
-  const legacyState = _buildLegacyState(atlasState);
+  let legacyState = _buildLegacyState(atlasState);
   _setActiveState(legacyState);
 
   try { renderMarkerPanelPage(legacyState); }
   catch (e) { console.warn('marker_readiness.mount: renderMarkerPanelPage threw —', e); }
 
   if (atlasState.inversion) atlasState.inversion._page18State = legacyState;
+
+  // 2026-05-26: self-bootstrap scrubber_main on direct navigation.
+  const bootstrap = await ensureChromTracks(atlasState, registry);
+  if (bootstrap.ok) {
+    legacyState = _buildLegacyState(atlasState);
+    _setActiveState(legacyState);
+    try { renderMarkerPanelPage(legacyState); }
+    catch (e) { console.warn('marker_readiness.mount: post-bootstrap render threw —', e); }
+    if (atlasState.inversion) atlasState.inversion._page18State = legacyState;
+  }
 }
 
 /**

@@ -135,7 +135,8 @@ function _tryLoadCachedClustering(atlasState) {
       _cache_hit:      true,
     });
     return true;
-  } catch (_) {
+  } catch (e) {
+    console.warn('dosage_cluster_adaptive_k: cache parse/read failed —', e);
     return false;
   }
 }
@@ -183,6 +184,13 @@ async function _autoComputeDosageClustering(root, atlasState, registry) {
       catch (e) {
         console.warn('dosage_cluster_adaptive_k: scrubber_main resolve threw —', e);
       }
+      // 2026-05-26: contribute chromSummary (SPEC_multichrom Slice 1).
+      if (data && typeof atlasState.setChromSummary === 'function') {
+        try {
+          const cs = await import('../../../../core/chrom_summary.js');
+          atlasState.setChromSummary(chrom, cs.buildChromSummary(data, { chrom }));
+        } catch (_) { /* non-essential */ }
+      }
     }
   }
   if (!data || !Array.isArray(data.windows)) {
@@ -218,7 +226,9 @@ async function _autoComputeDosageClustering(root, atlasState, registry) {
       });
       return;
     }
-  } catch (_) { /* sessionStorage unavailable / malformed; recompute */ }
+  } catch (e) {
+    console.warn('dosage_cluster_adaptive_k: sessionStorage read failed (will recompute) —', e);
+  }
 
   // Show a loading hint NOW so the user sees the page is alive while
   // the multi-second sync compute runs (vs the previous behavior:
@@ -265,7 +275,7 @@ async function _autoComputeDosageClustering(root, atlasState, registry) {
   // chromosomes may overflow — silently skip caching on quota error,
   // recompute is the worst case.
   try { sessionStorage.setItem(cacheKey, JSON.stringify(result)); }
-  catch (_) { /* over quota or storage disabled */ }
+  catch (e) { console.warn('dosage_cluster_adaptive_k: cache write failed (over quota or storage disabled) —', e); }
 }
 
 // 2026-05-23: web-worker dispatcher for adaptiveKDosageClustering.
@@ -347,7 +357,10 @@ async function _runSyncFallback(D, nS, nW, opts) {
     requestAnimationFrame(() => {
       setTimeout(() => {
         try { resolve(mod.adaptiveKDosageClustering(arr, nS, nW, opts || {})); }
-        catch (_) { resolve(null); }
+        catch (e) {
+          console.warn('dosage_cluster_adaptive_k: sync compute threw —', e);
+          resolve(null);
+        }
       }, 0);
     });
   });

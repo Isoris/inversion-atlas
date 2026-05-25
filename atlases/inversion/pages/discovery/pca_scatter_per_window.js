@@ -103,7 +103,11 @@ export async function mount(root, atlasState, registry) {
   // stash on direct mount. The page expects a pre-computed pca_results[]
   // array, but the data already lives on state.data.windows[w].{pc1,pc2,
   // lam1,lam2} — no compute kernel needed, just adaptation.
-  if (!pageState.data || !pageState.data.pca_results) {
+  // 2026-05-26 perf: was `!pageState.data || !pageState.data.pca_results`
+  // but `_buildPageState` puts `pca_results` at the top level (line 238),
+  // never under `.data`. The first clause was always true → auto-build
+  // ran on every tab visit. Matches the similarity_matrix fix pattern.
+  if (!pageState.pca_results) {
     try {
       await _autoBuildPcaPanelState(atlasState, registry);
       pageState = _buildPageState(atlasState);
@@ -137,6 +141,13 @@ async function _autoBuildPcaPanelState(atlasState, registry) {
       catch (e) {
         console.warn('pca_scatter_per_window: scrubber_main resolve threw —', e);
         return;
+      }
+      // 2026-05-26: contribute chromSummary (SPEC_multichrom Slice 1).
+      if (data && typeof atlasState.setChromSummary === 'function') {
+        try {
+          const cs = await import('../../../../core/chrom_summary.js');
+          atlasState.setChromSummary(chrom, cs.buildChromSummary(data, { chrom }));
+        } catch (_) { /* non-essential */ }
       }
     }
   }
@@ -642,6 +653,36 @@ function _wireToolbar(state) {
     if (idx != null) state.selection.toggleSelectedSample(idx);
   };
 
+  // 2026-05-26: keyboard nav over the scrubber strip — mirrors sim_mat /
+  // similarity_matrix patterns. Ignored when focus is in a form input so
+  // the toolbar's view/weighting/anchor/color/axis pickers still get
+  // their own key handling.
+  const onKeyDown = (ev) => {
+    if (!state) return;
+    const t = ev.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT'
+              || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+      return;
+    }
+    const Nw = Array.isArray(state.pca_results) ? state.pca_results.length : 0;
+    if (Nw <= 0) return;
+    const cur = state.selection.getActiveWindowIdx();
+    const base = Number.isFinite(cur) ? (cur | 0) : 0;
+    let next = base;
+    const step = ev.shiftKey ? 10 : 1;
+    switch (ev.key) {
+      case 'ArrowLeft':  next = base - step; break;
+      case 'ArrowRight': next = base + step; break;
+      case 'Home':       next = 0; break;
+      case 'End':        next = Nw - 1; break;
+      default: return;
+    }
+    ev.preventDefault();
+    next = Math.max(0, Math.min(Nw - 1, next));
+    if (next === base) return;
+    state.selection.setActiveWindowIdx(next);  // subscriber repaints
+  };
+
   const unsubSelection = state.selection.subscribe(() => { repaintAll(); });
 
   state._handlers = {
@@ -650,6 +691,7 @@ function _wireToolbar(state) {
     onScrubberMove, onScrubberClick,
     onScatterMove, onScatterClick,
     onScatterDown, onScatterUp,
+    onKeyDown,
     unsubSelection,
   };
 
@@ -665,6 +707,7 @@ function _wireToolbar(state) {
   _addListener('pcaPanelScatterCanvas',   'mousemove', onScatterMove);
   _addListener('pcaPanelScatterCanvas',   'mouseup',   onScatterUp);
   _addListener('pcaPanelScatterCanvas',   'click',     onScatterClick);
+  if (typeof document !== 'undefined') document.addEventListener('keydown', onKeyDown);
 }
 
 function _teardownToolbar(state) {
@@ -682,6 +725,9 @@ function _teardownToolbar(state) {
   if (h.onScatterMove)    _removeListener('pcaPanelScatterCanvas',  'mousemove', h.onScatterMove);
   if (h.onScatterUp)      _removeListener('pcaPanelScatterCanvas',  'mouseup',   h.onScatterUp);
   if (h.onScatterClick)   _removeListener('pcaPanelScatterCanvas',  'click',     h.onScatterClick);
+  if (typeof document !== 'undefined' && h.onKeyDown) {
+    document.removeEventListener('keydown', h.onKeyDown);
+  }
   if (typeof h.unsubSelection === 'function') { try { h.unsubSelection(); } catch (_) {} }
   state._handlers = {};
 }

@@ -23,6 +23,7 @@
 // =====================================================================
 
 import { _pageState, _setActiveState } from './marker_panels/_state.js';
+import { ensureChromTracks } from '../../shared/ensure_chrom_tracks.js';
 
 export function wirePage10(state) {
   // Keep _pageState in sync with the factory's closure-captured state so
@@ -299,13 +300,23 @@ export function renderMarkerPage(state) {
  * (used to look up chrom/start_bp/end_bp by candidate_id).
  */
 export async function mount(root, atlasState, registry) {
-  const legacyState = _buildLegacyState(atlasState);
+  let legacyState = _buildLegacyState(atlasState);
   _setActiveState(legacyState);
 
   try { renderPage10(legacyState); }
   catch (e) { console.warn('marker_panels.mount: renderPage10 threw —', e); }
 
   if (atlasState.inversion) atlasState.inversion._page10State = legacyState;
+
+  // 2026-05-26: self-bootstrap scrubber_main on direct navigation.
+  const bootstrap = await ensureChromTracks(atlasState, registry);
+  if (bootstrap.ok) {
+    legacyState = _buildLegacyState(atlasState);
+    _setActiveState(legacyState);
+    try { renderPage10(legacyState); }
+    catch (e) { console.warn('marker_panels.mount: post-bootstrap render threw —', e); }
+    if (atlasState.inversion) atlasState.inversion._page10State = legacyState;
+  }
 }
 
 /**

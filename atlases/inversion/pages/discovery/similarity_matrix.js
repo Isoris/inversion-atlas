@@ -52,6 +52,9 @@ import { fitCanvasNoDpr } from '../../shared/page1_utils.js';
 const DEFAULT_VIEW_STATE = Object.freeze({
   show_block_overlay:    true,
   show_diagonal:         true,
+  show_cluster_bands:    true,   // 2026-05-26: declared explicitly so the
+                                 // reflect path keeps the new checkbox in sync.
+                                 // Renderer reads `!== false` so this matches.
   sample_order_mode:     'natural',
 });
 
@@ -94,7 +97,12 @@ export async function mount(root, atlasState, registry) {
   // dosage_heatmap. Fetch a default dosage chunk, slice its markers
   // into windows, run computeSimilarityAndBlocks, stash the result
   // on inv.similarity_panel_state, and re-render.
-  if (!pageState.data || !pageState.data.similarity_result) {
+  // 2026-05-26 perf: was `!pageState.data || !pageState.data.similarity_result`
+  // but `_buildPageState` puts similarity_result at the top level, never
+  // under `.data` — so the second clause was always undefined and the
+  // auto-compute ran on EVERY mount, even when a cached result existed.
+  // Symptom: redundant heavy fetch + compute on every tab visit.
+  if (!pageState.similarity_result) {
     try {
       await _autoComputeSimilarity(root, atlasState);
       pageState = _buildPageState(atlasState);
@@ -169,16 +177,29 @@ async function _autoComputeSimilarity(root, atlasState) {
     .replace('__END__',   String(endBp | 0))
     .replace('__CAP__',   String(cap));
   _setLoadingHint(root, `computing similarity for ${sourceLabel}…`);
+  // 2026-05-26: AbortController timeout so a missing atlas_server.py
+  // surfaces as a clear failure instead of an infinite "loading…".
+  const controller = (typeof AbortController === 'function') ? new AbortController() : null;
+  const timeoutMs = 15000;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
   let chunk = null;
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, controller ? { signal: controller.signal } : undefined);
+    if (timer) clearTimeout(timer);
     if (!r.ok) {
-      _setLoadingHint(root, `chunk fetch failed (HTTP ${r.status}). Open from a candidate to specify a region.`);
+      _setLoadingHint(root, `chunk fetch failed (HTTP ${r.status}) — ` +
+        `is atlas_server.py running? (start.sh, default port 8000)`);
       return;
     }
     chunk = await r.json();
   } catch (e) {
-    _setLoadingHint(root, `chunk fetch failed: ${e && e.message ? e.message : 'network error'}`);
+    if (timer) clearTimeout(timer);
+    const aborted = e && (e.name === 'AbortError');
+    _setLoadingHint(root, aborted
+      ? `chunk request timed out after ${timeoutMs / 1000}s — ` +
+        `is atlas_server.py running? (start.sh, default port 8000)`
+      : `chunk fetch failed: ${e && e.message ? e.message : 'network error'} — ` +
+        `is atlas_server.py running?`);
     return;
   }
   if (!chunk || !Array.isArray(chunk.markers) || !Array.isArray(chunk.dosage)
@@ -308,6 +329,9 @@ function _renderHeader(state) {
   if (cbOv) cbOv.checked = !!state.view_state.show_block_overlay;
   const cbDg = document.getElementById('similarityPanelShowDiagonal');
   if (cbDg) cbDg.checked = !!state.view_state.show_diagonal;
+  // 2026-05-26: cluster-bands checkbox added to HTML.
+  const cbCb = document.getElementById('similarityPanelShowClusterBands');
+  if (cbCb) cbCb.checked = state.view_state.show_cluster_bands !== false;
   const sel = document.getElementById('similarityPanelSampleOrder');
   if (sel) sel.value = state.view_state.sample_order_mode || 'natural';
   // Active window label.
@@ -477,6 +501,10 @@ function _wireToolbar(state) {
     state.view_state.show_diagonal = !!(e && e.target && e.target.checked);
     repaint();
   };
+  const onShowClusterBands = (e) => {
+    state.view_state.show_cluster_bands = !!(e && e.target && e.target.checked);
+    repaint();
+  };
   const onSampleOrder = (e) => {
     const v = (e && e.target && e.target.value) || 'natural';
     state.view_state.sample_order_mode = v;
@@ -523,24 +551,58 @@ function _wireToolbar(state) {
     if (cell) state.selection.toggleSelectedSample(cell.i);
   };
 
+  // 2026-05-26: keyboard nav over the transition strip — mirrors sim_mat's
+  // pattern so users can step the active window without aiming at thin
+  // strip cells. Ignored when focus is in a form input (so the toolbar's
+  // sample-order dropdown still gets arrow-key handling).
+  const onKeyDown = (ev) => {
+    if (!state || !state.similarity_result) return;
+    const t = ev.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT'
+              || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+      return;
+    }
+    const wins = state.similarity_result.windows;
+    const Nw = Array.isArray(wins) ? wins.length : 0;
+    if (Nw <= 0) return;
+    const cur = state.selection.getActiveWindowIdx();
+    const base = Number.isFinite(cur) ? (cur | 0) : 0;
+    let next = base;
+    const step = ev.shiftKey ? 10 : 1;
+    switch (ev.key) {
+      case 'ArrowLeft':  next = base - step; break;
+      case 'ArrowRight': next = base + step; break;
+      case 'Home':       next = 0; break;
+      case 'End':        next = Nw - 1; break;
+      default: return;
+    }
+    ev.preventDefault();
+    next = Math.max(0, Math.min(Nw - 1, next));
+    if (next === base) return;
+    state.selection.setActiveWindowIdx(next);  // selection subscriber repaints
+  };
+
   const unsubSelection = state.selection.subscribe(() => {
     repaintAll();
   });
 
   state._handlers = {
-    onShowOverlay, onShowDiagonal, onSampleOrder,
+    onShowOverlay, onShowDiagonal, onShowClusterBands, onSampleOrder,
     onTransitionMove, onTransitionClick,
     onMatrixMove, onMatrixClick,
+    onKeyDown,
     unsubSelection,
   };
 
   _addListener('similarityPanelShowBlockOverlay', 'change',    onShowOverlay);
   _addListener('similarityPanelShowDiagonal',     'change',    onShowDiagonal);
+  _addListener('similarityPanelShowClusterBands', 'change',    onShowClusterBands);
   _addListener('similarityPanelSampleOrder',      'change',    onSampleOrder);
   _addListener('similarityPanelTransitionCanvas', 'mousemove', onTransitionMove);
   _addListener('similarityPanelTransitionCanvas', 'click',     onTransitionClick);
   _addListener('similarityPanelMatrixCanvas',     'mousemove', onMatrixMove);
   _addListener('similarityPanelMatrixCanvas',     'click',     onMatrixClick);
+  if (typeof document !== 'undefined') document.addEventListener('keydown', onKeyDown);
 }
 
 function _teardownToolbar(state) {
@@ -548,11 +610,15 @@ function _teardownToolbar(state) {
   const h = state._handlers;
   if (h.onShowOverlay)      _removeListener('similarityPanelShowBlockOverlay', 'change',    h.onShowOverlay);
   if (h.onShowDiagonal)     _removeListener('similarityPanelShowDiagonal',     'change',    h.onShowDiagonal);
+  if (h.onShowClusterBands) _removeListener('similarityPanelShowClusterBands', 'change',    h.onShowClusterBands);
   if (h.onSampleOrder)      _removeListener('similarityPanelSampleOrder',      'change',    h.onSampleOrder);
   if (h.onTransitionMove)   _removeListener('similarityPanelTransitionCanvas', 'mousemove', h.onTransitionMove);
   if (h.onTransitionClick)  _removeListener('similarityPanelTransitionCanvas', 'click',     h.onTransitionClick);
   if (h.onMatrixMove)       _removeListener('similarityPanelMatrixCanvas',     'mousemove', h.onMatrixMove);
   if (h.onMatrixClick)      _removeListener('similarityPanelMatrixCanvas',     'click',     h.onMatrixClick);
+  if (typeof document !== 'undefined' && h.onKeyDown) {
+    document.removeEventListener('keydown', h.onKeyDown);
+  }
   if (typeof h.unsubSelection === 'function') { try { h.unsubSelection(); } catch (_) {} }
   state._handlers = {};
 }

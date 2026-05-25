@@ -17,6 +17,7 @@
 
 import { hungarianChainProjection, concordanceMatrix } from '../../../shared/hungarian.js';
 import { clusterByConcordance } from '../../../shared/clustering.js';
+import { getL2Cluster } from '../../../shared/page1_data_helpers.js';
 
 // =====================================================================
 // Constants (legacy lines 39089-39091)
@@ -39,6 +40,23 @@ export const LINEAGE_MIN_L2_FOR_COMPUTE = 3;
 export function lineageCacheKey(l2_indices, K, threshold, mode, chrom) {
   return [
     chrom || '_', mode || 'default', K, threshold,
+    l2_indices.length,
+    (l2_indices[0] || 0),
+    (l2_indices[l2_indices.length - 1] || 0),
+  ].join('::');
+}
+
+/**
+ * 2026-05-21 perf (Tier-C finding #4): threshold-independent slice of
+ * the lineage cache key. The projection + concordance matrix depend on
+ * (chrom, mode, K, l2_indices) but NOT on threshold — threshold is a
+ * pure post-processing knob in clusterByConcordance. Splitting the
+ * cache lets the threshold slider rebuild only the cluster step,
+ * skipping the expensive O(n_L2²) concordance recomputation.
+ */
+function _lineageProjectionKey(l2_indices, K, mode, chrom) {
+  return [
+    chrom || '_', mode || 'default', K,
     l2_indices.length,
     (l2_indices[0] || 0),
     (l2_indices[l2_indices.length - 1] || 0),
@@ -86,29 +104,44 @@ export function runLineageCompute(state, opts) {
     return state.lineageResult;
   }
 
-  // Default getLabelsForL2: read from local_pca_dosage's L2-cluster cache.
-  const getLabelsForL2 = opts.getLabelsForL2 || ((li) => {
-    const cache = state.l2GroupCache;
-    if (!cache) return null;
-    const entry = cache.get ? cache.get(li) : cache[li];
-    return (entry && entry.labels) ? entry.labels : null;
-  });
+  // 2026-05-21 perf (Tier-C finding #4): check the threshold-independent
+  // projection cache first. If hit, we skip hungarianChainProjection +
+  // concordanceMatrix entirely and just re-run clusterByConcordance
+  // with the new threshold. Threshold-slider changes are now O(cluster)
+  // instead of O(projection + concordance + cluster).
+  const projKey = _lineageProjectionKey(l2_indices, K, mode, chrom);
+  let projection, concordance;
+  const projCache = state.lineageProjectionCache;
+  if (!opts.force && projCache && projCache.key === projKey) {
+    projection = projCache.projection;
+    concordance = projCache.concordance;
+  } else {
+    // Default getLabelsForL2: route through getL2Cluster so the data-
+    // identity cache (state.data._l2ClusterCache) is consulted, and
+    // misses compute on demand. 2026-05-21: replaces a direct read of
+    // state.l2GroupCache (now stale — the cache moved to state.data).
+    const getLabelsForL2 = opts.getLabelsForL2 || ((li) => {
+      const entry = getL2Cluster(state, li);
+      return (entry && entry.labels) ? entry.labels : null;
+    });
 
-  let projection;
-  try {
-    projection = hungarianChainProjection(l2_indices, K, getLabelsForL2);
-  } catch (_) {
-    state.lineageResult = null;
-    state.lineageCacheKey = null;
-    return null;
-  }
-  if (!projection || projection.n_samples === 0 || projection.n_total_L2 === 0) {
-    state.lineageResult = null;
-    state.lineageCacheKey = null;
-    return null;
+    try {
+      projection = hungarianChainProjection(l2_indices, K, getLabelsForL2);
+    } catch (_) {
+      state.lineageResult = null;
+      state.lineageCacheKey = null;
+      return null;
+    }
+    if (!projection || projection.n_samples === 0 || projection.n_total_L2 === 0) {
+      state.lineageResult = null;
+      state.lineageCacheKey = null;
+      state.lineageProjectionCache = null;
+      return null;
+    }
+    concordance = concordanceMatrix(projection);
+    state.lineageProjectionCache = { key: projKey, projection, concordance };
   }
 
-  const concordance = concordanceMatrix(projection);
   const cluster = clusterByConcordance(concordance, projection.n_samples, threshold);
 
   // Per-lineage fish counts for downstream UI.

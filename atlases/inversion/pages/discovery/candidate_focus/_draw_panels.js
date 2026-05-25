@@ -16,6 +16,12 @@
 
 import { _pageState } from './_state.js';
 import { sampleSpreadRange, getPC, getL2Cluster, allSampleIdx, getActiveSimScale, groupColor } from '../../../shared/page1_data_helpers.js';
+// 2026-05-26: wire the canvas + theme helpers that the legacy monolith
+// exposed as globals. Without these, every drawCandX call logged
+// "fitCanvas is not defined" / "themeColor is not defined" and silently
+// stopped painting.
+import { fitCanvas, themeColor } from '../../../shared/page1_utils.js';
+import { drawSlabMiniPCA } from '../local_pca_dosage/l3_panel.js';
 
 // --- _candWindowRange — extracted from legacy line 59237 (candidate_focus-private) ---
 // Returns the [s0, e0] (0-based, inclusive) window range of a candidate's
@@ -426,4 +432,157 @@ export function drawCandidateLocationStrip(c) {
   drawCandSimMini(c);
   drawCandL1Mini(c);
   drawCandKaryoMini(c);
+}
+
+// 2026-05-26: ports of three mini-strip drawers + the shared canvas
+// helper that the legacy monolith exposed as globals. The ES-module
+// migration left them dangling — every drawCandidateLocationStrip call
+// crashed at the first reference and the location strip rendered blank.
+// Bodies copied byte-verbatim from legacy/Inversion_atlas.html lines
+// 59079, 59091, 59134, 59183 with two adjustments:
+//   • `state.X` → read through `_pageState` (module shim)
+//   • `_fitMiniCanvas` kept local — it differs from page1_utils's
+//     fitCanvas() in that it tolerates a `null` canvas and uses raw
+//     clientWidth/Height (no parent fallback) so the tiny strip
+//     canvases inside the candidate metadata column don't inherit the
+//     parent grid track's full width.
+
+function _fitMiniCanvas(canvas) {
+  if (!canvas) return null;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || 200;
+  const cssH = canvas.clientHeight || 60;
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: cssW, h: cssH };
+}
+
+function drawCandSimMini(c) {
+  const state = _pageState;
+  const canvas = document.getElementById('cand-mini-simdat');
+  const fit = _fitMiniCanvas(canvas);
+  if (!fit) return;
+  const { ctx, w, h } = fit;
+  ctx.clearRect(0, 0, w, h);
+  if (!state || !state.data || !state.data.windows) return;
+  const N = state.data.n_windows;
+  const totalBp = state.data.windows[N - 1].end_bp;
+
+  // Background bar
+  ctx.fillStyle = 'rgba(120, 120, 120, 0.15)';
+  ctx.fillRect(0, h * 0.35, w, h * 0.3);
+
+  // L1 envelopes as thin tinted rects
+  const l1s = state.data.l1_envelopes || [];
+  for (const env of l1s) {
+    const sw = (env._s0 != null) ? env._s0 : (env.start_w - 1);
+    const ew = (env._e0 != null) ? env._e0 : (env.end_w - 1);
+    if (sw == null || ew == null) continue;
+    const sBp = state.data.windows[sw].start_bp;
+    const eBp = state.data.windows[ew].end_bp;
+    const x1 = (sBp / totalBp) * w;
+    const x2 = (eBp / totalBp) * w;
+    ctx.fillStyle = 'rgba(48, 116, 200, 0.22)';
+    ctx.fillRect(x1, h * 0.35, Math.max(1, x2 - x1), h * 0.3);
+  }
+
+  // Candidate region
+  const cx1 = (c.start_bp / totalBp) * w;
+  const cx2 = (c.end_bp / totalBp) * w;
+  ctx.fillStyle = '#f5a524';
+  ctx.fillRect(cx1, h * 0.2, Math.max(1.5, cx2 - cx1), h * 0.6);
+
+  // Tick marks
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('0', 2, h - 3);
+  ctx.textAlign = 'right';
+  ctx.fillText(`${(totalBp / 1e6).toFixed(1)} Mb`, w - 3, h - 3);
+}
+
+function drawCandL1Mini(c) {
+  const state = _pageState;
+  const canvas = document.getElementById('cand-mini-l1');
+  const fit = _fitMiniCanvas(canvas);
+  if (!fit) return;
+  const { ctx, w, h } = fit;
+  ctx.clearRect(0, 0, w, h);
+  if (!state || !state.data || !state.data.windows) return;
+
+  // Parent L1 (env containing the candidate window range), else a tight view.
+  const l1s = state.data.l1_envelopes || [];
+  let parent = null;
+  for (const env of l1s) {
+    const sw = (env._s0 != null) ? env._s0 : (env.start_w - 1);
+    const ew = (env._e0 != null) ? env._e0 : (env.end_w - 1);
+    if (sw <= c.start_w && ew >= c.end_w) { parent = env; break; }
+  }
+  let viewStartBp, viewEndBp;
+  if (parent) {
+    const sw = (parent._s0 != null) ? parent._s0 : (parent.start_w - 1);
+    const ew = (parent._e0 != null) ? parent._e0 : (parent.end_w - 1);
+    viewStartBp = state.data.windows[sw].start_bp;
+    viewEndBp   = state.data.windows[ew].end_bp;
+  } else {
+    const span = c.end_bp - c.start_bp;
+    viewStartBp = Math.max(0, c.start_bp - span * 0.25);
+    viewEndBp   = c.end_bp + span * 0.25;
+  }
+  const viewSpan = viewEndBp - viewStartBp;
+
+  ctx.fillStyle = 'rgba(48, 116, 200, 0.18)';
+  ctx.fillRect(0, h * 0.35, w, h * 0.3);
+
+  const cx1 = ((c.start_bp - viewStartBp) / viewSpan) * w;
+  const cx2 = ((c.end_bp - viewStartBp) / viewSpan) * w;
+  ctx.fillStyle = '#f5a524';
+  ctx.fillRect(Math.max(0, cx1), h * 0.2, Math.max(1.5, cx2 - cx1), h * 0.6);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(parent ? (parent.candidate_id || 'L1') : 'no L1', 2, h - 3);
+  ctx.textAlign = 'right';
+  ctx.fillText(`${((viewEndBp - viewStartBp) / 1e6).toFixed(2)} Mb view`, w - 3, h - 3);
+}
+
+function drawCandKaryoMini(c) {
+  const state = _pageState;
+  const canvas = document.getElementById('cand-mini-karyo');
+  const fit = _fitMiniCanvas(canvas);
+  if (!fit) return;
+  const { ctx, w, h } = fit;
+  ctx.clearRect(0, 0, w, h);
+  if (!state || !state.data || !state.data.windows) return;
+  const N = state.data.n_windows;
+  const totalBp = state.data.windows[N - 1].end_bp;
+
+  const barY = h * 0.4;
+  const barH = h * 0.2;
+  ctx.fillStyle = 'rgba(180, 180, 180, 0.4)';
+  ctx.beginPath();
+  if (ctx.roundRect) {
+    ctx.roundRect(2, barY, w - 4, barH, barH / 2);
+  } else {
+    ctx.rect(2, barY, w - 4, barH);
+  }
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(150, 150, 150, 0.5)';
+  ctx.stroke();
+
+  const cx1 = (c.start_bp / totalBp) * (w - 4) + 2;
+  const cx2 = (c.end_bp / totalBp) * (w - 4) + 2;
+  ctx.fillStyle = '#f5a524';
+  ctx.fillRect(cx1, barY - 2, Math.max(2, cx2 - cx1), barH + 4);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = '9px ui-monospace, monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(state.data.chrom || 'chr', 2, h - 3);
+  ctx.textAlign = 'right';
+  const midMb = ((c.start_bp + c.end_bp) / 2 / 1e6).toFixed(2);
+  ctx.fillText(`${midMb} Mb`, w - 3, h - 3);
 }

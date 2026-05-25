@@ -511,10 +511,28 @@ function _sequentialGreyToRed(t) {
 }
 
 function _sequentialBlueToYellow(t) {
-  // t=0 → cool blue #2b6ca8; t=1 → warm yellow #f0c14b. Mid: greenish.
-  const r = Math.round( 43 + (240 -  43) * t);
-  const g = Math.round(108 + (193 - 108) * t);
-  const b = Math.round(168 + ( 75 - 168) * t);
+  // 2026-05-26: was a 2-stop blue→yellow lerp in RGB space (rgb(43,108,168)
+  // → rgb(240,193,75)) which produced a desaturated olive midpoint
+  // (rgb(141,150,121)) — same "looks like grey" problem the het ramp had.
+  // theta_pi / ghsl values cluster around the cohort median so most
+  // samples landed in that olive middle.
+  //
+  // Fix: 3-stop ramp routed through a saturated teal so the visual
+  // midpoint stays vivid. Endpoints unchanged so existing screenshots
+  // still match at t=0 / t=1; only the interior is more colourful.
+  const tt = Math.max(0, Math.min(1, t));
+  // #2b6ca8 (43,108,168) → #3cb4b8 (60,180,184) → #f0c14b (240,193,75)
+  if (tt <= 0.5) {
+    const u = tt * 2;
+    const r = Math.round( 43 + ( 60 -  43) * u);
+    const g = Math.round(108 + (180 - 108) * u);
+    const b = Math.round(168 + (184 - 168) * u);
+    return `rgb(${r},${g},${b})`;
+  }
+  const u = (tt - 0.5) * 2;
+  const r = Math.round( 60 + (240 -  60) * u);
+  const g = Math.round(180 + (193 - 180) * u);
+  const b = Math.round(184 + ( 75 - 184) * u);
   return `rgb(${r},${g},${b})`;
 }
 

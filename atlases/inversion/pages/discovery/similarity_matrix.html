@@ -18,6 +18,15 @@
           <input id="similarityPanelShowDiagonal" type="checkbox" checked>
           Diagonal
         </label>
+        <!-- 2026-05-26: cluster-bands toggle. Sibling of block-overlay /
+             diagonal. The renderer reads `show_cluster_bands !== false`
+             (defaults true); DEFAULT_VIEW_STATE in similarity_matrix.js
+             now declares it explicitly so the reflect path keeps the
+             checkbox in sync after view-state changes. -->
+        <label class="similarity-toggle">
+          <input id="similarityPanelShowClusterBands" type="checkbox" checked>
+          Cluster bands
+        </label>
         <label class="similarity-toggle">
           Order
           <select id="similarityPanelSampleOrder" class="similarity-select">

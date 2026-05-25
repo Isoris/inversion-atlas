@@ -64,6 +64,18 @@
 <div class="wrap">
   <aside>
     <button id="sidebarToggleBtn" title="Collapse / expand the parameters pane">‹</button>
+    <!-- 2026-05-26: float-mode toggle (Quentin's "settings bar should be
+         floating, not on the left"). Click to detach the sidebar into a
+         draggable floating panel; click again to dock back. State + last
+         position persisted to localStorage by atlas-core's
+         core/sidebar_floating.js (shell auto-installs on every page mount;
+         this button is the opt-in entry point). -->
+    <button id="sidebarFloatBtn"
+            title="Detach sidebar as a floating panel (drag from the first heading). Click again to re-dock."
+            style="position: absolute; top: 8px; right: 28px; background: transparent;
+                   color: var(--ink-dim); border: 1px solid var(--rule);
+                   border-radius: 3px; padding: 0 6px; font-family: var(--mono);
+                   font-size: 11px; cursor: pointer; line-height: 18px;">📌</button>
     <!-- v3.51: sim minimap — sticky panel at top of sidebar, hidden by default.
          When user clicks "Move to minimap" on the sim panel, this becomes
          visible and the main sim panel hides. -->
@@ -423,6 +435,13 @@
               data-mode="fixed">📐 fixed</button>
       <button id="resetLayoutBtn"
               title="Reset layout to defaults (sidebar expanded, panels at default size)">↺ reset layout</button>
+      <!-- 2026-05-26: re-open the floating sim_mat panel after it's been
+           closed via its ✕ button (compact mode only — non-compact modes
+           always show sim in the main grid). Visible only when data-sim-
+           hidden is set on body. -->
+      <button id="simShowBtn"
+              title="Re-open the floating sim_mat panel (compact-mode only)"
+              style="display: none;">🔲 sim</button>
       <!-- 2026-05-19 — active-mode toggle. Switches every panel
            (sim_mat, |Z|, lines, PCA, L3, tracks) between dosage,
            θπ, and GHSL data sources. Color mode (kmeans / family
@@ -485,6 +504,10 @@
       <div class="panel-label"><b>sim_mat</b> · L1 (blue) / L2 (green) overlays · click to jump · drag bottom edge to resize</div>
       <button id="simFitSquare" title="Auto-size panel so the heatmap is a perfect square at full window width. With v3.99 turn 7 max cap raised to 2400px, this gives a near-real-size sim_mat (e.g. ~1700×1700 on a 1920px-wide viewport).">⛶ fit square</button>
       <button id="simMoveMinimapBtn" title="Move sim heatmap into a small sticky panel above the sidebar Data section. Frees vertical space in the main panel area.">▤ move to minimap</button>
+      <!-- 2026-05-26: close button visible only in compact mode (CSS-gated).
+           Toggles body[data-sim-hidden]; re-open via #simShowBtn in ctrlBar. -->
+      <button id="simPanelCloseBtn" class="simPanelClose"
+              title="Hide the floating sim_mat panel. Re-open via the 🔲 sim button in the toolbar.">✕</button>
       <div id="simResize" title="Drag to resize · double-click to reset"></div>
     </div>
 
@@ -982,6 +1005,22 @@
                        border-radius: 2px; border: 1px solid var(--rule);"></span>
           <span class="pca-axis-ramp-legend-max"></span>
         </span>
+        <!-- 2026-05-26: 🔬 dosage / het debug. Open a modal with the
+             per-tracked-sample dosage + het values for the active range
+             AND a sample-id projection table — answers "why does GHSL
+             colour the scatter but dosage / het stay grey?". GHSL pulls
+             values from the precomp JSON (same sample order, no
+             projection needed); dosage / het pull from the
+             /api/dosage/chunk endpoint whose sample ids may not match
+             data.samples → all NaN → grey. The modal pinpoints which
+             chunk ids failed to bind. -->
+        <button id="dosageDebugBtn" type="button"
+                title="Diagnose 'PCA scatter stays grey under color: dosage / het'. Shows the per-tracked-sample dosage + het values at the active range and which chunk sample ids matched / failed to match data.samples."
+                style="margin-left: 8px; font-size: 10.5px; padding: 1px 8px;
+                       background: var(--panel-3, #232a36);
+                       border: 1px solid var(--rule, #2a3242);
+                       border-radius: 2px; color: var(--ink-dim); cursor: pointer;
+                       font-family: var(--mono, ui-monospace, monospace);">🔬 dbg</button>
         <span id="pcaAxisAvailNote" class="pca-axis-avail"></span>
         <button id="pcaCollapseBtn" class="pca-axis-collapse"
                 title="Collapse / expand the PCA panel — drag the L3 panel up to take its space">▼</button>
@@ -1003,6 +1042,25 @@
                div. Width 110px, height 70px, translucent panel
                background. -->
           <div id="screeInset" class="scree-inset" style="display: none;"></div>
+          <!-- 2026-05-26: per-tracked-sample ramp-value inline panel.
+               Always-visible answer to "is dosage / het / GHSL / θπ
+               actually computed for my tracked samples right now?".
+               Bottom-left overlay over the scatter; hidden unless a
+               ramp colorMode is active AND there's at least one tracked
+               sample. Populated on every drawPCA via
+               _refreshTrackedRampValuesPanel. -->
+          <div id="pcaTrackedRampValues"
+               style="display: none; position: absolute;
+                      left: 8px; bottom: 8px; z-index: 5;
+                      max-width: 320px; max-height: 220px;
+                      overflow-y: auto;
+                      background: rgba(15, 20, 29, 0.92);
+                      border: 1px solid var(--rule, #2a3242);
+                      border-radius: 3px; padding: 5px 7px;
+                      font: 10.5px ui-monospace, monospace;
+                      color: var(--ink, #e6edf6);
+                      pointer-events: auto;
+                      backdrop-filter: blur(2px);"></div>
       <!-- v3.50: legacy <div class="panel-label"> removed. pcaAxisBar above
            already shows X/Y dropdowns and the linked-views checkbox.
            pcaPanelLabelAxes lookups in JS are null-safe so this removal is OK. -->
@@ -1142,18 +1200,12 @@
                            background: rgba(245,165,36,0.15);
                            border: 1px solid rgba(245,165,36,0.5);
                            color: var(--accent); white-space: nowrap;">0 selected</span>
-              <button id="pcaLassoConfirmBtn"
-                      title="Replace the tracked-samples list with the lassoed set"
-                      style="background: var(--accent); color: #0e1116;
-                             border: 1px solid var(--accent); border-radius: 3px;
-                             padding: 1px 8px; font-family: var(--mono); font-size: 10px;
-                             cursor: pointer; font-weight: 600;">Confirm</button>
-              <button id="pcaLassoClearBtn"
-                      title="Clear the current lasso selection without committing"
-                      style="background: var(--panel-2); color: var(--ink-dim);
-                             border: 1px solid var(--rule); border-radius: 3px;
-                             padding: 1px 8px; font-family: var(--mono); font-size: 10px;
-                             cursor: pointer;">Clear</button>
+              <!-- 2026-05-26: removed #pcaLassoConfirmBtn + #pcaLassoClearBtn.
+                   The lasso now auto-commits on pointer-up (pca_panel.js:1545)
+                   and there's no in-flight rectangle to "clear" — these
+                   buttons were leftovers from an earlier confirm-on-button
+                   design that never had handlers. Matching compact pair
+                   (Confirm/Clear inside the popover) removed below. -->
             </div>
             <!-- Row D: K(N) cycle button + 6 K-colored band buttons.
                  Each button shows just the K-index ("1".."6") in its actual
@@ -1461,18 +1513,9 @@
                        background: rgba(245,165,36,0.15);
                        border: 1px solid rgba(245,165,36,0.5);
                        color: var(--accent); white-space: nowrap;">0 selected</span>
-          <button id="pcaLassoConfirmBtnCompact"
-                  title="Replace the tracked-samples list with the lassoed set"
-                  style="background: var(--accent); color: #0e1116;
-                         border: 1px solid var(--accent); border-radius: 3px;
-                         padding: 1px 8px; font-family: var(--mono); font-size: 10px;
-                         cursor: pointer; font-weight: 600;">Confirm</button>
-          <button id="pcaLassoClearBtnCompact"
-                  title="Clear the current lasso selection without committing"
-                  style="background: var(--panel-2); color: var(--ink-dim);
-                         border: 1px solid var(--rule); border-radius: 3px;
-                         padding: 1px 8px; font-family: var(--mono); font-size: 10px;
-                         cursor: pointer;">Clear</button>
+          <!-- 2026-05-26: removed compact Confirm/Clear lasso pair — see
+               note on the non-compact pair above. Lasso auto-commits on
+               pointer-up; there's no in-flight rectangle to clear. -->
         </div>
         <!-- 2026-05-18: trail-back + N-tracked sliders moved to #tPanelOverlay
              popup. The compact body now jumps from the (hidden) input
@@ -1568,12 +1611,11 @@
              transition.
              Quentin (2026-05-20): "I feel that these buttons are deprecated
              or shouldnt be there in the tracked samples. or move them to
-             the settings toggle". -->
-        <div style="display: none;">
-          <button id="lockColorsBtnCompact"></button>
-          <button id="promoteCandidateBtnCompact" disabled></button>
-          <button id="exportKLabelsBtnCompact"></button>
-        </div>
+             the settings toggle".
+             2026-05-26: deleted per Quentin's note — these 3 buttons were
+             hidden (display:none), had no handlers, and were flagged as
+             deprecated. The lock-colors / promote-candidate / export-K
+             actions live in the non-compact rails. -->
 
         <!-- 2026-05-20: color-mode picker relocated to #tPanelOverlay
              (the ▾ tracked-samples settings popup) per Quentin's
@@ -1675,30 +1717,13 @@
              State: state.l2SweepEnabled (boolean, default false).
              Persisted to localStorage.pca_scrubber_v3.l2SweepEnabled.
              Per-chrom dismissed-set persisted under
-             pca_scrubber_v3.l2SweepDismissed.<chrom>. -->
-        <label id="l2SweepToggleLabel" class="l3-more-item" style="margin-left: 12px; display: flex;
-                                              align-items: center; gap: 4px;
-                                              font-family: var(--mono); font-size: 10.5px;
-                                              color: var(--ink-dim); cursor: pointer;
-                                              user-select: none;"
-               title="Auto-run inheritance clustering against ALL usable L2 envelopes on the chromosome (not just user-promoted candidates), and auto-promote L2s that pass the 5-gate filter (silhouette ≥0.30, ≥2 inheritance groups touched, min band size ≥5, not already saved, ≥100 kb from existing candidates). Auto-promoted candidates are tagged 'auto_l2_sweep' and appear in the catalogue with a distinct chip; they do NOT feed the I·g pills until you confirm them. Default OFF.">
-          <input type="checkbox" id="l2SweepToggle" style="margin: 0;" />
-          <span>L2-sweep 🤖</span>
-        </label>
-        <!-- turn 134 Slice 2: inspector trigger button. Opens the
-             L2-sweep inspector modal showing every L2 in the current
-             sweep result with per-row promote/dismiss + filters + bulk
-             actions. Disabled (greyed) when no sweep result is on
-             state.l2SweepResult — i.e. before the L2-sweep toggle is
-             enabled, or before any chrom is loaded. -->
-        <button id="l2SweepInspectBtn"
-                class="l3-more-item"
-                style="margin-left: 4px; background: transparent;
-                       border: 1px solid var(--rule); color: var(--ink-dim);
-                       padding: 1px 6px; cursor: pointer; font-family: var(--mono);
-                       font-size: 10.5px; border-radius: 3px;"
-                title="Open the L2-sweep inspector — review every L2 in the sweep with per-row promote/dismiss buttons, filter by silhouette / group count, bulk actions, and re-sweep. Disabled until the L2-sweep toggle has run at least once on the current chrom."
-                disabled>🔍 inspect</button>
+             pca_scrubber_v3.l2SweepDismissed.<chrom>.
+             2026-05-26: REMOVED — L2-sweep functionality migrated to the
+             haplotype_regimes page (V-walker + Cramér's V auto-merge in
+             the long-range pipeline + auto-merge V_macro button). The
+             toggle + inspector button here were orphan scaffold (no JS
+             handler) and the auto-sweep concept now lives in the regimes
+             pipeline's discovery loop. -->
         <!-- turn 135 Slice 1 (SPEC_g_panel_unified_groups.md): G-panel
              trigger button. Opens the unified groups popup with three
              tabs (karyotype / inheritance / manual). Slice 1 ships the
@@ -1824,15 +1849,28 @@
                an action is staged and Enter will commit it. All three
                buttons disable when candidate mode is off (no draft can
                exist outside candidate mode). -->
+          <!-- 2026-05-26 TODO: candidate-mode L3 draft merge/separate/confirm —
+               aspirational v4-turn-113 feature. The HTML scaffolding exists
+               but the underlying helpers (extendL3DraftRight / shrinkL3DraftRight /
+               commitL3Draft / discardL3Draft / _refreshCmActionButtons) were
+               never implemented — not in the migrated code, not in
+               legacy/Inversion_atlas.html. The keyboard mirror in
+               local_pca_dosage/hotkeys.js:130-181 is typeof-guarded so it
+               silent-no-ops. Buttons stay HTML-disabled until the L3 draft
+               state machine ships. -->
           <div class="l3-act-row" id="l3ActionRow"
-               title="Candidate-draft action buttons — same actions as the keyboard hotkeys (↑ extend / ↓ shrink / Enter promote). Visible affordance for the keyboard flow when working close to the recluster dropdown.">
+               data-todo="candidate-mode-l3-draft-not-implemented"
+               title="[TODO] Candidate-draft action buttons — UI is in place but the underlying L3 draft state machine (extendL3DraftRight / commitL3Draft / etc.) was never implemented. Buttons remain disabled until the feature ships.">
             <span class="l3-act-row-label">draft:</span>
             <button id="l3ActMergeBtn" class="l3-act-btn l3-act-merge" disabled
-                    title="Merge ↑ — extend the draft candidate to include the next neighbor on the right. Same as ArrowUp in candidate mode. Creates a draft on first click if none exists.">merge ↑</button>
+                    data-todo="extendL3DraftRight-not-implemented"
+                    title="[TODO — not implemented] Merge ↑ — would extend the draft candidate to include the next neighbor on the right. Awaits extendL3DraftRight() helper.">merge ↑</button>
             <button id="l3ActSeparateBtn" class="l3-act-btn l3-act-separate" disabled
-                    title="Separate ↓ — shrink the draft candidate from the rightmost edge. Same as ArrowDown in candidate mode. No-op when the draft is already at minimum width.">separate ↓</button>
+                    data-todo="shrinkL3DraftRight-not-implemented"
+                    title="[TODO — not implemented] Separate ↓ — would shrink the draft candidate from the rightmost edge. Awaits shrinkL3DraftRight() helper.">separate ↓</button>
             <button id="l3ActConfirmBtn" class="l3-act-btn l3-act-confirm" disabled
-                    title="Confirm [Enter] — commit the current draft as a candidate (adds to state.candidateList, marks confirmed, appears on the candidate strip + catalogue). Pulses while a draft is staged.">confirm [Enter]</button>
+                    data-todo="commitL3Draft-not-implemented"
+                    title="[TODO — not implemented] Confirm [Enter] — would commit the current draft as a candidate. Awaits commitL3Draft() helper.">confirm [Enter]</button>
           </div>
           <!-- v4 turn 113 (Ask 1) → v4 turn 123: candidate-edit cluster
                (F flip / B set boundary / C cut / track 1/2) — relocated
@@ -1844,24 +1882,40 @@
                restyled with semantic color: F=teal (mode toggle),
                B=blue (precision/snap), C=orange (cut/split). Track 1/2
                keep their neutral pill-pair styling with active inversion. -->
-          <div id="candidateEditRow">
+          <!-- 2026-05-26 TODO: candidate-mode edit cluster (F flip / B boundary
+               / C cut / track 1↔2) — companions to the #l3ActionRow above.
+               Same dead-UI pattern: HTML only, no JS wiring in the migrated
+               code, and the underlying flip/boundary/cut/track-switch helpers
+               don't exist anywhere (not in legacy/Inversion_atlas.html either).
+               Unlike #l3ActionRow these buttons are NOT html-disabled — added
+               `disabled` here to match the same affordance signal (clicks
+               would otherwise silently do nothing). Restore `disabled`-off
+               when the candidate-edit state machine ships. -->
+          <div id="candidateEditRow" data-todo="candidate-mode-edit-cluster-not-implemented">
             <span class="cm-edit-row-label">edit:</span>
-            <button id="cmFlipBtn" class="cm-edit-btn cm-edit-flip"
-                    title="F — flip the active draft between L2 and W (window) resolution. In W mode, the draft has window-precision start/end edges that can be nudged with B or refined by clicking the W-row at a specific window.">F flip L2↔W</button>
-            <button id="cmBoundaryBtn" class="cm-edit-btn cm-edit-boundary"
-                    title="B — snap the nearer edge (start_w or end_w) of the active W-resolution draft to the cursor's window. Auto-flips L2→W if needed. Useful for shrinking a draft to a precise boundary inside an L2.">B set boundary</button>
-            <button id="cmCutBtn" class="cm-edit-btn cm-edit-cut"
-                    title="C — toggle a cut marker at the cursor's window inside the active W-resolution draft. Cuts render as 1-px amber lines on the W-row and are persisted with the candidate. Note: cuts are visual + persisted in this turn; commit-time SPLIT (turning N cuts into N+1 candidates on promotion) ships in a future turn.">C ✂ cut</button>
-            <!-- v4 turn 38 (Ask C step 3): track switcher pair (track 1 / 2). -->
+            <button id="cmFlipBtn" class="cm-edit-btn cm-edit-flip" disabled
+                    data-todo="cm-flip-not-implemented"
+                    title="[TODO — not implemented] F — would flip the active draft between L2 and W (window) resolution. Awaits the candidate-mode edit state machine.">F flip L2↔W</button>
+            <button id="cmBoundaryBtn" class="cm-edit-btn cm-edit-boundary" disabled
+                    data-todo="cm-boundary-not-implemented"
+                    title="[TODO — not implemented] B — would snap the nearer edge of the active W-resolution draft to the cursor's window. Awaits the candidate-mode edit state machine.">B set boundary</button>
+            <button id="cmCutBtn" class="cm-edit-btn cm-edit-cut" disabled
+                    data-todo="cm-cut-not-implemented"
+                    title="[TODO — not implemented] C — would toggle a cut marker at the cursor's window inside the active W-resolution draft. Awaits the candidate-mode edit state machine.">C ✂ cut</button>
+            <!-- v4 turn 38 (Ask C step 3): track switcher pair (track 1 / 2).
+                 2026-05-26: same TODO status as the F/B/C buttons. -->
             <span class="cm-track-switcher" style="display: inline-flex; gap: 0; align-items: center; margin-left: 4px;"
-                  title="Track switcher (Ask C). Track 1 = default candidate. Click 'track 2' to build a parallel candidate for an overlapping inversion in the same region. Both tracks commit together as a single two-axes candidate. Mutual exclusivity enforced — a band can belong to at most one track at a time.">
+                  data-todo="cm-track-switcher-not-implemented"
+                  title="[TODO — not implemented] Track switcher — would let a draft carry two parallel candidates (overlapping inversions). Awaits the candidate-mode edit state machine.">
               <span style="font-family: var(--mono); font-size: 9px; color: var(--ink-dimmer); margin-right: 3px;">tracks:</span>
-              <button id="cmTrack1Btn" class="cm-edit-btn cm-edit-track"
+              <button id="cmTrack1Btn" class="cm-edit-btn cm-edit-track" disabled
                       data-active="1"
-                      title="Edit track 1 (default). Click band swatches on the focal L3 pane to add/remove bands from this track.">1</button>
-              <button id="cmTrack2Btn" class="cm-edit-btn cm-edit-track"
+                      data-todo="cm-track1-not-implemented"
+                      title="[TODO — not implemented] Edit track 1 (default).">1</button>
+              <button id="cmTrack2Btn" class="cm-edit-btn cm-edit-track" disabled
                       data-active="0"
-                      title="Edit track 2 (for overlapping inversions). Clicking activates a 2nd parallel track on the active draft. Add bands to it via the focal-pane band selector. Empty track 2 is dropped at commit time."
+                      data-todo="cm-track2-not-implemented"
+                      title="[TODO — not implemented] Edit track 2 (for overlapping inversions)."
                       style="margin-left: -1px;">2</button>
             </span>
           </div>

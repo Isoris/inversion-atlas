@@ -68,7 +68,7 @@ import { buildTrackPanels, drawTracks, onPCAClick, onSimClick, onZClick, setCur,
 import { attachSidebarHandlers } from './local_pca_dosage/sidebar.js';
 import { attachHotkeys } from './local_pca_dosage/hotkeys.js';
 import { attachPcaLasso } from './local_pca_dosage/pca_panel.js';
-import { installDosageChunkFetcher } from '../../shared/dosage_chunks.js';
+import { installDosageChunkFetcher, buildDosageDebugReport, resetDosageDiagnosticsForChromChange } from '../../shared/dosage_chunks.js';
 
 // Theta-pi mirror (local_pca_theta_pi) and GHSL mirror (local_pca_ghsl) entry points. These are
 // painted from local_pca_dosage's applyData() because the mirror panels share local_pca_dosage's
@@ -142,6 +142,14 @@ export function applyData(state, data) {
   // fish-set is cohort-wide so it survives chrom changes, but the
   // compute cache is per-chrom.
   _bandTraceClearCache(state);
+  // 2026-05-26: clear dosage-side caches + one-shot diagnostic flags so
+  // the user gets a fresh shape-validation / sample-id-match log on the
+  // new chrom, and the bp-range-keyed het/dosage_mean caches don't alias
+  // to stale values from the previous chrom. The chunk LRU itself is
+  // intentionally kept — its keys are chrom-prefixed and the
+  // covering-fallback filters by chrom, so chunks from a previously-
+  // visited chrom stay available if the user navigates back.
+  resetDosageDiagnosticsForChromChange(state);
   loadBandTraceState(state);
   state.bandTraceFishSet = null;
   state._lineageComputeScheduled = false;
@@ -405,6 +413,10 @@ export async function mount(root, atlasState, registry) {
   document.body.dataset.layoutMode = restoredMode;
   legacyState.layoutMode = restoredMode;
   try { localStorage.setItem('pca_scrubber_v3.layoutmode', restoredMode); } catch (_) {}
+
+  // 2026-05-26: floating-sidebar wiring promoted to atlas-core
+  // (core/sidebar_floating.js + shell.css). The shell auto-installs
+  // on every shell.page_mount event — no per-page install call needed.
   // The body[data-active-mode] attribute is set AFTER applyData runs
   // (further below), because applyData is what restores state.activeMode
   // from localStorage — we'd be writing 'undefined' here.
@@ -616,6 +628,13 @@ export async function mount(root, atlasState, registry) {
       },
     });
   } catch (e) { console.warn('installDosageChunkFetcher:', e); }
+
+  // 2026-05-26: wire the 🔬 dosage debug button (#dosageDebugBtn). Opens
+  // a small overlay listing every tracked sample's computed dosage + het
+  // for the active L2 range plus a one-line diagnosis. Helps debug the
+  // recurring "PCA scatter stays grey under color: dosage / het" UX.
+  try { _wireDosageDebugBtn(legacyState); }
+  catch (e) { console.warn('local_pca_dosage.mount: _wireDosageDebugBtn threw —', e); }
 
   // Replay any enrichments the user dropped in a prior session. Async,
   // fire-and-forget; matching enrichments merge onto state.data and
@@ -1049,6 +1068,206 @@ function _installSyntheticDosageChunks(data) {
       },
     ],
   };
+}
+
+// 2026-05-26: dosage-debug button. Click → modal listing each tracked
+// sample's dosage + het for the active L2 range, plus a one-line
+// diagnosis pointing at the most-likely failure mode (id mismatch,
+// no chunk yet, no markers in range, all-NA dosage, etc.). Stateless;
+// pulls a fresh report on every click.
+function _wireDosageDebugBtn(state) {
+  if (typeof document === 'undefined') return;
+  const btn = document.getElementById('dosageDebugBtn');
+  if (!btn || btn.dataset.dosageDbgWired === '1') return;
+  btn.dataset.dosageDbgWired = '1';
+  btn.addEventListener('click', () => _openDosageDebugModal(state));
+}
+
+function _openDosageDebugModal(state) {
+  const r = buildDosageDebugReport(state, state && state.tracked, null);
+  // Build a minimal overlay (matches the shell modal look without
+  // pulling shell_chrome._openModal cross-package).
+  let overlay = document.getElementById('dosageDebugOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'dosageDebugOverlay';
+    overlay.style.cssText = 'position: fixed; inset: 0; z-index: 9000;'
+      + ' background: rgba(0,0,0,0.45); display: none;'
+      + ' align-items: flex-start; justify-content: center; padding-top: 60px;';
+    document.body.appendChild(overlay);
+  }
+  const rng = r.range || { startBp: '?', endBp: '?', startW: '?', endW: '?', chrom: '?' };
+  const rangeMb = (Number.isFinite(rng.startBp) && Number.isFinite(rng.endBp))
+    ? `${(rng.startBp / 1e6).toFixed(3)}–${(rng.endBp / 1e6).toFixed(3)} Mb`
+    : `bp ${rng.startBp}–${rng.endBp}`;
+  const rowsHtml = (r.trackedRows || []).map(row => {
+    const dos = Number.isFinite(row.dosage) ? row.dosage.toFixed(3) : '<span style="color:#d94f4f">NaN</span>';
+    const het = Number.isFinite(row.het)    ? row.het.toFixed(3)    : '<span style="color:#d94f4f">NaN</span>';
+    return `<tr>
+      <td style="padding: 2px 8px; font-family: var(--mono);">${row.sample_idx}</td>
+      <td style="padding: 2px 8px; font-family: var(--mono);">${_escHtml(row.sample_id)}</td>
+      <td style="padding: 2px 8px; font-family: var(--mono); text-align: right;">${dos}</td>
+      <td style="padding: 2px 8px; font-family: var(--mono); text-align: right;">${het}</td>
+    </tr>`;
+  }).join('');
+  const lruHtml = (r.lruKeys || []).length === 0
+    ? '<span class="dim">none cached yet</span>'
+    : r.lruKeys.map(k => `<code style="margin-right: 6px;">${_escHtml(k)}</code>`).join('');
+  overlay.innerHTML = `
+    <div role="dialog" aria-labelledby="dosageDebugTitle"
+         style="background: var(--panel-2, #181d27); color: var(--ink, #e6edf6);
+                border: 1px solid var(--rule, #2a3242); border-radius: 4px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+                max-width: 760px; width: 92%; padding: 14px 18px;
+                font-family: var(--serif); font-size: 12px; line-height: 1.5;
+                max-height: 80vh; overflow-y: auto;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 10px;">
+        <div id="dosageDebugTitle"
+             style="font-size: 14px; font-weight: 600; font-family: var(--mono);">
+          🔬 Dosage debug — chrom ${_escHtml(rng.chrom || '?')} · ${rangeMb}
+          · windows ${rng.startW}–${rng.endW}
+        </div>
+        <button id="dosageDebugCloseBtn" type="button"
+                style="background: transparent; border: 1px solid var(--rule);
+                       color: var(--ink-dim); border-radius: 3px;
+                       padding: 3px 10px; font-family: var(--mono); font-size: 11px;
+                       cursor: pointer;">✕ close</button>
+      </div>
+      <div style="background: rgba(245,165,36,0.10); border-left: 2px solid var(--accent, #f5a524);
+                  padding: 6px 10px; margin-bottom: 12px; font-size: 11.5px;">
+        ${_escHtml(r.diagnosis)}
+      </div>
+      <div style="margin-bottom: 8px; font-size: 11px; color: var(--ink-dim);">
+        <b>Cached chunk keys (${(r.lruKeys || []).length}):</b> ${lruHtml}
+      </div>
+      ${_renderIdProjectionDetails(r.idProjection)}
+      <table style="width: 100%; border-collapse: collapse; font-size: 11.5px;">
+        <thead>
+          <tr style="color: var(--ink-dim); text-transform: uppercase; font-size: 10px;
+                     letter-spacing: 0.05em; border-bottom: 1px solid var(--rule);">
+            <th style="padding: 4px 8px; text-align: left;">si</th>
+            <th style="padding: 4px 8px; text-align: left;">sample id</th>
+            <th style="padding: 4px 8px; text-align: right;">dosage mean</th>
+            <th style="padding: 4px 8px; text-align: right;">het rate</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml || '<tr><td colspan="4" style="padding: 8px; color: var(--ink-dim);">No tracked samples — lasso or click PCA points to track them first.</td></tr>'}</tbody>
+      </table>
+      <div class="dim" style="margin-top: 10px; font-size: 10.5px;">
+        ${_renderNaNHint(report)}
+      </div>
+    </div>
+  `;
+  overlay.style.display = 'flex';
+  const close = () => {
+    overlay.style.display = 'none';
+    document.removeEventListener('keydown', onKey);
+    overlay.removeEventListener('click', onOverlay);
+  };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const onOverlay = (e) => { if (e.target === overlay) close(); };
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('click', onOverlay);
+  const closeBtn = overlay.querySelector('#dosageDebugCloseBtn');
+  if (closeBtn) closeBtn.addEventListener('click', close);
+}
+
+// Branch the hint shown under the tracked-sample table on the actual
+// projection rate so users don't get sent chasing a sample-id mismatch
+// when projection is 100% but every dosage cell is NaN (different
+// failure mode — server returned no markers in range, or every cell is -1).
+function _renderNaNHint(report) {
+  if (!report) return '';
+  const rows = Array.isArray(report.trackedRows) ? report.trackedRows : [];
+  if (rows.length === 0) return '';
+  const allNaN = rows.every(r => !Number.isFinite(r.dosage));
+  if (!allNaN) return '';
+  const proj = report.idProjection;
+  const rate = proj && proj.match_rate != null ? proj.match_rate : null;
+  if (rate == null) {
+    return 'NaN dosage on every row + cached chunk present → check the '
+         + '<code>[dosage_chunks] sample-id match:</code> line in the console '
+         + 'for the projection rate.';
+  }
+  if (rate < 0.5) {
+    return `NaN dosage on every row + projection only ${(rate * 100).toFixed(0)}% `
+         + '→ <b>sample-id mismatch</b> between chunk.samples and data.samples. '
+         + 'Open the projection table above; the unmatched rows show what chunk '
+         + 'IDs the matcher couldn\'t resolve.';
+  }
+  // projection 50-100% → IDs are matching. Different failure.
+  return `NaN dosage on every row but projection is ${(rate * 100).toFixed(0)}% — `
+       + 'IDs are matching. The chunk is loaded but either '
+       + '<b>(a)</b> no markers in this bp range (chunk\'s marker pos_bp values fall outside startBp/endBp), or '
+       + '<b>(b)</b> every dosage cell is -1 (NA) for this region. '
+       + 'Look in the console for <code>[dosage_chunks] computeHetRateForRange produced all-NaN</code> — '
+       + 'it prints <code>markers in range: X/N</code> and <code>with non-NA calls: X/N</code> '
+       + 'so you can tell (a) vs (b) at a glance.';
+}
+
+function _escHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+// Render the id-projection forensic block. Collapsed <details> when the
+// match rate is healthy (≥80%), open by default when low (so the user
+// SEES the mismatch). Caps the row list at 50 to keep the modal small;
+// shows unmatched samples first since those are the actionable rows.
+function _renderIdProjectionDetails(p) {
+  if (!p || !Array.isArray(p.sample_map) || p.sample_map.length === 0) {
+    return '<div class="dim" style="margin-bottom: 8px; font-size: 10.5px;">'
+         + 'No chunk loaded — id-projection forensic unavailable.</div>';
+  }
+  const ratePct = (p.match_rate * 100).toFixed(1);
+  const openAttr = (p.match_rate < 0.8) ? ' open' : '';
+  // Order: unmatched rows first, then matched. Limits to first 50 each.
+  const unmatched = p.sample_map.filter(s => !s.matched).slice(0, 50);
+  const matched   = p.sample_map.filter(s =>  s.matched).slice(0, 50);
+  const rows = unmatched.concat(matched);
+  const rowHtml = rows.map(s => {
+    const status = s.matched
+      ? '<span style="color: var(--good, #3cc08a);">✓</span>'
+      : '<span style="color: #d94f4f;">✗</span>';
+    const cohort = s.matched
+      ? `${s.cohort_idx} — ${_escHtml(s.cohort_id || '?')}`
+      : '<span class="dim">no match</span>';
+    return `<tr>
+      <td style="padding: 1px 8px; font-family: var(--mono); text-align: center;">${status}</td>
+      <td style="padding: 1px 8px; font-family: var(--mono);">${s.chunk_idx}</td>
+      <td style="padding: 1px 8px; font-family: var(--mono);">${_escHtml(s.chunk_id)}</td>
+      <td style="padding: 1px 8px; font-family: var(--mono);">${cohort}</td>
+    </tr>`;
+  }).join('');
+  const cappedNote = (unmatched.length === 50 || matched.length === 50)
+    ? '<div class="dim" style="font-size: 10px; padding: 4px 0;">(capped at 50 unmatched + 50 matched)</div>'
+    : '';
+  return `<details${openAttr} style="margin-bottom: 12px;">
+    <summary style="cursor: pointer; font-size: 11px; color: var(--ink-dim);">
+      <b>Sample-id projection:</b> ${p.matched}/${p.chunk_n} chunk samples matched
+      (${ratePct}%) · ${p.cohort_n} cohort samples total
+    </summary>
+    <div style="max-height: 260px; overflow-y: auto; margin-top: 6px;
+                border: 1px solid var(--rule); border-radius: 2px;
+                background: var(--panel-3, #232a36);">
+      <table style="width: 100%; border-collapse: collapse; font-size: 10.5px;">
+        <thead style="position: sticky; top: 0; background: var(--panel-3, #232a36);">
+          <tr style="color: var(--ink-dim); text-transform: uppercase;
+                     letter-spacing: 0.05em; font-size: 9.5px;
+                     border-bottom: 1px solid var(--rule);">
+            <th style="padding: 3px 8px;">match</th>
+            <th style="padding: 3px 8px; text-align: left;">chunk_idx</th>
+            <th style="padding: 3px 8px; text-align: left;">chunk_id</th>
+            <th style="padding: 3px 8px; text-align: left;">cohort_idx — cohort_id</th>
+          </tr>
+        </thead>
+        <tbody>${rowHtml}</tbody>
+      </table>
+      ${cappedNote}
+    </div>
+  </details>`;
 }
 
 function _wireCanvasHandlers(root, state) {

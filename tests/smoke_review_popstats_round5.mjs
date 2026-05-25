@@ -11,7 +11,7 @@
 //     in #psNoChrom and does NOT touch #psStack with stale content
 //   - mount() with activeChrom + a synthetic registry.resolve('scrubber_main')
 //     populates _pageState with { chrom, data, candidate, cur } and
-//     atlasState.inversion._page6State is identity-equal
+//     atlasState.popstats._page_popstatsState is identity-equal
 //   - mount() error path (registry.resolve throws) surfaces the message
 //     in #psNoChrom rather than crashing
 //   - unmount() clears _pageState
@@ -174,10 +174,12 @@ check('_pageState.data identity-equal',      state._pageState && state._pageStat
 check('_pageState.candidate present (null)', state._pageState && 'candidate' in state._pageState);
 check('_pageState.cur a number',             typeof state._pageState?.cur === 'number');
 
-check('atlasState.inversion._page6State stashed',
-      atlasState2.inversion._page6State !== undefined);
+// 2026-05-26: stash moved to atlasState.popstats._page_popstatsState
+// (popstats is its own atlas now, not a sub-section of inversion).
+check('atlasState.popstats._page_popstatsState stashed',
+      atlasState2.popstats && atlasState2.popstats._page_popstatsState !== undefined);
 check('stashed state identity-equal to _pageState',
-      atlasState2.inversion._page6State === state._pageState);
+      atlasState2.popstats._page_popstatsState === state._pageState);
 
 // -----------------------------------------------------------------------------
 group('Smoke: mount() error path (registry.resolve throws) surfaces in #psNoChrom');

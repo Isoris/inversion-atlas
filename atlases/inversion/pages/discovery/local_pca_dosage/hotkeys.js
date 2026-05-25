@@ -130,6 +130,28 @@ export function attachHotkeys(state) {
   // Candidate-mode arrow up/down + Enter/Escape handler. Mirrors legacy
   // 69220-69233. Bail-out conditions and helper calls match the legacy
   // verbatim.
+  //
+  // 2026-05-26 TODO: all five helpers (extendL3DraftRight, shrinkL3DraftRight,
+  // commitL3Draft, discardL3Draft, _refreshCmActionButtons) are NOT defined
+  // anywhere in the migrated code or in legacy/Inversion_atlas.html — the
+  // candidate-mode L3 draft state machine was never implemented. The
+  // `typeof X === 'function'` guards below make every key a silent no-op.
+  // Once a key is pressed in candidate mode, _warnCandidateModeTodo logs a
+  // one-time devtools hint so the dead state isn't invisible.
+  let _candidateModeTodoLogged = false;
+  function _warnCandidateModeTodo(keyName, helperName) {
+    if (_candidateModeTodoLogged) return;
+    _candidateModeTodoLogged = true;
+    if (typeof console !== 'undefined' && console.debug) {
+      console.debug(
+        `[local_pca_dosage] candidate-mode key '${keyName}' fired but ` +
+        `helper '${helperName}' is not implemented (and never was — ` +
+        `the L3 draft state machine is aspirational). See ` +
+        `local_pca_dosage/hotkeys.js:~130 and #l3ActionRow[data-todo].`
+      );
+    }
+  }
+
   const candidateModeHandler = (ev) => {
     if (!state.candidateMode) return;
     // Don't intercept when user is typing in input/textarea/contenteditable.
@@ -143,7 +165,7 @@ export function attachHotkeys(state) {
       ev.preventDefault();
       if (typeof extendL3DraftRight === 'function') {
         try { extendL3DraftRight(); } catch (_) {}
-      }
+      } else { _warnCandidateModeTodo('ArrowUp', 'extendL3DraftRight'); }
       if (typeof _refreshCmActionButtons === 'function') {
         try { _refreshCmActionButtons(); } catch (_) {}
       }
@@ -152,7 +174,7 @@ export function attachHotkeys(state) {
       ev.preventDefault();
       if (typeof shrinkL3DraftRight === 'function') {
         try { shrinkL3DraftRight(); } catch (_) {}
-      }
+      } else { _warnCandidateModeTodo('ArrowDown', 'shrinkL3DraftRight'); }
       if (typeof _refreshCmActionButtons === 'function') {
         try { _refreshCmActionButtons(); } catch (_) {}
       }
@@ -161,7 +183,7 @@ export function attachHotkeys(state) {
       ev.preventDefault();
       if (typeof commitL3Draft === 'function') {
         try { commitL3Draft(); } catch (_) {}
-      }
+      } else { _warnCandidateModeTodo('Enter', 'commitL3Draft'); }
       if (typeof _refreshCmActionButtons === 'function') {
         try { _refreshCmActionButtons(); } catch (_) {}
       }
@@ -170,7 +192,7 @@ export function attachHotkeys(state) {
       ev.preventDefault();
       if (typeof discardL3Draft === 'function') {
         try { discardL3Draft(); } catch (_) {}
-      }
+      } else { _warnCandidateModeTodo('Escape', 'discardL3Draft'); }
       if (typeof _refreshCmActionButtons === 'function') {
         try { _refreshCmActionButtons(); } catch (_) {}
       }

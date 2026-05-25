@@ -419,6 +419,16 @@
         "scrubber_main"
       ]
     },
+    "sim_mat": {
+      "_label": "sim_mat",
+      "_doc": "Dedicated sim_mat heatmap page. Renders the same window×window similarity matrix that local_pca_dosage shows in its sim panel, but as a standalone surface. Delegates the paint to pages/discovery/local_pca_dosage/sim_panel.js#drawSim — single source of truth for the heatmap visual, envelope overlays, anchor strip, and active-cursor line. State priority: (1) atlasState.inversion._local_pca_dosage_state if local_pca_dosage was already mounted; (2) bootstrap via registry.resolve('scrubber_main', { chrom }) so the page works as a first-mount destination. Click-to-jump on the heatmap updates state.cur and re-paints. No state mutation beyond cur + the drawSim cache on state.__simImgCache / state._simGeom.",
+      "requires_layers": [],
+      "requires_operations": [],
+      "requires_slots": [],
+      "preloads": [
+        "scrubber_main"
+      ]
+    },
     "tree_panel": {
       "_label": "tree panel",
       "_doc": "Inversion-core sample tree (Neighbour-Joining on dosage distances) with cluster colouring and ARI-vs-clusters badge. Cartridge implementation of HANDOFF_5 (specs_todo/mgl_adapter/HANDOFF_5_tree.md). Phase 1 scope: single sample-tree canvas built browser-side via NJ on distance matrices (no IQ-TREE round-trip), leaves coloured by candidate-mode cluster labels, hover/click linkage with the panel's selection store, ARI badge of tree clades at K=cluster_count vs cluster labels. Deferred (Phase 2+): band-tree (Path A) side-by-side, bootstrap support on internal nodes, het-mode controls (iupac/hom_only/n/random — only matters for IQ-TREE Path B), cross-panel hover linkage with PCA/heatmap. Input contract: atlasState.inversion.tree_panel_state = { tree: mgl_nj_tree.buildNjTree output, leaf_cluster_labels: Array<number|string>, leaf_colors_by_cluster: Array<string>, candidate_label?: string } — producer not yet wired. Subdir: _state.js, renderer.js (canvas tree painter), selection.js (hover/click selection store).",

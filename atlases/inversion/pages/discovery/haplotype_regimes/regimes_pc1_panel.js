@@ -131,7 +131,13 @@ export function drawRegimesPC1Panel(state) {
 
   // Cache PC1 per window — pulling from getPC1 is potentially expensive.
   // Cache on track so re-renders without focal change are cheap.
-  if (!track._pc1Matrix || track._pc1Matrix._key !== `n=${nGrid}|${rp.scope}`) {
+  // 2026-05-21 perf (HR4): added `current_chromosome_idx` to the cache
+  // key. Pre-fix, two different chroms with the same nGrid would
+  // false-hit the cache. The surrounding `track` IS rebuilt on chrom
+  // change today (via ensureRegimesTrack scope/ci invalidation) so this
+  // never bit in practice, but the brittle invariant is now removed.
+  const _pc1Key = `n=${nGrid}|${rp.scope}|ci=${rp.current_chromosome_idx}`;
+  if (!track._pc1Matrix || track._pc1Matrix._key !== _pc1Key) {
     const M = new Array(n_samples);
     for (let si = 0; si < n_samples; si++) {
       M[si] = new Float32Array(nGrid);
@@ -178,17 +184,25 @@ export function drawRegimesPC1Panel(state) {
     const yPad = (yMax - yMin) * 0.05;
     yMin -= yPad; yMax += yPad;
     track._pc1Matrix = M;
-    track._pc1Matrix._key = `n=${nGrid}|${rp.scope}`;
+    track._pc1Matrix._key = _pc1Key;
     track._pc1YMin = yMin;
     track._pc1YMax = yMax;
   }
   const M = track._pc1Matrix;
   const yMin = track._pc1YMin, yMax = track._pc1YMax;
   const toY = (v) => pad.t + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
-  const xByGi = new Float32Array(nGrid);
-  for (let gi = 0; gi < nGrid; gi++) {
-    xByGi[gi] = pad.l + (gi / Math.max(1, nGrid - 1)) * plotW;
+  // 2026-05-21 perf (HR4): cache xByGi on the track keyed by
+  // (plotW, pad.l, nGrid) — same pattern as the lanes panel.
+  if (!track._pc1XByGi || track._pc1XByGiW !== plotW || track._pc1XByGiPadL !== pad.l) {
+    const arr = new Float32Array(nGrid);
+    for (let gi = 0; gi < nGrid; gi++) {
+      arr[gi] = pad.l + (gi / Math.max(1, nGrid - 1)) * plotW;
+    }
+    track._pc1XByGi = arr;
+    track._pc1XByGiW = plotW;
+    track._pc1XByGiPadL = pad.l;
   }
+  const xByGi = track._pc1XByGi;
   const cellW = Math.max(1, plotW / nGrid);
 
   // ---------------- (B) Pattern-class strip ----------------
@@ -281,13 +295,22 @@ export function drawRegimesPC1Panel(state) {
   // Voter samples — coloured by their original voter band
   const bandHues = ['#f5a524', '#22d3ee', '#a78bfa', '#34d399', '#f472b6',
                     '#fb7185', '#facc15', '#60a5fa'];
-  const siToFocalBand = new Map();
-  for (let bi = 0; bi < voter.bands.length; bi++) {
-    const b = voter.bands[bi];
-    const bandSamples = locus.per_band_samples[b];
-    if (!bandSamples) continue;
-    for (const si of bandSamples) siToFocalBand.set(si, bi);
+  // 2026-05-21 perf (HR4): cache siToFocalBand on the track keyed by
+  // voter identity (mirrors the lanes-panel pattern). Uses a separate
+  // _pc1SiToFocalBand slot so it doesn't clash with the lanes panel
+  // when both panels share a track.
+  if (!track._pc1SiToFocalBand || track._pc1SiToFocalBandVoter !== voter) {
+    const m = new Map();
+    for (let bi = 0; bi < voter.bands.length; bi++) {
+      const b = voter.bands[bi];
+      const bandSamples = locus.per_band_samples[b];
+      if (!bandSamples) continue;
+      for (const si of bandSamples) m.set(si, bi);
+    }
+    track._pc1SiToFocalBand = m;
+    track._pc1SiToFocalBandVoter = voter;
   }
+  const siToFocalBand = track._pc1SiToFocalBand;
   // Match regimes_panel.js: alpha 0.35/0.80 + lineWidth 0.8 (was 0.45/0.85 + 1.2).
   // 2026-05-26: trim per Quentin's "lines are a bit thick" feedback — keeps
   // voter visibility but lets dense overlap regions surface gradients.
@@ -311,14 +334,27 @@ export function drawRegimesPC1Panel(state) {
   const seedChr = locus.chromosome_idx != null
     ? locus.chromosome_idx
     : (locus.chrom != null ? locus.chrom : -1);
-  let seedGiStart = -1, seedGiEnd = -1;
-  for (let gi = 0; gi < nGrid; gi++) {
-    const wl = windowList[gi];
-    if (wl.chr !== seedChr) continue;
-    if (wl.w >= locus.s_window && wl.w <= locus.e_window) {
-      if (seedGiStart < 0) seedGiStart = gi;
-      seedGiEnd = gi;
+  // 2026-05-21 perf (HR4): cache the seed-gi range on the track keyed by
+  // (locus, windowList) identity. Same pattern as the lanes panel — uses
+  // a separate _pc1Seed* slot to avoid clashing.
+  let seedGiStart, seedGiEnd;
+  if (track._pc1SeedGiLocus === locus && track._pc1SeedGiWindowList === windowList) {
+    seedGiStart = track._pc1SeedGiStart;
+    seedGiEnd   = track._pc1SeedGiEnd;
+  } else {
+    seedGiStart = -1; seedGiEnd = -1;
+    for (let gi = 0; gi < nGrid; gi++) {
+      const wl = windowList[gi];
+      if (wl.chr !== seedChr) continue;
+      if (wl.w >= locus.s_window && wl.w <= locus.e_window) {
+        if (seedGiStart < 0) seedGiStart = gi;
+        seedGiEnd = gi;
+      }
     }
+    track._pc1SeedGiLocus = locus;
+    track._pc1SeedGiWindowList = windowList;
+    track._pc1SeedGiStart = seedGiStart;
+    track._pc1SeedGiEnd   = seedGiEnd;
   }
   // Skip stripe fills when the rect would cover ≥85% of the plot width —
   // see regimes_panel.js for the rationale (orange tint drowns out the

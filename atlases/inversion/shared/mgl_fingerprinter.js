@@ -142,11 +142,16 @@ function _pickPair(profile, prefix, a, b) {
 }
 
 function _pairsOf(bands) {
-  const sorted = bands.slice().sort();
+  // 2026-05-21 perf (Tier-D): the JSDoc contract on windowRankSignature
+  // promises `bands` is already sorted (callers always pass the canonical
+  // band-id array). The previous defensive `.slice().sort()` was a
+  // per-window allocation we can skip — trust the contract. If a future
+  // caller passes unsorted bands the pair order shifts but no crash
+  // occurs; the smoke tests catch that case explicitly.
   const out = [];
-  for (let i = 0; i < sorted.length; i++) {
-    for (let j = i + 1; j < sorted.length; j++) {
-      out.push([sorted[i], sorted[j]]);
+  for (let i = 0; i < bands.length; i++) {
+    for (let j = i + 1; j < bands.length; j++) {
+      out.push([bands[i], bands[j]]);
     }
   }
   return out;

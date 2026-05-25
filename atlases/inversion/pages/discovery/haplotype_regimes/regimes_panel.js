@@ -551,10 +551,19 @@ export function drawRegimesPanel(state) {
   const yLanes = max_K;          // visual lanes 0..max_K-1
   const laneStep = plotH / yLanes;
   const laneY = (band) => pad.t + plotH - (band + 0.5) * laneStep;
-  const xByGi = new Float32Array(nGrid);
-  for (let gi = 0; gi < nGrid; gi++) {
-    xByGi[gi] = pad.l + (gi / (nGrid - 1)) * plotW;
+  // 2026-05-21 perf (HR3): cache xByGi on the track keyed by
+  // (plotW, pad.l, nGrid). The previous Float32Array(nGrid) alloc + fill
+  // ran every paint even for arrow-key cycles that don't change geometry.
+  if (!track._xByGi || track._xByGiW !== plotW || track._xByGiPadL !== pad.l) {
+    const arr = new Float32Array(nGrid);
+    for (let gi = 0; gi < nGrid; gi++) {
+      arr[gi] = pad.l + (gi / (nGrid - 1)) * plotW;
+    }
+    track._xByGi = arr;
+    track._xByGiW = plotW;
+    track._xByGiPadL = pad.l;
   }
+  const xByGi = track._xByGi;
 
   // ---------------- (1) Pattern-class strip ----------------
   // One coloured cell per window. Width per cell = plotW / nGrid.
@@ -680,12 +689,22 @@ export function drawRegimesPanel(state) {
   // colouring in lines_panel.js.
   const bandHues = ['#f5a524', '#22d3ee', '#a78bfa', '#34d399', '#f472b6',
                     '#fb7185', '#facc15', '#60a5fa'];
-  // Map: si → focal_band_index (0..voter.bands.length-1)
-  const siToFocalBand = new Map();
-  for (let bi = 0; bi < voter.bands.length; bi++) {
-    const b = voter.bands[bi];
-    for (const si of locus.per_band_samples[b]) siToFocalBand.set(si, bi);
+  // 2026-05-21 perf (HR3): siToFocalBand cached on the track keyed by
+  // voter identity. The voter object is rebuilt only when focal changes,
+  // so the Map stays valid across arrow-key cycles on the SAME focal
+  // (alpha/zoom paints) and across re-paints triggered by unrelated
+  // state changes.
+  if (!track._siToFocalBand || track._siToFocalBandVoter !== voter) {
+    const m = new Map();
+    for (let bi = 0; bi < voter.bands.length; bi++) {
+      const b = voter.bands[bi];
+      const set = locus.per_band_samples[b];
+      if (set) for (const si of set) m.set(si, bi);
+    }
+    track._siToFocalBand = m;
+    track._siToFocalBandVoter = voter;
   }
+  const siToFocalBand = track._siToFocalBand;
   // 2026-05-21: voter lines at alpha 0.45 (was 1.0). With 27+ voter samples
   // each striking a ~1.4px path across 9000 windows, full-opacity hue
   // (especially band 0's orange) saturates the canvas into a solid blob
@@ -749,14 +768,28 @@ export function drawRegimesPanel(state) {
   const seedChr = locus.chromosome_idx != null
     ? locus.chromosome_idx
     : (locus.chrom != null ? locus.chrom : -1);
-  let seedGiStart = -1, seedGiEnd = -1;
-  for (let gi = 0; gi < windowList.length; gi++) {
-    const wl = windowList[gi];
-    if (wl.chr !== seedChr) continue;
-    if (wl.w >= locus.s_window && wl.w <= locus.e_window) {
-      if (seedGiStart < 0) seedGiStart = gi;
-      seedGiEnd = gi;
+  // 2026-05-21 perf (HR3): cache the seed-gi range on the track keyed by
+  // (locus identity, windowList identity). The linear scan over windowList
+  // (O(nGrid) — ~9000 iterations on a long chrom) was firing every paint
+  // even though both inputs are stable across paints with the same focal.
+  let seedGiStart, seedGiEnd;
+  if (track._seedGiLocus === locus && track._seedGiWindowList === windowList) {
+    seedGiStart = track._seedGiStart;
+    seedGiEnd   = track._seedGiEnd;
+  } else {
+    seedGiStart = -1; seedGiEnd = -1;
+    for (let gi = 0; gi < windowList.length; gi++) {
+      const wl = windowList[gi];
+      if (wl.chr !== seedChr) continue;
+      if (wl.w >= locus.s_window && wl.w <= locus.e_window) {
+        if (seedGiStart < 0) seedGiStart = gi;
+        seedGiEnd = gi;
+      }
     }
+    track._seedGiLocus = locus;
+    track._seedGiWindowList = windowList;
+    track._seedGiStart = seedGiStart;
+    track._seedGiEnd   = seedGiEnd;
   }
   // Skip when the rect would cover ≥85% of the plot width: nothing to
   // localize, and the orange tint just drowns out the per-sample lines.

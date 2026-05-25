@@ -41,6 +41,7 @@
 // Reuse global `state` until the merge chat refactors to contextFromState.
 import { _pageState, _setActiveState } from './stats_profile/_state.js';
 import { _esc } from '../../shared/page1_data_helpers.js';
+import { ensureChromTracks } from '../../shared/ensure_chrom_tracks.js';
 import { _mpDeriveAutoPanel } from './marker_readiness.js';
 import { _setActiveState as _setPage18State } from './marker_readiness/_state.js';
 // Round 5 step 12: cross-species helpers — promoted from runtime guards
@@ -1169,7 +1170,7 @@ export function renderStatsProfilePage(state) {
  * sharing is safe in both directions.
  */
 export async function mount(root, atlasState, registry) {
-  const legacyState = _buildLegacyState(atlasState);
+  let legacyState = _buildLegacyState(atlasState);
   _setActiveState(legacyState);
   // Bridge state to marker_readiness so the cross-page call (_mpDeriveAutoPanel)
   // sees live data when called from inside stats_profile's render.
@@ -1183,6 +1184,20 @@ export async function mount(root, atlasState, registry) {
   catch (e) { console.warn('stats_profile.mount: renderStatsProfilePage threw —', e); }
 
   if (atlasState.inversion) atlasState.inversion._page17State = legacyState;
+
+  // 2026-05-26: self-bootstrap scrubber_main on direct navigation. After
+  // the rebuild the marker_readiness + cross_species_breakpoints bridges
+  // are re-set so their helpers see the new state.data too.
+  const bootstrap = await ensureChromTracks(atlasState, registry);
+  if (bootstrap.ok) {
+    legacyState = _buildLegacyState(atlasState);
+    _setActiveState(legacyState);
+    _setPage18State(legacyState);
+    _setPage16State(legacyState);
+    try { renderStatsProfilePage(legacyState); }
+    catch (e) { console.warn('stats_profile.mount: post-bootstrap render threw —', e); }
+    if (atlasState.inversion) atlasState.inversion._page17State = legacyState;
+  }
 }
 
 /**

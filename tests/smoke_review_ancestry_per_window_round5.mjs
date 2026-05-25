@@ -19,7 +19,7 @@
 //   - mount() WITH a synthetic window.renderAncestryPage → renderer
 //     called; fallback NOT triggered (#ancNoChrom not touched)
 //   - _pageState live-binding observed across module boundaries
-//   - atlasState.inversion._page7State stash identity-equal to
+//   - atlasState.popstats._page_ancestry_per_windowState stash identity-equal to
 //     _pageState
 //   - refreshPage7(state) callable directly (re-render path)
 //   - unmount() clears _pageState
@@ -85,12 +85,14 @@ global.document = {
 global.window = global;
 
 function buildAtlasState(opts) {
+  // 2026-05-26: ancestry_per_window is a popstats page now. Canonical
+  // slots: chrom + candidate live under .shared; viewChips live under
+  // .popstats. Keep .inversion for back-compat tests that still target it.
   return {
-    inversion: Object.assign({
-      data: {},
+    inversion: Object.assign({}, opts.inversion || {}),
+    popstats:  Object.assign({
       ancestryViewChips: new Set(),
-      candidate: null,
-    }, opts.inversion || {}),
+    }, opts.popstats || {}),
     shared: Object.assign({
       activeChrom: null,
       activeCandidate: null,
@@ -127,10 +129,13 @@ const ancNoChrom = _ensureNode('ancNoChrom');
 const ancStack   = _ensureNode('ancStack');
 check('#ancNoChrom shown (display=block)',
       ancNoChrom.style.display === 'block');
-check('#ancNoChrom text mentions "renderer not loaded"',
-      ancNoChrom.innerHTML.includes('Ancestry renderer not loaded'));
-check('#ancNoChrom text mentions atlas_page6_wiring sibling',
-      ancNoChrom.innerHTML.includes('atlas_page6_wiring.js'));
+// 2026-05-26: fallback text rewritten to surface the known-TODO state
+// (renderer lost in the inversion→popstats split) plus the data contract
+// the page would consume. Audit-driven UX improvement.
+check('#ancNoChrom text mentions "renderer pending"',
+      ancNoChrom.innerHTML.includes('renderer pending'));
+check('#ancNoChrom text mentions the data contract',
+      ancNoChrom.innerHTML.includes('state.data.ancestry'));
 check('#ancStack innerHTML cleared',
       ancStack.innerHTML === '');
 
@@ -138,10 +143,12 @@ check('#ancStack innerHTML cleared',
 group('Smoke: _pageState live-binding');
 check('_pageState set after mount',
       state._pageState && typeof state._pageState === 'object');
-check('atlasState.inversion._page7State stashed',
-      atlasState.inversion._page7State !== undefined);
+// 2026-05-26: stash moved to atlasState.popstats._page_ancestry_per_windowState
+// (popstats is its own atlas now, not a sub-section of inversion).
+check('atlasState.popstats._page_ancestry_per_windowState stashed',
+      atlasState.popstats && atlasState.popstats._page_ancestry_per_windowState !== undefined);
 check('stashed state identity-equal to _pageState',
-      atlasState.inversion._page7State === state._pageState);
+      atlasState.popstats._page_ancestry_per_windowState === state._pageState);
 const stashedState = state._pageState;
 check('_pageState has data slot',                'data' in stashedState);
 check('_pageState.ancestryViewChips is Set',     stashedState.ancestryViewChips instanceof Set);
@@ -153,15 +160,23 @@ _resetNodes();
 let rendererCalls = 0;
 global.renderAncestryPage = function () { rendererCalls++; };
 
+// 2026-05-26: canonical sources after the popstats namespace migration —
+// candidate from shared.activeCandidate; data via registry.resolve('scrubber_main').
 const atlasState2 = buildAtlasState({
-  inversion: {
-    candidate: { id: 'C001', confirmed: true },
-    data: { ancestry: { _stub: true } },
+  shared: {
+    activeChrom: 'LG01',
+    activeCandidate: { id: 'C001', confirmed: true },
   },
 });
+const registry2 = {
+  resolve: async (name, args) =>
+    name === 'scrubber_main' && args && args.chrom === 'LG01'
+      ? { ancestry: { _stub: true } }
+      : null,
+};
 
 let mount2OK = true; let mount2Err = null;
-try { await ancestry_per_window.mount(root, atlasState2, registry); }
+try { await ancestry_per_window.mount(root, atlasState2, registry2); }
 catch (e) { mount2OK = false; mount2Err = e; }
 check('populated mount() ran without throwing',
       mount2OK, mount2Err ? mount2Err.message : '');
@@ -172,7 +187,7 @@ const ancNoChrom2 = _ensureNode('ancNoChrom');
 check('#ancNoChrom NOT touched when renderer present (display unset)',
       ancNoChrom2.style.display === '');
 check('atlasState2 stash refreshed',
-      atlasState2.inversion._page7State === state._pageState);
+      atlasState2.popstats && atlasState2.popstats._page_ancestry_per_windowState === state._pageState);
 check('_pageState.candidate propagated',
       state._pageState.candidate && state._pageState.candidate.id === 'C001');
 

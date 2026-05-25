@@ -118,6 +118,15 @@ async function _seedTreePanelStateIfMissing(atlasState, registry) {
     console.warn('tree_panel.mount: scrubber_main resolve failed —', e);
     return;
   }
+  // 2026-05-26: contribute chromSummary (SPEC_multichrom Slice 1) so the
+  // topbar chrom picker carries the same summary fields other scrubber
+  // resolvers produce. Non-essential — fail-soft on missing helper.
+  if (data && typeof atlasState.setChromSummary === 'function') {
+    try {
+      const cs = await import('../../../../core/chrom_summary.js');
+      atlasState.setChromSummary(chrom, cs.buildChromSummary(data, { chrom }));
+    } catch (_) { /* non-essential */ }
+  }
   let auto;
   try {
     auto = autoBuildTreeFromPCA(data, candidate);

@@ -115,6 +115,14 @@ export async function mount(root, atlasState, registry) {
     try { data = await registry.resolve('scrubber_main', { chrom }); }
     catch (e) { console.warn('window_summary_table.mount: scrubber_main resolve threw —', e); }
   }
+  // 2026-05-26: contribute to the chrom-summary cache so a user who
+  // lands directly here populates the shell chip (SPEC_multichrom Slice 1).
+  if (data && chrom && atlasState && typeof atlasState.setChromSummary === 'function') {
+    try {
+      const cs = await import('../../../../core/chrom_summary.js');
+      atlasState.setChromSummary(chrom, cs.buildChromSummary(data, { chrom }));
+    } catch (_) { /* non-essential cache write */ }
+  }
   // 2026-05-19: cache the resolved `data` envelope + activeMode on the
   // legacyState so the toolbar mode-toggle (#winSumModeBar) can re-derive
   // legacyState.precomp on click without paying a fresh registry resolve

@@ -13,7 +13,7 @@
 //   - mount() runs on a fully populated atlasState (paints all four
 //     canvases — Layer 1/2, metrics, Layer 3)
 //   - _pageState live-binding visible across module boundaries
-//   - atlasState.inversion._pageAncestryScrollerState stash
+//   - atlasState.popstats._page_fish_ancestry_scrollerState stash
 //   - view-mode dropdown change triggers a repaint (clearRect called)
 //   - click on the Layer-2 canvas populates the right-panel selection
 //   - unmount() clears _pageState
@@ -230,7 +230,8 @@ group('Smoke: mount() on minimal atlasState (empty-state)');
   catch (e) { ok = false; err = e; }
   check('mount() ran without throwing', ok, err ? err.message : '');
   check('_pageState set',               state._pageState && typeof state._pageState === 'object');
-  check('atlasState stash present',     atlasState.inversion._pageAncestryScrollerState !== undefined);
+  // 2026-05-26: stash moved to atlasState.popstats._page_fish_ancestry_scrollerState.
+  check('atlasState stash present',     atlasState.popstats && atlasState.popstats._page_fish_ancestry_scrollerState !== undefined);
   check('header chromLabel = "—"',      _ensureNode('ancScrollChromLabel').textContent === '—');
   check('selection card shows empty hint',
         _ensureNode('ancScrollSelectedFields').innerHTML.indexOf('No brick selected') >= 0);

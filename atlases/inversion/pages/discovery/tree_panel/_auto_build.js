@@ -67,7 +67,10 @@ export function autoBuildTreeFromPCA(data, candidate) {
   try {
     const cl = clusterL2(ctx, l2idx);
     labels = (cl && cl.labels) ? Array.from(cl.labels) : null;
-  } catch (_) { labels = null; }
+  } catch (e) {
+    console.warn('tree_panel auto-build: clusterL2 threw — labels will be all-zero', e);
+    labels = null;
+  }
   if (!labels) labels = new Array(nS).fill(0);
 
   // 2. distance matrix from per-L2 window PC1 vectors.

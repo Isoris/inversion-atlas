@@ -48,6 +48,7 @@ import {
   wireCatalogueToolbar,
   teardownCatalogueToolbar,
 } from './catalogue/catalogue.js';
+import { ensureChromTracks } from '../../shared/ensure_chrom_tracks.js';
 
 // Re-export the public set so the manifest's module: contract is preserved
 // across the split.
@@ -136,7 +137,7 @@ export function initCataloguePage(state) {
  * yet, the catalogue shows its empty state.
  */
 export async function mount(root, atlasState, registry) {
-  const legacyState = _buildLegacyState(atlasState);
+  let legacyState = _buildLegacyState(atlasState);
   _setActiveState(legacyState);
 
   // Render empty state (or the future catalogue table).
@@ -149,6 +150,20 @@ export async function mount(root, atlasState, registry) {
 
   // Stash for inter-mount lookups.
   if (atlasState.inversion) atlasState.inversion._page3State = legacyState;
+
+  // 2026-05-26: self-bootstrap scrubber_main via the shared helper so
+  // direct navigation to catalogue (without local_pca_dosage having
+  // mounted) still populates inv.tracks[chrom]. Without this,
+  // `legacy.data` stays null and `catalogueRows = data.l2_envelopes`
+  // resolves to an empty array → empty-state hint on first visit.
+  const bootstrap = await ensureChromTracks(atlasState, registry);
+  if (bootstrap.ok) {
+    legacyState = _buildLegacyState(atlasState);
+    _setActiveState(legacyState);
+    try { renderCataloguePage(legacyState); }
+    catch (e) { console.warn('catalogue.mount: post-bootstrap render threw —', e); }
+    if (atlasState.inversion) atlasState.inversion._page3State = legacyState;
+  }
 }
 
 /**

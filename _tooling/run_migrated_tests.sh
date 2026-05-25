@@ -56,6 +56,14 @@ UNITS=(
   test_shared_sample_color.js
   test_shared_build_family_palette.js
   test_shared_per_sample_line_color.js
+  test_shared_ensure_chrom_tracks.js
+  # 2026-05-26: persist_debounced helper + manuscript-bundle generators
+  # + STORE-only zip writer (SPEC_manuscript_bundle_export slices 1/2/3/5)
+  # + dosage_chunks debug helper (PCA scatter grey-when-dosage diagnosis).
+  test_shared_persist_debounced.js
+  test_shared_manuscript_bundle.js
+  test_shared_zip_store.js
+  test_shared_dosage_debug.js
   test_analysis_mendelian.js
   test_analysis_mendelian_inheritance.js
   test_relatedness_schema.js

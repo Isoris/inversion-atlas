@@ -622,54 +622,64 @@ export function drawLinesPanel(state) {
       // edge cases when boundary mb falls exactly on a window center).
       // For non-precomp sources (GHSL etc.) the grid is mb-positioned and we
       // fall back to the mb-range path.
-      let l2BpRanges = null;     // mb-based, used when sourceGrid != null
-      let l2WinRanges = null;    // window-index-based, used when sourceGrid == null
-      let gridSlotByGi = null;   // Int16Array(nGrid): slot index (0..candL2s.length-1)
-                                 // covering this gi, or -1 if outside all L2s.
-                                 // Pre-bucketed once so the per-fish loop is O(nGrid),
-                                 // not O(nGrid * nL2). Int16 (not Int8) because some
-                                 // candidates merge >127 L2s on long chromosomes.
+      // 2026-05-21 perf (Tier-A finding #5): cache gridSlotByGi across
+      // frames + memoize per-fc jumpMask results. The bucketing loop is
+      // O(nGrid × nL2) and the mask build is O(nGrid) per tracked fish;
+      // both are stable across paints as long as the candidate, grid
+      // type, and nGrid don't change. Cached on state.
+      let gridSlotByGi = null;   // Int16Array(nGrid): slot 0..candL2s.length-1
+      let jumpMaskMemo = null;   // Map<fc, mask|null>
       if (candL2s && candL2s.length > 0) {
         const envs = d.l2_envelopes || [];
-        if (sourceGrid) {
-          l2BpRanges = candL2s.map(li => {
-            const env = envs[li];
-            return env ? [env.start_bp / 1e6, env.end_bp / 1e6] : null;
-          });
-          // Pre-bucket gi → slot by mb position
-          gridSlotByGi = new Int16Array(nGrid).fill(-1);
-          for (let gi = 0; gi < nGrid; gi++) {
-            const mb = mbAt(gi);
-            for (let p = 0; p < l2BpRanges.length; p++) {
-              const r = l2BpRanges[p];
-              if (!r) continue;
-              if (mb >= r[0] && mb <= r[1]) { gridSlotByGi[gi] = p; break; }
-            }
-          }
+        const cacheKey = (cand ? cand.id : '') + '|' + (sourceGrid ? 'mb' : 'win') + '|' + nGrid;
+        const cached = state._candBandsCache;
+        if (cached && cached.key === cacheKey) {
+          gridSlotByGi = cached.gridSlotByGi;
+          jumpMaskMemo = cached.jumpMaskMemo;
         } else {
-          // Precomp grid: compare integer window indices.
-          l2WinRanges = candL2s.map(li => {
-            const env = envs[li];
-            return env ? [env._s0, env._e0] : null;
-          });
           gridSlotByGi = new Int16Array(nGrid).fill(-1);
-          for (let gi = 0; gi < nGrid; gi++) {
-            for (let p = 0; p < l2WinRanges.length; p++) {
-              const r = l2WinRanges[p];
-              if (!r) continue;
-              if (gi >= r[0] && gi <= r[1]) { gridSlotByGi[gi] = p; break; }
+          if (sourceGrid) {
+            const l2BpRanges = candL2s.map(li => {
+              const env = envs[li];
+              return env ? [env.start_bp / 1e6, env.end_bp / 1e6] : null;
+            });
+            for (let gi = 0; gi < nGrid; gi++) {
+              const mb = mbAt(gi);
+              for (let p = 0; p < l2BpRanges.length; p++) {
+                const r = l2BpRanges[p];
+                if (!r) continue;
+                if (mb >= r[0] && mb <= r[1]) { gridSlotByGi[gi] = p; break; }
+              }
+            }
+          } else {
+            // Precomp grid: compare integer window indices.
+            const l2WinRanges = candL2s.map(li => {
+              const env = envs[li];
+              return env ? [env._s0, env._e0] : null;
+            });
+            for (let gi = 0; gi < nGrid; gi++) {
+              for (let p = 0; p < l2WinRanges.length; p++) {
+                const r = l2WinRanges[p];
+                if (!r) continue;
+                if (gi >= r[0] && gi <= r[1]) { gridSlotByGi[gi] = p; break; }
+              }
             }
           }
+          jumpMaskMemo = new Map();
+          state._candBandsCache = { key: cacheKey, gridSlotByGi, jumpMaskMemo };
         }
       }
       // Helper: build the mask for a given fish_call entry. Returns null when
       // no jumping (so caller can use the cheap path). Uses the pre-bucketed
-      // gridSlotByGi so the lookup is O(1) per gi.
+      // gridSlotByGi so the lookup is O(1) per gi. Memoized per (cand id +
+      // grid type + nGrid) tuple; subsequent paints on the same candidate
+      // reuse the masks without re-walking nGrid per tracked fish.
       function _buildJumpMask(fc) {
         if (!fc || !candFishCalls || !candL2s || !gridSlotByGi) return null;
         if (fc.subband_stability == null) return null;
         if (fc.subband_stability >= 1) return null;
         if (!Array.isArray(fc.votes) || fc.regime < 0) return null;
+        if (jumpMaskMemo && jumpMaskMemo.has(fc)) return jumpMaskMemo.get(fc);
         const mask = new Uint8Array(nGrid);
         let anyJumped = false;
         for (let gi = 0; gi < nGrid; gi++) {
@@ -681,7 +691,9 @@ export function drawLinesPanel(state) {
             anyJumped = true;
           }
         }
-        return anyJumped ? mask : null;
+        const result = anyJumped ? mask : null;
+        if (jumpMaskMemo) jumpMaskMemo.set(fc, result);
+        return result;
       }
       const normalStyle_jump = { strokeStyle: '#e0555c', lineWidth: 1.6, dash: [4, 3] };
       ctx.lineWidth = 1.4;

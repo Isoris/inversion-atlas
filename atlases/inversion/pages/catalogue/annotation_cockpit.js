@@ -43,6 +43,7 @@
 // =============================================================================
 
 import { _pageState, _setActiveState } from './annotation_cockpit/_state.js';
+import { ensureChromTracks } from '../../shared/ensure_chrom_tracks.js';
 
 // ---------------------------------------------------------------------------
 // VERBATIM extraction from legacy lines 46970–47616.
@@ -752,13 +753,24 @@ export function refreshAnnotationCockpit(state) {
  * (haplotype panel lookups), activeMode (which catalogue view is active).
  */
 export async function mount(root, atlasState, registry) {
-  const legacyState = _buildLegacyState(atlasState);
+  let legacyState = _buildLegacyState(atlasState);
   _setActiveState(legacyState);
 
   try { refreshAnnotationCockpit(legacyState); }
   catch (e) { console.warn('annotation_cockpit.mount: refreshAnnotationCockpit threw —', e); }
 
   if (atlasState.inversion) atlasState.inversion._page21State = legacyState;
+
+  // 2026-05-26: self-bootstrap scrubber_main so direct navigation
+  // populates inv.tracks[chrom] and downstream renderers have data.
+  const bootstrap = await ensureChromTracks(atlasState, registry);
+  if (bootstrap.ok) {
+    legacyState = _buildLegacyState(atlasState);
+    _setActiveState(legacyState);
+    try { refreshAnnotationCockpit(legacyState); }
+    catch (e) { console.warn('annotation_cockpit.mount: post-bootstrap refresh threw —', e); }
+    if (atlasState.inversion) atlasState.inversion._page21State = legacyState;
+  }
 }
 
 /**

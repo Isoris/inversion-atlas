@@ -40,6 +40,7 @@
 
 import {
   discoverSeedsOnChromosome,
+  discoverSeedsOnChromosomeAsync,
   SEED_DISCOVERY_DEFAULTS,
 } from './seed_discovery.js';
 
@@ -163,6 +164,66 @@ export function runStage1(ctx, opts) {
       tracked_sample_idx: ctx.tracked_sample_idx,
     }, seed_opts);
     // V-plateau quality gate: count INTERIOR windows in seed footprint
+    let n_kept = 0;
+    for (const seed of sweep.seeds) {
+      const interior_frac = seedInteriorFrac(seed);
+      seed.chromosome_idx = ci;
+      seed.interior_frac  = interior_frac;
+      if (interior_frac >= o.min_seed_interior_frac) {
+        all_seeds.push(seed);
+        n_kept++;
+      }
+    }
+    per_chrom.push({
+      chrom_idx:     ci,
+      n_provisional: sweep.n_provisional,
+      n_raw:         sweep.n_raw,
+      n_seeded:      sweep.n_seeded,
+      n_kept,
+    });
+  }
+  return { seeds: all_seeds, per_chrom_summary: per_chrom };
+}
+
+/**
+ * Async chunked variant of runStage1. Same return shape; yields every
+ * `opts.seed_discovery.chunk_anchors` anchors via
+ * discoverSeedsOnChromosomeAsync. Reports fine-grained progress via
+ * `onProgress({ chrom_idx, anchors_done, anchors_total, n_seeds })`
+ * so the caller can render a per-chromosome progress bar.
+ *
+ * 2026-05-21 perf (HR8): Stage 1 dominates pipeline cost on dense
+ * chroms (~1-2 seconds in the per-chrom anchor loop). Yielding every
+ * 50 anchors gives ~20 paint opportunities per chrom instead of 0.
+ */
+export async function runStage1Async(ctx, opts, onProgress) {
+  const o = Object.assign({}, BANDING_PIPELINE_DEFAULTS, opts || {});
+  const seed_opts = Object.assign({}, o.seed_discovery,
+                                  { classification: o.classification });
+  const all_seeds = [];
+  const per_chrom = [];
+  for (let ci = 0; ci < ctx.chromosomes.length; ci++) {
+    const chr = ctx.chromosomes[ci];
+    const innerProgress = (done, total, nSeeds) => {
+      if (typeof onProgress === 'function') {
+        try {
+          onProgress({
+            chrom_idx:     ci,
+            anchors_done:  done,
+            anchors_total: total,
+            n_seeds:       nSeeds,
+          });
+        } catch (_) {}
+      }
+    };
+    const sweep = await discoverSeedsOnChromosomeAsync({
+      getLabels:      ctx.getLabels,
+      getK:           ctx.getK,
+      getBandQuality: ctx.getBandQuality,
+      chr_s_window:   chr.s_window,
+      chr_e_window:   chr.e_window,
+      tracked_sample_idx: ctx.tracked_sample_idx,
+    }, seed_opts, innerProgress);
     let n_kept = 0;
     for (const seed of sweep.seeds) {
       const interior_frac = seedInteriorFrac(seed);
@@ -439,11 +500,113 @@ export function runBandingPipeline(ctx, opts) {
   };
 }
 
+/**
+ * Async variant of runBandingPipeline that yields control to the event
+ * loop between stages. Behaviourally identical to the sync version —
+ * same inputs, same return shape — but rewrites the four stages as
+ * `await`-separated steps so the browser can:
+ *   1. paint the "running stage N…" status before the next stage starts
+ *   2. process user input (clicks on cancel, tab away, etc.)
+ *
+ * 2026-05-21 perf (HR2 haplotype audit): the sync version blocks the
+ * main thread for 2-5 seconds on dense chromosomes; this version
+ * spreads the cost across 4 frames with no per-stage overhead.
+ * `onProgress(stageName, partialResult)` is called BEFORE each stage
+ * starts so the caller can update its status UI ("running stage 1…",
+ * "running stage 2 — 12 seeds…", etc.); `partialResult` is the merged
+ * result-so-far for any caller that wants to render an early preview.
+ *
+ * Each stage is still synchronous internally — chunking inside a stage
+ * (e.g. per-chromosome iteration within stage 1) would need a deeper
+ * refactor. Today the 4-stage split is enough: stage 1 dominates,
+ * stages 2/3/4 finish in <500ms typically. If a real worker is needed
+ * later, this async surface can wrap a postMessage call to a worker
+ * without changing the caller.
+ *
+ * @param {object} ctx                           same as runBandingPipeline
+ * @param {object} opts                          same as runBandingPipeline
+ * @param {(stage:string, partial:object)=>void} [onProgress]
+ * @returns {Promise<object>}                   same shape as runBandingPipeline
+ */
+export async function runBandingPipelineAsync(ctx, opts, onProgress) {
+  const o = Object.assign({}, BANDING_PIPELINE_DEFAULTS, opts || {});
+  const _yield = () => new Promise(r => setTimeout(r, 0));
+  const _progress = (stage, partial) => {
+    if (typeof onProgress === 'function') {
+      try { onProgress(stage, partial); } catch (_) {}
+    }
+  };
+
+  _progress('stage1', null);
+  await _yield();
+  // 2026-05-21 perf (HR8): use the chunked Stage 1 so progress updates
+  // fire DURING the per-chromosome anchor sweep (every ~50 anchors,
+  // ~20 progress paints per chrom on a typical run). The callback shape
+  // for stage1 progress is { chrom_idx, anchors_done, anchors_total,
+  // n_seeds } — distinct from the inter-stage `partial` shape so callers
+  // can render a progress bar.
+  const stage1ProgressForward = (info) => {
+    _progress('stage1_progress', info);
+  };
+  const stage1 = await runStage1Async(ctx, o, stage1ProgressForward);
+
+  _progress('stage2', { stage1 });
+  await _yield();
+  const stage2 = runStage2(stage1.seeds, o.cross_seed);
+
+  _progress('stage3', { stage1, stage2 });
+  await _yield();
+  const stage3 = runStage3(stage1.seeds, ctx, stage2, o);
+
+  let stage4 = null;
+  if (!o.skip_stage4 && stage3.loci.length > 0) {
+    _progress('stage4', { stage1, stage2, stage3 });
+    await _yield();
+    stage4 = runStage4(stage1.seeds, stage3.loci, ctx, o);
+  }
+
+  // Rollups (same as sync version)
+  let n_raw = 0;
+  for (const r of stage1.per_chrom_summary) n_raw += r.n_raw;
+  const n_valid = stage2.valid_seed_ids.length;
+  let n_target_clean = 0, n_target_soft = 0, n_target_other = 0;
+  let n_stability_upgraded = 0;
+  if (stage4) {
+    for (const T of stage4.per_target) {
+      if (!T.consensus) continue;
+      const c = T.consensus.consensus_class;
+      if (c === 'CLEAN_PARTITION') n_target_clean++;
+      else if (c === 'SOFT_PARTITION') n_target_soft++;
+      else n_target_other++;
+    }
+    n_stability_upgraded = stage4.summary.n_stability_upgraded;
+  }
+
+  return {
+    stage1, stage2, stage3, stage4,
+    summary: {
+      n_seeds_raw:               n_raw,
+      n_seeds_after_plateau:     stage1.seeds.length,
+      n_seeds_valid:             n_valid,
+      n_loci:                    stage3.loci.length,
+      n_linkage_groups:          stage2.linkage.n_groups,
+      n_targets:                 stage4 ? stage4.summary.n_targets : 0,
+      n_target_clean_partitions: n_target_clean,
+      n_target_soft_partitions:  n_target_soft,
+      n_target_other:            n_target_other,
+      n_stability_upgraded:      n_stability_upgraded,
+      per_chrom:                 stage1.per_chrom_summary,
+    },
+  };
+}
+
 // Console-debug
 if (typeof window !== 'undefined') {
-  window._runStage1            = runStage1;
-  window._runStage3            = runStage3;
-  window._runStage4            = runStage4;
-  window._runBandingPipeline   = runBandingPipeline;
+  window._runStage1                = runStage1;
+  window._runStage1Async           = runStage1Async;
+  window._runStage3                = runStage3;
+  window._runStage4                = runStage4;
+  window._runBandingPipeline       = runBandingPipeline;
+  window._runBandingPipelineAsync  = runBandingPipelineAsync;
   window._BANDING_PIPELINE_DEFAULTS = BANDING_PIPELINE_DEFAULTS;
 }

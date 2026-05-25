@@ -212,10 +212,16 @@ export function getNcRNADensity(state, chrom) {
   return state.ncRNADensity[chrom] || null;
 }
 
-/** Alphabetically sorted list of chroms with ncRNA density loaded. */
+/** Alphabetically sorted list of chroms with ncRNA density loaded.
+ *  2026-05-21 perf (Tier-D): identity-cached on state.ncRNADensity —
+ *  same pattern as repeat_density.repeatDensityChromList. */
 export function ncRNADensityChromList(state) {
   if (!state || !state.ncRNADensity) return [];
-  return Object.keys(state.ncRNADensity).sort();
+  if (state._ncRNADensityChromListSrc !== state.ncRNADensity) {
+    state._ncRNADensityChromList    = Object.keys(state.ncRNADensity).sort();
+    state._ncRNADensityChromListSrc = state.ncRNADensity;
+  }
+  return state._ncRNADensityChromList;
 }
 
 /**

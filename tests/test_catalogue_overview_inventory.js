@@ -7,8 +7,8 @@
 // the DOM rather than in a catch().
 //
 // Run from inversion-atlas root:
-//   node atlases/inversion/pages/catalogue/test_page_overview_inventory.js
-import { atlasServer, listLayers } from '../../shared/atlas_server.js';
+//   node tests/test_catalogue_overview_inventory.js
+import { atlasServer, listLayers } from '../atlases/inversion/shared/atlas_server.js';
 
 // Point the singleton URL at a deterministic origin.
 atlasServer.setUrl('http://test.local');

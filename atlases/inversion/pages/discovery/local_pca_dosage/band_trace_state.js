@@ -16,6 +16,7 @@ import {
   bandTraceForFishSet,
 } from '../../../shared/band_trace.js';
 import { persistDebounced } from '../../../shared/persist_debounced.js';
+import { getL2Cluster } from '../../../shared/page1_data_helpers.js';
 
 // =====================================================================
 // localStorage keys (legacy lines 39700-39701)
@@ -73,15 +74,14 @@ export function bandTraceGetOrCompute(state) {
     return state.bandTraceCache;
   }
   const l2_indices = d.l2_envelopes.map((_, i) => i);
-  // The pure-compute layer needs a getLabelsForL2 callback. The atlas
-  // exposes per-L2 K-means labels via state.l2GroupCache, which local_pca_dosage's
-  // L3 panel + lines panel both maintain. Caller is responsible for
-  // ensuring that cache is warm; if it isn't, the compute degrades
-  // gracefully via the projection's empty-chain return.
+  // The pure-compute layer needs a getLabelsForL2 callback. Route
+  // through getL2Cluster so the call uses the data-identity cache —
+  // misses compute the cluster on demand (and warm the cache for
+  // downstream consumers) rather than returning null when the L3 panel
+  // hasn't populated it yet. 2026-05-21: was reading state.l2GroupCache
+  // directly, which moved to state.data._l2ClusterCache.
   const getLabelsForL2 = (li) => {
-    const cache = state.l2GroupCache;
-    if (!cache) return null;
-    const entry = cache.get ? cache.get(li) : cache[li];
+    const entry = getL2Cluster(state, li);
     return (entry && entry.labels) ? entry.labels : null;
   };
   const trace = bandTraceForFishSet(fishSet, { K, l2_indices, getLabelsForL2 });

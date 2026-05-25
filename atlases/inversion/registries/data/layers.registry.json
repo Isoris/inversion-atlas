@@ -20,6 +20,8 @@
       "_root_doc": "Resolved through master_config.yaml -> roots.precomp_zblocks (currently /mnt/e/results_inversions/local_PCA_MDS_z/09_atlas_json/). To switch precomp source, edit the root entry — no layer change needed.",
       "schema": "schemas/scrubber_main.schema.json",
       "chunked": false,
+      "worker_parse": true,
+      "_worker_parse_doc": "2026-05-26: precomp scrubber JSONs run 20-60 MB per chrom; main-thread JSON.parse blocks paint/scroll for ~300-800 ms. atlas-core/core/worker_json_parse.js offloads to a Web Worker so the page stays interactive during mount. Wall-clock is roughly the same (structured-clone cost mirrors the parse) but the page no longer freezes.",
       "_v2_chunked_plan": "When whole-genome support arrives, set chunked: true and split <chrom>.json into <chrom>_<window_block>.json shards.",
       "pin_to": "AtlasState.inversion.tracks.{chrom}",
       "fields": [
@@ -77,7 +79,9 @@
       "source": "file",
       "root": "precomp_thetapi",
       "auto_index": true,
+      "worker_parse": true,
       "_auto_index_doc": "Same discovery mechanism as scrubber_main but pointed at the theta-pi pipeline root. Layout is nested (04_atlas_json/C_gar_LG{NN}/C_gar_LG{NN}_phase2_theta.json); the server's depth-2 scan handles it. Consumed by local_pca_theta_pi (local PCA θπ) via _buildLegacyState's merge of tracks_thetapi into state.data.",
+      "_worker_parse_doc": "Same shape + size class as scrubber_main; offloaded to the Web Worker so the local_pca_dosage mount's Promise.all([thetapi, ghsl]) doesn't pile two heavy parses onto the main thread back-to-back.",
       "pin_to": "AtlasState.inversion.tracks_thetapi.{chrom}"
     },
     "scrubber_ghsl": {
@@ -86,7 +90,9 @@
       "source": "file",
       "root": "precomp_ghsl",
       "auto_index": true,
+      "worker_parse": true,
       "_auto_index_doc": "Same discovery mechanism as scrubber_main but pointed at the GHSL pipeline root. Pre-wired for symmetry with scrubber_thetapi; resolves to whatever filename convention the GHSL pipeline lands on, because the layer asks the server which files exist instead of templating.",
+      "_worker_parse_doc": "Same rationale as scrubber_main / scrubber_thetapi: heavy precomp JSON, parse blocks paint; worker keeps the main thread interactive.",
       "pin_to": "AtlasState.inversion.tracks_ghsl.{chrom}"
     },
     "repeat_density": {
@@ -381,10 +387,9 @@
     },
     "dosage_chunk_layer": {
       "tier": "warm",
-      "preload_on": "candidate_change",
       "source": "operation",
       "operation": "dosage_chunk",
-      "_doc": "Used by per-sample lines panel. Preloaded when candidate changes since dosage view is a primary visualization."
+      "_doc": "Used by per-sample lines panel. Lazy-loaded on demand — the operation needs start/end bp args that the prewarm scheduler cannot supply from shared.activeChrom alone (was preload_on: candidate_change, but that fired without start/end and the server returned 422 Unprocessable Entity). Pages that need this layer resolve it explicitly with {chrom, start, end, cap}. 2026-05-26."
     },
     "dosage_manifest_layer": {
       "tier": "warm",
@@ -407,6 +412,8 @@
     "candidate_karyotype_per_sample": {
       "tier": "warm",
       "preload_on": "candidate_change",
+      "disabled": true,
+      "_disabled_reason": "2026-05-26: analysis/karyotype_assignment.js is TODO (see analysis/README.md). Disabled to silence 404s on every candidate_change; re-enable once the analysis module is implemented.",
       "source": "analysis",
       "analysis": "analysis/karyotype_assignment.js#assignKaryotypes",
       "schema": "schemas/karyotype_assignment.schema.json",
@@ -424,6 +431,8 @@
     "trio_inventory": {
       "tier": "warm",
       "preload_on": "page_mount",
+      "disabled": true,
+      "_disabled_reason": "2026-05-26: analysis/trio_finder.js is TODO (see analysis/README.md). Disabled to silence 404s on every page mount; re-enable once the analysis module is implemented.",
       "source": "analysis",
       "analysis": "analysis/trio_finder.js#findTrios",
       "cache_key": "trios:1st_degree",

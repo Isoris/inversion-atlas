@@ -64,6 +64,18 @@ export function updateWinLabel(state) {
 // 2026-05-19: clamp cur to the active view's n_windows so a click on a
 // theta-pi-frame x position doesn't fly past the dosage view's bounds
 // (or vice versa). The view's window count is the source of truth.
+//
+// 2026-05-21 perf (Tier-S finding #1): the 13-panel cascade now runs
+// inside a requestAnimationFrame, with rapid same-frame setCur calls
+// coalescing into one paint. state.cur + #scrubber DOM value still
+// update synchronously per call (so reads see the latest position),
+// but the expensive draws fire at most once per frame using the LAST
+// cur value seen in that frame. Arrow-key hold / scrubber drag at
+// 60+ Hz used to fire 60+ full cascades per second; now caps at the
+// browser's rAF rate (~60/s on a 60Hz display).
+let _setCurRafId = null;
+let _setCurPendingState = null;
+
 export function setCur(state, i) {
   _setActiveState(state);
   if (!state || !state.data) return;
@@ -84,12 +96,35 @@ export function setCur(state, i) {
   const _scrubEl = document.getElementById('scrubber');
   if (_scrubEl) _scrubEl.value = state.cur;
 
+  // Schedule one cascade per frame; coalesce concurrent calls.
+  _setCurPendingState = state;
+  if (_setCurRafId !== null) return;
+  if (typeof requestAnimationFrame !== 'function') {
+    // Non-browser env (tests) — run synchronously to preserve the
+    // legacy single-threaded ordering.
+    _runSetCurCascade(state);
+    return;
+  }
+  _setCurRafId = requestAnimationFrame(() => {
+    _setCurRafId = null;
+    const s = _setCurPendingState;
+    _setCurPendingState = null;
+    if (s) _runSetCurCascade(s);
+  });
+}
+
+// Extracted from the original inline body so it can run from either the
+// rAF callback or the synchronous fallback. Behaviourally identical to
+// the pre-2026-05-21 cascade — same call order, same perf
+// instrumentation, same try/catch boundaries.
+function _runSetCurCascade(state) {
   // 2026-05-19 perf instrumentation. Opt-in: set `window.__perfDbg = true`
   // in the dev console to enable. Off by default → zero overhead. Logs
-  // per-call ms in the format `[scrub] setCur(N): total=Xms (drawSim=…
-  // drawZ=… …)`. Knowing which step dominates is the first step toward
-  // fixing it; the user-facing wins below (same-L2 skip for renderL3Panel,
-  // cursor-only path for drawSim) are also gated on this measurement.
+  // per-frame ms in the format `[scrub] setCur(N): total=Xms (drawSim=…
+  // drawZ=… …)`. With 2026-05-21 rAF batching, "N" is the latest cur in
+  // the coalesced frame; if a paint covered 3 setCur calls in the
+  // 16ms before the rAF fired, the log shows the result of paining the
+  // last one (the 2 intermediate values were skipped).
   const _PERF = (typeof window !== 'undefined') && window.__perfDbg === true;
   const _tAll = _PERF ? performance.now() : 0;
   const _ts = _PERF ? {} : null;

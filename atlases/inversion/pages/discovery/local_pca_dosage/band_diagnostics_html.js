@@ -163,26 +163,60 @@ export function bandDiagsMiniChipsHtml(state, diag, K, l2idx) {
       + `<span class="bd-pill-lbl">${label}</span>`
       + `<span class="bd-pill-val">${valueStr}</span>`
       + `</span>`;
-    const ghslStr = _bdFmt(b.ghsl_mean, 'auto');
-    const tpiStr  = _bdFmt(b.theta_pi_mean, 'sci');
-    const hetStr  = _bdFmt(b.het_mean, 'auto');
-    const rohStr  = _bdFmt(b.roh_overlap_pct, 'pct');
+    // 2026-05-26: pills distinguish null sub-states. Glyphs:
+    //   '—' = layer not present in data
+    //   '⋯' = layer present but value not yet computed (async path)
+    //   '?' = layer present, compute ran, but produced no finite values
+    //         (band-empty / sample-id mismatch / all-NA region)
+    // Real numbers stay numeric; the legacy '?' is preserved as a final
+    // fallback when none of the more-specific signals apply.
+    const ds = diag.data_status || {};
+    const _layerPill = (value, kind, layerKey, layerHumanName) => {
+      if (Number.isFinite(value)) return { str: _bdFmt(value, kind), suffix: '' };
+      if (!ds[layerKey]) {
+        return { str: '—', suffix: ' · ' + layerHumanName + ' layer not loaded' };
+      }
+      return { str: '?', suffix: ' · ' + layerHumanName + ' computed but no finite value for this band' };
+    };
+    const ghslP = _layerPill(b.ghsl_mean,        'auto', 'ghsl',     'GHSL');
+    const tpiP  = _layerPill(b.theta_pi_mean,    'sci',  'theta_pi', 'θπ');
+    const rohP  = _layerPill(b.roh_overlap_pct,  'pct',  'roh',      'ROH');
+    // het has the async chunk-loading state on top of the other two
+    // sub-states so its branching is unique.
+    let hetStr;
+    let hetTitleSuffix;
+    if (Number.isFinite(b.het_mean)) {
+      hetStr = _bdFmt(b.het_mean, 'auto');
+      hetTitleSuffix = '';
+    } else if (!ds.het) {
+      hetStr = '—';
+      hetTitleSuffix = ' · dosage_chunks layer not loaded';
+    } else if (b._het_vals && b._het_vals.length === 0) {
+      hetStr = '?';
+      hetTitleSuffix = ' · chunk loaded but no calls for this band (all -1 NA, or sample-id mismatch)';
+    } else {
+      hetStr = '⋯';
+      hetTitleSuffix = ' · chunk in flight or computing';
+    }
+    const ghslStr = ghslP.str;
+    const tpiStr  = tpiP.str;
+    const rohStr  = rohP.str;
     const flagsHint = b.flags.length > 0 ? ` · flags: ${b.flags.join(', ')}` : '';
     const hetClickable = !!(diag.het_shape && diag.data_status && diag.data_status.het);
     const hetExtra = hetClickable
       ? ` data-hs-trigger="1" data-hs-l2idx="${l2idx == null ? '' : l2idx}" style="background:${color};cursor:pointer;"`
       : '';
-    const hetTitle = hetClickable
+    const hetTitle = (hetClickable
       ? `dosage heterozygosity mean for band g${b.k}${flagsHint} · click for shape`
-      : `dosage heterozygosity mean for band g${b.k}${flagsHint}`;
+      : `dosage heterozygosity mean for band g${b.k}${flagsHint}`) + hetTitleSuffix;
     rows.push(
       `<div class="bd-mini-row">`
       + `<span class="bd-mini-band" style="color:${color}">g${b.k}</span>`
       + `<span class="bd-mini-n dim">n=${b.n}</span>`
-      + pill('GHSL', ghslStr, `GHSL mean for band g${b.k}${flagsHint}`)
-      + pill('θπ',   tpiStr,  `theta/pi mean for band g${b.k}${flagsHint}`)
+      + pill('GHSL', ghslStr, `GHSL mean for band g${b.k}${flagsHint}${ghslP.suffix}`)
+      + pill('θπ',   tpiStr,  `theta/pi mean for band g${b.k}${flagsHint}${tpiP.suffix}`)
       + pill('het',  hetStr,  hetTitle, hetExtra)
-      + pill('ROH',  rohStr,  `% samples in band g${b.k} with ROH overlapping interval${flagsHint}`)
+      + pill('ROH',  rohStr,  `% samples in band g${b.k} with ROH overlapping interval${flagsHint}${rohP.suffix}`)
       + `</div>`
     );
   }

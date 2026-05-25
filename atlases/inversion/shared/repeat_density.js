@@ -323,10 +323,17 @@ export function resolveRepeatDensityClass(state, chrom) {
   return cls.length > 0 ? cls[0] : null;
 }
 
-/** Alphabetically sorted list of chroms with repeat density loaded. */
+/** Alphabetically sorted list of chroms with repeat density loaded.
+ *  2026-05-21 perf (Tier-D): cached on state, invalidated by identity
+ *  drift on state.repeatDensity (the data object). Per-render callers
+ *  used to rebuild + sort the keys array on every paint. */
 export function repeatDensityChromList(state) {
   if (!state || !state.repeatDensity) return [];
-  return Object.keys(state.repeatDensity).sort();
+  if (state._repeatDensityChromListSrc !== state.repeatDensity) {
+    state._repeatDensityChromList    = Object.keys(state.repeatDensity).sort();
+    state._repeatDensityChromListSrc = state.repeatDensity;
+  }
+  return state._repeatDensityChromList;
 }
 
 // =====================================================================

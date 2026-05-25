@@ -75,6 +75,13 @@
            with structured metadata block; round-trippable for tools that
            want to programmatically reload the catalogue. -->
       <button id="catExportJSON" class="export" title="Export as JSON — { meta: { chrom, species, schema_version, filter context, ... }, columns: [...], rows: [...] }. Round-trippable for programmatic catalogue analysis or re-loading.">⬇ export JSON</button>
+      <!-- 2026-05-26: SPEC_manuscript_bundle_export Slices 1/2/3/5 —
+           single-click .zip with README + candidate catalogue (TSV + JSON)
+           + paste-ready results paragraphs + supplementary tables S1 + S2
+           + reviewer atlas-links. Calls buildManuscriptBundleBlob() in
+           shared/manuscript_bundle.js; pure browser-side, no network. -->
+      <button id="catExportBundle" class="export"
+              title="Download a manuscript-ready .zip — README + catalogue (TSV + JSON) + paste-ready Results paragraphs + supplementary tables S1 + S2 + per-candidate atlas links. Confirmed candidates only.">📦 manuscript bundle</button>
       <!-- v3.99 t14e+ continue: gallery figure — a single PNG montage with
            one panel per CONFIRMED candidate. Useful for manuscript figures.
            Uses the catalogue's confirmed-candidate filter (state.candidateList

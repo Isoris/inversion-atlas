@@ -117,6 +117,13 @@ async function _autoDetectNested(root, atlasState, registry) {
       catch (e) {
         console.warn('nested_inversion_detector: scrubber_main resolve threw —', e);
       }
+      // 2026-05-26: contribute chromSummary (SPEC_multichrom Slice 1).
+      if (data && typeof atlasState.setChromSummary === 'function') {
+        try {
+          const cs = await import('../../../../core/chrom_summary.js');
+          atlasState.setChromSummary(chrom, cs.buildChromSummary(data, { chrom }));
+        } catch (_) { /* non-essential */ }
+      }
     }
   }
   if (!data || !Array.isArray(data.windows)) {

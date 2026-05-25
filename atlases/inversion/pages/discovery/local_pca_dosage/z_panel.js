@@ -273,6 +273,63 @@ export function _drawRegimeBreadthStrip(ctx, pad, plotW, plotH, mbMin, mbMax) {
   ctx.restore();
 }
 
+// 2026-05-21 perf (Tier-A finding #4): precompute dominant-lineage per
+// L2 instead of running a 2-pass O(nS) tally per L2 PER FRAME. With
+// nL2=100, nS=2200, that was 440k inner iterations per paint. Cache
+// keyed on (state.data, state.lineageResult, state.k) — invalidates
+// only when data changes, lineage recomputes, or K shifts.
+//
+// Returns Int32Array of length nL2; cell value is the dominant lineage
+// id in that L2's largest band, or -1 when no lineage applies (chain
+// break, missing cluster, or no samples in the dominant band have a
+// lineage assignment).
+function _computeDominantLineagePerL2(state) {
+  const d = state && state.data;
+  if (!d || !Array.isArray(d.l2_envelopes)) return null;
+  const result = state.lineageResult;
+  if (!result || !result.lineage_id_per_sample) return null;
+  const K = state.k || 3;
+  const cache = state._dominantLineagePerL2Cache;
+  if (cache &&
+      cache.dataDep   === d      &&
+      cache.lineageDep === result &&
+      cache.K          === K     &&
+      cache.array.length === d.l2_envelopes.length) {
+    return cache.array;
+  }
+  const lineageOf = result.lineage_id_per_sample;
+  const nL2 = d.l2_envelopes.length;
+  const out = new Int32Array(nL2);
+  for (let i = 0; i < nL2; i++) out[i] = -1;
+  for (let l2idx = 0; l2idx < nL2; l2idx++) {
+    const cl = getL2Cluster(l2idx);
+    if (!cl || !cl.fixedKLabels) continue;
+    const labels = cl.fixedKLabels;
+    const Kc = cl.K || K;
+    const bandCounts = new Int32Array(Kc);
+    for (let s = 0; s < labels.length; s++) {
+      const lb = labels[s];
+      if (lb >= 0 && lb < Kc) bandCounts[lb]++;
+    }
+    let bigBand = 0, bigCount = -1;
+    for (let k = 0; k < Kc; k++) if (bandCounts[k] > bigCount) { bigCount = bandCounts[k]; bigBand = k; }
+    const lineageCounts = {};
+    for (let s = 0; s < labels.length; s++) {
+      if (labels[s] !== bigBand) continue;
+      const lid = lineageOf[s];
+      if (lid == null || lid < 0) continue;
+      lineageCounts[lid] = (lineageCounts[lid] || 0) + 1;
+    }
+    let domLineage = -1, domCount = -1;
+    for (const k of Object.keys(lineageCounts)) {
+      if (lineageCounts[k] > domCount) { domCount = lineageCounts[k]; domLineage = +k; }
+    }
+    out[l2idx] = domLineage;
+  }
+  state._dominantLineagePerL2Cache = { dataDep: d, lineageDep: result, K, array: out };
+  return out;
+}
+
 // --- _drawLineageStrip — legacy lines 34790-34888 ---
 export function _drawLineageStrip(ctx, pad, plotW, plotH, mbMin, mbMax) {
   const _state = _pageState;
@@ -287,7 +344,8 @@ export function _drawLineageStrip(ctx, pad, plotW, plotH, mbMin, mbMax) {
     // to thrash. Just skip the strip for this paint.
     return;
   }
-  const lineageOf = result.lineage_id_per_sample;
+  const domLineagePerL2 = _computeDominantLineagePerL2(_state);
+  if (!domLineagePerL2) return;
 
   // Strip drawn just ABOVE the regime-breadth strip (which sits at
   // pad.t - 6, height 5). Place lineage strip at pad.t - 13, height 5
@@ -331,32 +389,9 @@ export function _drawLineageStrip(ctx, pad, plotW, plotH, mbMin, mbMax) {
       continue;
     }
 
-    // Find the dominant lineage among the fish in this L2's largest band.
-    const cl = getL2Cluster(l2idx);
-    if (!cl || !cl.fixedKLabels) continue;
-    const labels = cl.fixedKLabels;
-    const K = cl.K || (_state.k || 3);
-    // Largest-band: tally band sizes
-    const bandCounts = new Int32Array(K);
-    for (let s = 0; s < labels.length; s++) {
-      const lb = labels[s];
-      if (lb >= 0 && lb < K) bandCounts[lb]++;
-    }
-    let bigBand = 0, bigCount = -1;
-    for (let k = 0; k < K; k++) if (bandCounts[k] > bigCount) { bigCount = bandCounts[k]; bigBand = k; }
-
-    // Dominant lineage in that band
-    const lineageCounts = {};
-    for (let s = 0; s < labels.length; s++) {
-      if (labels[s] !== bigBand) continue;
-      const lid = lineageOf[s];
-      if (lid == null || lid < 0) continue;
-      lineageCounts[lid] = (lineageCounts[lid] || 0) + 1;
-    }
-    let domLineage = -1, domCount = -1;
-    for (const k of Object.keys(lineageCounts)) {
-      if (lineageCounts[k] > domCount) { domCount = lineageCounts[k]; domLineage = +k; }
-    }
+    // 2026-05-21 perf: dominant lineage looked up from memoized array
+    // (was 2-pass O(nS) tally per L2 inline).
+    const domLineage = domLineagePerL2[l2idx];
     if (domLineage < 0) continue;
 
     // Color: same golden-angle palette as _lineageColor for visual continuity

@@ -85,6 +85,7 @@
 
 import { _pageState, _setActiveState } from './boundary_refinement/_state.js';
 import { renderCandidateNavInline as _renderCandidateNavInline } from '../../shared/candidate_nav.js';
+import { ensureChromTracks } from '../../shared/ensure_chrom_tracks.js';
 import { probeModeB, renderModeBBadge } from '../../../../core/mode_b_badge.js';
 import {
   refreshBoundariesUi,
@@ -419,7 +420,7 @@ export function refreshPage11(state) {
  * selected." placeholder cleanly.
  */
 export async function mount(root, atlasState, registry) {
-  const legacyState = _buildLegacyState(atlasState);
+  let legacyState = _buildLegacyState(atlasState);
   _setActiveState(legacyState);
 
   try { renderBoundariesPage(); }
@@ -431,6 +432,19 @@ export async function mount(root, atlasState, registry) {
   catch (e) { console.warn('boundary_refinement.mount: _bndAttachHotkeys threw —', e); }
 
   if (atlasState.inversion) atlasState.inversion._page11State = legacyState;
+
+  // 2026-05-26: self-bootstrap scrubber_main via the shared helper so the
+  // boundary editor / scored-track panels render on direct navigation
+  // — without this, legacy.data falls back to `{}` and every renderer
+  // that iterates state.data.windows / state.data.l1_envelopes bails.
+  const bootstrap = await ensureChromTracks(atlasState, registry);
+  if (bootstrap.ok) {
+    legacyState = _buildLegacyState(atlasState);
+    _setActiveState(legacyState);
+    try { renderBoundariesPage(); }
+    catch (e) { console.warn('boundary_refinement.mount: post-bootstrap render threw —', e); }
+    if (atlasState.inversion) atlasState.inversion._page11State = legacyState;
+  }
 
   // Mode-B probe — non-blocking. Resolves lineage + active-version
   // boundaries so the reviewer can see what they'd overwrite on save.

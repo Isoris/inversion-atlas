@@ -70,13 +70,23 @@ export function getActiveSimScale(state) {
     : state.data;
   if (!d) return null;
   // New multi-scale path
-  if (d.sim_scales && Object.keys(d.sim_scales).length > 0) {
-    const lab = state.simScale && d.sim_scales[state.simScale]
-              ? state.simScale
-              : (d.default_sim_scale && d.sim_scales[d.default_sim_scale]
-                 ? d.default_sim_scale
-                 : Object.keys(d.sim_scales)[0]);
-    return d.sim_scales[lab];
+  // 2026-05-21 perf (Tier-D): defer the Object.keys() call to only the
+  // fallback branch — when state.simScale or d.default_sim_scale is
+  // present (the common case) we never enumerate keys at all. Previously
+  // both `.length > 0` AND `[0]` invoked Object.keys, building the array
+  // twice per call.
+  if (d.sim_scales) {
+    let lab = null;
+    if (state.simScale && d.sim_scales[state.simScale]) {
+      lab = state.simScale;
+    } else if (d.default_sim_scale && d.sim_scales[d.default_sim_scale]) {
+      lab = d.default_sim_scale;
+    } else {
+      const keys = Object.keys(d.sim_scales);
+      if (keys.length > 0) lab = keys[0];
+    }
+    if (lab !== null) return d.sim_scales[lab];
+    // else fall through to the legacy sim_thumb path
   }
   // Legacy single-thumbnail path
   if (d.sim_thumb && d.sim_thumb_n > 0) {
@@ -1027,29 +1037,43 @@ export function reconcileViewControlsForData(state) {
 // `clusterL2(l2idx)`; the shared module's `clusterL2(ctx, l2idx)` takes
 // an explicit context, and `ClusterCache.getOrCompute(ctx, l2idx)` handles
 // the cache + ctx-based invalidation rule.
+//
+// 2026-05-21 perf: cache lives on `state.data` (the chrom payload), NOT
+// on `state`. The chrom object is the right identity invariant — it
+// only changes on chrom switch, while `state` is rebuilt on every page
+// re-mount. Tabbing away and back to local_pca_dosage on the same chrom
+// used to rebuild every L2 cluster from scratch; now it's a O(1) cache
+// hit. The Map clears itself on knob change via clusterCacheKey
+// comparison inside ClusterCache.invalidateIfChanged, so switching K /
+// silThreshold / etc. still triggers recompute as expected.
 export function getL2Cluster(state, l2idx) {
   if (!state || !state.data) return null;
-  if (!state._l2ClusterCache) state._l2ClusterCache = new ClusterCache();
+  if (!state.data._l2ClusterCache) state.data._l2ClusterCache = new ClusterCache();
   const ctx = contextFromState(state);
-  return state._l2ClusterCache.getOrCompute(ctx, l2idx);
+  return state.data._l2ClusterCache.getOrCompute(ctx, l2idx);
 }
 
 // --- getL2ClusterAt(state, l2idx, K) — legacy lines 10770-10784 ---
 // Per-K cluster cache (used by L3 panel when l3KMode is 'k6' or 'both').
 // Cache identity: data chrom + n_windows; per-K key is `${l2idx}_${K}`.
+//
+// 2026-05-21 perf: hung off `state.data` like getL2Cluster above. The
+// dataKey check is now redundant (different data = no cache present at
+// all) but kept as belt-and-braces for the rare case where state.data
+// is reassigned IN PLACE rather than replaced (e.g. legacy reloads).
 export function getL2ClusterAt(state, l2idx, K) {
   if (!state || !state.data) return null;
-  if (!state.l2GroupCacheAtK) state.l2GroupCacheAtK = new Map();
+  if (!state.data._l2GroupCacheAtK) state.data._l2GroupCacheAtK = new Map();
   const dataKey = state.data.chrom + '|' + state.data.n_windows;
-  if (state._l2GroupCacheAtKDataKey !== dataKey) {
-    state.l2GroupCacheAtK = new Map();
-    state._l2GroupCacheAtKDataKey = dataKey;
+  if (state.data._l2GroupCacheAtKDataKey !== dataKey) {
+    state.data._l2GroupCacheAtK = new Map();
+    state.data._l2GroupCacheAtKDataKey = dataKey;
   }
   const k = `${l2idx}_${K}`;
-  if (state.l2GroupCacheAtK.has(k)) return state.l2GroupCacheAtK.get(k);
+  if (state.data._l2GroupCacheAtK.has(k)) return state.data._l2GroupCacheAtK.get(k);
   const ctx = contextFromState(state);
   const r = clusterL2AtK(ctx, l2idx, K);
-  state.l2GroupCacheAtK.set(k, r);
+  state.data._l2GroupCacheAtK.set(k, r);
   return r;
 }
 

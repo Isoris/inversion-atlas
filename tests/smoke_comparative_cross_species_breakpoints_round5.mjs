@@ -208,8 +208,12 @@ check('mount() ran without throwing', mountOK, mountErr ? mountErr.message : '')
 group('Smoke: _pageState live-binding after mount');
 check('_pageState set after mount',
       state._pageState && typeof state._pageState === 'object');
-check('atlasState.inversion._page16State stashed',
-      atlasState.inversion._page16State === state._pageState);
+// 2026-05-26: stash moved from atlasState.inversion._page16State to
+// atlasState['cross-species']._page_cross_species_breakpointsState (this
+// is a cross-species page, not an inversion page).
+check('atlasState["cross-species"]._page_cross_species_breakpointsState stashed',
+      atlasState['cross-species'] &&
+      atlasState['cross-species']._page_cross_species_breakpointsState === state._pageState);
 const stashedState = state._pageState;
 check('_pageState has crossSpecies slot',     'crossSpecies' in stashedState);
 check('_pageState has _crossSpeciesUI slot',  '_crossSpeciesUI' in stashedState);

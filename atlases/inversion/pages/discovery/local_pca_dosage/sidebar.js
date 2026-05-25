@@ -142,6 +142,154 @@ export function attachSidebarHandlers(state) {
   _wireNewShellControls(state);
   _wireActiveModeBar(state);
   _wireL3Controls(state);
+  _wireZPanelSettings(state);
+  _wireLinesLineageStripToggle(state);
+}
+
+// =============================================================================
+// Lines lineage-strip toggle (2026-05-26)
+// =============================================================================
+// #linesLineageStripToggle is a checkbox in the lines-panel header. The draw
+// path (lines_panel.js:967, z_panel.js:336) already reads state.linesLineageStripOn
+// — toggling it on/off shows or hides the per-L2 dominant-lineage strip
+// inside the per-sample lines panel.
+//
+// Default-ON contract per legacy line 34057: state init has the slot true;
+// localStorage '0' explicitly disables, anything else (including missing)
+// keeps the default.
+function _wireLinesLineageStripToggle(state) {
+  const LS_KEY = 'inversion_atlas.linesLineageStripOn';
+  const cb = $('linesLineageStripToggle');
+  if (!cb) return;
+
+  // Restore from localStorage on mount. The slot defaults to true; an
+  // explicit '0' is the only thing that turns it off.
+  try {
+    const stored = localStorage.getItem(LS_KEY);
+    if (stored === '0') {
+      state.linesLineageStripOn = false;
+      cb.checked = false;
+    } else {
+      cb.checked = !!state.linesLineageStripOn;
+    }
+  } catch (_) {
+    cb.checked = !!state.linesLineageStripOn;
+  }
+
+  cb.addEventListener('change', (e) => {
+    const on = !!e.target.checked;
+    state.linesLineageStripOn = on;
+    try { localStorage.setItem(LS_KEY, on ? '1' : '0'); } catch (_) {}
+    try { drawLinesPanel(state); } catch (err) { console.warn('linesLineageStripToggle drawLinesPanel:', err); }
+  });
+}
+
+// =============================================================================
+// Z-panel settings popover (2026-05-26)
+// =============================================================================
+// The Z-panel toolbar has a ⚙ button (#zSettingsToggleBtn) that opens a
+// floating popover (#zSettingsBox) holding:
+//   - color-mode buttons (#zColorMode > button[data-zcolor]):
+//     bands / gradient / zone / highlight
+//   - value-mode buttons (#zValueMode > button[data-zvalue]):
+//     abs / signed
+//   - highlight-threshold input (#zHighlightInput, visible only when
+//     color-mode === 'highlight')
+//
+// The HTML was shipped legacy-side but the toggle handler + button
+// listeners were never written — popover stayed display:none forever,
+// so users were stuck on the defaults (bands + abs). The draw path
+// (z_panel.js) already reads state.zColorMode / state.zValueMode /
+// state.zHighlightThr, so wiring is all that's missing.
+//
+// Persists each setting to localStorage so the user's choice survives reload.
+function _wireZPanelSettings(state) {
+  const LS_COLOR = 'pca_scrubber_v3.zColorMode';
+  const LS_VALUE = 'pca_scrubber_v3.zValueMode';
+  const LS_THR   = 'pca_scrubber_v3.zHighlightThr';
+
+  // Restore persisted state first so the first render reflects it.
+  try {
+    const c = localStorage.getItem(LS_COLOR);
+    if (c === 'bands' || c === 'gradient' || c === 'zone' || c === 'highlight') {
+      state.zColorMode = c;
+    }
+  } catch (_) {}
+  try {
+    const v = localStorage.getItem(LS_VALUE);
+    if (v === 'abs' || v === 'signed') state.zValueMode = v;
+  } catch (_) {}
+  try {
+    const t = parseFloat(localStorage.getItem(LS_THR));
+    if (Number.isFinite(t) && t >= 0) state.zHighlightThr = t;
+  } catch (_) {}
+
+  const toggleBtn  = $('zSettingsToggleBtn');
+  const popover    = $('zSettingsBox');
+  const highlight  = $('zHighlightCtrl');
+  const thrInput   = $('zHighlightInput');
+
+  // Reflect helpers — sync UI to state on every change.
+  const _syncActive = (containerId, dataAttr, current) => {
+    const container = $(containerId);
+    if (!container) return;
+    container.querySelectorAll('button[' + dataAttr + ']').forEach(b => {
+      b.classList.toggle('active', b.getAttribute(dataAttr) === current);
+    });
+  };
+  const _syncHighlightVisibility = () => {
+    if (!highlight) return;
+    highlight.style.display = (state.zColorMode === 'highlight') ? 'inline-flex' : 'none';
+  };
+  const _syncAll = () => {
+    _syncActive('zColorMode', 'data-zcolor', state.zColorMode || 'bands');
+    _syncActive('zValueMode', 'data-zvalue', state.zValueMode || 'abs');
+    _syncHighlightVisibility();
+    if (thrInput) thrInput.value = String(state.zHighlightThr != null ? state.zHighlightThr : 1.8);
+  };
+
+  // Toggle popover visibility on ⚙ click.
+  if (toggleBtn && popover) {
+    toggleBtn.addEventListener('click', () => {
+      const open = popover.style.display !== 'none' && popover.style.display !== '';
+      popover.style.display = open ? 'none' : 'flex';
+    });
+  }
+
+  // Color-mode buttons.
+  document.querySelectorAll('#zColorMode button[data-zcolor]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = btn.getAttribute('data-zcolor');
+      state.zColorMode = v;
+      try { localStorage.setItem(LS_COLOR, v); } catch (_) {}
+      _syncAll();
+      try { drawZ(state); } catch (e) { console.warn('zColorMode drawZ:', e); }
+    });
+  });
+
+  // Value-mode buttons.
+  document.querySelectorAll('#zValueMode button[data-zvalue]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = btn.getAttribute('data-zvalue');
+      state.zValueMode = v;
+      try { localStorage.setItem(LS_VALUE, v); } catch (_) {}
+      _syncAll();
+      try { drawZ(state); } catch (e) { console.warn('zValueMode drawZ:', e); }
+    });
+  });
+
+  // Highlight-threshold numeric input — only meaningful when zColorMode==='highlight'.
+  if (thrInput) {
+    thrInput.addEventListener('change', () => {
+      const t = parseFloat(thrInput.value);
+      if (!Number.isFinite(t) || t < 0) return;
+      state.zHighlightThr = t;
+      try { localStorage.setItem(LS_THR, String(t)); } catch (_) {}
+      try { drawZ(state); } catch (e) { console.warn('zHighlightThr drawZ:', e); }
+    });
+  }
+
+  _syncAll();
 }
 
 // =============================================================================
@@ -2080,6 +2228,32 @@ function _wireDataSection(state) {
   // Expose the setter on state so non-sidebar code (e.g. _applyViewMode)
   // can move sim to/from the minimap without re-implementing the logic.
   state._setSimInMinimap = _setSimInMinimap;
+
+  // 2026-05-26 — close / re-open the floating sim_mat panel in compact mode.
+  // The panel is positioned as a fixed bottom-right overlay (compact-mode CSS);
+  // ✕ inside the panel hides it via body[data-sim-hidden=1], and the 🔲 sim
+  // button in #ctrlBar re-opens it. Hidden state persisted to localStorage.
+  const SIM_HIDDEN_LS_KEY = 'pca_scrubber_v3.simHidden';
+  const _setSimHidden = (hidden) => {
+    if (!document.body || !document.body.dataset) return;
+    if (hidden) document.body.dataset.simHidden = '1';
+    else delete document.body.dataset.simHidden;
+    try { localStorage.setItem(SIM_HIDDEN_LS_KEY, hidden ? '1' : '0'); } catch (_) {}
+    if (!hidden) {
+      // Re-show: redraw so the canvas paints at the floating-panel size.
+      requestAnimationFrame(() => {
+        try { drawSim(state); } catch (_) {}
+      });
+    }
+  };
+  const closeSimBtn = $('simPanelCloseBtn');
+  const showSimBtn  = $('simShowBtn');
+  if (closeSimBtn) closeSimBtn.addEventListener('click', () => _setSimHidden(true));
+  if (showSimBtn)  showSimBtn .addEventListener('click', () => _setSimHidden(false));
+  // Restore persisted hidden state on mount.
+  try {
+    if (localStorage.getItem(SIM_HIDDEN_LS_KEY) === '1') _setSimHidden(true);
+  } catch (_) {}
   // 2026-05-20 (revised): sim_mat defaults to the MAIN panel, NOT the
   // minimap. Earlier we defaulted to minimap which opened up the main
   // panel area, but with the sidebar now also defaulting to collapsed

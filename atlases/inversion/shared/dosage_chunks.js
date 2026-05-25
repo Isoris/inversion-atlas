@@ -75,6 +75,27 @@ function _normIdCanon(s) {
   return _normId(s).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+// Strip filesystem path + common alignment file extensions so that
+// "/path/to/CGA009.bam", "CGA009.bam", "CGA009.cram", "CGA009" all
+// collapse to "CGA009". Mirrors the R-side 08a_build_sample_metadata.R
+// cleaning step:
+//   clean_cga <- vapply(bam_ids, function(x) {
+//     base <- basename(x)
+//     sub("\\.(bam|cram|sam)$", "", base, ignore.case = TRUE)
+//   }, character(1))
+// Critical when the server's dosage samples.tsv ships bam-file paths
+// (or just basenames-with-extensions) while the cohort precomp's `cga`
+// field carries the cleaned IDs — without this step, no exact match.
+function _stripPathAndExt(s) {
+  if (!s) return s;
+  // basename: handle both POSIX and Windows separators
+  const slash = Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\'));
+  let base = slash >= 0 ? s.slice(slash + 1) : s;
+  // strip .bam / .cram / .sam (case-insensitive), plus optional .gz
+  base = base.replace(/\.(bam|cram|sam)(\.gz)?$/i, '');
+  return base;
+}
+
 // Strip common species/dataset prefixes both directions so e.g.
 // "C_gar_CGA001" ↔ "CGA001" / "CGA-001" / "cga001" all match.
 // Examples of prefixes seen in the wild: "C_gar_", "Cgar_",
@@ -108,48 +129,79 @@ function _stripPrefixes(id) {
 
 function _aliasesForCohortEntry(s, fallbackIdx) {
   const out = [];
+  const seen = new Set();
+  const _add = (v) => {
+    if (v == null || v === '') return;
+    const cleaned = _stripPathAndExt(_normId(v));
+    // Push the raw normalised form first (so exact-string matchers hit it),
+    // then the path/extension-stripped variant, then prefix-stripped
+    // variants of both. The chunk side runs the same cleaning at lookup
+    // time so most chains end up pointing at the same canonical form.
+    for (const raw of [_normId(v), cleaned]) {
+      if (raw && !seen.has(raw)) { seen.add(raw); out.push(raw); }
+      for (const stripped of _stripPrefixes(raw)) {
+        if (!seen.has(stripped)) { seen.add(stripped); out.push(stripped); }
+      }
+    }
+  };
   if (s == null) {
     out.push('S' + fallbackIdx);
     return out;
   }
   if (typeof s === 'string' || typeof s === 'number') {
-    for (const v of _stripPrefixes(_normId(s))) out.push(v);
+    _add(s);
+    if (out.length === 0) out.push('S' + fallbackIdx);
     return out;
   }
   // Object — pull every plausible identifier field.
   const fields = ['id', 'cga', 'ind', 'sample', 'sample_id',
                   'name', 'label', 'ID', 'IND', 'CGA',
-                  'sampleId', 'sampleID', 'individual', 'idx'];
-  const seen = new Set();
-  for (const f of fields) {
-    const v = s[f];
-    if (v == null || v === '') continue;
-    for (const a of _stripPrefixes(_normId(v))) {
-      if (!seen.has(a)) { seen.add(a); out.push(a); }
-    }
-  }
+                  'sampleId', 'sampleID', 'individual', 'idx',
+                  'bam', 'bamfile', 'path'];
+  for (const f of fields) _add(s[f]);
   if (out.length === 0) out.push('S' + fallbackIdx);
   return out;
 }
 
 function _buildSampleIdMap(state, chunkSamples) {
   const cohortSamples = (state && state.data && state.data.samples) || [];
-  const map = new Map();
-  // Pass 1: exact + variant aliases per cohort sample.
-  for (let ci = 0; ci < cohortSamples.length; ci++) {
-    const aliases = _aliasesForCohortEntry(cohortSamples[ci], ci);
-    for (const a of aliases) {
-      if (!map.has(a)) map.set(a, ci);
+  // 2026-05-21 perf (Tier-C finding #5): the alias resolution + the
+  // first two map-build passes are PURELY cohort-derived — they don't
+  // depend on chunkSamples at all. Cache the cohort-only piece on
+  // state, invalidated by identity drift on state.data.samples. The
+  // per-chunk path then just clones the cached map and attaches
+  // chunk-specific `_byPos` + runs the diagnostic. Before: 2 × O(n_cohort)
+  // calls to _aliasesForCohortEntry per chunk fetch, each call doing
+  // string normalisation; after: zero alias calls on the hot path.
+  const _cached = state && state._cohortSampleAliasMap;
+  let map;
+  if (_cached && _cached.samples === cohortSamples) {
+    // Clone the cached cohort-only map so chunk-specific fields
+    // (`_byPos`) don't pollute the cache.
+    map = new Map(_cached.map);
+  } else {
+    map = new Map();
+    // Compute aliases ONCE per cohort sample (instead of twice — once
+    // for pass 1, once for pass 2 — as the legacy code did).
+    const aliasesPerSample = new Array(cohortSamples.length);
+    for (let ci = 0; ci < cohortSamples.length; ci++) {
+      aliasesPerSample[ci] = _aliasesForCohortEntry(cohortSamples[ci], ci);
     }
-  }
-  // Pass 2: canonicalised form as a fallback. Only filled when the
-  // canonical key isn't already taken by an exact alias.
-  for (let ci = 0; ci < cohortSamples.length; ci++) {
-    const aliases = _aliasesForCohortEntry(cohortSamples[ci], ci);
-    for (const a of aliases) {
-      const c = _normIdCanon(a);
-      if (c && !map.has(c)) map.set(c, ci);
+    // Pass 1: exact + variant aliases per cohort sample.
+    for (let ci = 0; ci < cohortSamples.length; ci++) {
+      for (const a of aliasesPerSample[ci]) {
+        if (!map.has(a)) map.set(a, ci);
+      }
     }
+    // Pass 2: canonicalised form as a fallback. Only filled when the
+    // canonical key isn't already taken by an exact alias.
+    for (let ci = 0; ci < cohortSamples.length; ci++) {
+      for (const a of aliasesPerSample[ci]) {
+        const c = _normIdCanon(a);
+        if (c && !map.has(c)) map.set(c, ci);
+      }
+    }
+    if (state) state._cohortSampleAliasMap = { samples: cohortSamples, map: new Map(map) };
   }
   // Pass 3: positional fallback. The beagle (which the server reads as
   // the dosage matrix's column order) often ships placeholder IDs like
@@ -229,14 +281,21 @@ function _buildSampleIdMap(state, chunkSamples) {
 // mis-sized cohorts don't get aligned to the wrong rows.
 function _lookupCohortIdx(map, chunkId, chunkIdx) {
   if (chunkId != null) {
-    const key = _normId(chunkId);
-    if (map.has(key)) return map.get(key);
-    for (const stripped of _stripPrefixes(key)) {
+    const raw = _normId(chunkId);
+    // 2026-05-26: chunk samples often ship as bam paths from the server
+    // (e.g. "/path/to/CGA009.bam") while the cohort precomp's `cga`
+    // field carries the cleaned ID ("CGA009"). Try the path/extension-
+    // stripped form FIRST so the common case hits without falling back
+    // to canonical or positional alignment.
+    const cleaned = _stripPathAndExt(raw);
+    if (map.has(cleaned)) return map.get(cleaned);
+    if (map.has(raw)) return map.get(raw);
+    for (const stripped of _stripPrefixes(cleaned)) {
       if (map.has(stripped)) return map.get(stripped);
     }
-    const canon = _normIdCanon(key);
+    const canon = _normIdCanon(cleaned);
     if (map.has(canon)) return map.get(canon);
-    for (const stripped of _stripPrefixes(key)) {
+    for (const stripped of _stripPrefixes(cleaned)) {
       const c = _normIdCanon(stripped);
       if (c && map.has(c)) return map.get(c);
     }
@@ -267,6 +326,39 @@ export function invalidateHetRateCache(state) {
   if (state && state.__hetRateCache instanceof Map) {
     state.__hetRateCache.clear();
   }
+}
+
+/**
+ * 2026-05-26: per-chrom reset hook. Called from applyData() when a new
+ * chromosome's precomp lands. Clears:
+ *   - het-rate cache + dosage-mean cache (cacheKey-keyed by bp range, no
+ *     chrom prefix — coincident L2 bp ranges between chroms would alias
+ *     and return stale values)
+ *   - all one-shot diagnostic flags (so the user gets a fresh
+ *     chunk-shape / sample-id / marker-filter / all-NaN log for the new
+ *     chrom instead of "already logged once this session")
+ *   - alias map cache (cohort.samples identity changes on chrom load,
+ *     but explicit clear is cheap defence against future precomp shapes
+ *     that reuse the array)
+ *
+ * NOT cleared: state.__dosageChunkLru. The LRU keys include chrom and
+ * its covering-fallback explicitly filters by chrom prefix, so cross-chrom
+ * leakage is already prevented. Keeping it around lets navigating
+ * back to a previous chrom reuse already-fetched chunks (free perf).
+ *
+ * @param {Object} state
+ */
+export function resetDosageDiagnosticsForChromChange(state) {
+  if (!state) return;
+  if (state.__hetRateCache instanceof Map) state.__hetRateCache.clear();
+  if (state.__dosageMeanCache instanceof Map) state.__dosageMeanCache.clear();
+  state.__cohortSampleAliasMap = null;
+  state.__chunkShapeValidated = false;
+  state.__dosageMatchRateLogged = false;
+  state.__hetAllNanLogged = false;
+  state.__hetMarkerFilterLogged = false;
+  state.__dosageMeanAllNanLogged = false;
+  state.__dosageMeanMarkerFilterLogged = false;
 }
 
 /**
@@ -325,15 +417,43 @@ export function computeHetRateForRange(state, startBp, endBp, opts) {
   // _buildSampleIdMap for the multi-pass alias strategy.
   const idToCohort = _buildSampleIdMap(state, chunk.samples);
 
-  // Filter markers to bp span
+  // Filter markers to bp span. 2026-05-26: pos_bp coerced through
+  // Number(...) so a server that serialises bp positions as strings
+  // ("13350000" instead of 13350000) still filters correctly. JSON
+  // bigints sometimes ship as strings.
   const inRange = [];
+  let nMarkersWithBp = 0;          // markers that have a finite pos_bp at all
+  let markerMinBp = Infinity;
+  let markerMaxBp = -Infinity;
   for (let mi = 0; mi < chunk.markers.length; mi++) {
     const m = chunk.markers[mi];
-    if (!m || !Number.isFinite(m.pos_bp)) continue;
-    if (m.pos_bp < startBp || m.pos_bp > endBp) continue;
+    if (!m) continue;
+    const bp = (typeof m.pos_bp === 'number') ? m.pos_bp : Number(m.pos_bp);
+    if (!Number.isFinite(bp)) continue;
+    nMarkersWithBp++;
+    if (bp < markerMinBp) markerMinBp = bp;
+    if (bp > markerMaxBp) markerMaxBp = bp;
+    if (bp < startBp || bp > endBp) continue;
     inRange.push(mi);
   }
   if (inRange.length === 0) {
+    // 2026-05-26: one-shot diagnostic for the marker-shape failure mode.
+    // Distinguishes "no markers had pos_bp at all" (chunk shape unexpected
+    // — server returns markers as something other than {pos_bp:…} objects)
+    // from "markers exist but all fall outside the requested bp range"
+    // (chunk-cache key off, or covering-chunk fallback returned a chunk
+    // for a different span).
+    if (state && !state.__hetMarkerFilterLogged && typeof console !== 'undefined') {
+      const m0 = chunk.markers[0];
+      console.warn('[dosage_chunks] computeHetRateForRange: 0 markers in bp range:',
+        `requested ${startBp}-${endBp}`,
+        `· chunk has ${chunk.markers.length} markers`,
+        `· markers with finite pos_bp: ${nMarkersWithBp}/${chunk.markers.length}`,
+        `· marker bp span: ${isFinite(markerMinBp) ? markerMinBp : '—'}…${isFinite(markerMaxBp) ? markerMaxBp : '—'}`,
+        `· first marker shape: ${typeof m0 === 'object' ? JSON.stringify(Object.keys(m0 || {})) : typeof m0}`,
+        `· first marker value: ${JSON.stringify(m0)}`);
+      state.__hetMarkerFilterLogged = true;
+    }
     return out;
   }
 
@@ -355,12 +475,35 @@ export function computeHetRateForRange(state, startBp, endBp, opts) {
   // Project to cohort space — _lookupCohortIdx handles exact and
   // canonicalised (alphanumeric-lowercase) fallbacks so prefix /
   // separator / case variants still match.
+  let nProjected = 0, nWithCalls = 0;
+  let sumNonNa = 0;
   for (let ci = 0; ci < nChunkS; ci++) {
     const cohortIdx = _lookupCohortIdx(idToCohort, chunk.samples[ci], ci);
     if (cohortIdx < 0 || cohortIdx >= nS) continue;
+    nProjected++;
+    sumNonNa += nonNaCounts[ci];
+    if (nonNaCounts[ci] > 0) nWithCalls++;
     out[cohortIdx] = (nonNaCounts[ci] === 0)
       ? NaN
       : hetCounts[ci] / nonNaCounts[ci];
+  }
+
+  // 2026-05-26: one-shot diagnostic for "all-NaN despite chunk landing".
+  // Fires when the chunk projects to ZERO real values across the cohort,
+  // which is the "het looks grey" failure mode. Tells you whether the
+  // chain broke at projection (0 chunk samples mapped to cohort) or at
+  // calls (markers in range but every cell is -1 NA).
+  if (state && !state.__hetAllNanLogged && typeof console !== 'undefined'
+      && (nWithCalls === 0 || nProjected === 0)) {
+    console.warn('[dosage_chunks] computeHetRateForRange produced all-NaN:',
+      `bp range ${startBp}-${endBp}`,
+      `· markers in range: ${inRange.length}/${chunk.markers.length}`,
+      `· chunk samples: ${nChunkS}`,
+      `· projected to cohort: ${nProjected}/${nS}`,
+      `· with non-NA calls: ${nWithCalls}/${nProjected}`,
+      `· avg non-NA per sample: ${nProjected > 0 ? (sumNonNa / nProjected).toFixed(1) : 0}`,
+      `· first chunk dosage row sample: ${chunk.dosage[inRange[0]] && Array.from(chunk.dosage[inRange[0]]).slice(0, 5)}`);
+    state.__hetAllNanLogged = true;
   }
 
   if (cacheKey != null && cache) cache.set(cacheKey, out);
@@ -476,15 +619,36 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
   // _buildSampleIdMap for the multi-pass alias strategy.
   const idToCohort = _buildSampleIdMap(state, chunk.samples);
 
-  // Filter markers to bp span
+  // Filter markers to bp span. Same string-coercion fix as
+  // computeHetRateForRange above.
   const inRange = [];
+  let nMarkersWithBp = 0;
+  let markerMinBp = Infinity;
+  let markerMaxBp = -Infinity;
   for (let mi = 0; mi < chunk.markers.length; mi++) {
     const m = chunk.markers[mi];
-    if (!m || !Number.isFinite(m.pos_bp)) continue;
-    if (m.pos_bp < startBp || m.pos_bp > endBp) continue;
+    if (!m) continue;
+    const bp = (typeof m.pos_bp === 'number') ? m.pos_bp : Number(m.pos_bp);
+    if (!Number.isFinite(bp)) continue;
+    nMarkersWithBp++;
+    if (bp < markerMinBp) markerMinBp = bp;
+    if (bp > markerMaxBp) markerMaxBp = bp;
+    if (bp < startBp || bp > endBp) continue;
     inRange.push(mi);
   }
   if (inRange.length === 0) {
+    // 2026-05-26: mirror of the diagnostic in computeHetRateForRange.
+    if (state && !state.__dosageMeanMarkerFilterLogged && typeof console !== 'undefined') {
+      const m0 = chunk.markers[0];
+      console.warn('[dosage_chunks] computeDosageMeanForRange: 0 markers in bp range:',
+        `requested ${startBp}-${endBp}`,
+        `· chunk has ${chunk.markers.length} markers`,
+        `· markers with finite pos_bp: ${nMarkersWithBp}/${chunk.markers.length}`,
+        `· marker bp span: ${isFinite(markerMinBp) ? markerMinBp : '—'}…${isFinite(markerMaxBp) ? markerMaxBp : '—'}`,
+        `· first marker shape: ${typeof m0 === 'object' ? JSON.stringify(Object.keys(m0 || {})) : typeof m0}`,
+        `· first marker value: ${JSON.stringify(m0)}`);
+      state.__dosageMeanMarkerFilterLogged = true;
+    }
     return out;
   }
 
@@ -506,16 +670,206 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
   // Project to cohort space — _lookupCohortIdx handles exact and
   // canonicalised (alphanumeric-lowercase) fallbacks so prefix /
   // separator / case variants still match.
+  let nProjected = 0, nWithCalls = 0;
+  let sumNonNa = 0;
   for (let ci = 0; ci < nChunkS; ci++) {
     const cohortIdx = _lookupCohortIdx(idToCohort, chunk.samples[ci], ci);
     if (cohortIdx < 0 || cohortIdx >= nS) continue;
+    nProjected++;
+    sumNonNa += nNonNa[ci];
+    if (nNonNa[ci] > 0) nWithCalls++;
     out[cohortIdx] = (nNonNa[ci] === 0)
       ? NaN
       : sumDos[ci] / nNonNa[ci];
   }
 
+  // 2026-05-26: one-shot diagnostic mirroring computeHetRateForRange's.
+  if (state && !state.__dosageMeanAllNanLogged && typeof console !== 'undefined'
+      && (nWithCalls === 0 || nProjected === 0)) {
+    console.warn('[dosage_chunks] computeDosageMeanForRange produced all-NaN:',
+      `bp range ${startBp}-${endBp}`,
+      `· markers in range: ${inRange.length}/${chunk.markers.length}`,
+      `· chunk samples: ${nChunkS}`,
+      `· projected to cohort: ${nProjected}/${nS}`,
+      `· with non-NA calls: ${nWithCalls}/${nProjected}`,
+      `· avg non-NA per sample: ${nProjected > 0 ? (sumNonNa / nProjected).toFixed(1) : 0}`,
+      `· first chunk dosage row sample: ${chunk.dosage[inRange[0]] && Array.from(chunk.dosage[inRange[0]]).slice(0, 5)}`);
+    state.__dosageMeanAllNanLogged = true;
+  }
+
   if (cacheKey != null && cache) cache.set(cacheKey, out);
   return out;
+}
+
+/**
+ * 2026-05-26 — diagnostic helper for the "PCA scatter still shows grey
+ * when colored by dosage/het" UX. Builds a per-tracked-sample row with
+ * the cohort id, the computed dosage value, the computed het value,
+ * and the active bp range that was queried. Lets the user see at a
+ * glance whether the chunk produced numbers (id-projection success)
+ * or NaN (chunk-miss / id-mismatch / no markers in range).
+ *
+ * Returns:
+ *   {
+ *     range:       { startBp, endBp, startW, endW, chrom },
+ *     lruKeys:     Array<string>      cached chunk keys for this chrom,
+ *     trackedRows: Array<{ sample_idx, sample_id, dosage, het }>,
+ *     diagnosis:   string             one-line human-readable verdict,
+ *   }
+ *
+ * @param {Object} state              local_pca_dosage page state
+ * @param {Array<number>} trackedIdx  fall-back to state.tracked when null
+ * @param {{startW, endW}} [range]    fall-back to L2 envelope around cur
+ */
+export function buildDosageDebugReport(state, trackedIdx, range) {
+  const d = state && state.data;
+  if (!d) {
+    return { range: null, lruKeys: [], trackedRows: [], diagnosis: 'no state.data' };
+  }
+  const tracked = (trackedIdx && trackedIdx.length > 0)
+    ? Array.from(trackedIdx)
+    : (Array.isArray(state.tracked) ? state.tracked.slice() : []);
+
+  // Pick the range — caller may override; default mirrors drawPCA's
+  // L2-envelope logic so the debug panel reports on the same window
+  // range the PCA paint just used.
+  let startW, endW;
+  if (range && Number.isFinite(range.startW) && Number.isFinite(range.endW)) {
+    startW = range.startW; endW = range.endW;
+  } else {
+    const cur = state.cur | 0;
+    const curL2 = state.windowToL2 ? state.windowToL2[cur] : -1;
+    if (curL2 >= 0 && d.l2_envelopes && d.l2_envelopes[curL2]) {
+      const env = d.l2_envelopes[curL2];
+      startW = (env._s0 != null) ? env._s0 : (env.start_w - 1);
+      endW   = (env._e0 != null) ? env._e0 : (env.end_w - 1);
+    } else {
+      const slabHalf = 20;
+      startW = Math.max(0, cur - slabHalf);
+      endW   = Math.min((d.n_windows | 0) - 1, cur + slabHalf);
+    }
+  }
+  const ws = (d.windows || [])[startW];
+  const we = (d.windows || [])[endW];
+  const startBp = ws ? (ws.start_bp != null ? ws.start_bp : ws.center_bp) : NaN;
+  const endBp   = we ? (we.end_bp   != null ? we.end_bp   : we.center_bp) : NaN;
+
+  // Drop the cached values for this exact cacheKey so the recompute
+  // below reflects what the chunk currently contains (not a stale
+  // NaN-array from before the chunk landed).
+  const cacheKeyD = `lines:dosage:${startW}-${endW}`;
+  const cacheKeyH = `lines:${startW}-${endW}`;
+  const cache = state.__dosageMeanCache;
+  if (cache && cache.delete) { cache.delete(cacheKeyD); cache.delete(cacheKeyH); }
+
+  const dosVals = computeDosageMeanForRange(state, startBp, endBp, {
+    getCachedChunk: state._linesPanelGetCachedChunk || null,
+    cacheKey: cacheKeyD,
+  });
+  const hetVals = computeHetRateForRange(state, startBp, endBp, {
+    getCachedChunk: state._linesPanelGetCachedChunk || null,
+    cacheKey: cacheKeyH,
+  });
+
+  const samples = Array.isArray(d.samples) ? d.samples : [];
+  const trackedRows = tracked.map((si) => {
+    const sample = samples[si] || null;
+    const sid = (sample && (sample.cga || sample.id || sample.sample || sample.ind)) || `S${si}`;
+    return {
+      sample_idx: si,
+      sample_id:  sid,
+      dosage: dosVals && Number.isFinite(dosVals[si]) ? dosVals[si] : NaN,
+      het:    hetVals && Number.isFinite(hetVals[si]) ? hetVals[si] : NaN,
+    };
+  });
+
+  const lru = state.__dosageChunkLru;
+  const lruKeys = lru ? Array.from(lru.keys()) : [];
+
+  // 2026-05-26: id-projection forensic — when the diagnosis lands on
+  // "sample-id mismatch", the user wants to SEE which chunk ids didn't
+  // match which cohort ids. Walks the same matcher (_buildSampleIdMap +
+  // _lookupCohortIdx) the real per-marker projection uses, so what
+  // shows up here is the actual contributor to NaN.
+  let idProjection = null;
+  try {
+    const chunkForProbe = (typeof state._linesPanelGetCachedChunk === 'function')
+      ? state._linesPanelGetCachedChunk(startBp, endBp) : null;
+    if (chunkForProbe && Array.isArray(chunkForProbe.samples)) {
+      const cohortSamples = (state.data && state.data.samples) || [];
+      const map = _buildSampleIdMap(state, chunkForProbe.samples);
+      const sampleMap = [];
+      let matchedCount = 0;
+      for (let i = 0; i < chunkForProbe.samples.length; i++) {
+        const chunkId = chunkForProbe.samples[i];
+        const cohortIdx = _lookupCohortIdx(map, chunkId, i);
+        const matched = cohortIdx >= 0;
+        if (matched) matchedCount++;
+        const cohortEntry = matched ? cohortSamples[cohortIdx] : null;
+        const cohortId = (cohortEntry
+          && (cohortEntry.cga || cohortEntry.id || cohortEntry.sample || cohortEntry.ind))
+          || (matched ? `S${cohortIdx}` : null);
+        sampleMap.push({
+          chunk_idx: i,
+          chunk_id: typeof chunkId === 'string' ? chunkId : String(chunkId),
+          cohort_idx: cohortIdx,
+          cohort_id: cohortId,
+          matched,
+        });
+      }
+      idProjection = {
+        chunk_n:        chunkForProbe.samples.length,
+        cohort_n:       cohortSamples.length,
+        matched:        matchedCount,
+        unmatched:      chunkForProbe.samples.length - matchedCount,
+        match_rate:     chunkForProbe.samples.length > 0
+                          ? matchedCount / chunkForProbe.samples.length : 0,
+        sample_map:     sampleMap,
+      };
+    }
+  } catch (_) { /* never block the report on a forensic probe */ }
+
+  // One-line verdict so the user knows WHY it's grey, when it is.
+  // 2026-05-26: branch on the actual projection rate before blaming
+  // sample-id mismatch. With 100% projection but all-NaN values the
+  // failure mode is "server returned -1 for every cell in this range"
+  // or "no markers in this bp range" — NOT id mismatch. Misdiagnosing
+  // it sent users hunting in the wrong layer of the chain.
+  const nDosNaN = trackedRows.filter(r => !Number.isFinite(r.dosage)).length;
+  const nHetNaN = trackedRows.filter(r => !Number.isFinite(r.het)).length;
+  const projRate = idProjection ? idProjection.match_rate : null;
+  const projOk = projRate != null && projRate >= 0.99;
+  let diagnosis;
+  if (!state._linesPanelGetCachedChunk) {
+    diagnosis = 'getCachedChunk not installed — installDosageChunkFetcher never ran (no dosage_chunks layer?).';
+  } else if (lruKeys.length === 0) {
+    diagnosis = 'No chunks cached yet — the first fetch is in flight or failed. Watch the network tab for /dosage/chunk.';
+  } else if (trackedRows.length === 0) {
+    diagnosis = 'No tracked samples — nothing to colour. Lasso or click PCA points to track them first.';
+  } else if (nDosNaN === trackedRows.length && nHetNaN === trackedRows.length) {
+    // All NaN — but the cause depends on the projection rate.
+    if (projRate != null && projRate < 0.5) {
+      diagnosis = `All tracked samples NaN AND chunk projection is ${(projRate * 100).toFixed(0)}% — sample-id mismatch between chunk.samples and data.samples. Check chunk ID example vs cohort entry example in the [dosage_chunks] sample-id match: console line.`;
+    } else if (projOk) {
+      diagnosis = `All tracked samples NaN BUT chunk projection is ${(projRate * 100).toFixed(0)}% — IDs are matching. Either (a) no markers in this bp range (server returned a chunk whose markers fall outside [startBp, endBp]), or (b) every dosage cell is -1 (NA) for this region. Check the [dosage_chunks] computeHetRateForRange produced all-NaN warn in console for the marker count + non-NA stats.`;
+    } else {
+      diagnosis = 'All tracked samples NaN for both dosage AND het. Projection rate unknown — check the [dosage_chunks] sample-id match: console line for the breakdown.';
+    }
+  } else if (nDosNaN === trackedRows.length) {
+    diagnosis = 'Dosage NaN for all tracked — chunk loaded but no markers in this bp range, or all dosage values were -1 / NaN.';
+  } else if (nDosNaN > 0) {
+    diagnosis = `${trackedRows.length - nDosNaN}/${trackedRows.length} tracked samples have a dosage value — the others are NaN (chunk markers may not cover every sample).`;
+  } else {
+    diagnosis = 'All tracked samples have dosage + het values — the PCA scatter should be coloured. If it isn\'t, check state.colorMode / state._pcaModePsVals.mode parity.';
+  }
+
+  return {
+    range: { startBp, endBp, startW, endW, chrom: d.chrom || null },
+    lruKeys,
+    trackedRows,
+    idProjection,
+    diagnosis,
+  };
 }
 
 // =====================================================================
@@ -616,6 +970,51 @@ export function installDosageChunkFetcher(state, opts) {
       })
       .then(chunk => {
         if (!chunk || typeof chunk !== 'object') return;
+        // 2026-05-26: one-shot chunk-shape validation. Fires on the
+        // FIRST chunk that lands per session, regardless of __dosageDbg.
+        // Surfaces structural problems (no markers array, no dosage
+        // matrix, markers don't have pos_bp, etc.) the moment a chunk
+        // arrives — much earlier than the downstream all-NaN warns
+        // and points directly at "what's wrong with the server response".
+        if (!state.__chunkShapeValidated) {
+          state.__chunkShapeValidated = true;
+          const issues = [];
+          if (!Array.isArray(chunk.markers)) {
+            issues.push('chunk.markers is not an array (got ' + typeof chunk.markers + ')');
+          } else if (chunk.markers.length === 0) {
+            issues.push('chunk.markers is empty');
+          } else {
+            const m0 = chunk.markers[0];
+            if (typeof m0 !== 'object' || m0 == null) {
+              issues.push('chunk.markers[0] is not an object (got ' + typeof m0 + ')');
+            } else if (!('pos_bp' in m0)) {
+              const keys = Object.keys(m0);
+              issues.push('chunk.markers[0] has no pos_bp field (has: ' + keys.join(', ') + ')');
+            }
+          }
+          if (!Array.isArray(chunk.dosage)) {
+            issues.push('chunk.dosage is not an array (got ' + typeof chunk.dosage + ')');
+          } else if (chunk.dosage.length === 0) {
+            issues.push('chunk.dosage is empty');
+          } else {
+            const row0 = chunk.dosage[0];
+            if (!Array.isArray(row0) && !ArrayBuffer.isView(row0)) {
+              issues.push('chunk.dosage[0] is not an array/TypedArray (got ' + typeof row0 + ')');
+            }
+          }
+          if (!Array.isArray(chunk.samples)) {
+            issues.push('chunk.samples is not an array (got ' + typeof chunk.samples + ')');
+          }
+          if (issues.length > 0) {
+            console.warn('[dosage_chunks] first-chunk shape validation FAILED:',
+              issues.join(' · '),
+              '· chunk keys:', Object.keys(chunk).join(', '));
+          } else if (typeof window !== 'undefined' && window.__dosageDbg === true) {
+            console.log('[dosage_chunks] first-chunk shape OK:',
+              `${chunk.markers.length} markers · ${chunk.samples.length} samples · ${chunk.dosage.length} dosage rows`,
+              `· marker[0]:`, chunk.markers[0]);
+          }
+        }
         lru.set(key, chunk);
         while (lru.size > _DOSAGE_LRU_SIZE) {
           const firstKey = lru.keys().next().value;

@@ -20,6 +20,37 @@
 import { _pageState } from './_state.js';
 import { candidateListIndexOf, candidateListSortedByPos, isInCandidateList } from './_list.js';
 import { _esc, _fmt4, _fmtP, groupColor } from '../../../shared/page1_data_helpers.js';
+// 2026-05-26: previously called as a global from the legacy monolith; the
+// ES-module port left it dangling — every candidate render logged
+// "loadHaplotypeLabels is not defined". Wire the existing module.
+import { loadHaplotypeLabels } from '../../../shared/haplotype_labels.js';
+
+// 2026-05-26: ported from legacy/Inversion_atlas.html ports lines 14187 +
+// 58222. Both are short and pure; keeping them local to this file avoids
+// a new shared module for two callers. If a 3rd caller appears, promote.
+
+export function _candidateL2Ids(c) {
+  if (!c) return [];
+  const out = new Set();
+  if (Array.isArray(c.l2_ids)) {
+    for (const id of c.l2_ids) if (id) out.add(id);
+  }
+  const state = _pageState;
+  if (Array.isArray(c.l2_indices) && state && state.data && Array.isArray(state.data.l2_envelopes)) {
+    for (const li of c.l2_indices) {
+      const env = state.data.l2_envelopes[li];
+      if (env && env.candidate_id) out.add(env.candidate_id);
+    }
+  }
+  return Array.from(out);
+}
+
+function _ancGetGlobalQ(stateData) {
+  const L = stateData && stateData.ancestry_q_global;
+  if (!L || !Array.isArray(L.samples) || !Array.isArray(L.q)) return null;
+  return { K: L.K, samples: L.samples, q: L.q,
+           source: 'q_global.tsv (genome-wide, all chroms)' };
+}
 
 // ---------------------------------------------------------------------------
 // Module-private constants (extracted from legacy)

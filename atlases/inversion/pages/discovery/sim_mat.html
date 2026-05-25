@@ -1,0 +1,47 @@
+  <div id="sim_mat" class="page">
+
+    <header id="simMatHeader" class="simmat-header">
+      <div class="simmat-title">
+        <h2>Sim_mat heatmap</h2>
+        <span id="simMatChromLabel" class="simmat-meta">—</span>
+      </div>
+      <div class="simmat-controls">
+        <label class="simmat-toggle" title="Switch the active sim_mat scale (NN20 / NN40 / NN80 / ...)">
+          scale
+          <select id="simMatScaleSelect" class="simmat-select">
+            <option value="">—</option>
+          </select>
+        </label>
+        <span class="simmat-sep"></span>
+        <span id="simMatCursorLabel" class="simmat-meta" title="Current window index">cur —</span>
+        <span class="simmat-sep"></span>
+        <button id="simMatRefreshBtn"
+                title="Re-paint the sim_mat heatmap (e.g. after a layout change)"
+                style="background: var(--panel-2); color: var(--ink);
+                       border: 1px solid var(--rule); border-radius: 3px;
+                       padding: 2px 10px; font-family: var(--mono); font-size: 10px;
+                       cursor: pointer;">refresh</button>
+      </div>
+    </header>
+
+    <div class="simmat-body">
+      <div class="simmat-canvas-wrap">
+        <canvas id="simCanvas" class="simmat-canvas"></canvas>
+        <div id="simMatEmpty" class="simmat-empty" style="display:none;">
+          No sim_mat loaded. Open local_pca_dosage on a chromosome first
+          — this page reads from its scrubber state.
+        </div>
+      </div>
+    </div>
+
+    <footer id="simMatFooter" class="simmat-footer">
+      ⓘ Window × window similarity heatmap (the same view shown inside
+      the <code>local_pca_dosage</code> page, here as a standalone
+      surface). L1/L2 envelope overlays, anchor strip, and active-cursor
+      line follow whatever <code>local_pca_dosage</code> last set. Click
+      a cell to move the cursor; <kbd>←</kbd>/<kbd>→</kbd> step by 1,
+      <kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd> by 10,
+      <kbd>Home</kbd>/<kbd>End</kbd> jump to first/last window.
+    </footer>
+
+  </div>

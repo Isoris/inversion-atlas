@@ -858,6 +858,7 @@ let _dispDetailedHandler  = null;
 let _exportTSVHandler     = null;
 let _exportMDHandler      = null;
 let _exportJSONHandler    = null;
+let _exportBundleHandler  = null;
 let _viewAsCandHandler    = null;
 let _diamondLooseHandler  = null;
 let _diamondStrictHandler = null;
@@ -899,9 +900,10 @@ export function wireCatalogueToolbar(state, opts) {
   const viewL2    = document.getElementById('catViewL2');
   const dispSimple   = document.getElementById('catDispSimple');
   const dispDetailed = document.getElementById('catDispDetailed');
-  const exportTSV  = document.getElementById('catExportTSV');
-  const exportMD   = document.getElementById('catExportMD');
-  const exportJSON = document.getElementById('catExportJSON');
+  const exportTSV    = document.getElementById('catExportTSV');
+  const exportMD     = document.getElementById('catExportMD');
+  const exportJSON   = document.getElementById('catExportJSON');
+  const exportBundle = document.getElementById('catExportBundle');
   const viewAsCand    = document.getElementById('catViewAsCandidate');
   const onPromote     = (opts && typeof opts.onPromote === 'function') ? opts.onPromote : null;
   const diaLoose      = document.getElementById('catDiamondLoose');
@@ -1023,6 +1025,56 @@ export function wireCatalogueToolbar(state, opts) {
   _exportTSVHandler  = () => _doExport('tsv');
   _exportMDHandler   = () => _doExport('md');
   _exportJSONHandler = () => _doExport('json');
+  // 2026-05-26: SPEC_manuscript_bundle_export — single-click .zip with
+  // every paste-ready artefact (README + catalogue TSV/JSON + Results
+  // paragraphs + S1/S2 supplementary tables + atlas-links). Confirmed
+  // candidates only — that's the manuscript-relevant subset. The
+  // shared/manuscript_bundle.js helpers are dynamic-imported so this
+  // page only pays the cost when the user actually clicks the button.
+  _exportBundleHandler = async () => {
+    const btn = document.getElementById('catExportBundle');
+    const origLabel = btn ? btn.textContent : null;
+    if (btn) { btn.disabled = true; btn.textContent = '📦 building…'; }
+    try {
+      const mod = await import('../../../shared/manuscript_bundle.js');
+      // Confirmed candidates only — drives the manuscript story; provisional
+      // / draft / rejected rows don't belong in a paper-ready bundle.
+      const inv = (state && state._atlasState && state._atlasState.inversion) || {};
+      const confirmedList = Array.isArray(inv.candidateList)
+        ? inv.candidateList.filter(c => c && c.confirmed === true) : [];
+      const candidates = confirmedList.length > 0
+        ? confirmedList
+        : // Fall back to whatever the catalogue filter has selected when no
+          // candidates carry the `confirmed` flag yet (early-stage atlases).
+          sortCatalogueRows(
+            filterCatalogueRows(buildCatalogueRows(state), state),
+            state.catSortKey, state.catSortDir);
+      const samples = (inv.data && Array.isArray(inv.data.samples)) ? inv.data.samples : [];
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      // Reuse the catalogue's existing TSV export so the bundle's
+      // `candidate_catalogue.tsv` matches what page-3 already emits
+      // (column hygiene + metadata-block header).
+      const catalogueTSV = exportCatalogueTSV(candidates, state.catDispMode || 'detailed');
+      const blob = await mod.buildManuscriptBundleBlob({
+        candidates, samples,
+        meta: {
+          atlas_version: (typeof window !== 'undefined' && window.ATLAS_VERSION) || 'dev',
+          generated_at: new Date().toISOString(),
+          chrom_set: Array.from(
+            new Set(candidates.map(c => c && (c.chr || c.chrom)).filter(Boolean))).sort(),
+        },
+        catalogueTSV,
+        linkOpts: { atlas_id: 'inversion' },
+      });
+      const name = `manuscript_bundle_${stamp}.zip`;
+      try { onDownload(name, blob, 'application/zip'); } catch (_) {}
+    } catch (e) {
+      console.error('catalogue: manuscript bundle build failed:', e);
+      if (typeof alert === 'function') alert('Manuscript bundle build failed — see console for details.');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = origLabel; }
+    }
+  };
   _viewAsCandHandler = () => {
     const result = promoteSelectedToCandidates(state);
     refresh();
@@ -1051,9 +1103,10 @@ export function wireCatalogueToolbar(state, opts) {
   if (_canListen(viewL2))    viewL2.addEventListener('click',    _viewL2Handler);
   if (_canListen(dispSimple))   dispSimple.addEventListener('click',   _dispSimpleHandler);
   if (_canListen(dispDetailed)) dispDetailed.addEventListener('click', _dispDetailedHandler);
-  if (_canListen(exportTSV))  exportTSV.addEventListener('click',  _exportTSVHandler);
-  if (_canListen(exportMD))   exportMD.addEventListener('click',   _exportMDHandler);
-  if (_canListen(exportJSON)) exportJSON.addEventListener('click', _exportJSONHandler);
+  if (_canListen(exportTSV))    exportTSV.addEventListener('click',    _exportTSVHandler);
+  if (_canListen(exportMD))     exportMD.addEventListener('click',     _exportMDHandler);
+  if (_canListen(exportJSON))   exportJSON.addEventListener('click',   _exportJSONHandler);
+  if (_canListen(exportBundle)) exportBundle.addEventListener('click', _exportBundleHandler);
   if (_canListen(viewAsCand)) viewAsCand.addEventListener('click', _viewAsCandHandler);
   if (_canListen(diaLoose))   diaLoose.addEventListener('click',   _diamondLooseHandler);
   if (_canListen(diaStrict))  diaStrict.addEventListener('click',  _diamondStrictHandler);
@@ -1078,6 +1131,7 @@ export function teardownCatalogueToolbar() {
     ['catExportTSV',     'click',  '_exportTSVHandler'],
     ['catExportMD',      'click',  '_exportMDHandler'],
     ['catExportJSON',    'click',  '_exportJSONHandler'],
+    ['catExportBundle',  'click',  '_exportBundleHandler'],
     ['catViewAsCandidate', 'click', '_viewAsCandHandler'],
     ['catDiamondLoose',    'click', '_diamondLooseHandler'],
     ['catDiamondStrict',   'click', '_diamondStrictHandler'],
@@ -1089,6 +1143,7 @@ export function teardownCatalogueToolbar() {
     _selectAllHandler,     _clearSelHandler,      _viewFavHandler,   _viewL2Handler,
     _dispSimpleHandler,    _dispDetailedHandler,
     _exportTSVHandler,     _exportMDHandler,      _exportJSONHandler,
+    _exportBundleHandler,
     _viewAsCandHandler,
     _diamondLooseHandler,  _diamondStrictHandler, _diamondStrict2Handler,
   };
@@ -1102,7 +1157,7 @@ export function teardownCatalogueToolbar() {
   _headClickHandler = _bodyClickHandler = null;
   _selectAllHandler   = _clearSelHandler      = _viewFavHandler   = _viewL2Handler = null;
   _dispSimpleHandler  = _dispDetailedHandler  = null;
-  _exportTSVHandler   = _exportMDHandler      = _exportJSONHandler = null;
+  _exportTSVHandler   = _exportMDHandler      = _exportJSONHandler = _exportBundleHandler = null;
   _viewAsCandHandler  = null;
   _diamondLooseHandler = _diamondStrictHandler = _diamondStrict2Handler = null;
 }
@@ -1111,7 +1166,12 @@ function _defaultDownload(filename, content, mime) {
   if (typeof document === 'undefined') return;
   if (typeof Blob === 'undefined' || typeof URL === 'undefined') return;
   try {
-    const blob = new Blob([content], { type: mime || 'text/plain' });
+    // 2026-05-26: pass Blob inputs through unwrapped (the manuscript-bundle
+    // export hands us a pre-built application/zip Blob; re-wrapping would
+    // nest it inside an outer Blob and break Archive Utility on macOS).
+    const blob = (content instanceof Blob)
+      ? content
+      : new Blob([content], { type: mime || 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

@@ -196,18 +196,34 @@ async function _autoLoadDefaultChunk(root, atlasState) {
     .replace('__END__',   String(endBp | 0))
     .replace('__CAP__',   String(cap));
   // Show a "loading" status on the empty-state slot while the fetch is
-  // in flight so the user knows something is happening.
+  // in flight so the user knows something is happening. 2026-05-26: added
+  // a 15 s AbortController timeout so a server-side hang (or a workspace
+  // served without atlas_server.py) surfaces as a clear failure instead of
+  // an infinite "loading…" message. The endpoint is served by
+  // start.sh → atlas_server.py at http://127.0.0.1:8000/api/dosage/chunk;
+  // without it the page is read-only.
   _setLoadingHint(root, `loading dosage chunk for ${sourceLabel}…`);
+  const controller = (typeof AbortController === 'function') ? new AbortController() : null;
+  const timeoutMs = 15000;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
   let chunk = null;
   try {
-    const r = await fetch(url);
+    const r = await fetch(url, controller ? { signal: controller.signal } : undefined);
+    if (timer) clearTimeout(timer);
     if (!r.ok) {
-      _setLoadingHint(root, `failed to load dosage chunk (HTTP ${r.status}). Open from a candidate to specify a region.`);
+      _setLoadingHint(root, `failed to load dosage chunk (HTTP ${r.status}) — ` +
+        `is atlas_server.py running? (start.sh, default port 8000)`);
       return;
     }
     chunk = await r.json();
   } catch (e) {
-    _setLoadingHint(root, `dosage chunk fetch failed: ${e && e.message ? e.message : 'network error'}`);
+    if (timer) clearTimeout(timer);
+    const aborted = e && (e.name === 'AbortError');
+    _setLoadingHint(root, aborted
+      ? `dosage chunk request timed out after ${timeoutMs / 1000}s — ` +
+        `is atlas_server.py running? (start.sh, default port 8000)`
+      : `dosage chunk fetch failed: ${e && e.message ? e.message : 'network error'} — ` +
+        `is atlas_server.py running?`);
     return;
   }
   if (!chunk || typeof chunk !== 'object') return;
@@ -313,6 +329,9 @@ function _renderHeader(state) {
   if (gt) gt.checked = !!state.view_state.show_group_track;
   const pt = document.getElementById('dosageHeatmapShowPolarityTrack');
   if (pt) pt.checked = !!state.view_state.show_polarity_track;
+  // 2026-05-26: K6-track checkbox added to HTML; mirror existing pattern.
+  const k6 = document.getElementById('dosageHeatmapShowK6Track');
+  if (k6) k6.checked = !!state.view_state.show_k6_track;
 }
 
 // =====================================================================
@@ -447,6 +466,10 @@ function _wireToolbar(state) {
     state.view_state.show_polarity_track = !!(e && e.target && e.target.checked);
     repaint();
   };
+  const onShowK6Track = (e) => {
+    state.view_state.show_k6_track = !!(e && e.target && e.target.checked);
+    repaint();
+  };
   const onCanvasMove = (ev) => {
     const c = document.getElementById('dosageHeatmapCanvas');
     if (!c) return;
@@ -485,7 +508,7 @@ function _wireToolbar(state) {
 
   state._handlers = {
     onSampleOrder, onMarkerOrder,
-    onShowGroupTrack, onShowPolarityTrack,
+    onShowGroupTrack, onShowPolarityTrack, onShowK6Track,
     onCanvasMove, onCanvasClick, onCanvasLeave,
     unsubSelection,
   };
@@ -494,6 +517,7 @@ function _wireToolbar(state) {
   _addListener('dosageHeatmapMarkerOrder',        'change',     onMarkerOrder);
   _addListener('dosageHeatmapShowGroupTrack',     'change',     onShowGroupTrack);
   _addListener('dosageHeatmapShowPolarityTrack',  'change',     onShowPolarityTrack);
+  _addListener('dosageHeatmapShowK6Track',        'change',     onShowK6Track);
   _addListener('dosageHeatmapCanvas',             'mousemove',  onCanvasMove);
   _addListener('dosageHeatmapCanvas',             'click',      onCanvasClick);
   _addListener('dosageHeatmapCanvas',             'mouseleave', onCanvasLeave);
@@ -506,6 +530,7 @@ function _teardownToolbar(state) {
   if (h.onMarkerOrder)        _removeListener('dosageHeatmapMarkerOrder',        'change',    h.onMarkerOrder);
   if (h.onShowGroupTrack)     _removeListener('dosageHeatmapShowGroupTrack',     'change',    h.onShowGroupTrack);
   if (h.onShowPolarityTrack)  _removeListener('dosageHeatmapShowPolarityTrack',  'change',    h.onShowPolarityTrack);
+  if (h.onShowK6Track)        _removeListener('dosageHeatmapShowK6Track',        'change',    h.onShowK6Track);
   if (h.onCanvasMove)         _removeListener('dosageHeatmapCanvas',             'mousemove',  h.onCanvasMove);
   if (h.onCanvasClick)        _removeListener('dosageHeatmapCanvas',             'click',      h.onCanvasClick);
   if (h.onCanvasLeave)        _removeListener('dosageHeatmapCanvas',             'mouseleave', h.onCanvasLeave);

@@ -103,7 +103,7 @@ import { annotateRegimeStructures }
 // Page-isolation per specs_todo/SPEC_registry_write_and_page_isolation.md.
 
 // Pipeline core (audited v3.4)
-import { runBandingPipeline, BANDING_PIPELINE_DEFAULTS }
+import { runBandingPipelineAsync, BANDING_PIPELINE_DEFAULTS }
   from '../../shared/band_tracking/banding_pipeline.js';
 
 // band_quality scorer — computes silhouette + size-balance + eig-ratio
@@ -123,6 +123,7 @@ import { initRegimesPage, computeGenomeView } from './haplotype_regimes/regimes_
 import { regimeGroupsFromBands } from '../../shared/candidate_groups.js';
 import { classifyProjection } from '../../shared/band_tracking/projection.js';
 import { _dosageClassColour } from './haplotype_regimes/regimes_panel.js';
+import { persistDebounced } from '../../shared/persist_debounced.js';
 
 // ---------------------------------------------------------------------------
 // Page-local state. Set on mount, cleared on unmount. The regime panels
@@ -280,50 +281,82 @@ function _wireCtxCallbacks(state, atlasState) {
   // data.windows[w].pc1. ~226 samples × ~10k windows × adaptive K=2-6 is
   // ~1-2 seconds total on real data.
   // ---------------------------------------------------------------------
-  const perWinLabels = new Array(N);
-  const perWinK      = new Int8Array(N);
   const kRangeLo = (state.kRange && state.kRange[0]) || 2;
   const kRangeHi = (state.kRange && state.kRange[1]) || 6;
   const useAdaptiveK = state.kMode === 'adaptive';
   const fixedK = state.k;
-  let perWinComputed = 0;
-  let perWinSkipped  = 0;
-  for (let w = 0; w < N; w++) {
-    const win = data.windows && data.windows[w];
-    if (!win || !win.pc1 || win.pc1.length === 0) {
-      perWinLabels[w] = null;
-      perWinK[w] = 0;
-      perWinSkipped++;
-      continue;
-    }
-    let labels, K;
-    if (useAdaptiveK) {
-      const ak = adaptiveK1D(win.pc1, kRangeLo, kRangeHi,
-                             state.silThreshold, state.minNGroup);
-      if (ak != null) {
-        labels = ak.labels;
-        K = ak.k;
-      } else {
-        const fit = kmeans1D(win.pc1, kRangeLo);
-        labels = fit.labels;
-        K = kRangeLo;
+
+  // 2026-05-21 perf (HR1 #2): cache the per-window K-means result on
+  // `data._regimesPerWinCache`, keyed by the knob tuple that determines
+  // the output. Re-mounting the same chrom (very common — tabbing away
+  // & back, switching modes between long/short/het, replay-from-stash)
+  // skips the 1-2 second build entirely. Switching chroms invalidates
+  // naturally (different `data` → no cache present). Tweaking knobs
+  // invalidates via the key string. The cache lives ON the data object
+  // because `data` IS the chrom identity; piggybacking here avoids a
+  // separate eviction policy.
+  const _knobKey = useAdaptiveK
+    ? `adaptive|${kRangeLo}-${kRangeHi}|sil=${state.silThreshold}|minG=${state.minNGroup}`
+    : `fixed|k=${fixedK}`;
+  const _cached = data._regimesPerWinCache;
+  let perWinLabels, perWinK;
+  if (_cached && _cached.key === _knobKey) {
+    perWinLabels = _cached.labels;
+    perWinK      = _cached.K;
+    state._regimesPerWinProvenance = _cached.provenance;
+  } else {
+    perWinLabels = new Array(N);
+    perWinK      = new Int8Array(N);
+    let perWinComputed = 0;
+    let perWinSkipped  = 0;
+    for (let w = 0; w < N; w++) {
+      const win = data.windows && data.windows[w];
+      if (!win || !win.pc1 || win.pc1.length === 0) {
+        perWinLabels[w] = null;
+        perWinK[w] = 0;
+        perWinSkipped++;
+        continue;
       }
-    } else {
-      const fit = kmeans1D(win.pc1, fixedK);
-      labels = fit.labels;
-      K = fixedK;
+      let labels, K;
+      if (useAdaptiveK) {
+        // adaptiveK1D pre-sorts once internally and threads to the inner
+        // kmeans1D calls (HR1 #1 fix in shared/kmeans.js).
+        const ak = adaptiveK1D(win.pc1, kRangeLo, kRangeHi,
+                               state.silThreshold, state.minNGroup);
+        if (ak != null) {
+          labels = ak.labels;
+          K = ak.k;
+        } else {
+          // 2026-05-21 perf: pre-sort once for the fallback kmeans1D.
+          const sorted = Float64Array.from(win.pc1).sort();
+          const fit = kmeans1D(win.pc1, kRangeLo, { presorted: sorted });
+          labels = fit.labels;
+          K = kRangeLo;
+        }
+      } else {
+        const sorted = Float64Array.from(win.pc1).sort();
+        const fit = kmeans1D(win.pc1, fixedK, { presorted: sorted });
+        labels = fit.labels;
+        K = fixedK;
+      }
+      perWinLabels[w] = labels;
+      perWinK[w] = K;
+      perWinComputed++;
     }
-    perWinLabels[w] = labels;
-    perWinK[w] = K;
-    perWinComputed++;
+    state._regimesPerWinProvenance = {
+      n_windows:  N,
+      n_computed: perWinComputed,
+      n_skipped:  perWinSkipped,
+    };
+    data._regimesPerWinCache = {
+      key:        _knobKey,
+      labels:     perWinLabels,
+      K:          perWinK,
+      provenance: state._regimesPerWinProvenance,
+    };
   }
   state._regimesPerWinLabels = perWinLabels;
   state._regimesPerWinK      = perWinK;
-  state._regimesPerWinProvenance = {
-    n_windows:  N,
-    n_computed: perWinComputed,
-    n_skipped:  perWinSkipped,
-  };
 
   // ---------------------------------------------------------------------
   // L2-cluster cache: KEPT for backwards compat with the L3 pairs table
@@ -358,42 +391,58 @@ function _wireCtxCallbacks(state, atlasState) {
   // band_quality cache — computed against PER-WINDOW labels (not
   // L2-broadcast). Producer-shipped band_quality on the window still
   // wins when present.
+  //
+  // 2026-05-21 perf (HR1 #2): cached on `data._regimesBQCache` with the
+  // same knob key as the per-window K-means cache. Re-mount on the same
+  // chrom + knobs = skip the whole pass.
   // ---------------------------------------------------------------------
-  const bqCache = new Float32Array(N);
-  let bqProducerCount = 0;
-  let bqComputedCount = 0;
-  let bqZeroCount     = 0;
-  for (let w = 0; w < N; w++) {
-    const win = data.windows && data.windows[w];
-    if (!win) { bqCache[w] = 0; bqZeroCount++; continue; }
-    const shipped = (win.band_quality != null) ? win.band_quality
-                  : (win.bq           != null) ? win.bq
-                  : null;
-    if (shipped != null && Number.isFinite(+shipped)) {
-      bqCache[w] = +shipped;
-      bqProducerCount++;
-      continue;
+  let bqCache;
+  const _bqCached = data._regimesBQCache;
+  if (_bqCached && _bqCached.key === _knobKey) {
+    bqCache = _bqCached.bq;
+    state._regimesBandQualityProvenance = _bqCached.provenance;
+  } else {
+    bqCache = new Float32Array(N);
+    let bqProducerCount = 0;
+    let bqComputedCount = 0;
+    let bqZeroCount     = 0;
+    for (let w = 0; w < N; w++) {
+      const win = data.windows && data.windows[w];
+      if (!win) { bqCache[w] = 0; bqZeroCount++; continue; }
+      const shipped = (win.band_quality != null) ? win.band_quality
+                    : (win.bq           != null) ? win.bq
+                    : null;
+      if (shipped != null && Number.isFinite(+shipped)) {
+        bqCache[w] = +shipped;
+        bqProducerCount++;
+        continue;
+      }
+      const labels = perWinLabels[w];
+      const K      = perWinK[w] | 0;
+      if (!labels || K < 2 || !win.pc1) { bqCache[w] = 0; bqZeroCount++; continue; }
+      const r = bandQualityForWindow({
+        pc1:    win.pc1,
+        labels,
+        K,
+        eig1:   Number.isFinite(win.lam1) ? win.lam1 : 0,
+        eig2:   Number.isFinite(win.lam2) ? win.lam2 : 0,
+      });
+      bqCache[w] = Number.isFinite(r.band_quality) ? r.band_quality : 0;
+      bqComputedCount++;
     }
-    const labels = perWinLabels[w];
-    const K      = perWinK[w] | 0;
-    if (!labels || K < 2 || !win.pc1) { bqCache[w] = 0; bqZeroCount++; continue; }
-    const r = bandQualityForWindow({
-      pc1:    win.pc1,
-      labels,
-      K,
-      eig1:   Number.isFinite(win.lam1) ? win.lam1 : 0,
-      eig2:   Number.isFinite(win.lam2) ? win.lam2 : 0,
-    });
-    bqCache[w] = Number.isFinite(r.band_quality) ? r.band_quality : 0;
-    bqComputedCount++;
+    state._regimesBandQualityProvenance = {
+      n_windows:    N,
+      n_from_producer: bqProducerCount,
+      n_computed:   bqComputedCount,
+      n_zero:       bqZeroCount,
+    };
+    data._regimesBQCache = {
+      key:        _knobKey,
+      bq:         bqCache,
+      provenance: state._regimesBandQualityProvenance,
+    };
   }
   state._regimesBandQualityCache = bqCache;
-  state._regimesBandQualityProvenance = {
-    n_windows:    N,
-    n_from_producer: bqProducerCount,
-    n_computed:   bqComputedCount,
-    n_zero:       bqZeroCount,
-  };
 
   const bandQualityForWindow_cb = (w) =>
     (w >= 0 && w < N) ? (bqCache[w] || 0) : 0;
@@ -468,7 +517,7 @@ function _wireActionBar(root, state, atlasState) {
       b.classList.toggle('active', b.dataset.rgMode === state._regimesMode);
       b.addEventListener('click', () => {
         state._regimesMode = b.dataset.rgMode;
-        try { localStorage.setItem('haplotype_regimes.mode', state._regimesMode); } catch (_) {}
+        persistDebounced('haplotype_regimes.mode', state._regimesMode);
         modeBar.querySelectorAll('button[data-rg-mode]').forEach(b2 => {
           b2.classList.toggle('active', b2 === b);
         });
@@ -497,7 +546,7 @@ function _wireActionBar(root, state, atlasState) {
       b.classList.toggle('active', b.dataset.rgView === state._regimesView);
       b.addEventListener('click', () => {
         state._regimesView = b.dataset.rgView;
-        try { localStorage.setItem('haplotype_regimes.view', state._regimesView); } catch (_) {}
+        persistDebounced('haplotype_regimes.view', state._regimesView);
         viewBar.querySelectorAll('button[data-rg-view]').forEach(b2 => {
           b2.classList.toggle('active', b2 === b);
         });
@@ -651,8 +700,9 @@ async function _runPipeline(root, state) {
     return;
   }
   _setStatus(root, 'running pipeline…');
-  // The pipeline is synchronous and CPU-heavy; yield to the browser first
-  // so the status update paints.
+  // The pipeline is CPU-heavy; yield to the browser first so the status
+  // update paints. (Still needed even with the async pipeline so the
+  // first "running pipeline…" status renders before Stage 1 starts.)
   await new Promise(r => setTimeout(r, 0));
 
   // Pre-flight diagnostic: dump band_quality distribution + a sample of
@@ -678,12 +728,41 @@ async function _runPipeline(root, state) {
     }),
   };
 
+  // 2026-05-21 perf (HR2 + HR8): async pipeline with per-stage AND
+  // intra-Stage 1 (anchor-level) progress. Browser stays responsive
+  // throughout — including DURING the long Stage 1 anchor sweep, which
+  // yields every 50 anchors. The user sees a progress bar instead of a
+  // 1-2 second freeze.
+  const _STAGE_LABELS = {
+    stage1: 'stage 1 (chain walk + seed discovery)',
+    stage2: 'stage 2 (cross-seed linkage)',
+    stage3: 'stage 3 (refine loci)',
+    stage4: 'stage 4 (bruteforce voting)',
+  };
+  const onProgress = (stage, partial) => {
+    if (stage === 'stage1_progress') {
+      // Anchor-level update from runStage1Async — shape:
+      //   { chrom_idx, anchors_done, anchors_total, n_seeds }
+      const pct = Math.min(100,
+        Math.round((partial.anchors_done / partial.anchors_total) * 100));
+      _setStatus(root,
+        `running pipeline — stage 1 · ${pct}% ` +
+        `(${partial.anchors_done}/${partial.anchors_total} anchors, ${partial.n_seeds} seeds)…`);
+      return;
+    }
+    const label = _STAGE_LABELS[stage] || stage;
+    const seenSeeds = partial && partial.stage1
+      ? ` · ${partial.stage1.seeds.length} seeds so far`
+      : '';
+    _setStatus(root, `running pipeline — ${label}${seenSeeds}…`);
+  };
+
   let result;
   const t0 = performance.now();
   try {
-    result = runBandingPipeline(ctx, opts);
+    result = await runBandingPipelineAsync(ctx, opts, onProgress);
   } catch (e) {
-    console.error('runBandingPipeline threw:', e);
+    console.error('runBandingPipelineAsync threw:', e);
     _setStatus(root, `pipeline failed: ${e.message}`);
     return;
   }
@@ -853,7 +932,6 @@ function _renderL3PairsTable(root, state) {
     return;
   }
   wrap.style.display = 'flex';
-  body.innerHTML = '';
   const envs = data.l2_envelopes;
   const cache = state._regimesClusterCache;
   const ctx   = state._regimesClusterCtx;
@@ -864,10 +942,23 @@ function _renderL3PairsTable(root, state) {
       '</td></tr>';
     return;
   }
-  const rows = [];
-  for (let i = 0; i + 1 < envs.length; i++) {
-    rows.push(_computePairRow(state, i, i + 1, envs, cache, ctx));
+  // 2026-05-21 perf (HR5): memoize the pairs row list on the cluster
+  // cache + envelopes identity. Mode-toggle short→long→short used to
+  // refire ~99 Hungarian + contingency + cramersV computations on every
+  // entry; now once per (envelopes, cluster_cache) pair.
+  let rows;
+  if (state._regimesL3PairsCache &&
+      state._regimesL3PairsCache.envs  === envs &&
+      state._regimesL3PairsCache.cache === cache) {
+    rows = state._regimesL3PairsCache.rows;
+  } else {
+    rows = [];
+    for (let i = 0; i + 1 < envs.length; i++) {
+      rows.push(_computePairRow(state, i, i + 1, envs, cache, ctx));
+    }
+    state._regimesL3PairsCache = { envs, cache, rows };
   }
+  body.innerHTML = '';
   for (const r of rows) {
     body.appendChild(_renderPairRow(state, r));
   }

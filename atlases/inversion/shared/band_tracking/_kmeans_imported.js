@@ -20,13 +20,17 @@
  *
  * @param {ArrayLike<number>} values  input scalars (length n)
  * @param {number} k                  cluster count (k >= 1)
+ * @param {object} [opts]
+ * @param {Float64Array} [opts.presorted]  Optional ascending-sorted copy
+ *   of `values`. When supplied, skips the per-call `Float64Array.from(values)
+ *   .sort()` — see sister copy at `shared/kmeans.js` for the same hook.
  * @returns {{labels: Int8Array, centers: Float64Array, n_per_group: number[]}}
  */
-export function kmeans1D(values, k) {
+export function kmeans1D(values, k, opts) {
   const n = values.length;
   const labels = new Int8Array(n);
   if (n === 0) return { labels, centers: new Float64Array(k), n_per_group: new Array(k).fill(0) };
-  const sorted = Float64Array.from(values).sort();
+  const sorted = (opts && opts.presorted) ? opts.presorted : Float64Array.from(values).sort();
   const centers = new Float64Array(k);
   for (let i = 0; i < k; i++) {
     const q = (i + 0.5) / k;
@@ -175,17 +179,21 @@ export function silhouette1D(values, labels, k) {
  */
 export function adaptiveK1D(values, kMin, kMax, silThreshold, minNGroup) {
   if (values.length < kMin * minNGroup) return null;
+  // 2026-05-21 perf (HR1): mirror of sister kmeans.js — sort once, share
+  // across all inner kmeans1D calls. See sibling file for the rationale.
+  const presorted = Float64Array.from(values).sort();
+  const opts = { presorted };
   let bestK = kMin, bestSil = -Infinity, bestResult = null;
   for (let k = kMin; k <= kMax; k++) {
     if (values.length < k * minNGroup) break;
-    const r = kmeans1D(values, k);
+    const r = kmeans1D(values, k, opts);
     if (r.n_per_group.some(c => c < minNGroup)) continue;
     const sil = silhouette1D(values, r.labels, k);
     if (!isFinite(sil)) continue;
     if (sil > bestSil) { bestSil = sil; bestK = k; bestResult = r; }
   }
   if (bestResult == null) {
-    bestResult = kmeans1D(values, kMin);
+    bestResult = kmeans1D(values, kMin, opts);
     bestK = kMin;
     bestSil = silhouette1D(values, bestResult.labels, kMin);
   }

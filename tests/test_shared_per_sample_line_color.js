@@ -166,6 +166,23 @@ group('perSampleColorFor');
   check('theta_pi: degenerate range → null',
         perSampleColorFor('theta_pi', 0.5, flatArr) === null);
 
+  // 2026-05-26 sequential 3-stop regression: was a 2-stop blue→yellow
+  // RGB lerp with a desaturated olive midpoint (rgb(141,150,121)). The
+  // 3-stop ramp routes through a saturated teal (rgb(60,180,184)) at
+  // t=0.5 so the midpoint stays vivid. theta_pi cohorts that cluster
+  // near their median no longer collapse to a single grey/olive shade.
+  const seqArr = new Float64Array([0, 0.5, 1]);  // vMin=0, vMax=1
+  const seqMid = perSampleColorFor('theta_pi', 0.5, seqArr);
+  function _parseRgbT(s) {
+    const m = /rgb\((\d+),(\d+),(\d+)\)/.exec(s);
+    return m ? [+m[1], +m[2], +m[3]] : null;
+  }
+  const rgbSeqMid = _parseRgbT(seqMid);
+  check('theta_pi: midpoint is the new teal stop (~rgb(60,180,184))',
+        rgbSeqMid && rgbSeqMid[0] === 60 && rgbSeqMid[1] === 180 && rgbSeqMid[2] === 184);
+  check('theta_pi: midpoint is NOT olive (g must not dominate r/b like the old lerp)',
+        rgbSeqMid && rgbSeqMid[2] > rgbSeqMid[0]);  // blue > red, ramp side
+
   // Unknown mode → null
   check('unknown mode → null', perSampleColorFor('bogus', 0.5, arr) === null);
 

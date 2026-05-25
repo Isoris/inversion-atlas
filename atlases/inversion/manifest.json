@@ -61,6 +61,15 @@
       "_was_id": "page_sv_evidence"
     },
     {
+      "id": "sim_mat",
+      "slug": "sim_mat",
+      "label": "sim_mat",
+      "stage": "tooling",
+      "fragment": "atlases/inversion/pages/discovery/sim_mat.html",
+      "module": "atlases/inversion/pages/discovery/sim_mat.js",
+      "tooltip": "Dedicated window × window similarity heatmap — the same drawSim view that local_pca_dosage shows in its sim panel, as a standalone surface. Click to jump the cursor."
+    },
+    {
       "id": "tree_panel",
       "slug": "tree_panel",
       "label": "tree panel",

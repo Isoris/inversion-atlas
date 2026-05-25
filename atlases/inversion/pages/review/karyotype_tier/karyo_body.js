@@ -37,6 +37,28 @@ function _sigmaSpread(state) {
   return (state && (state.sigmaSpread || state._sigmaSpread)) || null;
 }
 
+// 2026-05-21 perf: memoize buildKaryotypeRows on (candidate, samples,
+// sigmaSpread) identity. The row build allocates one object per sample
+// (~226 allocs typical); the old call path fired it 2-3 times per
+// render and once per filter keystroke. Now: one build per
+// (candidate, samples) change; filter/sort/band toggles reuse.
+function _getKaryoRowsMemo(state) {
+  const c = state && state.candidate;
+  if (!c) return null;
+  const samples = _samples(state);
+  const sig = _sigmaSpread(state);
+  const cached = state._karyoRowsCache;
+  if (cached &&
+      cached.candidate === c &&
+      cached.samples   === samples &&
+      cached.sig       === sig) {
+    return cached.rows;
+  }
+  const rows = buildKaryotypeRows(c, samples, sig);
+  state._karyoRowsCache = { candidate: c, samples, sig, rows };
+  return rows;
+}
+
 /**
  * Build the karyotype body HTML for a populated candidate. Pure (no
  * DOM mutation): returns the inner HTML for #candKaryoContent.
@@ -48,9 +70,10 @@ export function renderKaryotypeBodyHtml(state) {
   const c = state && state.candidate;
   if (!c || !Array.isArray(c.locked_labels) || !Number.isFinite(c.K)) return '';
 
-  const samples = _samples(state);
   const sigSpread = _sigmaSpread(state);
-  const rows = buildKaryotypeRows(c, samples, sigSpread);
+  // 2026-05-21 perf: rows pulled from the memo so re-renders on the
+  // same candidate share one allocation across filter/sort/band changes.
+  const rows = _getKaryoRowsMemo(state);
   const twoTrack = isKaryoTwoTrack(c);
 
   // Header summary pills
@@ -223,9 +246,145 @@ export function renderKaryotypeBodyHtml(state) {
   }
   tbody += '</tbody>';
 
-  const tableHtml = '<table class="ck-table">' + thead + tbody + '</table>';
+  // 2026-05-21 perf: wrap the table in a stable container so
+  // renderKaryoTableOnly can swap just the inner table HTML without
+  // touching the toolbar (which would lose filter-input focus on every
+  // keystroke).
+  const tableHtml =
+    '<div id="ckTableWrap"><table class="ck-table">' + thead + tbody + '</table></div>';
 
   return headerHtml + toolbarHtml + tableHtml;
+}
+
+/**
+ * 2026-05-21 perf: partial-render the table only. Used by filter / band
+ * / sort handlers so the toolbar (and especially the filter input)
+ * keeps its DOM identity + focus across keystrokes. The header section
+ * stays untouched. The toolbar's #ckInfo count gets updated via
+ * textContent so it doesn't re-create the input either.
+ */
+export function renderKaryoTableOnly(state) {
+  if (typeof document === 'undefined') return;
+  const c = state && state.candidate;
+  if (!c) return;
+  const wrap = document.getElementById('ckTableWrap');
+  if (!wrap) {
+    // First-time path or DOM not yet built — fall back to full render.
+    renderKaryotypeBody(state);
+    return;
+  }
+  const allRows = _getKaryoRowsMemo(state);
+  const tableHtml = _renderTableInnerHtml(state, allRows);
+  wrap.innerHTML = tableHtml;
+  // Update the count without touching the input.
+  const info = document.getElementById('ckInfo');
+  if (info) {
+    const filtered = filterKaryoRows(allRows, state.karyoUi);
+    info.textContent = filtered.length + ' of ' + allRows.length + ' samples';
+  }
+}
+
+// Helper: build just the <table>...</table> inner HTML (no wrapper div).
+// Extracted so both the full body render AND renderKaryoTableOnly can
+// reuse it. Body of this fn mirrors the table-building section of
+// renderKaryotypeBodyHtml verbatim — kept inlined there for now to
+// keep this refactor minimal-diff; if a third caller appears, hoist.
+function _renderTableInnerHtml(state, allRows) {
+  const c = state.candidate;
+  const sigSpread = _sigmaSpread(state);
+  const ui = state.karyoUi || {};
+  const sortKey = typeof ui.sortKey === 'string' ? ui.sortKey : 'k_label';
+  const twoTrack = isKaryoTwoTrack(c);
+
+  const cols = twoTrack
+    ? [
+        { key: 'cga',       label: 'CGA' },
+        { key: 'ind',       label: 'Ind' },
+        { key: 'k_label',   label: 'Track 1' },
+        { key: 'k_label',   label: 'Track 2', _track: 1 },
+        { key: 'sigma',     label: 'σ' },
+        { key: 'family_id', label: 'Family' },
+        { key: 'ancestry',  label: 'Ancestry' },
+      ]
+    : [
+        { key: 'cga',       label: 'CGA' },
+        { key: 'ind',       label: 'Ind' },
+        { key: 'k_label',   label: 'Band' },
+        { key: 'sigma',     label: 'σ' },
+        { key: 'family_id', label: 'Family' },
+        { key: 'ancestry',  label: 'Ancestry' },
+      ];
+
+  let thead = '<thead><tr>';
+  for (const col of cols) {
+    const isSort = (sortKey === col.key);
+    const arrow = isSort ? (ui.sortAsc !== false ? '▲' : '▼') : '↕';
+    const cls = isSort ? 'sorted' : '';
+    thead += '<th data-key="' + col.key + '" class="' + cls + '">'
+      + _escape(col.label)
+      + ' <span style="opacity:0.5;font-size:9px;">' + arrow + '</span>'
+      + '</th>';
+  }
+  thead += '</tr></thead>';
+
+  let sigmaThr = Infinity;
+  if (sigSpread && sigSpread.length > 0) {
+    const v = [];
+    for (let i = 0; i < sigSpread.length; i++) {
+      if (Number.isFinite(sigSpread[i])) v.push(sigSpread[i]);
+    }
+    if (v.length >= 10) {
+      v.sort((a, b) => a - b);
+      const q50 = v[Math.min(v.length - 1, Math.floor(v.length * 0.5))];
+      sigmaThr = 2 * q50;
+    }
+  }
+
+  const filtered = filterKaryoRows(allRows, ui);
+  const sorted   = sortKaryoRows(filtered, ui);
+
+  const renderTrackCell = (r, trackIdx) => {
+    if (r.track_idx === trackIdx) {
+      return '<div class="band-cell" style="justify-content:flex-end;">'
+        + '<span class="swatch" style="background:' + groupColor(r.k_label) + ';"></span>'
+        + 'g' + r.k_label + '</div>';
+    }
+    return '<span style="color: var(--ink-dimmer);">—</span>';
+  };
+
+  let tbody = '<tbody>';
+  for (const r of sorted) {
+    const isHigh = Number.isFinite(r.sigma) && r.sigma > sigmaThr;
+    const sigmaCell = Number.isFinite(r.sigma) ? r.sigma.toFixed(4) : '—';
+    const sigmaClass = isHigh ? 'num high-sigma' : 'num';
+    const famLabel = r.family_id === -1 ? '—' : ('F' + r.family_id);
+    const ancLabel = r.ancestry || '—';
+    if (twoTrack) {
+      tbody += '<tr>'
+        + '<td>' + _escape(r.cga) + '</td>'
+        + '<td>' + _escape(r.ind) + '</td>'
+        + '<td class="num">' + renderTrackCell(r, 0) + '</td>'
+        + '<td class="num">' + renderTrackCell(r, 1) + '</td>'
+        + '<td class="' + sigmaClass + '">' + sigmaCell + (isHigh ? ' ⚠' : '') + '</td>'
+        + '<td class="num">' + _escape(famLabel) + '</td>'
+        + '<td>' + _escape(ancLabel) + '</td>'
+        + '</tr>';
+    } else {
+      tbody += '<tr>'
+        + '<td>' + _escape(r.cga) + '</td>'
+        + '<td>' + _escape(r.ind) + '</td>'
+        + '<td class="num"><div class="band-cell" style="justify-content:flex-end;">'
+        + '<span class="swatch" style="background:' + groupColor(r.k_label) + ';"></span>'
+        + r.k_label + '</div></td>'
+        + '<td class="' + sigmaClass + '">' + sigmaCell + (isHigh ? ' ⚠' : '') + '</td>'
+        + '<td class="num">' + _escape(famLabel) + '</td>'
+        + '<td>' + _escape(ancLabel) + '</td>'
+        + '</tr>';
+    }
+  }
+  tbody += '</tbody>';
+
+  return '<table class="ck-table">' + thead + tbody + '</table>';
 }
 
 // =====================================================================
@@ -267,11 +426,12 @@ export function renderKaryotypeBody(state, opts) {
   if (!content) return;
   content.innerHTML = renderKaryotypeBodyHtml(state);
 
-  // Update count display + sigma threshold note
+  // Update count display + sigma threshold note. 2026-05-21 perf: pull
+  // rows from the memo (populated during the renderKaryotypeBodyHtml
+  // call above) instead of re-running buildKaryotypeRows.
   const c = state && state.candidate;
   if (c && Array.isArray(c.locked_labels)) {
-    const samples = _samples(state);
-    const allRows = buildKaryotypeRows(c, samples, _sigmaSpread(state));
+    const allRows = _getKaryoRowsMemo(state);
     const filtered = filterKaryoRows(allRows, state.karyoUi);
     const info = document.getElementById('ckInfo');
     if (info) info.textContent = filtered.length + ' of ' + allRows.length + ' samples';
@@ -292,28 +452,31 @@ export function wireKaryotypeToolbar(state, opts) {
   const expBtn   = document.getElementById('ckExportTSV');
   const content  = document.getElementById('candKaryoContent');
 
-  const refresh = () => {
-    renderKaryotypeBody(state, opts);
+  // 2026-05-21 perf: filter/band/sort changes now do a PARTIAL render
+  // of just the table — preserves filter-input focus across keystrokes
+  // (the old full refresh wiped the input each keystroke, losing focus
+  // + cursor position).
+  const refreshTable = () => {
+    renderKaryoTableOnly(state);
     if (onChange) { try { onChange(state); } catch (_) {} }
   };
 
   _filterHandler = (evt) => {
     if (!state || !state.karyoUi) return;
     state.karyoUi.filter = (evt && evt.target && evt.target.value) || '';
-    refresh();
+    refreshTable();
   };
   _bandHandler = (evt) => {
     if (!state || !state.karyoUi) return;
     state.karyoUi.bandFilter = (evt && evt.target && evt.target.value) || '';
-    refresh();
+    refreshTable();
   };
   _exportHandler = () => {
     if (!state) return;
     const c = state.candidate;
     if (!c) return;
-    const samples = _samples(state);
-    const sig = _sigmaSpread(state);
-    const allRows = buildKaryotypeRows(c, samples, sig);
+    // 2026-05-21 perf: rows from memo (was buildKaryotypeRows fresh).
+    const allRows = _getKaryoRowsMemo(state);
     const filtered = filterKaryoRows(allRows, state.karyoUi);
     const sorted = sortKaryoRows(filtered, state.karyoUi);
     const tsv = exportKaryotypeTSV(c, sorted);
@@ -337,7 +500,9 @@ export function wireKaryotypeToolbar(state, opts) {
       state.karyoUi.sortKey = key;
       state.karyoUi.sortAsc = true;
     }
-    refresh();
+    // Sort changes table only — header arrows update via the table's
+    // <thead> being part of #ckTableWrap.
+    refreshTable();
   };
 
   if (_canListen(filterEl)) filterEl.addEventListener('input',  _filterHandler);

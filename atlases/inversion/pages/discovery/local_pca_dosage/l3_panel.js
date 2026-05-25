@@ -3025,7 +3025,11 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
 // + per-sample mean PC2 across the slab; sign + λ values come from the
 // slab midpoint window so the axis annotation matches what the slab is
 // actually summarising.
-function drawSlabMiniPCA(canvas, range, labels, opts) {
+// 2026-05-26: exported so candidate_focus/_draw_panels.js's
+// drawCandLocalPCA can reuse it instead of replicating ~200 lines of
+// slab-PCA math. The legacy monolith exposed it as a global; the
+// ES-module port left it private to this file.
+export function drawSlabMiniPCA(canvas, range, labels, opts) {
   const state = _pageState;
   if (!canvas) return;
   opts = opts || {};

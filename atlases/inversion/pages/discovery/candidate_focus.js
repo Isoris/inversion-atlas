@@ -36,6 +36,7 @@
 
 import { escapeHtml } from '../../shared/page1_utils.js';
 import { persistActiveCandidateId } from '../../shared/active_candidate.js';
+import { ensureChromTracks } from '../../shared/ensure_chrom_tracks.js';
 import { resolve as _registryResolve, getState as _getState } from '../../../../core/atlas_api.js';
 import { probeModeB, renderModeBBadge } from '../../../../core/mode_b_badge.js';
 import { getMacrostripeIdPerSample } from '../../shared/macrostripe.js';
@@ -471,7 +472,7 @@ function _exportGroupLabelsTsv(state, c) {
  */
 export async function mount(root, atlasState, registry) {
   // Build a legacy-shaped state object (same shape local_pca_dosage uses).
-  const legacyState = _buildLegacyState(atlasState);
+  let legacyState = _buildLegacyState(atlasState);
 
   // Page2 is a candidate-detail page — _setActiveState makes the
   // sub-module helpers see this state via ES module live-binding.
@@ -484,6 +485,20 @@ export async function mount(root, atlasState, registry) {
 
   // Stash for inter-mount lookups.
   if (atlasState.inversion) atlasState.inversion._page2State = legacyState;
+
+  // 2026-05-26: self-bootstrap scrubber_main via the shared helper so the
+  // deep-dive canvases (Local PCA, PC1 track per sample, lines panel,
+  // SIMDAT snapshot, L1 envelope, karyogram) render on direct navigation
+  // from the catalogue / a saved link — without this, they all silently
+  // bail on `if (!state.data) return` and the user sees empty panels.
+  const bootstrap = await ensureChromTracks(atlasState, registry);
+  if (bootstrap.ok) {
+    legacyState = _buildLegacyState(atlasState);
+    _setActiveState(legacyState);
+    try { renderCandidateMetadata(legacyState); }
+    catch (e) { console.warn('candidate_focus.mount: post-bootstrap render threw —', e); }
+    if (atlasState.inversion) atlasState.inversion._page2State = legacyState;
+  }
 
   // Mode-B lineage probe — non-blocking. Only fires when an active
   // candidate is selected; the badge stays hidden otherwise (matches

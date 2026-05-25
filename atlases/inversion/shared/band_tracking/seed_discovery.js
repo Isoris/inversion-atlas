@@ -349,10 +349,64 @@ export function discoverSeedsOnChromosome(args, opts) {
   return { seeds, n_provisional, n_seeded: seeds.length, n_raw: raw_seeds.length };
 }
 
+/**
+ * Async chunked variant of discoverSeedsOnChromosome. Same algorithm +
+ * same return shape — but yields control to the event loop every
+ * `opts.chunk_anchors` anchors (default 50), and reports progress via
+ * `onProgress(done, total, n_seeds_so_far)` before each chunk.
+ *
+ * 2026-05-21 perf (HR8 haplotype audit): the sync version dominates
+ * pipeline Stage 1 (~1-2 seconds frozen on a 10k-window chrom). The
+ * anchor loop is naturally chunkable — each iteration is independent
+ * up to the final `dedupSeeds` pass. Yielding every 50 anchors gives
+ * ~20 progress paints across the typical run with negligible overhead
+ * per yield (~0.1ms each at 60Hz).
+ *
+ * @param {object} args   same as discoverSeedsOnChromosome
+ * @param {object} opts   adds `chunk_anchors` (number, default 50)
+ * @param {(done:number, total:number, nSeeds:number)=>void} [onProgress]
+ * @returns {Promise<object>}   same shape as discoverSeedsOnChromosome
+ */
+export async function discoverSeedsOnChromosomeAsync(args, opts, onProgress) {
+  const o = Object.assign({}, SEED_DISCOVERY_DEFAULTS, opts || {});
+  const chunkAnchors = Math.max(1, (opts && opts.chunk_anchors) || 50);
+  const { getLabels, getK, getBandQuality,
+          chr_s_window, chr_e_window, tracked_sample_idx } = args;
+  const raw_seeds = [];
+  let n_provisional = 0;
+  let anchorCount = 0;
+  // Pre-compute total for progress reporting.
+  const total = Math.max(1,
+    Math.ceil((chr_e_window - chr_s_window + 1) / o.anchor_stride));
+  for (let center = chr_s_window; center <= chr_e_window; center += o.anchor_stride) {
+    n_provisional++;
+    anchorCount++;
+    const seed = discoverSeedFromAnchor({
+      center_w: center,
+      getLabels, getK, getBandQuality,
+      chr_s_window, chr_e_window,
+      tracked_sample_idx,
+    }, o);
+    if (seed) raw_seeds.push(seed);
+    if (anchorCount % chunkAnchors === 0) {
+      if (typeof onProgress === 'function') {
+        try { onProgress(anchorCount, total, raw_seeds.length); } catch (_) {}
+      }
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+  if (typeof onProgress === 'function') {
+    try { onProgress(anchorCount, total, raw_seeds.length); } catch (_) {}
+  }
+  const seeds = dedupSeeds(raw_seeds, o);
+  return { seeds, n_provisional, n_seeded: seeds.length, n_raw: raw_seeds.length };
+}
+
 // Console-debug
 if (typeof window !== 'undefined') {
-  window._discoverSeedFromAnchor    = discoverSeedFromAnchor;
-  window._discoverSeedsOnChromosome = discoverSeedsOnChromosome;
-  window._dedupSeeds                = dedupSeeds;
-  window._SEED_DISCOVERY_DEFAULTS   = SEED_DISCOVERY_DEFAULTS;
+  window._discoverSeedFromAnchor         = discoverSeedFromAnchor;
+  window._discoverSeedsOnChromosome      = discoverSeedsOnChromosome;
+  window._discoverSeedsOnChromosomeAsync = discoverSeedsOnChromosomeAsync;
+  window._dedupSeeds                     = dedupSeeds;
+  window._SEED_DISCOVERY_DEFAULTS        = SEED_DISCOVERY_DEFAULTS;
 }

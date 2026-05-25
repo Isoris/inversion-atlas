@@ -170,7 +170,15 @@ function _renderScreeInsetHTML() {
   // below auto-adapts (smaller bar width for larger N). The fallback
   // path (lam1/lam2 only) still shows just the 2 bars — there's nothing
   // more to draw without regenerating the precomp at higher NPC.
-  spectrum = spectrum.slice().sort((a, b) => b - a);
+  // 2026-05-21 perf (Tier-D): `w.lam_top_k` is always emitted descending
+  // by the precomp producer (eigenvalues are returned sorted by
+  // construction). Check whether the array is already monotone-decreasing
+  // and skip the copy+sort when it is — the common case.
+  let _alreadyDesc = true;
+  for (let _i = 1; _i < spectrum.length; _i++) {
+    if (spectrum[_i] > spectrum[_i - 1]) { _alreadyDesc = false; break; }
+  }
+  if (!_alreadyDesc) spectrum = spectrum.slice().sort((a, b) => b - a);
   // Widen the SVG when we have many bars so each stays at least ~3px wide.
   const svgH = 38;
   const minBarPx = 3;
@@ -490,6 +498,11 @@ export function drawPCA(state) {
   // GHSL and dosage we need a little bit of the scale". Always runs
   // (the helper hides itself when no ramp mode is active).
   try { _refreshRampLegend(state); } catch (_) {}
+  // 2026-05-26: inline always-visible per-tracked-sample value panel.
+  // Answers "is the ramp ACTUALLY producing values for my tracked
+  // samples?" without forcing the user to open a modal. Fires on
+  // every redraw so cursor movement + chunk arrivals update live.
+  try { _refreshTrackedRampValuesPanel(state); } catch (_) {}
 
   // v3.25: which two PCs to plot (default PC1×PC2). PC1 keeps its sign-flip
   // rule (signX); other PCs render in raw orientation. The analytics path
@@ -1245,7 +1258,12 @@ function _refreshRampLegend(state) {
     minLbl = Number.isFinite(vMin) ? vMin.toFixed(3) : '—';
     maxLbl = Number.isFinite(vMax) ? vMax.toFixed(3) : '—';
   } else if (ramp === 'theta_pi' || ramp === 'ghsl') {
-    gradientCss = 'linear-gradient(to right, #2b6ca8, #f0c14b)';
+    // 2026-05-26: was 2-stop blue→yellow (matched the old
+    // _sequentialBlueToYellow ramp). The new 3-stop renderer routes
+    // through a saturated teal at t=0.5 so the gradient bar matches
+    // the renderer's vivid midpoint instead of the muddy olive a 2-stop
+    // CSS interpolation produces.
+    gradientCss = 'linear-gradient(to right, #2b6ca8, #3cb4b8, #f0c14b)';
     minLbl = Number.isFinite(vMin) ? vMin.toFixed(3) : '—';
     maxLbl = Number.isFinite(vMax) ? vMax.toFixed(3) : '—';
   } else if (ramp === 'froh') {
@@ -1266,6 +1284,114 @@ function _refreshRampLegend(state) {
   if (bar) bar.style.background = gradientCss;
   if (minEl) minEl.textContent = minLbl;
   if (maxEl) maxEl.textContent = maxLbl;
+}
+
+// 2026-05-26: inline always-visible per-tracked-sample ramp value panel.
+// Bottom-left overlay over the PCA scatter (#pcaTrackedRampValues).
+// Hidden unless a ramp colorMode is active AND there's at least one
+// tracked sample. Reads state._pcaModePsVals which drawPCA precomputed
+// for the current cursor window, so the table always reflects what
+// the scatter is (or isn't) painting. NaN cells render in red — that's
+// the visual answer to "why is my sample grey".
+function _refreshTrackedRampValuesPanel(state) {
+  if (typeof document === 'undefined') return;
+  const panel = document.getElementById('pcaTrackedRampValues');
+  if (!panel) return;
+  const mode = state && state.colorMode;
+  const isRamp = mode && _PCA_RAMP_MODES.has(mode);
+  const tracked = (state && Array.isArray(state.tracked)) ? state.tracked : [];
+  if (!isRamp || tracked.length === 0) {
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+    return;
+  }
+  const psv = (state._pcaModePsVals && state._pcaModePsVals.mode === mode)
+    ? state._pcaModePsVals.vals : null;
+  const samples = (state.data && Array.isArray(state.data.samples)) ? state.data.samples : [];
+  const nNaN = tracked.reduce((n, si) =>
+    n + ((psv && Number.isFinite(psv[si])) ? 0 : 1), 0);
+
+  // 2026-05-26: for dosage / het modes, surface the cohort-side
+  // projection rate so the user can see "is the chunk being read at
+  // all" without opening the 🔬 modal. cohortNonNaN counts samples in
+  // psv (full cohort, not just tracked) that have a number — that's
+  // the actual projection success rate from the chunk.
+  let projHint = '';
+  if ((mode === 'dosage' || mode === 'het') && psv && psv.length > 0) {
+    let cohortNonNaN = 0;
+    for (let i = 0; i < psv.length; i++) {
+      if (Number.isFinite(psv[i])) cohortNonNaN++;
+    }
+    const pct = (cohortNonNaN / psv.length * 100).toFixed(0);
+    const colour = cohortNonNaN === 0
+      ? '#d94f4f'
+      : cohortNonNaN < psv.length * 0.5 ? 'var(--accent, #f5a524)'
+      : 'var(--good, #3cc08a)';
+    projHint = `<span style="color: ${colour};">${cohortNonNaN}/${psv.length} cohort samples projected (${pct}%)</span>`;
+  }
+
+  // Source hint — explains why the values are or aren't there.
+  const sourceHint = (mode === 'dosage' || mode === 'het')
+    ? '/api/dosage/chunk · needs id projection to data.samples'
+    : (mode === 'ghsl' || mode === 'theta_pi')
+      ? 'precomp JSON · same sample order as data.samples (no projection needed)'
+      : (mode === 'froh') ? 'cohort_sample_froh layer'
+      : 'per-sample value array';
+  const rows = tracked.map(si => {
+    const s = samples[si] || {};
+    const sid = (s.cga || s.id || s.sample || s.ind) || ('S' + si);
+    const v = (psv && Number.isFinite(psv[si])) ? psv[si] : null;
+    const valHtml = (v == null)
+      ? '<span style="color:#d94f4f;">NaN</span>'
+      : v.toFixed(3);
+    return `<div style="display: grid; grid-template-columns: 1fr 60px; gap: 8px; padding: 1px 0;">
+      <span>${_esc(sid)}</span><span style="text-align: right;">${valHtml}</span>
+    </div>`;
+  }).join('');
+  const verdict = (nNaN === tracked.length)
+    ? `<span style="color:#d94f4f;">All ${tracked.length} tracked samples NaN — scatter will be grey. Click 🔬 dbg for the projection breakdown.</span>`
+    : (nNaN === 0)
+      ? `<span style="color: var(--good, #3cc08a);">All ${tracked.length} tracked samples have values — scatter should be coloured.</span>`
+      : `${tracked.length - nNaN}/${tracked.length} tracked have a value (${nNaN} NaN — click 🔬 dbg).`;
+  panel.style.display = 'block';
+  // Show a 🔬 affordance when there's something to debug (projection
+  // rate < full OR any tracked NaN). Clicking the header opens the
+  // full modal without scrolling back to the toolbar button.
+  const dbgBtnEl = (typeof document !== 'undefined')
+    ? document.getElementById('dosageDebugBtn') : null;
+  const headerLink = dbgBtnEl
+    ? `<span title="Open full diagnostic modal" style="float: right; cursor: pointer;
+                                                       color: var(--ink-dim); font-size: 11px;"
+            data-open-dosage-dbg="1">🔬</span>`
+    : '';
+  panel.innerHTML = `
+    <div style="font-weight: 600; color: var(--accent, #f5a524); margin-bottom: 3px;">
+      ${headerLink}${_esc(mode)} · tracked-sample values @ cursor
+    </div>
+    <div class="dim" style="font-size: 9.5px; margin-bottom: 4px;">
+      source: ${_esc(sourceHint)}
+    </div>
+    ${projHint ? `<div style="font-size: 9.5px; margin-bottom: 4px;">${projHint}</div>` : ''}
+    ${rows}
+    <div style="margin-top: 4px; padding-top: 3px; border-top: 1px solid var(--rule);
+                font-size: 9.5px;">${verdict}</div>
+  `;
+  // Wire the 🔬 affordance — delegate the click to the existing toolbar
+  // button so all the modal-building logic stays in one place. Re-binds
+  // on every refresh; cheap (one element).
+  const link = panel.querySelector('[data-open-dosage-dbg]');
+  if (link && dbgBtnEl) {
+    link.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dbgBtnEl.click();
+    });
+  }
+}
+function _esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
 }
 
 // --- cycleKAside() — legacy lines 56537-56565 ---
