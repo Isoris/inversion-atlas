@@ -1,6 +1,0 @@
-{
-  "_doc": "Layers produced by evolution-atlas workflows + tools. Phase 2: stub — full layer set (per-candidate age, per-candidate polarity verdict, per-regime archaeology classification) populated in Phase 5 when the page UIs grow export buttons.",
-  "atlas_id": "evolution",
-  "version": "1.0",
-  "layers": []
-}

@@ -240,32 +240,15 @@ async function _autoComputeDosageClustering(root, atlasState, registry) {
       D[s * nW + i] = +w.pc1[s] || 0;
     }
   }
+  // 2026-05-23 perf: dispatch the compute to a dedicated web worker so
+  // the main thread stays interactive during the 3–8 s K-means + bootstrap
+  // + silhouette run. The worker imports the same shared compute helper
+  // so behavior is byte-identical to the inline path. Falls back to a
+  // RAF-deferred sync compute when worker instantiation fails (older
+  // browsers / module-worker disabled / non-secure context).
   let result = null;
   try {
-    const mod = await import('../../shared/mgl_dosage_clustering.js').catch(() => null);
-    if (mod && typeof mod.adaptiveKDosageClustering === 'function') {
-      // 2026-05-19 perf: yield so the browser PAINTS the loading
-      // hint before the multi-second sync compute starts. Just
-      // setTimeout(…, 0) doesn't guarantee a paint between yields —
-      // the task queue runs without necessarily letting the renderer
-      // tick. RAF-then-setTimeout pattern:
-      //   1. requestAnimationFrame waits for the next vsync (paint).
-      //   2. Inside the RAF callback, setTimeout(0) yields again so
-      //      the heavy compute runs as the next macrotask, AFTER the
-      //      paint has actually been flushed to the screen.
-      // Net effect: user sees "computing…" hint, then the tab freezes
-      // for the compute duration, then the result. Without this the
-      // tab freezes BEFORE the hint paints, and the user sees a blank
-      // page until the compute finishes.
-      result = await new Promise(resolve => {
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            try { resolve(mod.adaptiveKDosageClustering(D, nS, nW, {})); }
-            catch (_) { resolve(null); }
-          }, 0);
-        });
-      });
-    }
+    result = await _runOnWorkerWithFallback(D, nS, nW, {}, root);
   } catch (e) {
     _setLoadingHint(root, `adaptiveKDosageClustering threw: ${e && e.message ? e.message : 'error'}`);
     return;
@@ -282,6 +265,91 @@ async function _autoComputeDosageClustering(root, atlasState, registry) {
   // recompute is the worst case.
   try { sessionStorage.setItem(cacheKey, JSON.stringify(result)); }
   catch (_) { /* over quota or storage disabled */ }
+}
+
+// 2026-05-23: web-worker dispatcher for adaptiveKDosageClustering.
+// Returns a Promise<result|null>. Transfers D's buffer to the worker
+// so the cohort matrix isn't structured-cloned (cheaper for the 8 MB
+// 226×9k Float64Array). Sync fallback uses the same RAF+setTimeout
+// paint-deferral pattern the inline path used before, so the loading
+// hint still flushes to the screen before the freeze.
+let _workerInstance = null;
+function _getOrCreateWorker() {
+  if (_workerInstance) return _workerInstance;
+  if (typeof Worker !== 'function') return null;
+  try {
+    // import.meta.url resolves relative to THIS module so the worker
+    // file is fetched from the same dir regardless of how the page
+    // was mounted (atlas-core relative path or absolute).
+    const url = new URL('./dosage_cluster_adaptive_k_worker.js', import.meta.url);
+    _workerInstance = new Worker(url, { type: 'module' });
+    return _workerInstance;
+  } catch (e) {
+    console.warn('dosage_cluster_adaptive_k: worker instantiation failed; using sync fallback:', e);
+    _workerInstance = null;
+    return null;
+  }
+}
+
+async function _runOnWorkerWithFallback(D, nS, nW, opts, root) {
+  const worker = _getOrCreateWorker();
+  if (worker) {
+    return new Promise((resolve) => {
+      const onMessage = (ev) => {
+        const m = ev && ev.data;
+        if (!m) return;
+        if (m.type === 'result' || m.type === 'error') {
+          worker.removeEventListener('message', onMessage);
+          worker.removeEventListener('error', onError);
+          if (m.type === 'error') {
+            console.warn('dosage_cluster_adaptive_k worker error:', m.message);
+            // Try sync fallback so the user still gets a result.
+            _runSyncFallback(D, nS, nW, opts).then(resolve);
+            return;
+          }
+          resolve(m.result || null);
+        }
+      };
+      const onError = (e) => {
+        worker.removeEventListener('message', onMessage);
+        worker.removeEventListener('error', onError);
+        console.warn('dosage_cluster_adaptive_k worker errored:', e);
+        _runSyncFallback(D, nS, nW, opts).then(resolve);
+      };
+      worker.addEventListener('message', onMessage);
+      worker.addEventListener('error', onError);
+      // Transfer D's buffer so the worker takes ownership — zero copy.
+      // After this call D is empty in the main-thread context; the
+      // caller doesn't reuse it.
+      worker.postMessage(
+        { type: 'compute', D: D.buffer, nS, nW, opts },
+        [D.buffer],
+      );
+    });
+  }
+  return _runSyncFallback(D, nS, nW, opts);
+}
+
+async function _runSyncFallback(D, nS, nW, opts) {
+  // 2026-05-19 RAF+setTimeout pattern: yield once so the browser
+  // paints the loading hint before the multi-second sync compute
+  // starts. The freeze still happens — this is the unavoidable
+  // best-case when Worker isn't available. RAF waits for vsync, then
+  // setTimeout(0) yields one macrotask so the paint flushes first.
+  const mod = await import('../../shared/mgl_dosage_clustering.js').catch(() => null);
+  if (!mod || typeof mod.adaptiveKDosageClustering !== 'function') return null;
+  // D might be an ArrayBuffer if the worker transferred ownership and
+  // the caller stashed it; re-wrap if so. In the normal sync path D is
+  // still a Float64Array because no transfer happened.
+  const arr = (D instanceof ArrayBuffer) ? new Float64Array(D) : D;
+  return new Promise(resolve => {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        try { resolve(mod.adaptiveKDosageClustering(arr, nS, nW, opts || {})); }
+        catch (_) { resolve(null); }
+      }, 0);
+    });
+  });
 }
 
 function _setLoadingHint(root, msg) {

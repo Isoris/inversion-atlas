@@ -1,6 +1,0 @@
-{
-  "_doc": "Cluster-side producer workflows. Phase 2: none. Age estimation runs in-page (BUSCO 4D age computation + age_model_suggester are atlas-side JS modules, not external pipelines). Future MSMC-style per-regime dating workflows would live here.",
-  "atlas_id": "evolution",
-  "version": "1.0",
-  "workflows": []
-}

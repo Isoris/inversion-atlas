@@ -1,10 +1,7 @@
 {
   "_doc": "Index of atlas folders. Written by the assembly script (see README_PAIRING.md §10). The browser cannot list directories, so this file is the authoritative answer to 'what atlases are installed?'. atlas_discovery.js reads this at startup.",
   "atlases": [
-    "inversion",
-    "cross-species",
-    "evolution",
-    "popstats"
+    "inversion"
   ],
   "_assembled_from": [
     "atlas-core",
@@ -12,5 +9,5 @@
   ],
   "_assembled_at": "2026-05-23T00:00:00Z",
   "_assembly_version": "v1-draft",
-  "_notes_2026_05_23": "Added 'cross-species' atlas as Phase 1a of the 4-atlas split per docs/MIGRATION_4_ATLASES.md. Phase 1b (move existing comparative + mgl_* + cross-species shared modules from inversion-atlas) is the next step."
+  "_notes_2026_05_23": "Phase 1a complete. cross-species / evolution / popstats migrated OUT to their own standalone Desktop repos (cross-species-atlas, evolution-atlas, popstats-atlas) and registered in atlas-core/build/atlas.config. inversion-atlas now ships only the 'inversion' atlas package. NB: this _index.json is not consumed at assemble time (assemble.sh writes the workspace-level atlases/_index.json from the directory scan); kept here as documentation for what THIS repo provides."
 }

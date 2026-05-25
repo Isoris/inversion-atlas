@@ -395,11 +395,17 @@
 
   <div id="pagesArea" style="overflow: hidden;">
   <main id="local_pca_dosage" class="page active">
-    <!-- Mode-B freshness badge (2026-05-20). Populated by local_pca_dosage.js
-         after applyData runs; surfaces what the registry resolved for the
-         active chrom (windows, samples) + which of the 3 discovery axes
-         are loaded today. Fail-soft per core/mode_b_badge.js. -->
-    <div id="lpdModeBBadge" class="data-source-badge" style="margin: 4px 8px;"></div>
+    <!-- Mode-B freshness badge (2026-05-20).
+         2026-05-24: was first grid child of <main> with margin: 4px 8px.
+         When `display: none` (no data yet) it took no row and the 9 panels
+         filled the 9 template rows correctly; when it gained content +
+         visibility it grabbed row 1 and pushed ctrlBar → simPanel → ... →
+         l3Panel down by one row, causing the L3 reflow Quentin reported.
+         Pinned with position: absolute now so it sits OVER the page corner
+         and never enters grid auto-placement. -->
+    <div id="lpdModeBBadge" class="data-source-badge"
+         style="position: absolute; top: 4px; right: 8px; z-index: 5;
+                font-size: 10px; max-width: 60ch; opacity: 0.85;"></div>
     <div id="ctrlBar">
       <button class="play" id="playBtn">▶ Play</button>
       <input type="range" id="scrubber" min="0" max="0" value="0" step="1" disabled />

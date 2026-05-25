@@ -173,10 +173,12 @@ async function _autoBuildPcaPanelState(atlasState, registry) {
   }
   // Cluster assignment from the cursor's L2 (best-effort — null if the
   // cluster module isn't reachable from here, which is fine; the page
-  // renders without cluster coloring).
+  // renders without cluster coloring). Both `stash` and its `cur`/`windowToL2`
+  // are null when the user opens this page before local_pca_dosage has
+  // mounted (data came from registry.resolve fallback above).
   let cluster_assignment = null;
-  const cur = Number.isFinite(stash.cur) ? (stash.cur | 0) : 0;
-  if (stash.windowToL2 && stash.windowToL2[cur] >= 0
+  const cur = (stash && Number.isFinite(stash.cur)) ? (stash.cur | 0) : 0;
+  if (stash && stash.windowToL2 && stash.windowToL2[cur] >= 0
       && typeof window !== 'undefined') {
     try {
       // _state.js exposes getL2Cluster via the inversion stash's helpers

@@ -1,6 +1,0 @@
-inv_id	chrom	inv_edge	inv_edge_mb	breakpoint_mb	delta_kb	bp_class	query_species	detail
-INV_LG04a	LG04	start	16.45	16.45	0.0	interchrom	C_fuscus	X->Y
-INV_LG04a	LG04	start	16.45	16.5	50.0	orientation	C_apus	sign +->-
-INV_LG13	LG13	start	5.15	5.15	0.0	orientation	C_fuscus	sign +->-
-INV_LG27	LG27	start	12.4	12.41	10.0	block_gap	C_fuscus	gap 3Mb
-INV_LG27	LG27	end	16.5	16.48	20.0	interchrom	N_graeffei	A->B

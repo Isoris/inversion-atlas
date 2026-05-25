@@ -1,27 +1,41 @@
 // inversion_catalogue/overview.js
 // =====================================================================
-// Page "Overview" — synthesis-stage tab, declared but empty in legacy.
+// Page "Overview" — synthesis-stage landing surface.
 //
-// Legacy state (Inversion_atlas.html line 9322):
-//     <div id="overview" class="page"></div>
+// Two tiles:
+//   1. Layer inventory    — workspace action-pipeline registry contents.
+//                           Queries GET /api/layers (atlas-core envelope
+//                           index) and groups by layer_type. Answers
+//                           "what data has been captured in this
+//                           workspace?". Fail-soft when the server is
+//                           offline or no workspace-root is configured.
 //
-// The tab button exists at legacy line 5138 (data-page="overview"
-// data-stage="synthesis") but no body and no render function were ever
-// shipped. There are zero references to `renderOverview`, `renderPage_overview`,
-// or `overview` in any JS scope of the legacy file — verified by
-// `grep -niE "(renderOverview|overview|renderPageOverview)"`,
-// which only returns the tab button and the empty <div>.
+//   2. Candidate spreadsheet — sortable + filterable table of inversion
+//                           candidates from state.candidateList.
+//                           Manuscript-bound output: TSV export.
+//                           Columns: id, chrom, region (bp), length,
+//                           verdict, status (provisional / confirmed),
+//                           locked_labels, source, promoted_at.
+//                           Two filters: status (all / provisional /
+//                           confirmed) + chrom (auto-populated from the
+//                           data). Click a column header to sort; click
+//                           again to reverse.
 //
-// This module exists so the page registry has a non-throwing entry for
-// `overview`. If/when the synthesis overview gets designed, replace
-// the body of renderPageOverview() with the real render logic and update
-// overview.html with the panel skeleton.
-//
-// Round 5 step 8 (chat 36, 2026-05-07): refactored from chat-33 factory-
-// only pattern (`wirePageOverview(state) → { renderPageOverview }`) to
-// add the standard atlas-router lifecycle (mount/unmount/_pageState
-// live-binding). The factory is RETAINED for backward-compat — anything
-// that was importing wirePageOverview keeps working.
+// History:
+//   - Legacy single-file declared `<div id="overview">` (Inversion_atlas.html
+//     line 9322) and a tab button at line 5138 but never shipped a render
+//     function. Comments at line 5021 + 5134 of the monolith described
+//     two intended features: "candidate overview spreadsheet" + an
+//     action-pipeline inventory.
+//   - Round 5 step 8 (chat 36, 2026-05-07): added the atlas-router
+//     lifecycle (mount / unmount / _pageState live-binding). Factory
+//     entry wirePageOverview(state) RETAINED for backward-compat.
+//   - Round 1 2026-05-14: shipped the layer-inventory tile.
+//   - 2026-05-23: shipped the candidate-spreadsheet tile (this turn) —
+//     completes the second feature the legacy comments hinted at. Both
+//     tiles co-exist on one page; the spreadsheet reads from the live
+//     state.candidateList rather than a registry layer, so it works
+//     today without waiting for inversion.candidates_v1 to land on disk.
 // =====================================================================
 
 import { _pageState, _setActiveState } from './overview/_state.js';
@@ -45,6 +59,9 @@ function _renderPageOverview() {
   // the inventory populates as soon as the index loads.
   _populateLayerInventory()
     .catch((e) => console.warn('overview: _populateLayerInventory threw —', e));
+  // Candidate spreadsheet renders synchronously from _pageState.candidateList.
+  try { _populateCandidateSpreadsheet(); }
+  catch (e) { console.warn('overview: _populateCandidateSpreadsheet threw —', e); }
 }
 
 // ---------------------------------------------------------------------------
@@ -135,6 +152,230 @@ async function _populateLayerInventory() {
   }
   html += `</tbody></table>`;
   slot.innerHTML = html;
+}
+
+// ---------------------------------------------------------------------------
+// Candidate spreadsheet (manuscript-bound: sortable + filterable + TSV export).
+// ---------------------------------------------------------------------------
+// Reads _pageState.candidateList (mirrored from atlasState.inversion via
+// _buildLegacyState in mount()). Each candidate carries the shape promoted
+// by catalogue.js::promoteRowsToCandidates:
+//   { id, chrom, start_bp, end_bp, K, verdict, source, provisional,
+//     confirmed, promoted_from, promoted_at, locked_labels[] }
+
+const _sortState = { col: 'chrom', dir: 1 };  // 1 = asc, -1 = desc
+
+function _populateCandidateSpreadsheet() {
+  if (typeof document === 'undefined') return;
+  const slot = document.getElementById('invCandidateSpreadsheet');
+  if (!slot) return;
+
+  const list = Array.isArray(_pageState && _pageState.candidateList)
+    ? _pageState.candidateList
+    : [];
+
+  // Populate the chrom filter dropdown (idempotent — only adds new chroms).
+  const chromSel = document.getElementById('ovChromFilter');
+  if (chromSel) {
+    const have = new Set(Array.from(chromSel.options).map(o => o.value));
+    const chroms = new Set();
+    for (const c of list) { if (c && c.chrom) chroms.add(c.chrom); }
+    for (const ch of Array.from(chroms).sort()) {
+      if (have.has(ch)) continue;
+      const opt = document.createElement('option');
+      opt.value = ch;
+      opt.textContent = ch;
+      chromSel.appendChild(opt);
+    }
+  }
+
+  _ensureCandidateControlsBound();
+  _renderCandidateTable(list, slot);
+}
+
+function _ensureCandidateControlsBound() {
+  if (typeof document === 'undefined') return;
+  if (_ensureCandidateControlsBound._bound) return;
+  const statusSel = document.getElementById('ovStatusFilter');
+  const chromSel  = document.getElementById('ovChromFilter');
+  const exportBtn = document.getElementById('ovTsvExport');
+  if (!statusSel && !chromSel && !exportBtn) return;  // controls not in DOM yet
+
+  if (statusSel) statusSel.addEventListener('change', _refreshCandidateTable);
+  if (chromSel)  chromSel.addEventListener('change',  _refreshCandidateTable);
+  if (exportBtn) exportBtn.addEventListener('click',  _exportCandidatesTsv);
+  _ensureCandidateControlsBound._bound = true;
+}
+
+function _refreshCandidateTable() {
+  const slot = document.getElementById('invCandidateSpreadsheet');
+  if (!slot) return;
+  const list = Array.isArray(_pageState && _pageState.candidateList)
+    ? _pageState.candidateList
+    : [];
+  _renderCandidateTable(list, slot);
+}
+
+function _filteredCandidates(list) {
+  const statusSel = (typeof document !== 'undefined')
+    ? document.getElementById('ovStatusFilter') : null;
+  const chromSel  = (typeof document !== 'undefined')
+    ? document.getElementById('ovChromFilter')  : null;
+  const status = statusSel ? statusSel.value : 'all';
+  const chrom  = chromSel  ? chromSel.value  : '';
+
+  return list.filter(c => {
+    if (!c) return false;
+    if (chrom && c.chrom !== chrom) return false;
+    if (status === 'confirmed'   && c.confirmed   !== true) return false;
+    if (status === 'provisional' && c.provisional !== true) return false;
+    return true;
+  });
+}
+
+function _sortCandidates(rows) {
+  const { col, dir } = _sortState;
+  const cmp = (a, b) => {
+    let av = a[col];
+    let bv = b[col];
+    // length is derived
+    if (col === 'length') {
+      av = (a.end_bp != null && a.start_bp != null) ? (a.end_bp - a.start_bp) : null;
+      bv = (b.end_bp != null && b.start_bp != null) ? (b.end_bp - b.start_bp) : null;
+    }
+    // status pseudo-column
+    if (col === 'status') {
+      av = a.confirmed ? 2 : (a.provisional ? 1 : 0);
+      bv = b.confirmed ? 2 : (b.provisional ? 1 : 0);
+    }
+    if (av == null && bv == null) return 0;
+    if (av == null) return  1;   // nulls sort to the bottom regardless of dir
+    if (bv == null) return -1;
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+    return String(av).localeCompare(String(bv)) * dir;
+  };
+  return rows.slice().sort(cmp);
+}
+
+function _renderCandidateTable(allRows, slot) {
+  const summary = (typeof document !== 'undefined')
+    ? document.getElementById('ovCandSummary') : null;
+
+  if (allRows.length === 0) {
+    slot.innerHTML =
+      '<span class="ov-hint">' +
+      'No candidates yet. Promote one from the catalogue page or from a ' +
+      'diagnostic page (local PCA, haplotype regimes) to populate this table.' +
+      '</span>';
+    if (summary) summary.textContent = '';
+    return;
+  }
+
+  const filtered = _filteredCandidates(allRows);
+  const sorted = _sortCandidates(filtered);
+
+  if (summary) {
+    const nConf = filtered.filter(c => c.confirmed === true).length;
+    const nProv = filtered.filter(c => c.provisional === true && !c.confirmed).length;
+    summary.textContent =
+      `${sorted.length} shown (of ${allRows.length}) — ${nConf} confirmed, ${nProv} provisional`;
+  }
+
+  const cols = [
+    { key: 'id',            label: 'id' },
+    { key: 'chrom',         label: 'chrom' },
+    { key: 'start_bp',      label: 'start' },
+    { key: 'end_bp',        label: 'end' },
+    { key: 'length',        label: 'length' },
+    { key: 'verdict',       label: 'verdict' },
+    { key: 'status',        label: 'status' },
+    { key: 'locked_labels', label: 'locked_labels' },
+    { key: 'source',        label: 'source' },
+    { key: 'promoted_at',   label: 'promoted_at' },
+  ];
+
+  let html = '<table class="ov-table ov-table-cand"><thead><tr>';
+  for (const c of cols) {
+    const isActive = c.key === _sortState.col;
+    const arrow = isActive ? (_sortState.dir === 1 ? ' ▲' : ' ▼') : '';
+    html += `<th data-sort="${c.key}" class="ov-sortable${isActive ? ' ov-active' : ''}">` +
+            _escape(c.label) + arrow + '</th>';
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const r of sorted) {
+    const len = (r.end_bp != null && r.start_bp != null)
+      ? (r.end_bp - r.start_bp) : null;
+    const status = r.confirmed ? 'confirmed' : (r.provisional ? 'provisional' : '');
+    const statusClass = r.confirmed ? 'ov-conf' : (r.provisional ? 'ov-prov' : '');
+    const labels = Array.isArray(r.locked_labels) ? r.locked_labels.join(', ') : '';
+    html += '<tr>' +
+      `<td><code>${_escape(r.id || '')}</code></td>` +
+      `<td>${_escape(r.chrom || '')}</td>` +
+      `<td class="ov-right">${r.start_bp != null ? r.start_bp.toLocaleString() : ''}</td>` +
+      `<td class="ov-right">${r.end_bp   != null ? r.end_bp.toLocaleString()   : ''}</td>` +
+      `<td class="ov-right">${len != null ? len.toLocaleString() : ''}</td>` +
+      `<td>${_escape(r.verdict || '')}</td>` +
+      `<td class="${statusClass}">${status}</td>` +
+      `<td>${_escape(labels)}</td>` +
+      `<td class="ov-dim">${_escape(r.source || '')}</td>` +
+      `<td class="ov-dim">${_escape((r.promoted_at || '').slice(0, 10))}</td>` +
+      '</tr>';
+  }
+  html += '</tbody></table>';
+  slot.innerHTML = html;
+
+  // Bind sortable headers (re-attach on every render — innerHTML clears them).
+  const headers = slot.querySelectorAll('th.ov-sortable');
+  headers.forEach(h => {
+    h.addEventListener('click', () => {
+      const k = h.getAttribute('data-sort');
+      if (_sortState.col === k) _sortState.dir *= -1;
+      else { _sortState.col = k; _sortState.dir = 1; }
+      _refreshCandidateTable();
+    });
+  });
+}
+
+function _exportCandidatesTsv() {
+  if (typeof document === 'undefined') return;
+  const list = Array.isArray(_pageState && _pageState.candidateList)
+    ? _pageState.candidateList
+    : [];
+  const filtered = _filteredCandidates(list);
+  const sorted = _sortCandidates(filtered);
+
+  const cols = ['id','chrom','start_bp','end_bp','length','verdict',
+                'status','locked_labels','source','promoted_at'];
+  const lines = [cols.join('\t')];
+  for (const r of sorted) {
+    const len = (r.end_bp != null && r.start_bp != null)
+      ? (r.end_bp - r.start_bp) : '';
+    const status = r.confirmed ? 'confirmed' : (r.provisional ? 'provisional' : '');
+    const labels = Array.isArray(r.locked_labels) ? r.locked_labels.join('|') : '';
+    lines.push([
+      r.id || '',
+      r.chrom || '',
+      r.start_bp != null ? r.start_bp : '',
+      r.end_bp   != null ? r.end_bp   : '',
+      len,
+      r.verdict || '',
+      status,
+      labels,
+      r.source || '',
+      r.promoted_at || '',
+    ].map(v => String(v).replace(/\t/g, ' ').replace(/\n/g, ' ')).join('\t'));
+  }
+
+  const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/tab-separated-values' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `inversion_candidates_${new Date().toISOString().slice(0, 10)}.tsv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function _escape(s) {

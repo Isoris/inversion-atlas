@@ -2,15 +2,57 @@
     <div class="ov-content">
       <div class="ov-title">Synthesis overview</div>
       <div class="ov-subtitle">
-        Action-pipeline inventory. Lists every layer envelope currently
-        registered in <code>&lt;workspace&gt;/registry/layers.registry.json</code>.
-        Empty until at least one <code>POST /api/actions</code> has succeeded.
+        Two tiles: action-pipeline layer inventory (left) and the inversion
+        candidate spreadsheet (right). Both update live from session state.
       </div>
 
-      <!-- Populated by overview.js::_populateLayerInventory.
-           A 4-column table: layer_type · count · latest layer_id · created_at. -->
-      <div id="invLayerInventory" class="ov-panel">
-        <span class="ov-hint">Querying /api/layers …</span>
+      <div class="ov-grid">
+        <!-- Tile 1: layer inventory -->
+        <section class="ov-tile">
+          <div class="ov-tile-title">Layer inventory</div>
+          <div class="ov-tile-sub">
+            Action-pipeline envelopes registered in
+            <code>&lt;workspace&gt;/registry/layers.registry.json</code>.
+            Empty until at least one <code>POST /api/actions</code> has
+            succeeded.
+          </div>
+          <div id="invLayerInventory" class="ov-panel">
+            <span class="ov-hint">Querying /api/layers ...</span>
+          </div>
+        </section>
+
+        <!-- Tile 2: candidate spreadsheet -->
+        <section class="ov-tile">
+          <div class="ov-tile-title">Candidate spreadsheet</div>
+          <div class="ov-tile-sub">
+            All promoted candidates in this session. Click a column header
+            to sort. Filter by status or chrom. Manuscript-bound: export
+            to TSV.
+          </div>
+          <div class="ov-controls">
+            <label class="ov-ctrl">
+              status
+              <select id="ovStatusFilter">
+                <option value="all">all</option>
+                <option value="confirmed">confirmed only</option>
+                <option value="provisional">provisional only</option>
+              </select>
+            </label>
+            <label class="ov-ctrl">
+              chrom
+              <select id="ovChromFilter">
+                <option value="">all</option>
+              </select>
+            </label>
+            <button id="ovTsvExport" type="button" class="ov-btn">
+              export TSV
+            </button>
+            <span id="ovCandSummary" class="ov-summary-inline"></span>
+          </div>
+          <div id="invCandidateSpreadsheet" class="ov-panel">
+            <span class="ov-hint">Loading candidate list ...</span>
+          </div>
+        </section>
       </div>
     </div>
   </div>

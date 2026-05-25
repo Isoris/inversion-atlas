@@ -763,9 +763,14 @@ export async function mount(root, atlasState, registry) {
 
 /**
  * Unmount: clear _pageState so post-unmount callbacks see null.
+ * Also reset _annoCockpitInited so re-mount rebinds the click/keydown
+ * listeners on the NEW canvas. Without this, navigating away and back
+ * left the cockpit unresponsive to clicks because the old listener
+ * was on a canvas no longer in the DOM.
  */
 export async function unmount(root) {
   _setActiveState(null);
+  _annoCockpitInited = false;
 }
 
 function _buildLegacyState(atlasState) {

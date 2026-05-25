@@ -1,6 +1,0 @@
-{
-  "_doc": "File aliases. Phase 1a: none required (all reads go through layers.registry.json).",
-  "atlas_id": "cross-species",
-  "version": "1.0",
-  "files": []
-}

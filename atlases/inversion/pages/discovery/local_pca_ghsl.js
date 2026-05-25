@@ -656,11 +656,22 @@ export async function unmount(root) {
 
 function _buildLegacyState(atlasState) {
   const inv = atlasState.inversion || {};
+  const sh  = atlasState.shared    || {};
   const legacy = Object.assign({}, inv);
   // layersPresent: Set<layerName> — read by _refreshGhslLayerStatus.
-  // Default to an empty Set so the chat-33 helper's `.has(layerName)`
-  // call doesn't blow up on an undefined slot.
-  legacy.layersPresent = inv.layersPresent || new Set();
-  legacy.activeChrom   = inv.activeChrom   || null;
+  // Tolerate Array shape (matches sibling local_pca_theta_pi.js convention).
+  legacy.layersPresent = (inv.layersPresent instanceof Set)
+    ? inv.layersPresent
+    : new Set(Array.isArray(inv.layersPresent) ? inv.layersPresent : []);
+  // activeChrom lives under atlasState.shared, not under atlasState.inversion
+  // (the latter only holds inversion-specific slots: tracks, candidateList,
+  // cur, etc.). Reading `inv.activeChrom` always returned null/undefined
+  // and the chrom label `#ghChromLabel` rendered empty.
+  legacy.activeChrom   = sh.activeChrom || null;
+  // legacy.data is what ghslPanel(state) reads (`state.data.ghsl_panel`).
+  // Without this, every GHSL panel rendered empty even when scrubber_ghsl
+  // data was loaded. Matches local_pca_theta_pi.js:1178-1188 pattern.
+  const chrom = sh.activeChrom;
+  legacy.data = (chrom && inv.tracks && inv.tracks[chrom]) || null;
   return legacy;
 }

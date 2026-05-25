@@ -991,13 +991,18 @@ async function _mergePairToCandidate(state, r) {
   };
   const inv = (typeof window !== 'undefined' && window.atlasState && window.atlasState.inversion) || {};
   const page1State = inv._local_pca_dosage_state || { data, candidate: null, candidateList: [] };
-  try { candMod.addCandidateToList(page1State, cand); } catch (_) {}
-  try { candMod.setCandidate(page1State, cand); } catch (_) {}
+  try { candMod.addCandidateToList(page1State, cand); }
+  catch (e) { console.warn('[haplotype_regimes] addCandidateToList threw:', e); }
+  try { candMod.setCandidate(page1State, cand); }
+  catch (e) { console.warn('[haplotype_regimes] setCandidate threw:', e); }
   inv._local_pca_dosage_state = page1State;
   // Re-run short-range pipeline so the new candidate shows up as a
   // seed chip in the same view.
   const rootEl = document.getElementById('haplotype_regimes');
-  if (rootEl) { try { await _runPipeline(rootEl, state); } catch (_) {} }
+  if (rootEl) {
+    try { await _runPipeline(rootEl, state); }
+    catch (e) { console.warn('[haplotype_regimes] _runPipeline threw after L3-pair merge:', e); }
+  }
 }
 
 // =========================================================================
@@ -1487,7 +1492,8 @@ async function _promoteFocalSeed(root, state, atlasState) {
   inv._local_pca_dosage_state = page1State;
 
   _setStatus(root, `promoted locus #${focalIdx} (seed_id=${locus.seed_id}) → candidate ${cand.id}. Opening candidate focus…`);
-  try { window.location.hash = '#/inversion/candidate_focus'; } catch (_) {}
+  try { window.location.hash = '#/inversion/candidate_focus'; }
+  catch (e) { console.warn('[haplotype_regimes] hash navigation to candidate_focus failed:', e); }
 }
 
 /**

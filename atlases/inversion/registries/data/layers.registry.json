@@ -243,6 +243,24 @@
       "writable": true,
       "_doc": "The version index for a candidate. Names all versions ever computed and which is active. Boundaries, K, locked_labels are NOT here \u2014 those live per-version under data/candidates/{candidate_id}/{version_id}/. lineage.json is the index, not the data. NOT version-scoped (one per candidate, regardless of how many versions). writable: true \u2014 browser refinement workflows append new version entries via Registry.write."
     },
+    "candidates_v1": {
+      "tier": "warm",
+      "preload_on": "session_load",
+      "source": "file",
+      "path": "data/candidates/_index.json",
+      "writable": true,
+      "_status": "session_state",
+      "_doc": "Cohort-level inversion candidate list. The session-persisted form of atlasState.inversion.candidateList. Each entry: { id, chrom, start_bp, end_bp, K, verdict, source, provisional, confirmed, locked_labels[], promoted_at }. Cross-atlas: read by evolution, popstats, cross-species, relatedness, meiosis, diversity, population. Promoted via catalogue/local_pca_dosage/haplotype_regimes pages. Added 2026-05-23 to back the cross_atlas.exports declaration."
+    },
+    "regime_catalogue_v1": {
+      "tier": "warm",
+      "preload_on": "session_load",
+      "source": "file",
+      "path": "data/regimes/_catalogue.json",
+      "writable": true,
+      "_status": "not_implemented",
+      "_doc": "Haplotype regime catalogue (Cluster 4 of the haplotype-regimes pipeline: regime_mendelian / regime_dyad_mendelian / regime_pedigree / regime_linkage). Per-regime classification + per-window membership. Cross-atlas: read by popstats (per-regime stats), relatedness (regime inheritance page), meiosis (long-range regime context). Added 2026-05-23 to back the cross_atlas.exports declaration."
+    },
     "candidate_sv_counts": {
       "tier": "warm",
       "preload_on": "candidate_change",

@@ -18,7 +18,7 @@
   "operations": {
 
     "popstats_groupwise": {
-      "owned_by": "population",
+      "owned_by": "popstats",
       "_endpoint_origin": "popstats_server.py:1455 @app.post('/api/popstats/groupwise')",
       "_wraps": "region_popstats (Engine F)",
       "endpoint": "/api/popstats/groupwise",
@@ -43,7 +43,7 @@
     },
 
     "popstats_hobs_groupwise": {
-      "owned_by": "population",
+      "owned_by": "popstats",
       "_endpoint_origin": "popstats_server.py:1609 @app.post('/api/popstats/hobs_groupwise')",
       "_wraps": "angsd_fixed_HWE -doHWE + hobs_windower",
       "endpoint": "/api/popstats/hobs_groupwise",
@@ -63,7 +63,7 @@
     },
 
     "ancestry_groupwise_q": {
-      "owned_by": "population",
+      "owned_by": "popstats",
       "_endpoint_origin": "popstats_server.py:1735 @app.post('/api/ancestry/groupwise_q')",
       "_wraps": "instant_q local_Q_samples cache",
       "endpoint": "/api/ancestry/groupwise_q",

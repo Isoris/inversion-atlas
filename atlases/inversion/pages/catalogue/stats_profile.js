@@ -13,13 +13,17 @@
 //
 //   RESOLVED 2026-05-07 (round 5 step 12): _csGetSyntenyBlocks and
 //   _csPermutationTest were previously runtime-guarded via
-//   `typeof X === 'function'`. Round 5 step 11 migrated cross_species_breakpoints and made
-//   them explicit ES exports (legacy lines ~1488 and ~1791 in legacy
-//   single-file). They are now imported from '../comparative/cross_species_breakpoints.js'.
-//   The mount() function bridges stats_profile's legacyState into cross_species_breakpoints's
-//   _pageState (same pattern as the existing stats_profile → marker_readiness bridge),
-//   so cross_species_breakpoints's verbatim helpers see live crossSpecies + candidateList
-//   when stats_profile calls them during its render.
+//   `typeof X === 'function'`. Round 5 step 11 promoted them to explicit
+//   ES exports (legacy lines ~1488 and ~1791 in legacy single-file).
+//   2026-05-23 Phase 1a: cross_species_breakpoints moved out of inversion
+//   into its own atlas. Imports now resolve to
+//   '../../../cross-species/pages/breakpoints/cross_species_breakpoints.js'
+//   via the assembled atlas-workspace (cross-species and inversion are
+//   sibling atlases there). See atlas-core/build/assemble.sh for the
+//   layout. The mount() function still bridges stats_profile's legacyState
+//   into cross_species_breakpoints's _pageState (same pattern as the
+//   stats_profile → marker_readiness bridge), so cross_species_breakpoints's
+//   verbatim helpers see live crossSpecies + candidateList when called.
 //
 //   RESOLVED earlier: _esc imported from shared/page1_data_helpers.js;
 //   _mpDeriveAutoPanel imported from sibling marker_readiness.js.

@@ -1,6 +1,0 @@
-{
-  "_doc": "State slots. Phase 2: none declared — pages currently use state.<adhoc> slots inherited from inversion-atlas mounting (cross-atlas state slot inheritance is a Phase 5 cleanup task).",
-  "atlas_id": "evolution",
-  "version": "1.0",
-  "slots": []
-}

@@ -555,7 +555,12 @@ main#local_pca_dosage { grid-template-rows: 40px        /* ctrlBar */
                                  28px                  /* anchorStripPanel */
                                  minmax(160px, 1.6fr)  /* pcaPanel */
                                  minmax(180px, 1.6fr); /* l3Panel */
-             overflow: hidden; }
+             overflow: hidden;
+             position: relative; /* 2026-05-24: anchor for #lpdModeBBadge
+                                    (position:absolute, top-right corner).
+                                    Without this the badge anchors to the
+                                    viewport and collides with the header. */
+}
 /* v3.62: free layout mode. main becomes a normal block-flow scrollable
    container, panels stack at their natural / minimum heights, mouse wheel
    scrolls vertically. Triggered by body[data-layout-mode="free"] from the
@@ -3888,9 +3893,56 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
 }
 #multi_species_cockpit .ms-detail-kv .ms-kv-label { color: var(--ink-dim); }
 #multi_species_cockpit .ms-detail-kv .ms-kv-val { color: var(--ink); }
-/* ===== Synthesis overview (overview) — layer-envelope inventory ===== */
+/* ===== Synthesis overview (overview) — two tiles: layer inventory + candidate spreadsheet ===== */
 #overview { overflow-y: auto; }
-#overview .ov-content { padding: 16px; max-width: 980px; }
+#overview .ov-content { padding: 16px; max-width: 1600px; }
+#overview .ov-grid {
+  display: grid; grid-template-columns: minmax(360px, 1fr) minmax(560px, 2fr);
+  gap: 16px; align-items: start;
+}
+@media (max-width: 1100px) { #overview .ov-grid { grid-template-columns: 1fr; } }
+#overview .ov-tile {
+  border: 1px solid var(--rule); border-radius: 3px;
+  background: var(--panel); padding: 12px;
+}
+#overview .ov-tile-title {
+  font-family: var(--serif); font-weight: 500; font-size: 14px;
+  color: var(--ink); margin-bottom: 4px;
+}
+#overview .ov-tile-sub {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-dim); margin-bottom: 10px;
+}
+#overview .ov-controls {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+#overview .ov-ctrl {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+  display: inline-flex; align-items: center; gap: 4px;
+}
+#overview .ov-ctrl select {
+  font-family: var(--mono); font-size: 11px; padding: 2px 6px;
+  background: var(--panel-2); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: 2px;
+}
+#overview .ov-btn {
+  font-family: var(--mono); font-size: 11px; padding: 2px 10px;
+  background: var(--panel-2); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: 2px; cursor: pointer;
+}
+#overview .ov-btn:hover { background: var(--panel-3); border-color: var(--accent); }
+#overview .ov-summary-inline {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+  margin-left: auto;
+}
+#overview .ov-sortable { cursor: pointer; user-select: none; }
+#overview .ov-sortable:hover { background: var(--panel-2); }
+#overview .ov-sortable.ov-active { color: var(--accent); }
+#overview .ov-table-cand td { white-space: nowrap; }
+#overview .ov-table .ov-conf { color: #3cc08a; font-weight: 600; }
+#overview .ov-table .ov-prov { color: #f5a524; }
+
 #overview .ov-title {
   font-family: var(--serif); font-weight: 500; font-size: 18px;
   color: var(--ink); margin-bottom: 4px;

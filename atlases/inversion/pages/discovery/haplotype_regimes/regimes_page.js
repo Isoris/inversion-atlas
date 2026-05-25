@@ -164,7 +164,136 @@ export function initRegimesPage(state, args) {
     catch (_) {}
   }
   state._regimesTeardownKeyboard = _installPageKeyboardNav(state);
+
+  // Click-to-expand wirer (2026-05-24). Idempotent — safe to call on every
+  // pipeline re-run; uses the same dedup guard as the keyboard nav.
+  if (typeof state._regimesTeardownExpand === 'function') {
+    try { state._regimesTeardownExpand(); }
+    catch (_) {}
+  }
+  state._regimesTeardownExpand = _installExpandButtons(state);
+
   return state._regimesTeardownKeyboard;
+}
+
+// ---------------------------------------------------------------------
+// _installExpandButtons — click-to-enlarge for the 4 regimes panels.
+//
+// Each `.rg-panel-title button.rg-expand-btn` toggles `.rg-panel-expanded`
+// on its parent `<div id="regimes*Panel">`. Expanded panel takes
+// position:fixed full viewport (minus a small inset) with a semi-transparent
+// backdrop. Click backdrop or press Escape to restore.
+//
+// After toggling, dispatches a `window.resize` event so the canvas
+// fitCanvas() path runs and the renderer repaints at the new size.
+// drawRegimesPanel + drawRegimesPC1Panel both read `cv.clientWidth/Height`
+// at every call, so a fresh draw against the resized container picks up
+// the new dims without additional plumbing.
+// ---------------------------------------------------------------------
+function _installExpandButtons(state) {
+  if (typeof document === 'undefined') return () => {};
+  // One-time injection of the CSS for the expanded state + backdrop.
+  if (!document.getElementById('rg-panel-expand-css')) {
+    const style = document.createElement('style');
+    style.id = 'rg-panel-expand-css';
+    style.textContent = `
+      .rg-panel-expanded {
+        position: fixed !important;
+        inset: 4vh 4vw !important;
+        z-index: 1001 !important;
+        box-shadow: 0 12px 48px rgba(0,0,0,0.6),
+                    0 0 0 1px var(--accent, #f5a524);
+        border-radius: 4px;
+      }
+      .rg-expand-backdrop {
+        position: fixed; inset: 0; z-index: 1000;
+        background: rgba(8, 12, 20, 0.65);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+      }
+      .rg-expand-btn:hover { color: var(--accent, #f5a524) !important;
+                              border-color: var(--accent, #f5a524) !important; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Per-panel redraw dispatch. Each panel has its own (state, drawFn) pair —
+  // genome panels read from state._regimesGenomeState, chrom from state.
+  const panelSpec = {
+    regimesPanel:           { state: state,                            draw: drawRegimesPanel },
+    regimesGenomePanel:     { state: state._regimesGenomeState,        draw: drawRegimesPanel },
+    regimesPC1Panel:        { state: state,                            draw: drawRegimesPC1Panel },
+    regimesPC1GenomePanel:  { state: state._regimesGenomeState,        draw: drawRegimesPC1Panel },
+  };
+  const handlers = [];
+  let backdrop = null;
+  let expandedPanelId = null;
+
+  function _redrawAfterLayout() {
+    // rAF so the .rg-panel-expanded layout commits BEFORE the canvas
+    // queries clientWidth/Height via fitCanvas(). Without the rAF the
+    // canvas measures the pre-expand box and renders too small.
+    const fire = () => {
+      for (const pid of Object.keys(panelSpec)) {
+        const spec = panelSpec[pid];
+        if (!spec || !spec.state || typeof spec.draw !== 'function') continue;
+        try { spec.draw(spec.state); } catch (_) { /* fail-soft per-panel */ }
+      }
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fire);
+    else setTimeout(fire, 0);
+  }
+
+  function collapse() {
+    if (!expandedPanelId) return;
+    const panel = document.getElementById(expandedPanelId);
+    if (panel) panel.classList.remove('rg-panel-expanded');
+    expandedPanelId = null;
+    if (backdrop && backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+    backdrop = null;
+    _redrawAfterLayout();
+  }
+
+  function expand(panelId) {
+    if (expandedPanelId === panelId) { collapse(); return; }
+    if (expandedPanelId) collapse();
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    backdrop = document.createElement('div');
+    backdrop.className = 'rg-expand-backdrop';
+    backdrop.addEventListener('click', collapse);
+    document.body.appendChild(backdrop);
+    panel.classList.add('rg-panel-expanded');
+    expandedPanelId = panelId;
+    _redrawAfterLayout();
+  }
+
+  for (const pid of Object.keys(panelSpec)) {
+    const panel = document.getElementById(pid);
+    if (!panel) continue;
+    const btn = panel.querySelector('.rg-expand-btn');
+    if (!btn) continue;
+    const onClick = (e) => { e.preventDefault(); e.stopPropagation(); expand(pid); };
+    btn.addEventListener('click', onClick);
+    handlers.push(() => btn.removeEventListener('click', onClick));
+  }
+
+  // ESC dismisses.
+  const onKey = (e) => {
+    if (e.key === 'Escape' && expandedPanelId) {
+      e.preventDefault();
+      collapse();
+    }
+  };
+  document.addEventListener('keydown', onKey);
+  handlers.push(() => document.removeEventListener('keydown', onKey));
+
+  // Teardown closure — called on next initRegimesPage to prevent
+  // listener-stacking on re-runs.
+  return function teardownExpand() {
+    if (expandedPanelId) collapse();
+    for (const fn of handlers) { try { fn(); } catch (_) {} }
+  };
 }
 
 // Hide the genome panel containers if they exist. Tolerant of absence

@@ -308,8 +308,13 @@ export function renderBoundariesPage() {
 let _bndKeyHandlerAttached = false;
 
 export function _bndKeyHandler(e) {
+  // Visibility-gating used to check `.classList.contains('active')` but
+  // atlas-core's router swaps `#app-root.innerHTML` per page — it never
+  // sets `.active` on `.page` elements. Hotkeys E/F/B/R/A were therefore
+  // permanently dead. Mount/unmount already gate via _bndAttach/Detach so
+  // a simple element-present check is sufficient.
   const visible = document.getElementById('boundary_refinement');
-  if (!visible || !visible.classList || !visible.classList.contains('active')) return;
+  if (!visible) return;
   const ae = document.activeElement;
   if (ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return;
   // Don't trigger on Ctrl/Meta/Alt combos (those are reserved for browser shortcuts)
@@ -544,10 +549,13 @@ function _buildLegacyState(atlasState) {
   legacy.candidate     = sh.activeCandidate || null;
   legacy.candidateList = sh.candidateList || inv.candidateList || [];
 
-  // Transient slot — boundary_refinement reads state.data.final_classification (via
-  // the same _bnd* helpers that karyotype_tier keys on). Default empty object so
-  // sub-field access doesn't throw.
-  legacy.data = inv.data || {};
+  // Per-chromosome data lives at inv.tracks[chrom], not inv.data — the
+  // legacy `inv.data` slot is never populated by the loader. Without
+  // pulling from inv.tracks[activeChrom], _buildBoundaryTrackScores
+  // (boundaries.js:444+) saw `data.windows = undefined` and produced no
+  // tracks. Matches stats_profile.js:1207 pattern.
+  const chrom = sh.activeChrom;
+  legacy.data = (chrom && inv.tracks && inv.tracks[chrom]) || inv.data || {};
 
   // Page-internal density layers — lazily created by data IO; expose as
   // empty objects by default so wirer helpers (TODO_MISSING) can probe

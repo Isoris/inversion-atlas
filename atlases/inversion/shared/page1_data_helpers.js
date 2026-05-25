@@ -46,6 +46,16 @@ const FAMILY_PALETTE_BASE = [
   '#9f1239', '#854d0e', '#166534', '#1e40af', '#6b21a8'
 ];
 
+// Golden-angle HSL extension for hubs past FAMILY_PALETTE_BASE.length.
+// Top-N hubs keep their curated colors; overflow hubs get deterministic,
+// well-spread hues that never collide with each other.
+function extraHubColor(k) {
+  const h = (k * 137.508) % 360;
+  const s = 55 + (k % 3) * 10;
+  const l = 45 + ((k >> 1) % 3) * 8;
+  return `hsl(${h.toFixed(1)} ${s}% ${l}%)`;
+}
+
 // --- getActiveSimScale(state) — legacy lines 31311-31329 ---
 // Resolve which scale to render. Falls back to legacy `sim_thumb` when
 // no scales were embedded.
@@ -931,7 +941,9 @@ export function buildFamilyPalette(state) {
   let palIdx = 0;
   for (const [f, n] of sorted) {
     if (n >= 4) {
-      state.familyPalette[f] = FAMILY_PALETTE_BASE[palIdx % FAMILY_PALETTE_BASE.length];
+      state.familyPalette[f] = palIdx < FAMILY_PALETTE_BASE.length
+        ? FAMILY_PALETTE_BASE[palIdx]
+        : extraHubColor(palIdx - FAMILY_PALETTE_BASE.length);
       state.hubFamilies.push(f);
       palIdx++;
     } else if (n >= 2) {

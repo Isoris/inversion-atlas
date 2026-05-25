@@ -1,6 +1,0 @@
-{
-  "_doc": "Registry-side operations (compute that runs inside the atlas, not cluster-side). Phase 1a: none. Operations like 'tolerance-sweep recompute' or 'reciprocity recompute' will be added in Phase 1c when the page UI surfaces 'Recompute' affordances.",
-  "atlas_id": "cross-species",
-  "version": "1.0",
-  "operations": []
-}

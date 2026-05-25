@@ -209,7 +209,9 @@
       "stage": "synthesis",
       "fragment": "atlases/inversion/pages/catalogue/stats_profile.html",
       "module": "atlases/inversion/pages/catalogue/stats_profile.js",
-      "_was_id": "page17"
+      "_was_id": "page17",
+      "tooltip": "Manuscript-bound statistical profile per candidate. Reads cross-species.synteny + runs the focal-vs-background permutation test on top of base pi/FST/dXY/HWE. Complement to popstats.popstats (which is the lightweight live group-wise tile); stats_profile is the deep, manuscript-ready surface.",
+      "_overlap_resolved_2026_05_23": "Earlier audit flagged stats_profile as potentially duplicating popstats.popstats. Resolved 2026-05-23: keep both. popstats.popstats = live cohort tile, computes groupwise_stats_v1 on demand. stats_profile = manuscript page, layers cross-species synteny + permutation test on top + writes the manuscript-ready table. Complementary, not redundant. Do NOT consolidate."
     },
     {
       "id": "overview",
@@ -218,7 +220,9 @@
       "stage": "synthesis",
       "fragment": "atlases/inversion/pages/catalogue/overview.html",
       "module": "atlases/inversion/pages/catalogue/overview.js",
-      "_was_id": "page_overview"
+      "_was_id": "page_overview",
+      "tooltip": "Synthesis landing surface. Two tiles: (1) layer inventory — workspace action-pipeline envelopes queried from GET /api/layers, grouped by layer_type; (2) candidate spreadsheet — sortable + filterable table of all promoted inversion candidates with TSV export. Manuscript-bound deliverable.",
+      "_status_2026_05_23": "Implemented in two tiles 2026-05-23. (a) Layer inventory had landed round-1 2026-05-14. (b) Candidate spreadsheet added 2026-05-23 — completes the second feature the legacy monolith comments hinted at ('candidate overview spreadsheet, manuscript-bound deliverables', monolith line 5134). Earlier annotation calling this an 'empty stub' was based on the page's outdated header comment and is no longer accurate."
     },
     {
       "id": "help",
@@ -296,21 +300,173 @@
       "_doc": "Per-candidate karyotype assignment + marker readiness. Shrunk to 2 pages on 2026-05-18 (see STAGE_AUDIT_2026-05-18.md): ancestry / boundary-refinement / SV-evidence / popstats / stats_profile / overview moved out to evolution / discovery_2 / synthesis. Only karyotype_tier + marker_readiness remain — the actual per-candidate \"what kind of inversion\" surfaces."
     },
     {
-      "id": "evolution",
-      "label": "evolution",
-      "order": 5,
-      "_doc": "Per-candidate evolution stage: polarize ancestral vs derived arrangement, reconstruct founder-like / MRCA-like consensus, build haplotype networks of INV chromosomes, estimate age + leakage + internal substructure. All cartridges consume the existing mgl_adapter primitives (PCA / dosage / heatmap / nj-tree) plus a small set of evolution-specific helpers (founder_consensus, doubleton_sfs_clusters, haplotype_network, outgroup_synteny, inversion_age, mosaicism_detector)."
-    },
-    {
       "id": "synthesis",
       "label": "synthesis",
-      "order": 6,
+      "order": 5,
       "_doc": "Cohort-level synthesis surfaces. Project overview, manuscript-ready statistical profile, per-window popstats track stack. Restored 2026-05-18 — these pages were originally synthesis-stage in legacy but got swept into classification by the slug-migration scripts. See STAGE_AUDIT_2026-05-18.md for the audit trail."
     },
     {
       "id": "help",
       "label": "help",
-      "order": 7
+      "order": 6
     }
-  ]
+  ],
+  "_stages_removed_2026_05_23": "Removed the 'evolution' stage entry — all pages migrated to evolution-atlas (Phase 1a). Stage orders renumbered: synthesis 6→5, help 7→6. If a future inversion-side evolution embed (e.g. archaeology_card keyed by inversion candidate) lands, recreate the stage entry.",
+  "cross_atlas": {
+    "_doc": "In/out adapter declaration. Inversion is the central producer (inversion candidates + regimes drive every other atlas). Imports the data needed to call those candidates: cross-species breakpoints, genome assembly + annotation, popstats + evolution feedback.",
+    "imports": [
+      {
+        "layer": "genome.chromosome_map",
+        "from": "genome",
+        "purpose": "Canonical chrom lengths + names. Used by every inversion page that draws a chromosome axis."
+      },
+      {
+        "layer": "genome.centromere_telomere",
+        "from": "genome",
+        "purpose": "Mask centromere zones out of the candidate pool (low-confidence regions)."
+      },
+      {
+        "layer": "genome.gene_track",
+        "from": "genome",
+        "purpose": "Gene cargo per candidate; functional context on candidate_focus."
+      },
+      {
+        "layer": "genome.repeat_track",
+        "from": "genome",
+        "purpose": "Breakpoint repeat enrichment."
+      },
+      {
+        "layer": "genome.te_hierarchy",
+        "from": "genome",
+        "purpose": "TE-hierarchy alluvial per parental haplotype."
+      },
+      {
+        "layer": "genome.variant_annotations",
+        "from": "genome",
+        "purpose": "Deleterious-variant overlap with inversions."
+      },
+      {
+        "layer": "genome.conserved_elements",
+        "from": "genome",
+        "purpose": "UCE / regulatory overlap with inversions."
+      },
+      {
+        "layer": "cross-species.breakpoints_consolidated_v1",
+        "from": "cross-species",
+        "purpose": "Seed coordinates for candidate calls + cross-method-validated Tier 1 anchors."
+      },
+      {
+        "layer": "cross-species.bp_atlas_reciprocity_v1",
+        "from": "cross-species",
+        "purpose": "Confidence-tier badge on the catalogue."
+      },
+      {
+        "layer": "cross-species.bp_atlas_arcs_v1",
+        "from": "cross-species",
+        "purpose": "BP5 arc visualisation embedded on cross_species_breakpoints page (legacy comparative)."
+      },
+      {
+        "layer": "cross-species.atlas_data_v1",
+        "from": "cross-species",
+        "purpose": "BP5 figure JSON."
+      },
+      {
+        "layer": "cross-species.joint_candidates_v1",
+        "from": "cross-species",
+        "purpose": "5-class A-E classification surfaced in the catalogue."
+      },
+      {
+        "layer": "cross-species.pairwise_summary_v1",
+        "from": "cross-species",
+        "purpose": "Per-focal pairwise rearrangement summary."
+      },
+      {
+        "layer": "popstats.groupwise_stats_v1",
+        "from": "popstats",
+        "purpose": "Cohort-level FST/dXY/pi per candidate. Read on candidate_focus + stats_profile."
+      },
+      {
+        "layer": "popstats.hobs_hexp_groupwise_v1",
+        "from": "popstats",
+        "purpose": "Mode-B Hobs/Hexp QC chip."
+      },
+      {
+        "layer": "popstats.ancestry_per_window_v1",
+        "from": "popstats",
+        "purpose": "Ancestry-Delta12 QC track."
+      },
+      {
+        "layer": "evolution.age_busco4d_v1",
+        "from": "evolution",
+        "purpose": "Per-candidate age estimate on candidate_focus."
+      },
+      {
+        "layer": "evolution.archaeology_card_v1",
+        "from": "evolution",
+        "purpose": "Synthesis-stage archaeology card embed."
+      },
+      {
+        "layer": "evolution.polarisation_synteny_vote_v1",
+        "from": "evolution",
+        "purpose": "Polarity verdict on candidate_focus."
+      },
+      {
+        "layer": "evolution.polarisation_msa_stacked_v1",
+        "from": "evolution",
+        "purpose": "Polarity verdict (MSA path) on candidate_focus."
+      },
+      {
+        "layer": "evolution.haplotype_network_v1",
+        "from": "evolution",
+        "purpose": "Per-inversion haplotype network embed."
+      },
+      {
+        "layer": "meiosis.crossover_track",
+        "from": "meiosis",
+        "purpose": "Per-window CO density as a track on local_pca_dosage."
+      },
+      {
+        "layer": "diversity.cohort_master_per_chrom",
+        "from": "diversity",
+        "purpose": "Per-chromosome diversity rollup. Inversion overlays the theta_pi component as a background track on the local-PCA scrubber."
+      },
+      {
+        "layer": "diversity.samples_genomewide_het",
+        "from": "diversity",
+        "purpose": "Per-sample H baseline for the Hobs/Hexp QC chip."
+      },
+      {
+        "layer": "population.ngsrelate_kinship",
+        "from": "population",
+        "purpose": "Pairwise kinship for the layer_cleaning ancestry downweighting. (ngsrelate_kinship lives in population-atlas, not relatedness — corrected 2026-05-23.)"
+      },
+      {
+        "layer": "population.ngsadmix_q",
+        "from": "population",
+        "purpose": "K-cluster Q-matrix for global ancestry context."
+      }
+    ],
+    "exports": [
+      {
+        "layer": "inversion.candidates_v1",
+        "used_by": ["evolution", "popstats", "cross-species", "relatedness", "meiosis"],
+        "purpose": "The canonical inversion candidate list. Every per-candidate operation in every atlas is keyed by candidate_id."
+      },
+      {
+        "layer": "inversion.scrubber_main",
+        "used_by": ["popstats", "evolution"],
+        "purpose": "Per-chrom local-PCA atlas JSON. Read by review/popstats.js and age_divergence for chrom-level context."
+      },
+      {
+        "layer": "inversion.regime_catalogue_v1",
+        "used_by": ["popstats", "relatedness"],
+        "purpose": "Haplotype regime catalogue (Cluster 4 of the haplotype-regimes pipeline). Relatedness reads it for regime-inheritance; popstats reads it for per-regime stats."
+      },
+      {
+        "layer": "inversion.candidate_lineage",
+        "used_by": ["evolution", "popstats"],
+        "purpose": "Per-candidate version-index. Required arg for all per-candidate cross-atlas reads."
+      }
+    ]
+  }
 }

@@ -831,8 +831,13 @@ function _mpIngestText(text, filename, kind) {
   if (filename && /\.tsv$|\.txt$/i.test(filename)) {
     parsed = _mpParseTsv(text);
   } else {
-    try { parsed = JSON.parse(text); } catch (_) {
-      try { parsed = _mpParseTsv(text); } catch (__) { parsed = null; }
+    try { parsed = JSON.parse(text); } catch (jsonErr) {
+      try { parsed = _mpParseTsv(text); }
+      catch (tsvErr) {
+        console.warn('[markerPanel] both JSON and TSV parse failed for', filename,
+                     '— JSON:', jsonErr, '— TSV:', tsvErr);
+        parsed = null;
+      }
     }
   }
   if (!parsed) { console.warn('[markerPanel] could not parse', filename); return; }

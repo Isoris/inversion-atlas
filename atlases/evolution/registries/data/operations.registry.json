@@ -1,6 +1,0 @@
-{
-  "_doc": "Registry-side operations. Phase 2: none. Per-candidate age recompute / polarity revote could land here in Phase 5.",
-  "atlas_id": "evolution",
-  "version": "1.0",
-  "operations": []
-}
