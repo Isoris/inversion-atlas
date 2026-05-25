@@ -47,6 +47,7 @@ import {
   clusterSizesFromAssignment,
 } from './pca_scatter_per_window/selection.js';
 import { pcaCacheKey } from '../../shared/mgl_candidate_mode.js';
+import { fitCanvasNoDpr } from '../../shared/page1_utils.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   color_by:     'cluster',
@@ -397,6 +398,9 @@ function _paintScrubber(state) {
   if (typeof document === 'undefined' || !document.getElementById) return;
   const canvas = document.getElementById('pcaPanelScrubberCanvas');
   if (!canvas) return;
+  // 2026-05-26: fit canvas backing buffer to CSS box (renderer reads
+  // canvas.width/.height directly; default 300×150 → invisible content).
+  fitCanvasNoDpr(canvas);
   if (!Array.isArray(state.pca_results) || state.pca_results.length === 0) {
     if (canvas.getContext) {
       const ctx = canvas.getContext('2d');
@@ -422,6 +426,7 @@ function _paintScatterCanvas(state) {
   const canvas = document.getElementById('pcaPanelScatterCanvas');
   const empty  = document.getElementById('pcaPanelEmpty');
   if (!canvas) return;
+  fitCanvasNoDpr(canvas);
   const aw = _activePca(state);
   if (!aw || !aw.pc1 || !aw.pc2) {
     if (empty) empty.style.display = '';

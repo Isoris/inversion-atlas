@@ -84,8 +84,10 @@ export function drawRegimesPC1Panel(state) {
   ctx.clearRect(0, 0, w, h);
 
   // Geometry
-  const stripH = 16;
-  const pad = { l: 44, r: 16, t: 6 + stripH, b: 16 };
+  // 2026-05-26: stripH 16 → 12 + bottom pad 16 → 12 (matches the trim
+  // applied to regimes_panel.js — same "panels are a bit thick" feedback).
+  const stripH = 12;
+  const pad = { l: 44, r: 16, t: 6 + stripH, b: 12 };
   const plotW = w - pad.l - pad.r;
   const plotH = h - pad.t - pad.b;
   if (plotW <= 0 || plotH <= 0) return;
@@ -253,7 +255,8 @@ export function drawRegimesPC1Panel(state) {
   }
 
   // Untracked + non-voter — faint grey
-  ctx.lineWidth = 0.6;
+  // 2026-05-26: lineWidth 0.6 → 0.5 (matches regimes_panel.js trim).
+  ctx.lineWidth = 0.5;
   ctx.strokeStyle = 'rgba(140,150,170,0.10)';
   for (let si = 0; si < n_samples; si++) {
     if (voterSet.has(si)) continue;
@@ -261,7 +264,8 @@ export function drawRegimesPC1Panel(state) {
     strokePath(si);
   }
 
-  // Tracked but not in voter — preserved tracked colour at low alpha
+  // Tracked but not in voter — preserved tracked colour at low alpha.
+  // 2026-05-26: lineWidth 1.0 → 0.7.
   for (const si of trackedSet) {
     if (voterSet.has(si)) continue;
     let col = '#aab2c0';
@@ -269,7 +273,7 @@ export function drawRegimesPC1Panel(state) {
       const c = resolveSampleScopeColor(state, si, state.linesColorMode || 'kmeans');
       if (c) col = c;
     }
-    ctx.lineWidth = 1.0;
+    ctx.lineWidth = 0.7;
     ctx.strokeStyle = withAlpha(col, 0.45);
     strokePath(si);
   }
@@ -284,13 +288,14 @@ export function drawRegimesPC1Panel(state) {
     if (!bandSamples) continue;
     for (const si of bandSamples) siToFocalBand.set(si, bi);
   }
-  // Match regimes_panel.js: alpha 0.45 when voter has >8 samples so dense
-  // overlap doesn't saturate into a solid orange wash.
-  const voterAlpha = voterSet.size > 8 ? 0.45 : 0.85;
+  // Match regimes_panel.js: alpha 0.35/0.80 + lineWidth 0.8 (was 0.45/0.85 + 1.2).
+  // 2026-05-26: trim per Quentin's "lines are a bit thick" feedback — keeps
+  // voter visibility but lets dense overlap regions surface gradients.
+  const voterAlpha = voterSet.size > 8 ? 0.35 : 0.80;
   for (const si of voterSet) {
     const bi = siToFocalBand.get(si);
     const col = bandHues[(bi >= 0 ? bi : 0) % bandHues.length];
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 0.8;
     ctx.strokeStyle = withAlpha(col, voterAlpha);
     strokePath(si);
   }

@@ -18,7 +18,7 @@ import { fitCanvas, formatTrackVal, themeColor, withAlpha } from '../../../share
 import { isPerSampleLineColorMode, perSampleValuesForMode, perSampleColorFor } from '../../../shared/per_sample_line_color.js';
 import { drawCusumPanel } from './cusum_panel.js';
 
-import { _resolveSampleScopeColor, _setActiveState, trackedColor } from './_state.js';
+import { _resolveSampleScopeColor, _setActiveState, sampleScopeColorArray, trackedColor, trackedSet as getTrackedSet } from './_state.js';
 import { _LINES_COLOR_MODES, _isLinesColorModeAvailable, availablePCs, currentMbRange, getActiveModeView, getLinesGrid, getLinesSignAt, getLinesValuesAt } from './_data.js';
 import { _drawBandTraceStrip, _drawDiamondOverlay, _drawInheritanceLabelsStrip, _drawLineageStrip, _drawRegimeBreadthStrip, _drawSnpDensityShade, _drawSnpDensityStrip, _drawTrackedLinkageStrip, _drawTransitionRateStrip } from './z_panel.js';
 import { drawPCA } from './pca_panel.js';
@@ -27,6 +27,7 @@ import { setCur } from './events.js';
 import { wireBandTraceTooltip } from './band_trace_tooltip.js';
 import { wireInheritancePillTooltip } from './inheritance_tooltip.js';
 import { maybeShowFishInspectPopover } from './fish_inspect_popover.js';
+import { persistDebounced } from '../../../shared/persist_debounced.js';
 
 // 2026-05-20: per-mode "no data" notice text for the lines-panel
 // fallback warning (rendered top-right of the PC1 sub-panel when every
@@ -136,7 +137,9 @@ export function drawLinesPanel(state) {
     return;
   }
 
-  const trackedSet = new Set(state.tracked);
+  // 2026-05-21 perf: memoized — no per-frame Set allocation. See
+  // _state.js#trackedSet for the identity-keyed cache.
+  const trackedSet = getTrackedSet(state);
   // Defensive: d.windows might be missing or wrong-shaped when activeMode
   // is theta_pi/ghsl but the synthesized view didn't get a windows array
   // (e.g. theta_pi_per_window absent in this JSON). Without this guard
@@ -217,7 +220,19 @@ export function drawLinesPanel(state) {
     ].join('|');
     let cached = state.__linesCache[source];
     if (!cached || cached._key !== cacheKey) {
-      // Compute Y range across all samples and all windows for this source
+      // 2026-05-21 perf: single pass — gather raw values into rawMatrix,
+      // track yMin/yMax as we go, then derive yMatrix from rawMatrix in
+      // one indexed pass. The pre-2026 version walked every (gi, si)
+      // twice, calling getLinesValuesAt + getLinesSignAt + the
+      // (vals[si] * sign) multiplication twice per element. Merging cuts
+      // cache-miss cost roughly in half on the inner loop, which
+      // dominates total drawLinesPanel time on chrom changes.
+      const rawMatrix = new Array(nS);
+      for (let si = 0; si < nS; si++) {
+        const arr = new Float32Array(nGrid);
+        for (let i = 0; i < nGrid; i++) arr[i] = NaN;
+        rawMatrix[si] = arr;
+      }
       let yMin = Infinity, yMax = -Infinity;
       let validData = false;
       for (let gi = 0; gi < nGrid; gi++) {
@@ -227,6 +242,7 @@ export function drawLinesPanel(state) {
         for (let si = 0; si < nS; si++) {
           const v = vals[si] * sign;
           if (!isFinite(v)) continue;
+          rawMatrix[si][gi] = v;
           if (v < yMin) yMin = v;
           if (v > yMax) yMax = v;
           validData = true;
@@ -242,25 +258,24 @@ export function drawLinesPanel(state) {
       }
       const yPad = (yMax - yMin) * 0.05 || 0.01;
       yMin -= yPad; yMax += yPad;
-      const toY = (v) => pad.t + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+      const yRange = yMax - yMin;
       const xByGrid = new Float32Array(nGrid);
       for (let gi = 0; gi < nGrid; gi++) {
         xByGrid[gi] = pad.l + ((mbAt(gi) - mbMin) / (mbMax - mbMin)) * plotW;
       }
+      // Convert raw → y in a single indexed pass, no getLinesValuesAt
+      // recall, no sign re-multiplication.
       const yMatrix = new Array(nS);
       for (let si = 0; si < nS; si++) {
-        const arr = new Float32Array(nGrid);
-        for (let i = 0; i < nGrid; i++) arr[i] = NaN;
-        yMatrix[si] = arr;
-      }
-      for (let gi = 0; gi < nGrid; gi++) {
-        const vals = getLinesValuesAt(state, gi, source);
-        if (!vals) continue;
-        const sign = getLinesSignAt(state, gi, source);
-        for (let si = 0; si < nS; si++) {
-          const v = vals[si] * sign;
-          if (isFinite(v)) yMatrix[si][gi] = toY(v);
+        const row = rawMatrix[si];
+        const out = new Float32Array(nGrid);
+        for (let gi = 0; gi < nGrid; gi++) {
+          const v = row[gi];
+          out[gi] = isFinite(v)
+            ? pad.t + plotH - ((v - yMin) / yRange) * plotH
+            : NaN;
         }
+        yMatrix[si] = out;
       }
       cached = { _key: cacheKey, yMin, yMax, xByGrid, yMatrix };
       state.__linesCache[source] = cached;
@@ -464,6 +479,13 @@ export function drawLinesPanel(state) {
       const psVals = (lcMode !== 'family' && lcMode !== 'lineage')
         ? perSampleValuesForMode(state, lcMode, { startW: 0, endW: (state.data && state.data.n_windows - 1) | 0 })
         : null;
+      // 2026-05-21 perf: pre-resolve the per-sample scope color array
+      // ONCE for the active mode instead of calling _resolveSampleScopeColor
+      // inside the nS loop below. sampleScopeColorArray returns null for
+      // non-scope modes (the psVals path handles those).
+      const scopeColors = (lcMode === 'family' || lcMode === 'lineage')
+        ? sampleScopeColorArray(state, lcMode)
+        : null;
       // v4 turn 126: track how many samples got a real per-sample color.
       // If we're in family mode but every sample falls back to the default
       // stroke (because family_id isn't loaded on samples), the visual
@@ -479,8 +501,8 @@ export function drawLinesPanel(state) {
           // static map). Het/θπ/GHSL/F_ROH/confounder_alert use the
           // pre-computed per-sample value array + the per-mode color ramp.
           let c = null;
-          if (lcMode === 'family' || lcMode === 'lineage') {
-            c = _resolveSampleScopeColor(si, lcMode);
+          if (scopeColors) {
+            c = scopeColors[si];
           } else if (psVals) {
             c = perSampleColorFor(lcMode, psVals[si], psVals);
           }
@@ -1476,7 +1498,7 @@ export function setLinesPanelCandidateBands(state, b) {
   _setActiveState(state);
   const _state = (typeof window !== 'undefined' && window.state) ? window.state : state;
   _state.linesPanelCandidateBands = !!b;
-  try { localStorage.setItem(_LINES_PANEL_CAND_BANDS_KEY, b ? '1' : '0'); } catch (_) {}
+  persistDebounced(_LINES_PANEL_CAND_BANDS_KEY, b ? '1' : '0');
   drawLinesPanel(state);
 }
 

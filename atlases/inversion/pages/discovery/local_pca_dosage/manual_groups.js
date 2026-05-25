@@ -27,6 +27,7 @@ import { _pageState } from './_state.js';
 import { getL2Cluster } from './_data.js';
 import { drawPCA } from './pca_panel.js';
 import { renderL3Panel } from './l3_panel.js';
+import { persistDebounced } from '../../../shared/persist_debounced.js';
 
 // --- Palette + storage prefixes (legacy lines 47899-47904) ---
 const MG_PALETTE = [
@@ -82,17 +83,9 @@ function saveManualGroups() {
   const groups = (state && state.manualGroups) || [];
   const cohort = groups.filter(g => g.scope === 'cohort');
   const chrom  = groups.filter(g => g.scope !== 'cohort');
-  try {
-    localStorage.setItem(_mgCohortKey(),
-      JSON.stringify({ groups: cohort.map(_mgPick) }));
-  } catch (e) {}
+  persistDebounced(_mgCohortKey(), { groups: cohort.map(_mgPick) });
   const ck = _mgChromKey();
-  if (ck) {
-    try {
-      localStorage.setItem(ck,
-        JSON.stringify({ groups: chrom.map(_mgPick) }));
-    } catch (e) {}
-  }
+  if (ck) persistDebounced(ck, { groups: chrom.map(_mgPick) });
 }
 function _mgPick(g) {
   return { id: g.id, name: g.name, color: g.color, members: g.members.slice() };

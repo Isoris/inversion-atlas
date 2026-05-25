@@ -33,6 +33,7 @@ import { drawLinesPanel } from './lines_panel.js';
 import { renderL3Panel } from './l3_panel.js';
 import { refreshBandPickBar } from './candidates.js';
 import { _updateConcordBadge, onPCAClick, renderZoneBlock, setCur } from './events.js';
+import { persistDebounced } from '../../../shared/persist_debounced.js';
 import { addToManualGroup } from './manual_groups.js';
 
 // --- _K_CYCLE_ORDER — legacy line 56536 ---
@@ -403,7 +404,7 @@ function _wireScreeInsetDrag(el) {
     // Pin the user's choice so _positionScreeInsetSmart doesn't fight it
     // on subsequent drawPCA paints. Cleared by double-click.
     if (_pageState) _pageState._screeUserCorner = target;
-    try { localStorage.setItem('inversion_atlas.screeCorner', target); } catch (_) {}
+    persistDebounced('inversion_atlas.screeCorner', target);
   };
   el.addEventListener('mousedown', onMouseDown);
   // Double-click clears the user pin so smart-placement resumes.
@@ -916,8 +917,21 @@ function _drawSelectionHalo(ctx, ids, screenXY) {
   ctx.restore();
 }
 
-function _drawClusterLabelOverlay(ctx, state, groupLabels, screenXY, nS) {
-  const K = state.k || 3;
+// 2026-05-21 perf (Tier-A finding #3): memoize centroid math on the
+// (groupLabels, screenXY, K) tuple. groupLabels is stable per L2 + K,
+// screenXY is stable as long as the PC values + canvas size + viewport
+// don't change. Within a scrub that doesn't cross an L2 boundary, both
+// inputs reuse identity and the centroid math is a cache hit instead
+// of O(K + nS) per frame.
+function _computeClusterCentroids(state, groupLabels, screenXY, nS, K) {
+  const cache = state._clusterCentroidCache;
+  if (cache &&
+      cache.groupLabels === groupLabels &&
+      cache.screenXY    === screenXY    &&
+      cache.K           === K &&
+      cache.nS          === nS) {
+    return cache;
+  }
   const xSum = new Float64Array(K);
   const ySum = new Float64Array(K);
   const cnt  = new Int32Array(K);
@@ -930,6 +944,21 @@ function _drawClusterLabelOverlay(ctx, state, groupLabels, screenXY, nS) {
     ySum[k] += y;
     cnt[k]++;
   }
+  const cx = new Float64Array(K);
+  const cy = new Float64Array(K);
+  for (let k = 0; k < K; k++) {
+    if (cnt[k] === 0) { cx[k] = NaN; cy[k] = NaN; continue; }
+    cx[k] = xSum[k] / cnt[k];
+    cy[k] = ySum[k] / cnt[k];
+  }
+  const out = { groupLabels, screenXY, K, nS, cx, cy, cnt };
+  state._clusterCentroidCache = out;
+  return out;
+}
+
+function _drawClusterLabelOverlay(ctx, state, groupLabels, screenXY, nS) {
+  const K = state.k || 3;
+  const { cx, cy, cnt } = _computeClusterCentroids(state, groupLabels, screenXY, nS, K);
   ctx.save();
   ctx.font = 'bold 12px ui-monospace, monospace';
   ctx.textAlign = 'center';
@@ -937,15 +966,13 @@ function _drawClusterLabelOverlay(ctx, state, groupLabels, screenXY, nS) {
   ctx.lineWidth = 3;
   for (let k = 0; k < K; k++) {
     if (cnt[k] === 0) continue;
-    const cx = xSum[k] / cnt[k];
-    const cy = ySum[k] / cnt[k];
     const text = _clusterLabelText(state.pcaClusterLabelMode, k, K);
     if (!text) continue;
     // Halo (stroke against bg) then fill in the cluster's color.
     ctx.strokeStyle = 'rgba(14,17,22,0.92)';
-    ctx.strokeText(text, cx, cy);
+    ctx.strokeText(text, cx[k], cy[k]);
     ctx.fillStyle = groupColor(k) || '#fff';
-    ctx.fillText(text, cx, cy);
+    ctx.fillText(text, cx[k], cy[k]);
   }
   ctx.restore();
 }
@@ -1204,11 +1231,19 @@ function _refreshRampLegend(state) {
   // Mode-specific gradient + label format.
   let gradientCss = null, minLbl = '', maxLbl = '';
   if (ramp === 'het') {
+    // 2026-05-26: ramp is cohort-adaptive (median-anchored divergent),
+    // so the labels show the actual cohort min/max instead of the
+    // theoretical [0, 1] range. Falls back to '—' before chunk lands.
     gradientCss = 'linear-gradient(to right, #4a90ff, #cccccc, #d94f4f)';
-    minLbl = '0'; maxLbl = '1';
+    minLbl = Number.isFinite(vMin) ? vMin.toFixed(3) : '—';
+    maxLbl = Number.isFinite(vMax) ? vMax.toFixed(3) : '—';
   } else if (ramp === 'dosage') {
+    // 2026-05-26: ramp is cohort-adaptive (median-anchored divergent),
+    // so the labels show the actual cohort min/max instead of the
+    // theoretical diploid range [0, 2].
     gradientCss = 'linear-gradient(to right, #2c8fa1, #9aa1a8, #d94f4f)';
-    minLbl = '0'; maxLbl = '2';
+    minLbl = Number.isFinite(vMin) ? vMin.toFixed(3) : '—';
+    maxLbl = Number.isFinite(vMax) ? vMax.toFixed(3) : '—';
   } else if (ramp === 'theta_pi' || ramp === 'ghsl') {
     gradientCss = 'linear-gradient(to right, #2b6ca8, #f0c14b)';
     minLbl = Number.isFinite(vMin) ? vMin.toFixed(3) : '—';
@@ -1516,8 +1551,14 @@ export function attachPcaLasso(state) {
       if (samples.length > cap) st.trackedN = Math.min(50, samples.length);
       // Auto-deactivate lasso (one-shot, like the lines lasso).
       st.pcaLassoActive = false;
-      const cb = document.getElementById('pcaLassoToggle');
-      if (cb) cb.checked = false;
+      // 2026-05-26: was getElementById('pcaLassoToggle') — that bare id
+      // doesn't exist in local_pca_dosage.html. The two real toggles are
+      // #pcaLassoToggleCompact + #pcaLassoTogglePopup, so the UI never
+      // unchecked. Mirror the iteration pattern from sidebar.js:449.
+      for (const id of ['pcaLassoToggleCompact', 'pcaLassoTogglePopup']) {
+        const cb = document.getElementById(id);
+        if (cb) cb.checked = false;
+      }
       if (typeof _updatePcaLassoUI === 'function') _updatePcaLassoUI();
       renderTrackedList(st);
       if (typeof _syncTrackedCompactUI === 'function') _syncTrackedCompactUI();

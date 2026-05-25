@@ -34,6 +34,7 @@ import {
   entryToDisplay,
   clusterSizesFromLabels,
 } from './dosage_cluster_adaptive_k/selection.js';
+import { fitCanvasNoDpr } from '../../shared/page1_utils.js';
 
 // =====================================================================
 // Public entry — refresh
@@ -434,6 +435,9 @@ function _paintCurves(state) {
   const canvas = document.getElementById('dosageClusterCurvesCanvas');
   const empty  = document.getElementById('dosageClusterEmpty');
   if (!canvas) return;
+  // 2026-05-26: fit canvas backing buffer to CSS box (renderer reads
+  // canvas.width/.height directly; default 300×150 → invisible content).
+  fitCanvasNoDpr(canvas);
   const entry = _activeEntry(state);
   const curves = entry ? entry.cluster_curves : null;
   if (!curves || !Array.isArray(curves) || curves.length === 0) {

@@ -33,6 +33,7 @@ import {
   IGC_MIN_BANDS_FOR_CLUSTERING,
 } from '../../../../popstats/shared/inheritance_groups.js';
 import { inheritanceCacheKey } from './inheritance.js';
+import { persistDebounced } from '../../../shared/persist_debounced.js';
 // 2026-05-20 (SPEC_macrostripe_microgroup_hierarchy.md Phase 2): the
 // L2-sweep auto-promote pipeline should accept on macrostripe purity
 // instead of per-window K-means purity when band-tracking has produced
@@ -86,9 +87,8 @@ export function loadL2SweepDismissed(chrom) {
 
 export function saveL2SweepDismissed(chrom, set) {
   if (!chrom || !(set instanceof Set)) return;
-  if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.setItem(L2_SWEEP_DISMISSED_KEY_PFX + chrom, JSON.stringify(Array.from(set)));
+    persistDebounced(L2_SWEEP_DISMISSED_KEY_PFX + chrom, Array.from(set));
   } catch (e) {
     if (typeof console !== 'undefined' && console.warn) {
       console.warn('[l2sweep] dismissed-set persist failed:', e && e.message);

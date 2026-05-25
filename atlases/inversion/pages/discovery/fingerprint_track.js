@@ -50,6 +50,7 @@ import {
   MGL_ARCHITECTURE_SCENARIOS,
   MGL_SWITCH_TYPES,
 } from '../../shared/mgl_fingerprinter.js';
+import { fitCanvasNoDpr } from '../../shared/page1_utils.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   show_brief_switches:   false,
@@ -177,6 +178,9 @@ function _paintTrackCanvas(state) {
   const canvas = document.getElementById('fingerprintTrackCanvas');
   const empty  = document.getElementById('fingerprintTrackEmpty');
   if (!canvas) return;
+  // 2026-05-26: fit canvas backing buffer to CSS box (renderer reads
+  // canvas.width/.height directly; default 300×150 → invisible content).
+  fitCanvasNoDpr(canvas);
   if (!state.fingerprint_result
       || !Array.isArray(state.fingerprint_result.windows)
       || state.fingerprint_result.windows.length === 0) {
@@ -234,6 +238,7 @@ function _paintProportionsCanvas(state) {
   if (typeof document === 'undefined' || !document.getElementById) return;
   const canvas = document.getElementById('fingerprintProportionsCanvas');
   if (!canvas) return;
+  fitCanvasNoDpr(canvas);
   const fp = state.fingerprint_result;
   if (!fp || !Array.isArray(fp.windows) || fp.windows.length === 0) {
     if (canvas.getContext) {

@@ -43,6 +43,7 @@ import {
   groupColor,
 } from './_data.js';
 import { manualGroupForSample } from './manual_groups.js';
+import { persistDebounced } from '../../../shared/persist_debounced.js';
 // Live-binding import: setCur is called from click handlers (function bodies),
 // never at module-load time, so the events.js ↔ l3_panel.js cycle resolves
 // fine. Used to make neighbor panes clickable (jump cursor to that L2).
@@ -396,7 +397,7 @@ export function renderL3Panel(state) {
       const v = parseFloat(el.dataset[next]);
       // Update state + persist
       state.l3SecondaryMetric = next;
-      try { localStorage.setItem('pca_scrubber_v3.l3SecondaryMetric', next); } catch (_) {}
+      persistDebounced('pca_scrubber_v3.l3SecondaryMetric', next);
       // Update chip in-place — read the inner spans by querySelector
       el.dataset.metricActive = next;
       el.title = `${tips[next]}\n\nClick to cycle: Cramér's V → NMI → AMI → ARI → Cramér's V`;
@@ -436,7 +437,7 @@ export function renderL3Panel(state) {
                             'uv-denoise', 'uv-dbscan', 'uv-dist-rank', 'uv-dist-fuzzy'];
         if (validModes.includes(v)) {
           state.l3ReclusterMode = v;
-          try { localStorage.setItem('pca_scrubber_v3.l3ReclusterMode', v); } catch (_) {}
+          persistDebounced('pca_scrubber_v3.l3ReclusterMode', v);
           // v4.1 continue: trigger an L3 re-render so the contingency rebuilds
           // against the new mode. Three call sites pick up the change:
           // (1) the focal-vs-neighbor contingency (line ~14328 in
@@ -2561,6 +2562,18 @@ function slabFocalContentHtml(cl, range, K) {
             '</span>' +
           '</div>';
 
+  // 2026-05-26: invariant meta chips (windows / span / SNPs / density) —
+  // same row L2 mode renders. Without these, the focal pane was shorter
+  // in slab mode than in L2 mode, so switching scales shifted the
+  // mini-PCA canvas vertically. Quentin: "when we click different scales
+  // than L2 in the L3 contingency panels … it goes a bit up and down".
+  const synthEnvForStats = (Number.isFinite(startBp) && Number.isFinite(endBp))
+    ? { start_bp: startBp, end_bp: endBp } : null;
+  if (synthEnvForStats) {
+    const stats = _rangeInvariantStats(cl, s, e, synthEnvForStats);
+    html += _invariantMetaInlineHtml(stats);
+  }
+
   // K-dependent chips (per-group counts + center PC1). Same helper as L2 mode.
   html += _kSpecificMetaInlineHtml(cl, null);
 
@@ -3220,49 +3233,64 @@ function _kSpecificMetaInlineHtml(cl, l2idx) {
   return `<div class="meta-inline">${chips.join('')}</div>`;
 }
 
-// --- _l2InvariantStats — legacy lines 49774-49814 ---
-// Computes K-INVARIANT stats for an L2 envelope (windows, span, SNPs, density).
-function _l2InvariantStats(cl, env, l2idx) {
+// --- _rangeInvariantStats — generalized helper ---
+// Computes K-INVARIANT stats over any window range [startW, endW] (inclusive,
+// 0-indexed). Used by both _l2InvariantStats (L2 mode) and slabFocalContentHtml
+// (slab mode) so the focal pane shows the same chip row in either case — that
+// way switching scales (L2 ↔ 1w/5w/10w/Nw slab) doesn't shift the mini-PCA
+// canvas vertically.
+function _rangeInvariantStats(cl, startW, endW, env) {
   const state = _pageState;
   const WINDOW_DEFAULT_SNPS = (state && state.windowDefaultSnps != null)
     ? state.windowDefaultSnps : WINDOW_DEFAULT_SNPS_FALLBACK;
-  let l2_n_snps = 0;
-  let l2_n_snps_seen = 0;
-  let l2_n_snps_defaulted = 0;
-  if (l2idx != null && state && state.data && Array.isArray(state.data.windows)) {
-    const env_l2 = state.data.l2_envelopes[l2idx];
-    if (env_l2) {
-      const s0 = env_l2._s0, e0 = env_l2._e0;
-      for (let wi = s0; wi <= e0; wi++) {
-        const wObj = state.data.windows[wi];
-        if (wObj && (wObj.n_snps != null) && isFinite(wObj.n_snps)) {
-          l2_n_snps += wObj.n_snps;
-          l2_n_snps_seen++;
-        } else if (wObj) {
-          l2_n_snps += WINDOW_DEFAULT_SNPS;
-          l2_n_snps_defaulted++;
-        }
+  let n_snps = 0;
+  let n_snps_seen = 0;
+  let n_snps_defaulted = 0;
+  if (Number.isInteger(startW) && Number.isInteger(endW) && endW >= startW
+      && state && state.data && Array.isArray(state.data.windows)) {
+    for (let wi = startW; wi <= endW; wi++) {
+      const wObj = state.data.windows[wi];
+      if (wObj && (wObj.n_snps != null) && isFinite(wObj.n_snps)) {
+        n_snps += wObj.n_snps;
+        n_snps_seen++;
+      } else if (wObj) {
+        n_snps += WINDOW_DEFAULT_SNPS;
+        n_snps_defaulted++;
       }
     }
   }
-  const l2_span_bp = (env && env.end_bp != null && env.start_bp != null)
+  const span_bp = (env && env.end_bp != null && env.start_bp != null)
     ? (env.end_bp - env.start_bp) : null;
-  const l2_span_kb = (l2_span_bp != null) ? (l2_span_bp / 1000) : null;
-  const l2_span_mb = (l2_span_bp != null) ? (l2_span_bp / 1e6) : null;
-  const l2_win_per_mb = (l2_span_mb != null && l2_span_mb > 0)
-    ? (cl.nW / l2_span_mb) : null;
-  const l2_mean_win_kb = (l2_span_kb != null && cl.nW > 0)
-    ? (l2_span_kb / cl.nW) : null;
-  const l2_snp_density_per_kb = ((l2_n_snps_seen + l2_n_snps_defaulted) > 0 &&
-                                  l2_span_kb != null && l2_span_kb > 0)
-    ? (l2_n_snps / l2_span_kb) : null;
+  const span_kb = (span_bp != null) ? (span_bp / 1000) : null;
+  const span_mb = (span_bp != null) ? (span_bp / 1e6) : null;
+  const win_per_mb = (span_mb != null && span_mb > 0)
+    ? (cl.nW / span_mb) : null;
+  const mean_win_kb = (span_kb != null && cl.nW > 0)
+    ? (span_kb / cl.nW) : null;
+  const snp_density_per_kb = ((n_snps_seen + n_snps_defaulted) > 0 &&
+                              span_kb != null && span_kb > 0)
+    ? (n_snps / span_kb) : null;
   return {
     n_windows_used: cl.nW,
-    span_bp: l2_span_bp, span_kb: l2_span_kb, span_mb: l2_span_mb,
-    n_snps: l2_n_snps, n_snps_seen: l2_n_snps_seen, n_snps_defaulted: l2_n_snps_defaulted,
-    win_per_mb: l2_win_per_mb, mean_win_kb: l2_mean_win_kb,
-    snp_density_per_kb: l2_snp_density_per_kb,
+    span_bp, span_kb, span_mb,
+    n_snps, n_snps_seen, n_snps_defaulted,
+    win_per_mb, mean_win_kb,
+    snp_density_per_kb,
   };
+}
+
+// --- _l2InvariantStats — legacy lines 49774-49814 ---
+// Computes K-INVARIANT stats for an L2 envelope (windows, span, SNPs, density).
+// Thin wrapper over _rangeInvariantStats: resolves the L2 envelope's window
+// indices then delegates.
+function _l2InvariantStats(cl, env, l2idx) {
+  const state = _pageState;
+  let s0 = null, e0 = null;
+  if (l2idx != null && state && state.data) {
+    const env_l2 = state.data.l2_envelopes && state.data.l2_envelopes[l2idx];
+    if (env_l2) { s0 = env_l2._s0; e0 = env_l2._e0; }
+  }
+  return _rangeInvariantStats(cl, s0, e0, env);
 }
 
 // --- _invariantMetaInlineHtml — legacy lines 49829-49857 ---

@@ -53,6 +53,7 @@ import {
   summariseHoverCell,
   groupSizesFromSampleGroup,
 } from './dosage_heatmap/selection.js';
+import { fitCanvasNoDpr } from '../../shared/page1_utils.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   sample_order_mode:     'by_group',
@@ -324,6 +325,12 @@ function _paintHeatmap(state) {
   const canvas = document.getElementById('dosageHeatmapCanvas');
   const empty  = document.getElementById('dosageHeatmapEmpty');
   if (!canvas) return;
+  // 2026-05-26: size the canvas backing buffer to its CSS display box.
+  // The HTML has no width/height attributes, so the buffer defaults to
+  // 300×150 — paintDosageHeatmap then drew into that tiny buffer and
+  // the browser stretched the result to fit the wrap. Re-fit on every
+  // paint so layout changes track too.
+  fitCanvasNoDpr(canvas);
   if (!state.data) {
     if (empty) empty.style.display = '';
     if (canvas.getContext) {

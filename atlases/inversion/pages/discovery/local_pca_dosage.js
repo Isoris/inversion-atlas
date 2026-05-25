@@ -33,6 +33,7 @@ import { escapeHtml } from '../../shared/page1_utils.js';
 import '../../shared/macrostripe.js';
 import { resolve as _registryResolve, getState as _getState } from '../../../../core/atlas_api.js';
 import { renderModeBBadge } from '../../../../core/mode_b_badge.js';
+import { buildChromSummary } from '../../../../core/chrom_summary.js';
 
 import {
   _setActiveState,
@@ -417,6 +418,19 @@ export async function mount(root, atlasState, registry) {
     return;
   }
 
+  // 2026-05-21 perf: kick the θπ + GHSL fetches BEFORE awaiting
+  // scrubber_main. They share the network/disk pipe but the in-flight
+  // Promise dedup means the prewarm-scheduler's chrom_change fetches
+  // and these resolve to the same Promise. Starting both at the same
+  // time saves the ~RTT we used to lose by awaiting scrubber_main first
+  // and only then issuing the side fetches. We still await scrubber_main
+  // before continuing (it's required), then await the side promises a
+  // few lines down — by that point they've usually already settled.
+  const tpPromise   = Promise.resolve(registry.resolve('scrubber_thetapi', { chrom }))
+                        .catch(() => null);
+  const ghslPromise = Promise.resolve(registry.resolve('scrubber_ghsl',    { chrom }))
+                        .catch(() => null);
+
   let data;
   try {
     data = await registry.resolve('scrubber_main', { chrom });
@@ -452,10 +466,7 @@ export async function mount(root, atlasState, registry) {
   // not a function` blocking the entire mount, including the dataModeBar
   // availability check (which made GHSL look unavailable even when its
   // JSON was loaded). Promise.resolve flattens Promises and wraps values.
-  const [tpData, ghslData] = await Promise.all([
-    Promise.resolve(registry.resolve('scrubber_thetapi', { chrom })).catch(() => null),
-    Promise.resolve(registry.resolve('scrubber_ghsl',    { chrom })).catch(() => null),
-  ]);
+  const [tpData, ghslData] = await Promise.all([tpPromise, ghslPromise]);
   // 2026-05-19 SELECTIVE MERGE — earlier shallow `Object.assign(data, tpData)`
   // clobbered shared top-level fields (data.tracks, data.n_windows,
   // data.chrom, data.scale, etc.) with theta-pi's versions, breaking the
@@ -500,6 +511,18 @@ export async function mount(root, atlasState, registry) {
     }
     data.ghsl_view = ghslData;
   }
+
+  // 2026-05-26: write a per-chrom summary into AtlasState (SPEC
+  // multichrom_load_orchestrator Slice 1). Cheap (~few KB), keeps a
+  // metadata footprint for every chrom the user has visited so the
+  // genome-wide ideogram + future cross-chrom views don't have to
+  // rehydrate the full payload from IDB just to read counts. Fail-soft:
+  // a malformed payload doesn't block the mount.
+  try {
+    if (typeof atlasState.setChromSummary === 'function') {
+      atlasState.setChromSummary(chrom, buildChromSummary(data, { chrom }));
+    }
+  } catch (e) { console.warn('local_pca_dosage.mount: setChromSummary threw —', e); }
 
   // Mode-B freshness badge — surfaces which discovery axes are loaded
   // for this chrom. Non-blocking: `data` is already in hand (we'd have

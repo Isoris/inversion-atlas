@@ -498,8 +498,12 @@ export function drawRegimesPanel(state) {
   }
 
   // Geometry
-  const padTop_strip = 18;       // pattern-class strip height
-  const pad = { l: 44, r: 16, t: 6 + padTop_strip, b: 16 };
+  // 2026-05-26: padTop_strip 18 → 12 + bottom pad 16 → 12 per Quentin's
+  // "panels are a bit thick" feedback. Recovers ~10 px of vertical room
+  // for the actual band-lane plot, which makes the per-sample paths read
+  // less compressed when the panel is at its default (un-expanded) size.
+  const padTop_strip = 12;       // pattern-class strip height (was 18)
+  const pad = { l: 44, r: 16, t: 6 + padTop_strip, b: 12 };
   const plotW = w - pad.l - pad.r;
   const plotH = h - pad.t - pad.b;
   if (plotW <= 0 || plotH <= 0) {
@@ -642,7 +646,10 @@ export function drawRegimesPanel(state) {
 
   // Untracked + non-voter — grey lines (the "invisited windows were grey"
   // semantic from the chat, applied per-sample instead of per-window).
-  ctx.lineWidth = 0.6;
+  // 2026-05-26: lineWidth 0.6 → 0.5 per Quentin's "lines are a bit thick"
+  // feedback; untracked were already low-priority, push further into the
+  // background so voters read clearer.
+  ctx.lineWidth = 0.5;
   ctx.strokeStyle = 'rgba(140,150,170,0.10)';
   for (let si = 0; si < n_samples; si++) {
     if (voterSet.has(si)) continue;
@@ -653,6 +660,8 @@ export function drawRegimesPanel(state) {
   // Tracked but not in voter — keep their tracked colour but at low alpha,
   // so the user can see where their pinned samples go relative to the
   // voter group's regime.
+  // 2026-05-26: lineWidth 1.0 → 0.7 (-30%) so tracked samples don't compete
+  // with voter colouring for visual weight.
   for (const si of trackedSet) {
     if (voterSet.has(si)) continue;
     let col = '#aab2c0';
@@ -660,7 +669,7 @@ export function drawRegimesPanel(state) {
       const c = resolveSampleScopeColor(state, si, state.linesColorMode || 'kmeans');
       if (c) col = c;
     }
-    ctx.lineWidth = 1.0;
+    ctx.lineWidth = 0.7;
     ctx.strokeStyle = withAlpha(col, 0.45);
     strokePath(si);
   }
@@ -684,11 +693,16 @@ export function drawRegimesPanel(state) {
   // bright while sparse trails fade — same convention as the tracked-but-
   // not-voter lines above (alpha 0.45) and the lasso colouring in
   // lines_panel.js. Density still surfaces (overlap stacks alpha).
-  const voterAlpha = voterSet.size > 8 ? 0.45 : 0.85;
+  // 2026-05-26: further trim — lineWidth 1.2 → 0.8 (-33%), alpha 0.45 → 0.35
+  // when crowded (>8 voters). With 200+ voter samples each drawing a path
+  // across 9000 windows the canvas still saturated; the slimmer/lighter
+  // strokes let density gradients read better without losing the "voter"
+  // category emphasis.
+  const voterAlpha = voterSet.size > 8 ? 0.35 : 0.80;
   for (const si of voterSet) {
     const bi = siToFocalBand.get(si);
     const col = bandHues[(bi >= 0 ? bi : 0) % bandHues.length];
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 0.8;
     ctx.strokeStyle = withAlpha(col, voterAlpha);
     strokePath(si);
   }

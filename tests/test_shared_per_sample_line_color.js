@@ -91,6 +91,58 @@ group('perSampleColorFor');
   check('het: returns string color', typeof c1 === 'string' && c1.length > 0);
   check('het: NaN → null', perSampleColorFor('het', NaN, null) === null);
 
+  // 2026-05-26 het ramp regression: divergent blue→grey→red anchored
+  // at cohort median. Previously the het mode used sequential blue→yellow
+  // with a desaturated olive midpoint, which made clustered het rates
+  // (typical of real cohorts) all read as uniform grey. Verify each
+  // half of the divergent ramp is meaningfully separated.
+  // Cohort: 1..5 → median 3. value=1 should be saturated blue;
+  // value=3 (median) should be near-grey #cccccc; value=5 should be
+  // saturated red.
+  const hetArr = new Float64Array([1, 2, 3, 4, 5]);
+  // Bust any stashed cache from a prior test (we mutate arrays freely).
+  try { delete hetArr.__vStats; } catch (_) {}
+  const hetLo  = perSampleColorFor('het', 1, hetArr);
+  const hetMid = perSampleColorFor('het', 3, hetArr);
+  const hetHi  = perSampleColorFor('het', 5, hetArr);
+  function _parseRgb(s) {
+    const m = /rgb\((\d+),(\d+),(\d+)\)/.exec(s);
+    return m ? [+m[1], +m[2], +m[3]] : null;
+  }
+  const rgbLo  = _parseRgb(hetLo);
+  const rgbMid = _parseRgb(hetMid);
+  const rgbHi  = _parseRgb(hetHi);
+  check('het: cohort min → rgb()',  !!rgbLo);
+  check('het: cohort median → rgb()',  !!rgbMid);
+  check('het: cohort max → rgb()',  !!rgbHi);
+  check('het: cohort min is BLUE-dominant (B > R)',
+        rgbLo && rgbLo[2] > rgbLo[0]);
+  check('het: cohort max is RED-dominant (R > B)',
+        rgbHi && rgbHi[0] > rgbHi[2]);
+  check('het: median sits at legend neutral (~rgb(204,204,204))',
+        rgbMid && rgbMid[0] === 204 && rgbMid[1] === 204 && rgbMid[2] === 204);
+  // Skewed cohort: most samples cluster near 0.01, two outliers.
+  // Median-anchoring should still split them visibly across the ramp.
+  const skewed = new Float64Array([0.01, 0.012, 0.015, 0.02, 0.5]);
+  try { delete skewed.__vStats; } catch (_) {}
+  const sLo  = perSampleColorFor('het', 0.01, skewed);
+  const sMid = perSampleColorFor('het', 0.015, skewed);  // median
+  const sHi  = perSampleColorFor('het', 0.5, skewed);
+  check('het skewed: min and median produce different colors',
+        sLo !== sMid);
+  check('het skewed: median and max produce different colors',
+        sMid !== sHi);
+
+  // Out-of-cohort values get clamped to the ramp endpoints — defensive
+  // against rounding errors / wider-than-cohort lookups.
+  try { delete hetArr.__vStats; } catch (_) {}
+  const hetUnder = perSampleColorFor('het', -5, hetArr);   // < vMin
+  const hetOver  = perSampleColorFor('het', 99, hetArr);   // > vMax
+  check('het: value below vMin clamps to blue endpoint',
+        hetUnder === hetLo);
+  check('het: value above vMax clamps to red endpoint',
+        hetOver === hetHi);
+
   // froh: sequential grey→red
   const c2a = perSampleColorFor('froh', 0.0, null);
   const c2b = perSampleColorFor('froh', 1.0, null);
@@ -124,6 +176,20 @@ group('perSampleColorFor');
   check('dosage: 0 → rgb()',                /^rgb\(/.test(cD0));
   check('dosage: 0 / 1 / 2 all distinct',   cD0 !== cD1 && cD1 !== cD2 && cD0 !== cD2);
   check('dosage: NaN → null',               perSampleColorFor('dosage', NaN, null) === null);
+
+  // 2026-05-26 dosage median-anchor regression: clustered cohort dosages
+  // (skewed toward homozygotes) previously hit the desaturated grey
+  // midpoint of the teal→grey→red ramp because midpoint-rescaling put
+  // most samples near t=0.5. Median-anchoring should keep the spread.
+  const dosArr = new Float64Array([0.02, 0.05, 0.10, 0.15, 1.95]);
+  try { delete dosArr.__vStats; } catch (_) {}
+  const dLo  = perSampleColorFor('dosage', 0.02, dosArr);
+  const dMed = perSampleColorFor('dosage', 0.10, dosArr);  // median
+  const dHi  = perSampleColorFor('dosage', 1.95, dosArr);
+  check('dosage skewed: min and median produce different colors',
+        dLo !== dMed);
+  check('dosage skewed: median and max produce different colors',
+        dMed !== dHi);
 }
 
 // =====================================================================

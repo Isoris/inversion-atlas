@@ -190,17 +190,29 @@ function _buildSampleIdMap(state, chunkSamples) {
       && state && (!state.__dosageMatchRateLogged
                    || (typeof window !== 'undefined' && window.__dosageDbg === true))) {
     let matched = 0;
+    const coveredCohortIdx = new Set();
     for (let i = 0; i < chunkSamples.length; i++) {
-      if (_lookupCohortIdx(map, chunkSamples[i], i) >= 0) matched++;
+      const ci = _lookupCohortIdx(map, chunkSamples[i], i);
+      if (ci >= 0) {
+        matched++;
+        coveredCohortIdx.add(ci);
+      }
     }
     const rate = matched / chunkSamples.length;
+    // 2026-05-26: also report cohort coverage — match rate of 100% on
+    // a small chunk can still leave most cohort samples uncovered (which
+    // shows up as L3 het pills "?" and grey PCA points for the missing
+    // half). The "covers" half is the actually-load-bearing number when
+    // troubleshooting "het looks broken".
+    const coveredFrac = coveredCohortIdx.size / cohortSamples.length;
     const cohortSample = cohortSamples[0];
     const cohortPreview = (typeof cohortSample === 'string' || typeof cohortSample === 'number')
       ? cohortSample
       : JSON.stringify(cohortSample);
-    const fn = rate === 0 ? 'warn' : 'log';
+    const fn = (rate === 0 || coveredFrac < 0.5) ? 'warn' : 'log';
     console[fn]('[dosage_chunks] sample-id match:',
       `${matched}/${chunkSamples.length} = ${(rate * 100).toFixed(0)}%`,
+      `· covers ${coveredCohortIdx.size}/${cohortSamples.length} cohort (${(coveredFrac * 100).toFixed(0)}%)`,
       '· chunk ID example:', JSON.stringify(chunkSamples[0]),
       '· cohort entry example:', cohortPreview,
       '· cohort aliases for [0]:', _aliasesForCohortEntry(cohortSample, 0));

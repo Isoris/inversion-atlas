@@ -183,6 +183,33 @@ export function fitCanvas(canvas) {
   return { ctx, w: cssW, h: cssH };
 }
 
+// 2026-05-26 — no-DPR variant of fitCanvas. Sizes the canvas backing
+// buffer to its CSS display box (1:1 with CSS px, no devicePixelRatio
+// multiplication, no ctx.setTransform). Use when the renderer reads
+// canvas.width / canvas.height directly as pixel coordinates rather
+// than going through a DPR-scaled context (which is most of the
+// tooling-stage cartridges + dosage_heatmap). Without this fit those
+// canvases keep the default 300×150 backing buffer and the painted
+// content gets stretched (and visually collapsed) to fit the CSS box.
+//
+// Pure side-effect on the canvas; returns nothing. Idempotent — only
+// writes canvas.width / .height when the target value differs from
+// the current one, so it's safe to call on every frame.
+export function fitCanvasNoDpr(canvas) {
+  if (!canvas) return;
+  const parent = canvas.parentNode;
+  const measureW = (canvas.clientWidth) || (parent && parent.clientWidth)
+    || (typeof canvas.getBoundingClientRect === 'function'
+        ? canvas.getBoundingClientRect().width : 0) || 600;
+  const measureH = (canvas.clientHeight) || (parent && parent.clientHeight)
+    || (typeof canvas.getBoundingClientRect === 'function'
+        ? canvas.getBoundingClientRect().height : 0) || 360;
+  const targetW = Math.max(1, Math.floor(measureW));
+  const targetH = Math.max(1, Math.floor(measureH));
+  if (canvas.width  !== targetW) canvas.width  = targetW;
+  if (canvas.height !== targetH) canvas.height = targetH;
+}
+
 // ---------------------------------------------------------------------
 // Candidate-lane layout (legacy lines 32503-32536)
 // ---------------------------------------------------------------------

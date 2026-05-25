@@ -37,6 +37,7 @@ import {
   candidateCountsByStratum,
 } from './nested_inversion_detector/selection.js';
 import { detectNestedInversion } from '../../shared/mgl_nested_detector.js';
+import { fitCanvasNoDpr } from '../../shared/page1_utils.js';
 
 // =====================================================================
 // Public entry — refresh
@@ -278,6 +279,9 @@ function _paintTracks(state) {
   const canvas = document.getElementById('nestedDetectorTracksCanvas');
   const empty  = document.getElementById('nestedDetectorEmpty');
   if (!canvas) return;
+  // 2026-05-26: fit canvas backing buffer to CSS box (renderer reads
+  // canvas.width/.height directly; default 300×150 → invisible content).
+  fitCanvasNoDpr(canvas);
   const dr = state.detector_result;
   if (!dr) {
     if (empty) empty.style.display = '';

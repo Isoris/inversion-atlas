@@ -158,6 +158,19 @@ export async function mount(root, atlasState, registry) {
   state.data = data;
   state.activeChrom = chrom;
 
+  // 2026-05-26: contribute a chrom summary so a user who lands directly
+  // here (skipping local_pca_dosage) still populates the cross-chrom
+  // summary cache (SPEC_multichrom_load_orchestrator Slice 1). Idempotent
+  // — overwrites the previous entry for this chrom; the in-flight Promise
+  // dedup means the underlying `data` is the same object local_pca_dosage
+  // would have written anyway.
+  try {
+    const cs = await import('../../../../core/chrom_summary.js');
+    if (typeof atlasState.setChromSummary === 'function') {
+      atlasState.setChromSummary(chrom, cs.buildChromSummary(data, { chrom }));
+    }
+  } catch (_) { /* don't block the mount on a non-essential cache write */ }
+
   // Build the per-window-labels bridge (clusterL2 backed by a cache).
   _wireCtxCallbacks(state, atlasState);
 

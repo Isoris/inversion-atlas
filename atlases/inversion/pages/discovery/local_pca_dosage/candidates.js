@@ -16,6 +16,7 @@
 // Bodies extracted verbatim from the pre-split local_pca_dosage.js (eighth pass).
 
 import { withAlpha } from '../../../shared/page1_utils.js';
+import { persistDebounced } from '../../../shared/persist_debounced.js';
 
 // Optional atlas-core bridge. Only present when this cartridge is
 // merged into a full atlas-workspace; cartridge-only checkouts ship
@@ -966,10 +967,9 @@ export function persistCandidateList(state) {
   try {
     const key = _candStorageKey(state.data.chrom);
     const arr = (state.candidateList || []).map(candidateToJSON);
-    localStorage.setItem(key, JSON.stringify(arr));
+    persistDebounced(key, arr);
   } catch (e) {
-    // localStorage may be unavailable (private mode, quota exceeded, etc.).
-    // We surface the failure but don't crash — the list still works in memory.
+    // The stringify itself can throw (cyclic refs) — keep the warn for that.
     console.warn('[candidate] persist failed:', e.message);
   }
 }
@@ -1040,8 +1040,7 @@ export function setCandidate(state, cand) {
   // Persist the active candidate id so reloads can restore focus.
   // _persistActiveCandidate lives in events.js but the localStorage write
   // here is idempotent — duplicating it avoids a circular import.
-  try { localStorage.setItem('pca_scrubber_v3.activeCandidateId', cand.id || ''); }
-  catch (_) {}
+  persistDebounced('pca_scrubber_v3.activeCandidateId', cand.id || '');
   // Also add it to the saved list so the candidate-bar reflects the new
   // candidate immediately (legacy did this implicitly via the promote
   // button handler calling addCandidateToList before setCandidate, but

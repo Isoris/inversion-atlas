@@ -54,6 +54,8 @@ UNITS=(
   test_page1_band_diagnostics_html.js
   test_shared_candidate_predicates.js
   test_shared_sample_color.js
+  test_shared_build_family_palette.js
+  test_shared_per_sample_line_color.js
   test_analysis_mendelian.js
   test_analysis_mendelian_inheritance.js
   test_relatedness_schema.js

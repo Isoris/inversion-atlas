@@ -47,6 +47,7 @@ import {
   blockSizesFromAssignment,
 } from './similarity_matrix/selection.js';
 import { computeSimilarityAndBlocks } from '../../shared/mgl_similarity_matrix.js';
+import { fitCanvasNoDpr } from '../../shared/page1_utils.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   show_block_overlay:    true,
@@ -326,6 +327,9 @@ function _paintTransition(state) {
   if (typeof document === 'undefined' || !document.getElementById) return;
   const canvas = document.getElementById('similarityPanelTransitionCanvas');
   if (!canvas) return;
+  // 2026-05-26: HTML canvas has no width/height attrs → backing buffer
+  // defaults to 300×150; CSS stretches the result. Fit before paint.
+  fitCanvasNoDpr(canvas);
   const sr = state.similarity_result;
   if (!sr || !Array.isArray(sr.windows) || sr.windows.length === 0) {
     if (canvas.getContext) {
@@ -352,6 +356,7 @@ function _paintMatrix(state) {
   const canvas = document.getElementById('similarityPanelMatrixCanvas');
   const empty  = document.getElementById('similarityPanelEmpty');
   if (!canvas) return;
+  fitCanvasNoDpr(canvas);
   const aw = _activeWindow(state);
   if (!aw || !aw.similarity) {
     if (empty) empty.style.display = '';

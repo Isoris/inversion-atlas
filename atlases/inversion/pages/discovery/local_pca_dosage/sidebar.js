@@ -50,6 +50,7 @@ import {
   lassoLinkageGetOrCompute,
   lassoLinkageToTSV,
 } from '../../../shared/lasso_linkage.js';
+import { persistDebounced } from '../../../shared/persist_debounced.js';
 
 import { _setActiveState } from './_state.js';
 import {
@@ -243,9 +244,7 @@ function _wireL3Controls(state) {
         if (btn.disabled) return;
         const val = btn.getAttribute(dataAttr);
         state[stateKey] = val;
-        if (persistKey) {
-          try { localStorage.setItem(persistKey, val); } catch (_) {}
-        }
+        if (persistKey) persistDebounced(persistKey, val);
         container.querySelectorAll('button[' + dataAttr + ']').forEach(b => {
           b.classList.toggle('active', b === btn);
         });
@@ -282,8 +281,7 @@ function _wireL3Controls(state) {
     if (state.l3ReclusterMode) reclusterSel.value = state.l3ReclusterMode;
     reclusterSel.addEventListener('change', (e) => {
       state.l3ReclusterMode = e.target.value;
-      try { localStorage.setItem('pca_scrubber_v3.l3ReclusterMode', e.target.value); }
-      catch (_) {}
+      persistDebounced('pca_scrubber_v3.l3ReclusterMode', e.target.value);
       repaint();
     });
   }
@@ -300,8 +298,7 @@ function _wireL3Controls(state) {
     l3HetToggle.checked = !!state.l3HetColoring;
     l3HetToggle.addEventListener('change', (e) => {
       state.l3HetColoring = !!e.target.checked;
-      try { localStorage.setItem('pca_scrubber_v3.l3HetColoring', e.target.checked ? '1' : '0'); }
-      catch (_) {}
+      persistDebounced('pca_scrubber_v3.l3HetColoring', e.target.checked ? '1' : '0');
       repaint();
     });
   }
@@ -322,8 +319,7 @@ function _wireL3Controls(state) {
     l3MoreBtn.addEventListener('click', () => {
       const nowExpanded = l3Panel.classList.contains('l3-more-collapsed');
       l3Panel.classList.toggle('l3-more-collapsed', !nowExpanded);
-      try { localStorage.setItem('pca_scrubber_v3.l3MoreExpanded', nowExpanded ? '1' : '0'); }
-      catch (_) {}
+      persistDebounced('pca_scrubber_v3.l3MoreExpanded', nowExpanded ? '1' : '0');
     });
   }
 }
@@ -474,10 +470,8 @@ function _wireNewShellControls(state) {
     hetEl.disabled = !dosageAvail;
     hetEl.addEventListener('change', (e) => {
       state.l3HetColoring = !!e.target.checked;
-      try {
-        localStorage.setItem('pca_scrubber_v3.l3HetColoring',
-                             state.l3HetColoring ? '1' : '0');
-      } catch (_) {}
+      persistDebounced('pca_scrubber_v3.l3HetColoring',
+                       state.l3HetColoring ? '1' : '0');
       try { renderL3Panel(state); }
       catch (err) { console.warn('[l3HetToggle] renderL3Panel:', err); }
     });
@@ -556,8 +550,8 @@ function _wireNewShellControls(state) {
     macroEl.checked = !!state.useMacrostripeColors;
     macroEl.addEventListener('change', (e) => {
       state.useMacrostripeColors = !!e.target.checked;
-      try { localStorage.setItem('pca_scrubber_v3.useMacrostripeColors',
-                                  state.useMacrostripeColors ? '1' : '0'); } catch (_) {}
+      persistDebounced('pca_scrubber_v3.useMacrostripeColors',
+                       state.useMacrostripeColors ? '1' : '0');
       // Repaint chain — same surfaces the K-means microgroup coloring
       // touched. Wrapped in try/catch so one fail doesn't break the rest.
       try { drawPCA(state); }        catch (err) { console.warn('[macrostripeToggle] drawPCA:', err); }
@@ -627,8 +621,7 @@ function _wireNewShellControls(state) {
     apply();
     moreBtn.addEventListener('click', () => {
       on = !on;
-      try { localStorage.setItem('inversion_atlas.linesHeaderMoreOn', on ? '1' : '0'); }
-      catch (_) {}
+      persistDebounced('inversion_atlas.linesHeaderMoreOn', on ? '1' : '0');
       apply();
     });
     moreBtn.dataset.wired = '1';
@@ -793,9 +786,13 @@ function _wireClusterLabelHotkey(state) {
   document.addEventListener('keydown', (e) => {
     const tag = (e.target && e.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    // Only fire when local_pca_dosage is the active page.
+    // 2026-05-26: gate by element-exists rather than `.classList.contains('active')`.
+    // The atlas-core router swaps `#app-root.innerHTML` per page and
+    // NEVER sets `.active` — checking for the class made the N hotkey
+    // never fire (verified via memory `router_no_active_class.md`).
+    // Mirrors the fix already applied to the U-hotkey wirer below.
     const pageEl = document.getElementById('local_pca_dosage');
-    if (!pageEl || !pageEl.classList.contains('active')) return;
+    if (!pageEl) return;
     if ((e.key === 'n' || e.key === 'N')
         && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
       e.preventDefault();
@@ -803,8 +800,7 @@ function _wireClusterLabelHotkey(state) {
       const idx = _CLUSTER_LABEL_MODES.indexOf(cur);
       const next = _CLUSTER_LABEL_MODES[(idx + 1) % _CLUSTER_LABEL_MODES.length];
       state.pcaClusterLabelMode = next;
-      try { localStorage.setItem(_CLUSTER_LABEL_LS_KEY, next == null ? '' : next); }
-      catch (_) {}
+      persistDebounced(_CLUSTER_LABEL_LS_KEY, next == null ? '' : next);
       try { drawPCA(state); } catch (_) {}
     }
   });
@@ -895,8 +891,7 @@ function _wireCompactTrackedCollapse(state) {
   if (head.dataset.wired === '1') return;
   head.addEventListener('click', () => {
     collapsed = !collapsed;
-    try { localStorage.setItem(_TRACKED_COMPACT_LS_KEY, collapsed ? '1' : '0'); }
-    catch (_) {}
+    persistDebounced(_TRACKED_COMPACT_LS_KEY, collapsed ? '1' : '0');
     apply();
     // Repaint adjacent panels since the freed/claimed space changes
     // their bounds — same chain the ResizeObserver uses.
@@ -967,7 +962,7 @@ function _wireSidebarSectionPersist() {
       else node.removeAttribute('open');   // default = collapsed
     } catch (_) {}
     node.addEventListener('toggle', () => {
-      try { localStorage.setItem(key, node.open ? '1' : '0'); } catch (_) {}
+      persistDebounced(key, node.open ? '1' : '0');
     });
     node.dataset.persistWired = '1';
   });
@@ -1006,7 +1001,7 @@ function _initAttentionPulses() {
     const dismiss = () => {
       target.classList.remove('attention-pulse');
       target.classList.add('attention-pulse-fade');
-      try { localStorage.setItem(storeKey, '1'); } catch (_) {}
+      persistDebounced(storeKey, '1');
       setTimeout(() => target.classList.remove('attention-pulse-fade'), 850);
     };
     // The dismissal fires once on any of: click / focus / change. We can't
@@ -1641,8 +1636,8 @@ function _wireTrackedSettingsPopup(state) {
   const screeMirrors = ['screeToggle', 'screeToggleCompact', 'screeTogglePopup'];
   const screeApply = (val) => {
     state.screePlotEnabled = !!val;
-    try { localStorage.setItem('inversion_atlas.screePlotEnabled',
-                                state.screePlotEnabled ? '1' : '0'); } catch (_) {}
+    persistDebounced('inversion_atlas.screePlotEnabled',
+                     state.screePlotEnabled ? '1' : '0');
     for (const id of screeMirrors) {
       const el = $(id);
       if (el && el.checked !== !!val) el.checked = !!val;
@@ -1692,8 +1687,12 @@ function _wirePanelCollapseButtons(state) {
     // expand but rather the settings ... now its 2 arrows down better
     // have a single one and on the top." The second arrow (#tPanelOpenBtn
     // in the aside) is hidden by the same wire to leave one entry point.
-    { btn: 'l3CollapseBtn',  slot: 'l3Collapsed',  lsKey: 'pca_scrubber_v3.l3collapsed' },
-    { btn: 'zCollapseBtn',   slot: 'zCollapsed',   lsKey: 'pca_scrubber_v3.zcollapsed' },
+    { btn: 'l3CollapseBtn',    slot: 'l3Collapsed',    lsKey: 'pca_scrubber_v3.l3collapsed' },
+    { btn: 'zCollapseBtn',     slot: 'zCollapsed',     lsKey: 'pca_scrubber_v3.zcollapsed' },
+    // 2026-05-26: linesCollapseBtn (HTML id at local_pca_dosage.html:894)
+    // was previously omitted, so the per-sample-lines collapse arrow was
+    // unwired. Adding it with the same persistence pattern as l3/z.
+    { btn: 'linesCollapseBtn', slot: 'linesCollapsed', lsKey: 'pca_scrubber_v3.linescollapsed' },
   ];
   for (const s of SPECS) {
     const btn = $(s.btn);
@@ -1707,7 +1706,7 @@ function _wirePanelCollapseButtons(state) {
     btn.addEventListener('click', () => {
       state[s.slot] = !state[s.slot];
       btn.textContent = state[s.slot] ? '▶' : '▼';
-      try { localStorage.setItem(s.lsKey, state[s.slot] ? '1' : '0'); } catch (_) {}
+      persistDebounced(s.lsKey, state[s.slot] ? '1' : '0');
       try { applyMainGrid(state); } catch (_) {}
       // Re-fit canvases after the row resize.
       requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -1757,7 +1756,7 @@ function _applyViewMode(state, mode) {
       state.stepMode = stepFor;
       document.querySelectorAll('#stepModeBar button').forEach(b =>
         b.classList.toggle('active', b.dataset.step === stepFor));
-      try { localStorage.setItem('pca_scrubber_v3.stepmode', stepFor); } catch (_) {}
+      persistDebounced('pca_scrubber_v3.stepmode', stepFor);
       const info = document.getElementById('stepModeInfo');
       if (info) info.textContent = _stepModeLabel(state, stepFor);
       try { _syncStepModeToCompareUnit(state); } catch (_) {}
@@ -1828,7 +1827,7 @@ function _cycleStepSize(state) {
   document.querySelectorAll('#stepModeBar button').forEach(b => {
     b.classList.toggle('active', b.dataset.step === next);
   });
-  try { localStorage.setItem('pca_scrubber_v3.stepmode', next); } catch (_) {}
+  persistDebounced('pca_scrubber_v3.stepmode', next);
   _refreshStepSizeBtn(state);
   // 2026-05-20: also push the new step size into the L3 compareUnit so
   // the contingency table follows the cursor at the same scale. The
@@ -1843,7 +1842,7 @@ function _wireViewMode(state) {
     btn.addEventListener('click', () => {
       const m = btn.dataset.viewmode;
       if (m && m !== state.viewMode) {
-        try { localStorage.setItem(_VIEWMODE_STORAGE_KEY, m); } catch (_) {}
+        persistDebounced(_VIEWMODE_STORAGE_KEY, m);
         _applyViewMode(state, m);
       }
     });
@@ -1892,7 +1891,7 @@ function _applyLayoutMode(state, mode) {
       ? 'Layout: COMPACT — 2×2 upper grid + L3 below. Click for fixed.'
       : 'Layout: FIXED — single-column grid, fits one screen. Click for free.';
   }
-  try { localStorage.setItem(_LAYOUT_MODE_KEY, mode); } catch (_) {}
+  persistDebounced(_LAYOUT_MODE_KEY, mode);
   // Recompute the inline grid template. In compact/free mode the
   // function clears `main.style.gridTemplateRows = ''` so the CSS-driven
   // template for those modes takes over. Without this, the inline rows
@@ -1935,7 +1934,7 @@ function _setCandidateMode(state, b) {
     state.l3Draft = null;
     state.activeTrackIdx = 0;
   }
-  try { localStorage.setItem(_CANDIDATE_MODE_KEY, b ? '1' : '0'); } catch (_) {}
+  persistDebounced(_CANDIDATE_MODE_KEY, b ? '1' : '0');
   if (typeof refreshL3BcScopeButtons === 'function') refreshL3BcScopeButtons();
   try { renderL3Panel(state); } catch (_) {}
   if (state.data) {
@@ -2057,7 +2056,7 @@ function _wireDataSection(state) {
       if (on && !state.data) mini.classList.remove('active');
       else mini.classList.toggle('active', !!on);
     }
-    try { localStorage.setItem('pca_scrubber_v3.siminminimap', on ? '1' : '0'); } catch (_) {}
+    persistDebounced('pca_scrubber_v3.siminminimap', on ? '1' : '0');
     try { applyMainGrid(state); } catch (_) {}
     // Redraw the panels whose canvas sizes changed. Defer one frame so the
     // CSS reflow (display:none / .active toggle) settles before fitCanvas
@@ -2779,9 +2778,12 @@ function _wireManualGroups(state) {
   }
 
   // --- #mgAddBtn click — legacy lines 56584-56587 ---
-  const addBtn = $('mgAddBtn');
-  if (addBtn) {
-    addBtn.addEventListener('click', () => { manualGroupFromTracked(); });
+  // 2026-05-26: also wire #mgAddBtnCompact (popover tracked-samples panel
+  // mirror). Previously orphan — the compact button existed in HTML but
+  // had no handler, so clicking did nothing.
+  for (const id of ['mgAddBtn', 'mgAddBtnCompact']) {
+    const btn = $(id);
+    if (btn) btn.addEventListener('click', () => { manualGroupFromTracked(); });
   }
 
   // --- #mgBandPickBar button click — legacy lines 56589-56594 ---
@@ -2817,9 +2819,12 @@ function _wireManualGroups(state) {
   }
 
   // --- #mgClearAllBtn click — legacy lines 56617-56624 ---
-  const clrBtn = $('mgClearAllBtn');
-  if (clrBtn) {
-    clrBtn.addEventListener('click', () => {
+  // 2026-05-26: also wire #mgClearAllBtnCompact (popover mirror). Same
+  // confirm-dialog + clearAllManualGroups() as the non-compact variant.
+  for (const id of ['mgClearAllBtn', 'mgClearAllBtnCompact']) {
+    const btn = $(id);
+    if (!btn) continue;
+    btn.addEventListener('click', () => {
       const groups = state.manualGroups || [];
       if (groups.length === 0) return;
       if (confirm(`Clear all ${groups.length} manual groups? Per-chrom AND cohort. This cannot be undone unless you exported a TSV.`)) {
@@ -2864,7 +2869,7 @@ function _syncStepModeToCompareUnit(state) {
     state.compareUnit = newCompare;
     document.querySelectorAll('#l3CompareUnit button').forEach(b =>
       b.classList.toggle('active', b.dataset.l3unit === newCompare));
-    try { localStorage.setItem('pca_scrubber_v3.compareunit', newCompare); } catch (_) {}
+    persistDebounced('pca_scrubber_v3.compareunit', newCompare);
   }
   // Mirror N value into compareUnitN if winN
   if (state.stepMode === 'winN') {
@@ -2939,7 +2944,7 @@ function _wireJump(state) {
       document.querySelectorAll('#l3CompareUnit button[data-l3unit]').forEach(b =>
         b.classList.toggle('active', b.dataset.l3unit === want));
       state.compareUnit = want;
-      try { localStorage.setItem('pca_scrubber_v3.compareunit', want); } catch (_) {}
+      persistDebounced('pca_scrubber_v3.compareunit', want);
       // Reverse-sync to #stepModeBar so the sidebar shows the same
       // resolution when stepModeSync is on.
       if (state.stepModeSync) {
@@ -2949,7 +2954,7 @@ function _wireJump(state) {
           state.stepMode = newStep;
           document.querySelectorAll('#stepModeBar button').forEach(b =>
             b.classList.toggle('active', b.dataset.step === newStep));
-          try { localStorage.setItem('pca_scrubber_v3.stepmode', newStep); } catch (_) {}
+          persistDebounced('pca_scrubber_v3.stepmode', newStep);
           const info = document.getElementById('stepModeInfo');
           if (info) info.textContent = _stepModeLabel(state, newStep);
           if (typeof _refreshStepSizeBtn === 'function') {
@@ -2970,7 +2975,7 @@ function _wireJump(state) {
       const v = parseInt(e.target.value, 10);
       if (!Number.isFinite(v) || v < 1) return;
       state.compareUnitN = v;
-      try { localStorage.setItem('pca_scrubber_v3.compareunitn', String(v)); } catch (_) {}
+      persistDebounced('pca_scrubber_v3.compareunitn', String(v));
       // Mirror to sidebar stepModeN when sync is on.
       if (state.stepModeSync) {
         state.stepModeN = v;
@@ -2994,7 +2999,7 @@ function _wireJump(state) {
       state.stepMode = newMode;
       const info = document.getElementById('stepModeInfo');
       if (info) info.textContent = _stepModeLabel(state, newMode);
-      try { localStorage.setItem('pca_scrubber_v3.stepmode', newMode); } catch (e) {}
+      persistDebounced('pca_scrubber_v3.stepmode', newMode);
       // Sync the L3 toolbar if enabled
       _syncStepModeToCompareUnit(state);
       // turn 128: also refresh the header cycler so its text + lit state
@@ -3014,7 +3019,7 @@ function _wireJump(state) {
       const v = parseInt(stepModeNInput.value, 10);
       if (isFinite(v) && v >= 1 && v <= 200) {
         state.stepModeN = v;
-        try { localStorage.setItem('pca_scrubber_v3.stepmoden', String(v)); } catch (_) {}
+        persistDebounced('pca_scrubber_v3.stepmoden', String(v));
         // Refresh label if winN active
         if (state.stepMode === 'winN') {
           const info = document.getElementById('stepModeInfo');
@@ -3036,8 +3041,8 @@ function _wireJump(state) {
   if (stepModeSync) {
     stepModeSync.addEventListener('change', () => {
       state.stepModeSync = !!stepModeSync.checked;
-      try { localStorage.setItem('pca_scrubber_v3.stepmodesync',
-                                  state.stepModeSync ? '1' : '0'); } catch (_) {}
+      persistDebounced('pca_scrubber_v3.stepmodesync',
+                       state.stepModeSync ? '1' : '0');
       // If turning sync ON, immediately reconcile the two by pushing sidebar -> L3
       if (state.stepModeSync) _syncStepModeToCompareUnit(state);
       // Refresh label (it shows " · synced with L3 N" suffix)
@@ -3121,7 +3126,7 @@ function _wireSidebarToggle(state) {
       const wrap = document.querySelector('.wrap');
       const isCollapsed = wrap && wrap.getAttribute('data-sidebar') === 'collapsed';
       const next = !isCollapsed;
-      try { localStorage.setItem(_SIDEBAR_STORAGE_KEY, String(next)); } catch (e) {}
+      persistDebounced(_SIDEBAR_STORAGE_KEY, String(next));
       _applySidebarState(state, next);
       // 2026-05-20: same rule when the user manually collapses the
       // sidebar — restore sim to the main panel so it doesn't vanish

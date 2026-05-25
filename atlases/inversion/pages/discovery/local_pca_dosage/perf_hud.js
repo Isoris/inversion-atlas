@@ -30,6 +30,7 @@
 // block when window.__perfDbg is on.
 
 import { _pageState, _setActiveState } from './_state.js';
+import { persistDebounced } from '../../../shared/persist_debounced.js';
 
 const HUD_ID = 'perfHudOverlay';
 const LS_KEY = 'inversion_atlas.perfHudOn';
@@ -41,7 +42,7 @@ const ROLLING_WINDOW = 50;    // how many scrubs the p50/p95 line covers
 export function openPerfHud() {
   if (typeof document === 'undefined') return;
   window.__perfDbg = true;
-  try { localStorage.setItem(LS_KEY, '1'); } catch (_) {}
+  persistDebounced(LS_KEY, '1');
   let hud = document.getElementById(HUD_ID);
   if (!hud) hud = _buildHud();
   hud.style.display = 'block';
@@ -51,7 +52,7 @@ export function openPerfHud() {
 export function closePerfHud() {
   if (typeof document === 'undefined') return;
   window.__perfDbg = false;
-  try { localStorage.setItem(LS_KEY, '0'); } catch (_) {}
+  persistDebounced(LS_KEY, '0');
   const hud = document.getElementById(HUD_ID);
   if (hud) hud.style.display = 'none';
 }

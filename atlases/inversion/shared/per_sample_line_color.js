@@ -388,27 +388,70 @@ function _cohortRange(valuesArr) {
   return out;
 }
 
+// 2026-05-26: median-anchored cohort stats. Cached on the array under
+// __vStats so the O(N log N) sort is amortized across all samples in
+// one draw. Used by the het ramp's divergent anchoring.
+function _cohortRangeAndMedian(valuesArr) {
+  if (!valuesArr) return null;
+  if (valuesArr.__vStats) return valuesArr.__vStats;
+  const finite = [];
+  for (let i = 0; i < valuesArr.length; i++) {
+    const v = valuesArr[i];
+    if (Number.isFinite(v)) finite.push(v);
+  }
+  if (finite.length === 0) {
+    try { valuesArr.__vStats = null; } catch (_) {}
+    return null;
+  }
+  finite.sort((a, b) => a - b);
+  const mid = finite.length >> 1;
+  const vMed = (finite.length & 1)
+    ? finite[mid]
+    : (finite[mid - 1] + finite[mid]) / 2;
+  const out = { vMin: finite[0], vMax: finite[finite.length - 1], vMed };
+  try { valuesArr.__vStats = out; } catch (_) {}
+  return out;
+}
+
+// Map a value to t∈[0,1] using a piecewise-linear scale anchored at
+// the median (vMed → t=0.5). vMin → 0, vMax → 1. Degenerate halves
+// (vMed == vMin or vMed == vMax) collapse to the available side.
+// Clamped to [0, 1] so callers outside the cohort range still get a
+// well-defined ramp colour.
+function _twoSidedT(value, vMin, vMed, vMax) {
+  if (!Number.isFinite(value)) return 0.5;
+  let t;
+  if (value <= vMed) {
+    t = (vMed === vMin) ? 0 : 0.5 * (value - vMin) / (vMed - vMin);
+  } else {
+    t = (vMax === vMed) ? 1 : 0.5 + 0.5 * (value - vMed) / (vMax - vMed);
+  }
+  if (t < 0) return 0;
+  if (t > 1) return 1;
+  return t;
+}
+
 export function perSampleColorFor(mode, value, valuesArr) {
   if (!Number.isFinite(value)) return null;
 
   if (mode === 'het') {
-    // 2026-05-20: was `hetRateColor(value)` which fixed-normalizes to
-    // [0, 1] around 0.5. Real per-sample het rates over a typical L2
-    // envelope sit at ~0.001–0.05 — every sample landed at t ≈ 0.01
-    // on the RdBu ramp = all the same dark blue, invisible against
-    // the dark canvas background, reads as grey. Quentin: "the dosage
-    // in the tracked samples doesnt appear the points are grey ...
-    // maybe its a problem of color palette or smth?".
+    // 2026-05-26: was `_sequentialBlueToYellow` which has a desaturated
+    // olive midpoint (rgb(141,150,121)) at t=0.5. Real per-sample het
+    // rates over a typical L2 envelope cluster tightly around the cohort
+    // median, so most samples landed near t=0.5 → all painted in the
+    // muddy olive → read as "uniform grey/dim". Also disagreed with the
+    // legend strip, which shows a blue→grey→red divergent ramp.
     //
-    // Fix: same auto-scale-to-data pattern theta_pi/ghsl already use.
-    // Normalize each window's value to the actual [vMin, vMax] across
-    // the cohort so the colour spread fills the ramp regardless of
-    // the absolute rate. Range cached on the array so this is O(N)
-    // amortized across all samples in the same draw.
-    const r = _cohortRange(valuesArr);
-    if (r && r.vMin !== r.vMax) {
-      const t = (value - r.vMin) / (r.vMax - r.vMin);
-      return _sequentialBlueToYellow(t);
+    // Fix: divergent blue→light-grey→red ramp matching the legend, with
+    // the neutral anchored at the cohort MEDIAN (not the midpoint of
+    // [vMin, vMax]). Anchoring at the median guarantees roughly half
+    // the points fall on each saturated half regardless of distribution
+    // shape; midpoint-anchoring collapses to one half when the
+    // distribution is skewed (which het distributions usually are).
+    const stats = _cohortRangeAndMedian(valuesArr);
+    if (stats && stats.vMin !== stats.vMax) {
+      const t = _twoSidedT(value, stats.vMin, stats.vMed, stats.vMax);
+      return _legendBlueGreyRed(t);
     }
     return hetRateColor(value);
   }
@@ -436,14 +479,16 @@ export function perSampleColorFor(mode, value, valuesArr) {
   }
 
   if (mode === 'dosage') {
-    // 2026-05-20: same fix as het — fixed [0, 2] mapping wastes the
-    // ramp when the cohort's mean dosages cluster (e.g. all ≈ 0.05
-    // for a near-monomorphic site). Auto-scale to the cohort's
-    // [vMin, vMax] for visible spread; fall back to the fixed [0, 2]
-    // mapping when no valuesArr is supplied or the range collapses.
-    const r = _cohortRange(valuesArr);
-    if (r && r.vMin !== r.vMax) {
-      const t = (value - r.vMin) / (r.vMax - r.vMin);
+    // 2026-05-26: was midpoint-rescaled to [vMin, vMax]. Same olive/grey
+    // midpoint collapse as het had when the cohort's mean dosages cluster
+    // tightly (skewed distributions land most samples on the desaturated
+    // grey middle of the teal→grey→red ramp). Switch to median-anchored
+    // divergent so half the cohort sits on each saturated side regardless
+    // of skew. Falls back to the fixed [0, 2] mapping when no valuesArr
+    // is supplied or the cohort range collapses.
+    const stats = _cohortRangeAndMedian(valuesArr);
+    if (stats && stats.vMin !== stats.vMax) {
+      const t = _twoSidedT(value, stats.vMin, stats.vMed, stats.vMax);
       return _divergentTealRedThroughGrey(t);
     }
     const t = Math.max(0, Math.min(1, value / 2));
@@ -470,6 +515,25 @@ function _sequentialBlueToYellow(t) {
   const r = Math.round( 43 + (240 -  43) * t);
   const g = Math.round(108 + (193 - 108) * t);
   const b = Math.round(168 + ( 75 - 168) * t);
+  return `rgb(${r},${g},${b})`;
+}
+
+// Divergent blue→light-grey→red matching the legend strip in
+// pca_panel.js (`#4a90ff, #cccccc, #d94f4f`). Two linear segments.
+function _legendBlueGreyRed(t) {
+  if (t <= 0.5) {
+    const u = t * 2;
+    // #4a90ff = rgb(74,144,255) → #cccccc = rgb(204,204,204)
+    const r = Math.round( 74 + (204 -  74) * u);
+    const g = Math.round(144 + (204 - 144) * u);
+    const b = Math.round(255 + (204 - 255) * u);
+    return `rgb(${r},${g},${b})`;
+  }
+  const u = (t - 0.5) * 2;
+  // #cccccc → #d94f4f = rgb(217,79,79)
+  const r = Math.round(204 + (217 - 204) * u);
+  const g = Math.round(204 + ( 79 - 204) * u);
+  const b = Math.round(204 + ( 79 - 204) * u);
   return `rgb(${r},${g},${b})`;
 }
 

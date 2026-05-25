@@ -30,6 +30,7 @@ import { drawLinesPanel } from './lines_panel.js';
 import { drawPCA, drawAnchorStrip } from './pca_panel.js';
 import { renderL3Panel } from './l3_panel.js';
 import { drawTracks } from './events.js';
+import { persistDebounced } from '../../../shared/persist_debounced.js';
 
 const DEFAULTS = {
   simPanelH:   520,
@@ -179,7 +180,7 @@ function _wireOne(state, handleId, stateKey, defaultH, minH) {
     const next = Math.max(minH, Math.min(1200, startH + (e.clientY - startY)));
     state[stateKey] = next;
     if (resizedFlag) state[resizedFlag] = true;
-    try { localStorage.setItem(LS_KEY[stateKey], String(next)); } catch (_) {}
+    persistDebounced(LS_KEY[stateKey], String(next));
     applyMainGrid(state);
   });
   function endDrag(e) {
@@ -249,7 +250,7 @@ function _wireAsideHoriz(state) {
     const dxPct = ((e.clientX - startX) / paneW) * 100;
     const next  = startPct - dxPct;
     applyPct(next);
-    try { localStorage.setItem(LS_KEY.pcaAsideWPct, String(state.pcaAsideWPct)); } catch (_) {}
+    persistDebounced(LS_KEY.pcaAsideWPct, String(state.pcaAsideWPct));
   });
   function endDrag(e) {
     if (!dragging) return;
@@ -312,7 +313,7 @@ function _wireCssVar(state, handleId, opts) {
     else if (unit === 'fr') delta = (dPx / dimPx) * 3 * sign; // 1 main-axis = ~3fr feel
     else               delta = dPx * sign;
     apply(startVal + delta);
-    try { localStorage.setItem(LS_KEY[stateKey], String(state[stateKey])); } catch (_) {}
+    persistDebounced(LS_KEY[stateKey], String(state[stateKey]));
   });
   function endDrag(e) {
     if (!dragging) return;

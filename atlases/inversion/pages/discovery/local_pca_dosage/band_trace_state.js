@@ -15,6 +15,7 @@
 import {
   bandTraceForFishSet,
 } from '../../../shared/band_trace.js';
+import { persistDebounced } from '../../../shared/persist_debounced.js';
 
 // =====================================================================
 // localStorage keys (legacy lines 39700-39701)
@@ -121,9 +122,7 @@ export function setBandTraceFishSet(state, arr) {
   state.bandTraceFishSet = out;
   state.bandTraceCache = null;
   state.bandTraceCacheKey = null;
-  if (typeof localStorage !== 'undefined') {
-    try { localStorage.setItem(BTRACE_FISH_SET_LS_KEY, JSON.stringify(out)); } catch (_) {}
-  }
+  persistDebounced(BTRACE_FISH_SET_LS_KEY, out);
   return out;
 }
 
@@ -134,9 +133,7 @@ export function setBandTraceFishSet(state, arr) {
 export function setBandTraceOn(state, on) {
   if (!state) return;
   state.bandTraceOn = !!on;
-  if (typeof localStorage !== 'undefined') {
-    try { localStorage.setItem(BTRACE_ON_LS_KEY, on ? '1' : '0'); } catch (_) {}
-  }
+  persistDebounced(BTRACE_ON_LS_KEY, on ? '1' : '0');
 }
 
 /**

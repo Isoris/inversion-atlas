@@ -23,6 +23,8 @@
 // Storage schema
 // ---------------------------------------------------------------------
 
+import { persistDebounced } from '../../../shared/persist_debounced.js';
+
 export const ACTIVE_SAMPLES_LS_KEY = 'pca_scrubber_v3.active_samples';
 export const ACTIVE_SAMPLES_SCHEMA_VERSION = 1;
 
@@ -140,9 +142,7 @@ export function saveActiveSamples(state) {
     }
   }
   payload.reasons = reasonsOut;
-  try {
-    localStorage.setItem(ACTIVE_SAMPLES_LS_KEY, JSON.stringify(payload));
-  } catch (_) {}
+  persistDebounced(ACTIVE_SAMPLES_LS_KEY, payload);
 }
 
 // ---------------------------------------------------------------------

@@ -6231,3 +6231,75 @@ details.sidebar-section > summary h2 {
   height: 100% !important;
   display: block;
 }
+
+/* =============================================================================
+ * 2026-05-24: Floating sidebar override.
+ *
+ * Quentin asked: "Why do we still need this setting bar on the left? Can it be
+ * made a toggle panel that is floating, only active when we push the settings
+ * wheel?"
+ *
+ * Legacy behaviour: .wrap was a 2-column grid (320px aside | 1fr content).
+ * data-sidebar="collapsed" shrank the aside column to 28px (only the ‹ button
+ * visible). Always reserved space; the content never used the full width.
+ *
+ * New behaviour: aside becomes a FLOATING overlay panel at the left edge.
+ *   default (no attr)            → floating panel VISIBLE (slid in from left)
+ *   data-sidebar="collapsed"     → floating panel HIDDEN (translated off-screen)
+ *
+ * The mount calls _applySidebarState(state, true) on every fresh page entry
+ * (sidebar.js line 3106), so pages NOW START HIDDEN. The #globalSettingsBtn
+ * (orange gear in the shell topbar) forwards clicks to #sidebarToggleBtn,
+ * which flips the data-sidebar attribute — single click opens, click again
+ * closes. No JS changes; only CSS.
+ *
+ * Affects all 8 inversion discovery pages that share the .wrap + aside
+ * pattern (local_pca_dosage, dosage_cluster_adaptive_k, dosage_heatmap,
+ * fingerprint_track, nested_inversion_detector, pca_scatter_per_window,
+ * similarity_matrix, tree_panel).
+ * =============================================================================
+ */
+
+/* Collapse the legacy left column — content fills full width regardless of
+   data-sidebar state. !important overrides the legacy 320px / 28px rules. */
+.wrap                         { grid-template-columns: 1fr !important; }
+.wrap[data-sidebar="collapsed"] { grid-template-columns: 1fr !important; }
+
+/* Aside becomes a floating overlay pinned to the left of the content area.
+   Override the legacy `position: relative` (line 426). Width matches the
+   legacy 320px column so existing controls + sliders inside don't reflow. */
+aside {
+  position: absolute !important;
+  top: 0; left: 0; bottom: 0;
+  width: 320px;
+  z-index: 60;
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.45);
+  border-right: 1px solid var(--rule);
+  transition: transform 220ms ease-out;
+  transform: translateX(0);   /* visible by default */
+}
+
+/* Collapsed state = HIDDEN. Slide the panel off-screen to the left;
+   pointer-events: none so clicks pass through to whatever's underneath
+   while the slide-out animation completes. */
+.wrap[data-sidebar="collapsed"] aside {
+  transform: translateX(-100%);
+  pointer-events: none;
+  /* Defensive override of the legacy "padding: 0; overflow: hidden" — the
+     panel keeps its full padding while sliding off, so re-opening doesn't
+     visually jolt. */
+  padding: 14px 16px !important;
+  overflow-y: auto !important;
+}
+/* When hidden, the >*:not(#sidebarToggleBtn) hiding rule from line 491 is
+   redundant (the whole panel is off-screen anyway) but doesn't hurt. */
+
+/* Subtle backdrop while the panel is open — soft shadow tint behind so the
+   panel reads as "above" the canvas. Doesn't block clicks (no backdrop layer
+   covering the page); click anywhere else just leaves the panel open until
+   the user clicks the gear again. */
+
+/* Lock-in: any rules that targeted `.wrap[data-sidebar="collapsed"] aside > *`
+   or `.wrap[data-sidebar="collapsed"] #sidebarToggleBtn` continue to fire
+   (state machine unchanged); they're now styling an off-screen panel, so
+   the visual effect is just "hidden". */

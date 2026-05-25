@@ -97,10 +97,62 @@ const PALETTE = [
   '#b07cf7', '#f0d56a', '#7ad3db', '#ff8c6e',
 ];
 
-// --- trackedColor — legacy lines 35959-35959 ---
+// --- tracked-array index memo (2026-05-21 perf, Tier-S finding #3) ---
+// state.tracked is mutated by reassigning a fresh array (every mutation
+// site does `state.tracked = ...`, never `state.tracked.push`), so an
+// IDENTITY check on the array reference is enough to detect "should I
+// rebuild the Map/Set?" — no event hooks needed at the mutation sites.
+//
+// Before: callers did `state.tracked.indexOf(si)` (O(n) per call) or
+// `new Set(state.tracked)` (O(n) ALLOC per frame). With nS=2200 and
+// ~20 tracked samples typical, the per-frame Set-rebuild + indexOf
+// scans were ~100µs each, fired by several render paths per frame.
+// After: O(1) lookup, O(n) rebuild only when the tracked list actually
+// changes.
+
+/** Return a Map<si, indexInTracked> — the index doubles as the palette
+ *  slot for trackedColor(). Memoized; rebuilds only on tracked-array
+ *  reassignment. */
+export function trackedIndexMap(state) {
+  if (state._trackedIndexMapForArr !== state.tracked) {
+    const m = new Map();
+    const arr = state.tracked || [];
+    for (let i = 0; i < arr.length; i++) m.set(arr[i], i);
+    state._trackedIndexMap = m;
+    state._trackedIndexMapForArr = state.tracked;
+  }
+  return state._trackedIndexMap;
+}
+
+/** Return a Set<si> for O(1) "is sample tracked?" checks. Memoized on
+ *  the same identity invariant as trackedIndexMap. */
+export function trackedSet(state) {
+  if (state._trackedSetForArr !== state.tracked) {
+    state._trackedSet = new Set(state.tracked || []);
+    state._trackedSetForArr = state.tracked;
+  }
+  return state._trackedSet;
+}
+
+/** Return a Map<candidate.id, candidate> for O(1) lookup by id.
+ *  Memoized on state.candidateList identity. */
+export function candidateById(state) {
+  if (state._candidateByIdForArr !== state.candidateList) {
+    state._candidateById = new Map();
+    const arr = state.candidateList || [];
+    for (const c of arr) if (c && c.id) state._candidateById.set(c.id, c);
+    state._candidateByIdForArr = state.candidateList;
+  }
+  return state._candidateById;
+}
+
+// --- trackedColor — legacy lines 35959-35959 (now O(1) via trackedIndexMap) ---
 export function trackedColor(si) {
   const state = _pageState;
-  return PALETTE[state.tracked.indexOf(si) % PALETTE.length];
+  if (!state) return undefined;
+  const idx = trackedIndexMap(state).get(si);
+  if (idx === undefined) return undefined;
+  return PALETTE[idx % PALETTE.length];
 }
 
 // --- _vColor — legacy lines 36125-36145 ---
@@ -263,4 +315,42 @@ export function getSampleColor(si, mode, groupLabels) {
 export function _resolveSampleScopeColor(si, mode) {
   if (mode === 'lineage') return _lineageColor(si);
   return _sharedResolveSampleScopeColor(_pageState, si, mode);
+}
+
+// --- per-sample scope-color array memo (2026-05-21 perf, Tier-A finding #2) ---
+// Pre-resolves the per-sample color for an entire cohort under a given
+// scope-color mode (family / lineage / ancestry / manual) and caches the
+// result. Invalidated by identity drift on the dependencies that actually
+// drive the colors: state.data (chrom load), state.lineageResult (lineage
+// mode), state.manualGroups (manual mode). Other modes only care about
+// state.data identity.
+//
+// Before: drawLinesPanel called _resolveSampleScopeColor(si, lcMode) inside
+// the O(nS) inner loop. With nS=2200 and per-call cost ~1µs (Map lookup
+// + dispatch + string return), this was ~2 ms PER CACHE MISS frame just
+// for color resolution. After: one O(nS) build per mode change, cache hit
+// returns the array in O(1).
+const _SCOPE_COLOR_MODES = new Set(['family', 'lineage', 'ancestry', 'manual']);
+
+export function sampleScopeColorArray(state, mode) {
+  if (!state || !state.data || !state.data.samples) return null;
+  if (!_SCOPE_COLOR_MODES.has(mode)) return null;
+  _setActiveState(state);
+  if (!state._sampleColorCache) state._sampleColorCache = {};
+  const slot = state._sampleColorCache[mode];
+  const nS         = state.data.samples.length;
+  const dataDep    = state.data;
+  const lineageDep = (mode === 'lineage') ? state.lineageResult || null : null;
+  const manualDep  = (mode === 'manual')  ? state.manualGroups   || null : null;
+  if (slot &&
+      slot.dataDep    === dataDep    &&
+      slot.lineageDep === lineageDep &&
+      slot.manualDep  === manualDep  &&
+      slot.array.length === nS) {
+    return slot.array;
+  }
+  const out = new Array(nS);
+  for (let si = 0; si < nS; si++) out[si] = _resolveSampleScopeColor(si, mode);
+  state._sampleColorCache[mode] = { array: out, dataDep, lineageDep, manualDep };
+  return out;
 }
