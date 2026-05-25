@@ -198,6 +198,59 @@ check('no windows: all NaN',
         .every(v => Number.isNaN(v)));
 
 // -----------------------------------------------------------------------------
+group('resetDosageDiagnosticsForChromChange');
+{
+  // Populate every slot the helper claims to clear; verify it does.
+  const state = {
+    __hetRateCache:                    new Map([['k1', new Float32Array([0.5])]]),
+    __dosageMeanCache:                 new Map([['k2', new Float32Array([1.0])]]),
+    __cohortSampleAliasMap:            { samples: [], map: new Map() },
+    __chunkShapeValidated:             true,
+    __dosageMatchRateLogged:           true,
+    __hetAllNanLogged:                 true,
+    __hetMarkerFilterLogged:           true,
+    __dosageMeanAllNanLogged:          true,
+    __dosageMeanMarkerFilterLogged:    true,
+    __lastDosageFetchError:            { url: 'x', message: 'y', at: 1 },
+    // Chunk LRU is INTENTIONALLY preserved across chrom changes.
+    __dosageChunkLru:                  new Map([['LG01:1-1000', { samples: [] }]]),
+  };
+  DC.resetDosageDiagnosticsForChromChange(state);
+  check('het-rate cache cleared',
+        state.__hetRateCache.size === 0);
+  check('dosage-mean cache cleared',
+        state.__dosageMeanCache.size === 0);
+  check('alias map cleared',
+        state.__cohortSampleAliasMap === null);
+  check('chunk-shape-validated flag reset',
+        state.__chunkShapeValidated === false);
+  check('match-rate-logged flag reset',
+        state.__dosageMatchRateLogged === false);
+  check('hetAllNan-logged flag reset',
+        state.__hetAllNanLogged === false);
+  check('hetMarkerFilter-logged flag reset',
+        state.__hetMarkerFilterLogged === false);
+  check('dosageMeanAllNan-logged flag reset',
+        state.__dosageMeanAllNanLogged === false);
+  check('dosageMeanMarkerFilter-logged flag reset',
+        state.__dosageMeanMarkerFilterLogged === false);
+  check('lastDosageFetchError cleared',
+        state.__lastDosageFetchError === null);
+  // Critical invariant: chunk LRU is NOT cleared (per-chrom navigation
+  // back to a previously-visited chrom should reuse cached chunks).
+  check('chunk LRU PRESERVED (per-chrom keys + covering-fallback already filter)',
+        state.__dosageChunkLru.size === 1);
+}
+
+// Defensive: null / empty state shouldn't crash.
+check('reset on null state → no throw',
+      (() => { try { DC.resetDosageDiagnosticsForChromChange(null); return true; }
+               catch (_) { return false; } })());
+check('reset on empty state → no throw',
+      (() => { try { DC.resetDosageDiagnosticsForChromChange({}); return true; }
+               catch (_) { return false; } })());
+
+// -----------------------------------------------------------------------------
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

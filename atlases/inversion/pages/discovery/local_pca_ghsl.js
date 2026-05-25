@@ -52,11 +52,6 @@
 // (6 of 6).
 // =============================================================================
 
-import { contextFromState, clusterL2, ClusterCache } from '../../shared/per_l2_cluster.js';
-import { hetRateColor } from '../../shared/het_rate.js';
-import { alignLabels, hungarianChainProjection, concordanceMatrix } from '../../shared/hungarian.js';
-import { buildContingency, computeARI, computeNMI, cramersV } from '../../shared/contingency.js';
-import { kmeans1D, kmeans2D, silhouette1D, adaptiveK1D } from '../../shared/kmeans.js';
 // 2026-05-15: panel renderers consume the documented ghsl_panel +
 // ghsl_kstripes data shapes via these pure accessors. No invented data.
 import {
@@ -66,7 +61,11 @@ import {
   ghslAggregateRange,
 } from '../../shared/ghsl_panel.js';
 
-import { _pageState, _setActiveState } from './local_pca_ghsl/_state.js';
+// 2026-05-26: dropped 5 import statements (per_l2_cluster / het_rate /
+// hungarian / contingency / kmeans) — every symbol they exposed was only
+// used by the removed mount/wrapper code. _pageState / _setActiveState
+// from local_pca_ghsl/_state.js also dropped; that subdir file was
+// deleted in the same pass.
 
 // ---------------------------------------------------------------------------
 // Extracted bodies (chat-33, preserved VERBATIM)
@@ -100,24 +99,9 @@ export function _refreshGhslLayerStatus(state) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// State-aware public wrapper
-// ---------------------------------------------------------------------------
-
-/**
- * Public entry — state-aware wrapper around _refreshGhslLayerStatus.
- *
- * If `state` is passed, sets _pageState as a side effect before
- * delegating (mirrors confirmed_carousel's refreshConfirmedCarousel(state) pattern).
- * If called without args, falls back to _pageState set by mount().
- *
- * Returns the underlying call's return value (currently undefined).
- */
-export function refreshGhslLayerStatus(state) {
-  if (state) _setActiveState(state);
-  const resolved = state || _pageState || {};
-  return _refreshGhslLayerStatus(resolved);
-}
+// 2026-05-26: `refreshGhslLayerStatus` wrapper removed — no external
+// importer ever consumed the non-underscore alias (verified by grep).
+// local_pca_dosage.js imports `_refreshGhslLayerStatus` directly.
 
 // ---------------------------------------------------------------------------
 // Panel visibility — added 2026-05-15.
@@ -162,10 +146,9 @@ export function _refreshGhslPanelVisibility(state) {
   showHide('ghslEmpty', !hasAny, 'block');
 }
 
-export function refreshGhslPanelVisibility(state) {
-  if (state) _setActiveState(state);
-  return _refreshGhslPanelVisibility(state || _pageState || {});
-}
+// 2026-05-26: `refreshGhslPanelVisibility` wrapper removed — only the
+// removed mount() called it. The underscore-prefixed _refreshGhslPanelVisibility
+// is kept (future GHSL-page wiring will call it directly).
 
 // ---------------------------------------------------------------------------
 // Panel renderers — added 2026-05-15.
@@ -590,88 +573,13 @@ export function _renderGhslSampleTable(state) {
   slot.innerHTML = rows.join('');
 }
 
-/** Public render entry — calls all four panels in order, gated on
- *  ghsl_panel layer presence. Cheap to call repeatedly (each renderer
- *  is idempotent: clears its canvas, paints fresh). */
-export function renderGhslPanels(state) {
-  if (state) _setActiveState(state);
-  const s = state || _pageState;
-  if (!s || !ghslPanel(s)) return;
-  try { _renderGhslCtrlBar(s); } catch (e) { console.warn('local_pca_ghsl ctrlBar:', e); }
-  try { _drawGhslMeanStrip(s); } catch (e) { console.warn('local_pca_ghsl meanStrip:', e); }
-  try { _drawGhslHeatmap(s); }   catch (e) { console.warn('local_pca_ghsl heatmap:', e); }
-  try { _drawGhslLines(s); }     catch (e) { console.warn('local_pca_ghsl lines:', e); }
-  try { _renderGhslSampleTable(s); } catch (e) { console.warn('local_pca_ghsl sampleTable:', e); }
-}
-
 // ---------------------------------------------------------------------------
-// Atlas-router lifecycle (chat 38 round 5 step 15, 2026-05-07).
+// 2026-05-26: removed renderGhslPanels / mount / unmount / _buildLegacyState
+// (and the matching scale-select wiring). No external caller — only mount
+// referenced any of them, mount itself was never reached by atlas_router
+// (the GHSL page never made it into manifest.json because the six-panel
+// scanner is TODO and the layer-status stub didn't justify a dedicated
+// page). The underscore-prefixed renderers above stay as ready scaffolding
+// for whenever someone finishes wiring the GHSL scanner.
 // ---------------------------------------------------------------------------
 
-/**
- * Mount: called by atlas_router when the user navigates to local_pca_ghsl.
- *
- * Builds a legacy-shape state with the slots the chat-33 helper needs
- * (layersPresent — a Set of GHSL layer names; activeChrom for any
- * future chrom-aware rendering). Calls refreshGhslLayerStatus to
- * populate the five [data-gh-layer] indicator chips at mount time.
- */
-export async function mount(root, atlasState, registry) {
-  const legacyState = _buildLegacyState(atlasState);
-  _setActiveState(legacyState);
-
-  try { refreshGhslLayerStatus(legacyState); }
-  catch (e) { console.warn('local_pca_ghsl.mount: refreshGhslLayerStatus threw —', e); }
-
-  // 2026-05-15: wire panel-visibility + render any panels whose layers
-  // are present at mount time. When ghsl_panel is absent, the empty-state
-  // stays visible and the panel slots stay hidden — same pattern as local_pca_theta_pi.
-  try { refreshGhslPanelVisibility(legacyState); }
-  catch (e) { console.warn('local_pca_ghsl.mount: refreshGhslPanelVisibility threw —', e); }
-
-  try { renderGhslPanels(legacyState); }
-  catch (e) { console.warn('local_pca_ghsl.mount: renderGhslPanels threw —', e); }
-
-  // Wire the scale-select to re-render every panel on change.
-  if (typeof document !== 'undefined') {
-    const sel = document.getElementById('ghScaleSelect');
-    if (sel && !sel.__page15Wired) {
-      sel.addEventListener('change', () => {
-        try { renderGhslPanels(legacyState); }
-        catch (e) { console.warn('local_pca_ghsl scaleSelect change:', e); }
-      });
-      sel.__page15Wired = true;
-    }
-  }
-
-  if (atlasState.inversion) atlasState.inversion._page15State = legacyState;
-}
-
-/**
- * Unmount: clear _pageState so post-unmount callbacks see null.
- */
-export async function unmount(root) {
-  _setActiveState(null);
-}
-
-function _buildLegacyState(atlasState) {
-  const inv = atlasState.inversion || {};
-  const sh  = atlasState.shared    || {};
-  const legacy = Object.assign({}, inv);
-  // layersPresent: Set<layerName> — read by _refreshGhslLayerStatus.
-  // Tolerate Array shape (matches sibling local_pca_theta_pi.js convention).
-  legacy.layersPresent = (inv.layersPresent instanceof Set)
-    ? inv.layersPresent
-    : new Set(Array.isArray(inv.layersPresent) ? inv.layersPresent : []);
-  // activeChrom lives under atlasState.shared, not under atlasState.inversion
-  // (the latter only holds inversion-specific slots: tracks, candidateList,
-  // cur, etc.). Reading `inv.activeChrom` always returned null/undefined
-  // and the chrom label `#ghChromLabel` rendered empty.
-  legacy.activeChrom   = sh.activeChrom || null;
-  // legacy.data is what ghslPanel(state) reads (`state.data.ghsl_panel`).
-  // Without this, every GHSL panel rendered empty even when scrubber_ghsl
-  // data was loaded. Matches local_pca_theta_pi.js:1178-1188 pattern.
-  const chrom = sh.activeChrom;
-  legacy.data = (chrom && inv.tracks && inv.tracks[chrom]) || null;
-  return legacy;
-}

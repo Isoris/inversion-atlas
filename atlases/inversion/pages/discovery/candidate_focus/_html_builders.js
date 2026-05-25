@@ -121,7 +121,9 @@ const DOSAGE_HEATMAP_DEFAULTS = {
 
 // _ensureDosageHmState — legacy line 16795 (candidate_focus-private). Lazy-init
 // state.__dosageHm; used by candidateDosageHeatmapHtml + the wire.
-function _ensureDosageHmState() {
+// 2026-05-26: exported so _wires.js:362 can call it. Previously the wire
+// crashed with "_ensureDosageHmState is not defined".
+export function _ensureDosageHmState() {
   const state = _pageState;
   if (!state.__dosageHm) {
     state.__dosageHm = {

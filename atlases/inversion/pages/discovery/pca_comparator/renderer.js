@@ -117,7 +117,17 @@ export function paintPanel(state, layer) {
 
   // Plot samples.
   const screenXY = new Float32Array(nS * 2);
-  const trackedSet = new Set(ss.tracked || []);
+  // 2026-05-21 perf: trackedSet cached on state keyed by ss.tracked
+  // identity. The same Set is reused across all 3 layer panels per
+  // _paintAll call (was: 3× new Set allocation per paint).
+  let trackedSet;
+  const _tsCache = state._trackedSetCache;
+  if (_tsCache && _tsCache.arr === ss.tracked) {
+    trackedSet = _tsCache.set;
+  } else {
+    trackedSet = new Set(ss.tracked || []);
+    state._trackedSetCache = { arr: ss.tracked, set: trackedSet };
+  }
   for (let si = 0; si < nS; si++) {
     const x = pts.xs[si], y = pts.ys[si];
     if (!isFinite(x) || !isFinite(y)) {
@@ -325,42 +335,64 @@ export function paintLines(state, axis) {
   const plotW = Math.max(1, w - pad.l - pad.r);
   const plotH = Math.max(1, h - pad.t - pad.b);
 
-  // X is centre_mb if available, else window index.
-  const mbs = [];
-  let haveMb = true;
-  for (let i = 0; i < nWin; i++) {
-    const w0 = d.windows && d.windows[i];
-    const mb = w0 && Number.isFinite(w0.center_mb) ? +w0.center_mb : NaN;
-    if (!Number.isFinite(mb)) haveMb = false;
-    mbs.push(mb);
-  }
-  let mbMin = 0, mbMax = nWin - 1;
-  if (haveMb) {
-    mbMin = mbs[0]; mbMax = mbs[nWin - 1];
-    if (mbMax <= mbMin) mbMax = mbMin + 1;
+  // 2026-05-21 perf: cache the X-axis mb array + y-range scan on
+  // (d.windows, series.byWin) identity. Pre-fix these ran on EVERY
+  // paint, including cache-hits — for nWin=9000, nS=226 the y-range
+  // scan was a 2M-iteration loop that fired on every arrow-key scrub
+  // even though all inputs were stable. Now: once per chrom + anchor +
+  // axis change; arrow-key scrubs are O(1).
+  let mbs, haveMb, mbMin, mbMax, yMin, yMax;
+  const geomCache = state._linesGeomCache;
+  if (geomCache &&
+      geomCache.windowsRef === d.windows &&
+      geomCache.seriesRef  === series.byWin) {
+    mbs    = geomCache.mbs;
+    haveMb = geomCache.haveMb;
+    mbMin  = geomCache.mbMin;
+    mbMax  = geomCache.mbMax;
+    yMin   = geomCache.yMin;
+    yMax   = geomCache.yMax;
+  } else {
+    // X is centre_mb if available, else window index.
+    mbs = new Float64Array(nWin);
+    haveMb = true;
+    for (let i = 0; i < nWin; i++) {
+      const w0 = d.windows && d.windows[i];
+      const mb = w0 && Number.isFinite(w0.center_mb) ? +w0.center_mb : NaN;
+      if (!Number.isFinite(mb)) haveMb = false;
+      mbs[i] = mb;
+    }
+    mbMin = 0; mbMax = nWin - 1;
+    if (haveMb) {
+      mbMin = mbs[0]; mbMax = mbs[nWin - 1];
+      if (mbMax <= mbMin) mbMax = mbMin + 1;
+    }
+    // Compute robust y range across visible samples + windows.
+    yMin = +Infinity; yMax = -Infinity;
+    for (let i = 0; i < nWin; i++) {
+      const v = series.byWin[i];
+      if (!v) continue;
+      for (let s = 0; s < v.length; s++) {
+        const y = v[s];
+        if (!Number.isFinite(y)) continue;
+        if (y < yMin) yMin = y;
+        if (y > yMax) yMax = y;
+      }
+    }
+    if (!Number.isFinite(yMin) || !Number.isFinite(yMax) || yMax === yMin) {
+      yMin = -1; yMax = 1;
+    }
+    const yPad = (yMax - yMin) * 0.05;
+    yMin -= yPad; yMax += yPad;
+    state._linesGeomCache = {
+      windowsRef: d.windows, seriesRef: series.byWin,
+      mbs, haveMb, mbMin, mbMax, yMin, yMax,
+    };
   }
   const toX = (i) => {
     if (haveMb) return pad.l + ((mbs[i] - mbMin) / (mbMax - mbMin)) * plotW;
     return pad.l + (i / Math.max(1, nWin - 1)) * plotW;
   };
-
-  // Compute robust y range across visible samples + windows.
-  let yMin = +Infinity, yMax = -Infinity;
-  for (let i = 0; i < nWin; i++) {
-    const v = series.byWin[i];
-    if (!v) continue;
-    for (let s = 0; s < v.length; s++) {
-      const y = v[s];
-      if (!Number.isFinite(y)) continue;
-      if (y < yMin) yMin = y;
-      if (y > yMax) yMax = y;
-    }
-  }
-  if (!Number.isFinite(yMin) || !Number.isFinite(yMax) || yMax === yMin) {
-    yMin = -1; yMax = 1;
-  }
-  const yPad = (yMax - yMin) * 0.05;
-  yMin -= yPad; yMax += yPad;
   const toY = (y) => pad.t + (1 - (y - yMin) / (yMax - yMin)) * plotH;
 
   // 2026-05-20: offscreen-canvas cache for the polyline pass. Keyed by

@@ -220,15 +220,26 @@ function _buildSampleIdMap(state, chunkSamples) {
   // Instead we attach a parallel `_byPos` table the lookup wrapper
   // walks AFTER all string-based passes fail. Only safe when lengths
   // agree — different cohort sizes would mis-align.
-  if (chunkSamples && chunkSamples.length === cohortSamples.length
-      && cohortSamples.length > 0) {
-    map._byPos = new Array(chunkSamples.length);
-    for (let i = 0; i < chunkSamples.length; i++) map._byPos[i] = i;
-    // Pre-compute name-rate to decide whether positional should ALSO
-    // win on per-cell misses. If name matching has any hits at all,
-    // positional is only used for samples that didn't string-match.
-    // If name matching has zero hits (beagle-placeholder case), every
-    // sample resolves positionally.
+  // 2026-05-26: was strict length-equality. Beagle ships placeholder
+  // "Ind"/"Ind1"/"Ind2"... AND the chunk-side cohort may have been
+  // filtered (e.g. dropping QC'd samples), so chunkSamples.length and
+  // cohortSamples.length often differ by a few. Quentin's report:
+  // "0/226 cohort samples projected" because chunk has e.g. 218 Ind
+  // entries while cohort has 226 CGA entries, so the strict-equality
+  // guard skipped _byPos entirely. Relax to "lengths within 10% AND
+  // both > 0" — wide enough to cover the BAM-list-filtered cases,
+  // narrow enough that mis-aligned cohorts still fail loudly. The
+  // user can also flip state.__forcePositionalDosage = true to bypass
+  // the heuristic entirely (toggle exposed from the 🔬 modal).
+  const cN = cohortSamples.length;
+  const kN = chunkSamples ? chunkSamples.length : 0;
+  const lengthsCompatible = (cN > 0 && kN > 0)
+    && (cN === kN || Math.abs(cN - kN) / Math.max(cN, kN) <= 0.1);
+  const forcePositional = state && state.__forcePositionalDosage === true;
+  if (chunkSamples && (lengthsCompatible || forcePositional)) {
+    const bound = Math.min(kN, cN);
+    map._byPos = new Array(kN);
+    for (let i = 0; i < kN; i++) map._byPos[i] = (i < bound) ? i : -1;
   }
   // One-shot diagnostic per page load. Always logs the first match so
   // there's evidence whether the matcher is finding samples or not.
@@ -359,6 +370,9 @@ export function resetDosageDiagnosticsForChromChange(state) {
   state.__hetMarkerFilterLogged = false;
   state.__dosageMeanAllNanLogged = false;
   state.__dosageMeanMarkerFilterLogged = false;
+  // Clear stashed fetch error too — a 404 from a previous chrom isn't
+  // relevant info for the new one's debug panel.
+  state.__lastDosageFetchError = null;
 }
 
 /**
@@ -843,7 +857,16 @@ export function buildDosageDebugReport(state, trackedIdx, range) {
   if (!state._linesPanelGetCachedChunk) {
     diagnosis = 'getCachedChunk not installed — installDosageChunkFetcher never ran (no dosage_chunks layer?).';
   } else if (lruKeys.length === 0) {
-    diagnosis = 'No chunks cached yet — the first fetch is in flight or failed. Watch the network tab for /dosage/chunk.';
+    // 2026-05-26: if there's a stashed fetch error, surface it — turns
+    // "no chunks cached" (vague) into the actual server response.
+    const lastErr = state.__lastDosageFetchError;
+    if (lastErr) {
+      const ageSec = lastErr.at ? Math.round((Date.now() - lastErr.at) / 1000) : null;
+      const ageStr = ageSec != null ? ` (${ageSec}s ago)` : '';
+      diagnosis = `Dosage chunk fetch FAILED: ${lastErr.message}${ageStr}. URL: ${lastErr.url}`;
+    } else {
+      diagnosis = 'No chunks cached yet — the first fetch is in flight or failed silently. Watch the network tab for /dosage/chunk.';
+    }
   } else if (trackedRows.length === 0) {
     diagnosis = 'No tracked samples — nothing to colour. Lasso or click PCA points to track them first.';
   } else if (nDosNaN === trackedRows.length && nHetNaN === trackedRows.length) {
@@ -915,12 +938,100 @@ function _templateUrl(template, chrom, startBp, endBp, cap) {
     .replace('__CAP__',   String(cap | 0));
 }
 
+/**
+ * 2026-05-26 — load the dosage sample-map JSON (produced by
+ * _tooling/build_dosage_sample_map.py) and stash it on state so the
+ * chunk fetcher can rewrite chunk.samples[] using by_position[]. Fail-
+ * soft: a missing map (404) is fine — the chunk fetcher falls back to
+ * the standard alias / positional projection paths.
+ *
+ * Resolution order (first URL that returns valid JSON wins):
+ *   1. state.data.dosage_sample_map_url — explicit override.
+ *   2. The cohort-dosage pipeline root (CANONICAL — lives forever):
+ *        /mnt/e/results_inversions/sample_map.json
+ *      Same root as 01_beagle/ + 02_dosage_sites/; one map covers every
+ *      chromosome. The atlas server serves absolute /mnt/e/... paths
+ *      directly (see the existing /mnt/e/.../theta.json fetches in
+ *      the server log).
+ *   3. The atlas-local fallback (legacy / dev convenience):
+ *        /atlases/inversion/data/dosage/sample_map.json
+ *
+ * @param {object} state
+ * @returns {Promise<object|null>}  parsed map or null when absent
+ */
+const _DOSAGE_SAMPLE_MAP_CANDIDATES = [
+  // Pipeline root — same disk as the beagle + dosage TSV files. This is
+  // the canonical location: run build_dosage_sample_map.py once with
+  // --out /mnt/e/results_inversions/sample_map.json and every chrom
+  // load picks it up forever.
+  '/mnt/e/results_inversions/sample_map.json',
+  // Atlas-local fallback (when running on a machine without the
+  // pipeline disk mounted, or for the dev container).
+  '/atlases/inversion/data/dosage/sample_map.json',
+];
+
+export async function loadDosageSampleMap(state) {
+  if (!state) return null;
+  if (state.__dosageSampleMap !== undefined) return state.__dosageSampleMap;
+  const urls = [];
+  if (state.data && state.data.dosage_sample_map_url) {
+    urls.push(state.data.dosage_sample_map_url);
+  }
+  for (const u of _DOSAGE_SAMPLE_MAP_CANDIDATES) urls.push(u);
+
+  for (const url of urls) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) continue;
+      const m = await resp.json();
+      if (!m || typeof m !== 'object' || !Array.isArray(m.by_position)) {
+        console.warn(`[dosage_chunks] sample_map at ${url} missing by_position[] — trying next.`);
+        continue;
+      }
+      state.__dosageSampleMap = m;
+      console.log('[dosage_chunks] loaded sample_map:',
+        `${m.n_samples || m.by_position.length} samples`,
+        `· from ${url}`,
+        `· generated_at ${m.generated_at || '?'}`);
+      return m;
+    } catch (_) { /* try next candidate */ }
+  }
+  // Memoise the negative result so we don't re-fetch on every chunk
+  // landing. To force re-load (after running the script), reload the page.
+  state.__dosageSampleMap = null;
+  return null;
+}
+
+/**
+ * Apply the loaded sample_map to a chunk in-place: replaces
+ * chunk.samples[i] with map.by_position[i] for each position covered.
+ * Uncovered positions keep their original (placeholder) id. Idempotent
+ * — re-applying is a no-op because samples already match by_position.
+ *
+ * @param {object} chunk
+ * @param {object} map   from loadDosageSampleMap()
+ */
+function _applySampleMapToChunk(chunk, map) {
+  if (!chunk || !Array.isArray(chunk.samples) || !map || !Array.isArray(map.by_position)) return;
+  const n = Math.min(chunk.samples.length, map.by_position.length);
+  for (let i = 0; i < n; i++) {
+    const mapped = map.by_position[i];
+    if (typeof mapped === 'string' && mapped.length > 0) {
+      chunk.samples[i] = mapped;
+    }
+  }
+}
+
 export function installDosageChunkFetcher(state, opts) {
   if (!state || !state.data) return;
   const dc = state.data.dosage_chunks;
   if (!dc || !Array.isArray(dc.chunks) || dc.chunks.length === 0) return;
   const template = dc.chunks[0].url || dc._endpoint || null;
   if (!template || template.indexOf('__START__') < 0) return;
+  // Kick off the sample-map fetch in the background. The first chunk
+  // load will await it (best-effort) so even the first chunk binds via
+  // by_position when the map is present. Subsequent loads are sync.
+  loadDosageSampleMap(state).catch(() => {});
   const cap = (dc.cap_default | 0) || 1000;
   const onLoad = (opts && typeof opts.onLoad === 'function') ? opts.onLoad : () => {};
   if (!state.__dosageInflight) state.__dosageInflight = new Map();
@@ -970,6 +1081,18 @@ export function installDosageChunkFetcher(state, opts) {
       })
       .then(chunk => {
         if (!chunk || typeof chunk !== 'object') return;
+        // 2026-05-26: rewrite chunk.samples[] from the sample_map's
+        // by_position[] when one is loaded. This is the canonical fix
+        // for "chunk ships placeholder Ind/Ind1/Ind2 ids but the
+        // cohort wants CGA340/CGA166/CGA091" — the map (produced by
+        // _tooling/build_dosage_sample_map.py from the BAM list +
+        // beagle header) gives the correct order-aligned cohort ids,
+        // and rewriting in-place means _buildSampleIdMap's exact-match
+        // pass binds every sample without needing _byPos / positional
+        // fallback. Idempotent + no-op when the map isn't loaded.
+        try {
+          if (state.__dosageSampleMap) _applySampleMapToChunk(chunk, state.__dosageSampleMap);
+        } catch (_) { /* never block a chunk arrival on the rewrite */ }
         // 2026-05-26: one-shot chunk-shape validation. Fires on the
         // FIRST chunk that lands per session, regardless of __dosageDbg.
         // Surfaces structural problems (no markers array, no dosage
@@ -1040,6 +1163,17 @@ export function installDosageChunkFetcher(state, opts) {
       })
       .catch((e) => {
         console.warn('Dosage chunk fetch failed:', url, e);
+        // 2026-05-26: stash the last failure on state so buildDosageDebugReport
+        // can surface it. Otherwise the panel just shows "no chunks cached"
+        // for what's actually a repeated server-side error (404, 500, CORS,
+        // network down) — user wastes time looking at the wrong layer.
+        try {
+          state.__lastDosageFetchError = {
+            url,
+            message: (e && e.message) || String(e),
+            at: Date.now(),
+          };
+        } catch (_) { /* state may be frozen in tests */ }
       })
       .finally(() => inflight.delete(key));
     inflight.set(key, pr);

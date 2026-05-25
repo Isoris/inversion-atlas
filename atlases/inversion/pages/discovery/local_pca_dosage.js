@@ -73,8 +73,13 @@ import { installDosageChunkFetcher, buildDosageDebugReport, resetDosageDiagnosti
 // Theta-pi mirror (local_pca_theta_pi) and GHSL mirror (local_pca_ghsl) entry points. These are
 // painted from local_pca_dosage's applyData() because the mirror panels share local_pca_dosage's
 // data envelope (theta_pi_*, ghsl_panel) — they activate when those layers
-// are present in the loaded JSON. The local_pca_theta_pi/local_pca_ghsl modules also export
-// their own atlas-router lifecycle for when those pages are mounted directly.
+// are present in the loaded JSON.
+//
+// 2026-05-26: the local_pca_theta_pi / local_pca_ghsl files used to also
+// export mount/unmount + alias-wrapped renderers for a "directly mounted
+// page" path that was never registered in manifest.json. That dead
+// scaffolding was removed — the files now exist solely as panel-renderer
+// modules consumed from this file (~257 LOC of unreachable code dropped).
 import {
   _drawThAnchorStripPanel,
   _drawThCusumHero,
@@ -1137,6 +1142,21 @@ function _openDosageDebugModal(state) {
                   padding: 6px 10px; margin-bottom: 12px; font-size: 11.5px;">
         ${_escHtml(r.diagnosis)}
       </div>
+      <div style="display: flex; align-items: center; gap: 10px;
+                  padding: 6px 10px; margin-bottom: 12px;
+                  background: var(--panel-3, #232a36);
+                  border: 1px solid var(--rule); border-radius: 3px;">
+        <label style="display: inline-flex; align-items: center; gap: 6px;
+                      cursor: pointer; font-family: var(--mono); font-size: 11px;">
+          <input type="checkbox" id="dosageForcePositionalToggle"
+                 ${state && state.__forcePositionalDosage === true ? 'checked' : ''} />
+          <span>Force positional binding (ignore chunk sample ids)</span>
+        </label>
+        <span class="dim" style="font-size: 10.5px;">
+          Use when chunk ships placeholder ids (<code>Ind</code> / <code>Ind1</code>…) but
+          you know the column order matches <code>data.samples</code>.
+        </span>
+      </div>
       <div style="margin-bottom: 8px; font-size: 11px; color: var(--ink-dim);">
         <b>Cached chunk keys (${(r.lruKeys || []).length}):</b> ${lruHtml}
       </div>
@@ -1154,7 +1174,7 @@ function _openDosageDebugModal(state) {
         <tbody>${rowsHtml || '<tr><td colspan="4" style="padding: 8px; color: var(--ink-dim);">No tracked samples — lasso or click PCA points to track them first.</td></tr>'}</tbody>
       </table>
       <div class="dim" style="margin-top: 10px; font-size: 10.5px;">
-        ${_renderNaNHint(report)}
+        ${_renderNaNHint(r)}
       </div>
     </div>
   `;
@@ -1170,6 +1190,27 @@ function _openDosageDebugModal(state) {
   overlay.addEventListener('click', onOverlay);
   const closeBtn = overlay.querySelector('#dosageDebugCloseBtn');
   if (closeBtn) closeBtn.addEventListener('click', close);
+
+  // Wire the Force-positional toggle. Flips a state flag the
+  // _buildSampleIdMap path reads to install _byPos unconditionally.
+  // Invalidate the cohort-alias cache + per-range dosage/het caches so
+  // the next paint rebuilds the projection from scratch with positional
+  // bindings, then redraw.
+  const forceToggle = overlay.querySelector('#dosageForcePositionalToggle');
+  if (forceToggle) {
+    forceToggle.addEventListener('change', (e) => {
+      state.__forcePositionalDosage = !!e.target.checked;
+      // Invalidate caches so the next compute rebuilds with the new
+      // _byPos table.
+      try { state._cohortSampleAliasMap = null; } catch (_) {}
+      try { if (state.__dosageMeanCache && state.__dosageMeanCache.clear) state.__dosageMeanCache.clear(); } catch (_) {}
+      try { if (state.__hetRateCache    && state.__hetRateCache.clear)    state.__hetRateCache.clear();    } catch (_) {}
+      // Repaint + re-open the modal with the new projection numbers.
+      try { drawLinesPanel(state); } catch (_) {}
+      try { drawPCA(state); } catch (_) {}
+      setTimeout(() => _openDosageDebugModal(state), 100);
+    });
+  }
 }
 
 // Branch the hint shown under the tracked-sample table on the actual

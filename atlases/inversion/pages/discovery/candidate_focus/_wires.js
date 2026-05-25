@@ -18,7 +18,7 @@
 //   - All bodies use _pageState from ./_state.js.
 
 import { _pageState } from './_state.js';
-import { candidateHaplotypeAnnotationsHtml, _candidateL2Ids } from './_html_builders.js';
+import { candidateHaplotypeAnnotationsHtml, _candidateL2Ids, _ensureDosageHmState } from './_html_builders.js';
 import { addCandidateToList, candidateFromJSON, candidateToJSON, isInCandidateList } from './_list.js';
 import { refreshCandidateUI } from '../candidate_focus.js';
 

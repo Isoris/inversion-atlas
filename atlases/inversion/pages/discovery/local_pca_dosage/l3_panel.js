@@ -357,8 +357,42 @@ export function refreshPinUI(state) {
   }
 }
 
-// --- renderL3Panel(state) — legacy lines 48685-49193 ---
+// 2026-05-26: rAF-coalesce wrapper. During page mount the L3 panel gets
+// fingered ~6-10 times in quick succession as the chrom data + theta_pi
+// + GHSL + dosage_chunks + scrubber_main resolves arrive (each triggers
+// a setCur cascade or a direct renderL3Panel call). The mini-PCAs inside
+// each render cycle re-paint into the same canvases as state.cur shifts
+// across L2 boundaries, producing the "up and down" the user sees on
+// page 1 until they click a slab-mode button (which forces a stable
+// fingerprint and a one-shot final render). Coalescing same-frame calls
+// into one render preserves the existing fingerprint short-circuit and
+// turns the burst into a single paint per frame.
+//
+// _l3RenderInProgress is the recursion guard — the rAF callback calls
+// back into renderL3Panel, and we want THAT call to fall through to the
+// real body. Set just before the inner call, cleared just after.
+let _l3PendingRafId = null;
+let _l3PendingState = null;
+let _l3RenderInProgress = false;
+
 export function renderL3Panel(state) {
+  if (!_l3RenderInProgress
+      && typeof requestAnimationFrame === 'function'
+      && state && typeof state === 'object') {
+    _l3PendingState = state;
+    if (_l3PendingRafId != null) return;   // already queued; latest state wins
+    _l3PendingRafId = requestAnimationFrame(() => {
+      const s = _l3PendingState;
+      _l3PendingRafId = null;
+      _l3PendingState = null;
+      if (!s) return;
+      _l3RenderInProgress = true;
+      try { renderL3Panel(s); }
+      finally { _l3RenderInProgress = false; }
+    });
+    return;
+  }
+
   _setActiveState(state);
   // v4.1: install delegated click handler for the L3 metric-cycle chip,
   // once per document lifetime. We listen on document.body and check the

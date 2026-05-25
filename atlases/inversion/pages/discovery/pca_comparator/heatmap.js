@@ -24,6 +24,7 @@
 // into.
 
 import { getL2Cluster, groupColor } from '../local_pca_dosage/_data.js';
+import { clusterCacheKey, contextFromState } from '../../../shared/per_l2_cluster.js';
 
 // Layout constants for the heatmap canvas (CSS pixels).
 const STRIP_PAD = { l: 60, r: 8, t: 14, b: 18 };
@@ -63,12 +64,40 @@ export function paintHeatmap(state) {
 
   // Resolve per-window per-sample band labels via the L2-cluster cache.
   // Many windows share an L2 envelope → fetch each L2's labels once.
-  const labelByWinSam = _buildLabelMatrix(ss, nWin, nSam);
+  // 2026-05-21 perf: cache the Int8Array(nWin × nSam) — ~2 MB on LG01 —
+  // keyed by (data, cluster-cache key). Pre-fix this was reallocated +
+  // refilled every paint, including arrow-key scrubs that don't change
+  // the underlying labels at all. The cluster-cache key changes when
+  // any clustering knob does, which is the correct invalidation point.
+  let _lblClusterKey = null;
+  try { _lblClusterKey = clusterCacheKey(contextFromState(ss)); } catch (_) {}
+  let labelByWinSam;
+  const _lblCache = state._labelByWinSamCache;
+  if (_lblCache &&
+      _lblCache.data === ss.data &&
+      _lblCache.clusterKey === _lblClusterKey &&
+      _lblCache.matrix.length === nWin * nSam) {
+    labelByWinSam = _lblCache.matrix;
+  } else {
+    labelByWinSam = _buildLabelMatrix(ss, nWin, nSam);
+    state._labelByWinSamCache = {
+      data: ss.data, clusterKey: _lblClusterKey, matrix: labelByWinSam,
+    };
+  }
 
   // Row order: sort by band at the current window so the regime appears
   // as horizontal blocks. Ties broken by sample index for stability.
+  // 2026-05-21 perf: cache by (labelByWinSam identity, cur). Re-painting
+  // at the same cursor (focal-scope toggle, hover, etc.) reuses the sort.
   const cur = (ss.cur | 0);
-  const rowOrder = _rowOrderByBandAt(labelByWinSam, nSam, nWin, cur);
+  let rowOrder;
+  const _roCache = state._rowOrderCache;
+  if (_roCache && _roCache.labelByWinSam === labelByWinSam && _roCache.cur === cur) {
+    rowOrder = _roCache.rowOrder;
+  } else {
+    rowOrder = _rowOrderByBandAt(labelByWinSam, nSam, nWin, cur);
+    state._rowOrderCache = { labelByWinSam, cur, rowOrder };
+  }
 
   // 2026-05-20: scope = 'focal' restricts the heatmap to a slab around
   // the cursor matching the comparator's scrubUnit (1w / 5w / 10w /

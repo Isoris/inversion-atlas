@@ -32,17 +32,14 @@
   // _drawThPcaPanel() — legacy lines 54045-54168
 //
 
-import { contextFromState, clusterL2, ClusterCache } from '../../shared/per_l2_cluster.js';
-import { hetRateColor } from '../../shared/het_rate.js';
-import { alignLabels, hungarianChainProjection, concordanceMatrix } from '../../shared/hungarian.js';
-import { buildContingency, computeARI, computeNMI, cramersV } from '../../shared/contingency.js';
-import { kmeans1D, kmeans2D, silhouette1D, adaptiveK1D } from '../../shared/kmeans.js';
-// 2026-05-06 migration round 3: simColor hoisted into shared/color_helpers.js
-// (originally referenced via legacy global; line 613 below uses the typeof
-// guard pattern, which still works with an imported binding).
+// 2026-05-26: simColor is the only shared import this file actually
+// uses (line 636, in the sim_mat heatmap palette path). The previously-
+// imported per_l2_cluster / het_rate / hungarian / contingency / kmeans
+// bindings were only consumed by the removed mount/wrapper code; their
+// import statements have been dropped. `_pageState` / `_setActiveState`
+// from local_pca_theta_pi/_state.js also gone — that subdir file was
+// deleted in the same pass.
 import { simColor } from '../../shared/color_helpers.js';
-// Round 5 step 10 (chat 36, 2026-05-07): atlas-router state binding.
-import { _pageState, _setActiveState } from './local_pca_theta_pi/_state.js';
 
 // ---------------------------------------------------------------------------
 // TODO_MISSING — RESOLVED 2026-05-07 round 5 step 10.
@@ -1024,188 +1021,19 @@ export function _drawThPcaPanel(state) {
 }
 
 // ---------------------------------------------------------------------------
-// Atlas-router lifecycle (chat 36 round 5 step 10, 2026-05-07).
+// 2026-05-26: dead page-mount code removed (mount / unmount / renderPage12
+// / _buildLegacyState / non-underscore alias exports).
 //
-// The 8 verbatim helpers above already take `state` as their first
-// argument (chat-33 already migrated that part). The wrappers below
-// provide the standard renderer surface used by sibling pages:
-// each call sets _pageState (so any helper that needs state outside
-// of its argument can read live data) then delegates to the
-// underscore-prefixed verbatim. Plus the mount/unmount/_buildLegacyState
-// trio that gives atlas_router a uniform handle for local_pca_theta_pi.
+// This file ships the θπ panel renderers, NOT a standalone page.
+// `local_pca_dosage.js` imports the underscore-prefixed helpers above and
+// invokes them when state.activeMode === 'theta_pi'. There is no manifest
+// entry for `local_pca_theta_pi` — it was a placeholder for a planned
+// standalone page that never shipped, and the lifecycle scaffolding it
+// carried (~183 lines of mount/unmount/aliases) was unreachable by the
+// router.
+//
+// External importers of this file (verified 2026-05-26):
+//   - local_pca_dosage.js  → 8 underscore-prefixed _drawTh* / _refresh*
+//                            helpers used by the θπ mode-switch path
+// Nothing else imports anything from this file.
 // ---------------------------------------------------------------------------
-
-/**
- * Public entry — refresh the θπ layer-status indicators. Wrapper that
- * sets _pageState before delegating.
- */
-export function refreshThetaPiLayerStatus(state) {
-  if (state) _setActiveState(state);
-  return _refreshThetaPiLayerStatus(state || _pageState || {});
-}
-
-/**
- * Public entry — refresh the θπ panel visibility (which panels show
- * vs which stay hidden) based on which theta_pi_* layers are present.
- */
-export function refreshThetaPiPanelVisibility(state) {
-  if (state) _setActiveState(state);
-  return _refreshThetaPiPanelVisibility(state || _pageState || {});
-}
-
-/**
- * Public entry — render the θπ CUSUM hero panel (3-lane: per-carrier
- * strip, per-window CUSUM lines, per-carrier marker tracks).
- */
-export function drawThCusumHero(state) {
-  if (state) _setActiveState(state);
-  return _drawThCusumHero(state || _pageState || {});
-}
-
-/**
- * Public entry — render the per-sample θπ lines panel.
- */
-export function drawThLinesPanel(state) {
-  if (state) _setActiveState(state);
-  return _drawThLinesPanel(state || _pageState || {});
-}
-
-/**
- * Public entry — render the θπ window×window similarity matrix panel.
- */
-export function drawThSimMatPanel(state) {
-  if (state) _setActiveState(state);
-  return _drawThSimMatPanel(state || _pageState || {});
-}
-
-/**
- * Public entry — render the θπ |Z| panel.
- */
-export function drawThZPanel(state) {
-  if (state) _setActiveState(state);
-  return _drawThZPanel(state || _pageState || {});
-}
-
-/**
- * Public entry — render the θπ anchor strip panel.
- */
-export function drawThAnchorStripPanel(state) {
-  if (state) _setActiveState(state);
-  return _drawThAnchorStripPanel(state || _pageState || {});
-}
-
-/**
- * Public entry — render the θπ PCA panel.
- */
-export function drawThPcaPanel(state) {
-  if (state) _setActiveState(state);
-  return _drawThPcaPanel(state || _pageState || {});
-}
-
-/**
- * Convenience: render every θπ panel at once. Mirrors what local_pca_dosage's
- * `applyData` does for the dosage side: refresh layer indicators →
- * refresh panel visibility → draw all panels. Only the panels whose
- * layers are loaded actually render; the others show empty state.
- */
-export function renderPage12(state) {
-  if (state) _setActiveState(state);
-  const s = state || _pageState || {};
-  try { _refreshThetaPiLayerStatus(s); }       catch (e) { console.warn('local_pca_theta_pi.renderPage12: _refreshThetaPiLayerStatus —', e); }
-  try { _refreshThetaPiPanelVisibility(s); }   catch (e) { console.warn('local_pca_theta_pi.renderPage12: _refreshThetaPiPanelVisibility —', e); }
-  try { _drawThCusumHero(s); }                 catch (e) { console.warn('local_pca_theta_pi.renderPage12: _drawThCusumHero —', e); }
-  try { _drawThLinesPanel(s); }                catch (e) { console.warn('local_pca_theta_pi.renderPage12: _drawThLinesPanel —', e); }
-  try { _drawThSimMatPanel(s); }               catch (e) { console.warn('local_pca_theta_pi.renderPage12: _drawThSimMatPanel —', e); }
-  try { _drawThZPanel(s); }                    catch (e) { console.warn('local_pca_theta_pi.renderPage12: _drawThZPanel —', e); }
-  try { _drawThAnchorStripPanel(s); }          catch (e) { console.warn('local_pca_theta_pi.renderPage12: _drawThAnchorStripPanel —', e); }
-  try { _drawThPcaPanel(s); }                  catch (e) { console.warn('local_pca_theta_pi.renderPage12: _drawThPcaPanel —', e); }
-}
-
-/**
- * Mount: called by atlas_router when the user navigates to local_pca_theta_pi.
- *
- * Reads activeChrom from atlasState and builds a legacy-shape state
- * with the slots local_pca_theta_pi reads: data (chromosome precomp containing
- * cusum_theta + theta_pi_* layers), candidate (currently-active
- * candidate), candidateList, layersPresent (Set of layer names),
- * and pre-allocated geometry caches (_simGeom, _thSimGeom, _zGeom).
- */
-export async function mount(root, atlasState, registry) {
-  const legacyState = _buildLegacyState(atlasState);
-  _setActiveState(legacyState);
-
-  try { renderPage12(legacyState); }
-  catch (e) { console.warn('local_pca_theta_pi.mount: renderPage12 threw —', e); }
-
-  if (atlasState.inversion) atlasState.inversion._page12State = legacyState;
-}
-
-/**
- * Unmount: clear _pageState so post-unmount callbacks see null.
- */
-export async function unmount(root) {
-  _setActiveState(null);
-}
-
-function _buildLegacyState(atlasState) {
-  const inv = atlasState.inversion || {};
-  const sh  = atlasState.shared    || {};
-  const legacy = Object.assign({}, inv);
-  // Cross-atlas slots that the legacy code reads as state.candidate etc.
-  legacy.candidate         = sh.activeCandidate || null;
-  legacy.candidateList     = inv.candidateList  || [];
-  legacy.cur               = inv.cur != null ? inv.cur : 0;
-  // layersPresent must be a Set with `.has(name)` semantics — that's
-  // what _refreshThetaPiLayerStatus + _refreshThetaPiPanelVisibility expect.
-  legacy.layersPresent     = (inv.layersPresent instanceof Set)
-                             ? inv.layersPresent
-                             : new Set(Array.isArray(inv.layersPresent) ? inv.layersPresent : []);
-
-  // Chromosome precomp data. Page12 reads two separate atlas JSONs:
-  //   - inv.tracks[chrom]         — z-blocks atlas (scrubber_main; the
-  //     six-panel scaffolding, samples, windows, candidates)
-  //   - inv.tracks_thetapi[chrom] — theta-pi atlas (scrubber_thetapi;
-  //     theta_pi_per_window, theta_pi_local_pca, theta_pi_envelopes,
-  //     theta_pi_cusum)
-  // We expose them as a shallow merge under legacy.data so the local_pca_theta_pi
-  // renderers (which were written against the legacy monolith's
-  // single-source state.data) keep working unchanged.
-  //
-  // Field rename: the theta-pi pipeline writes `theta_pi_cusum` but
-  // local_pca_theta_pi reads `cusum_theta` (the atlas-canonical name from the
-  // legacy schema). Aliased during merge so future pipeline runs
-  // can switch to the canonical name without breaking this page.
-  const chrom = sh.activeChrom;
-  const tracksZ      = (chrom && inv.tracks          && inv.tracks[chrom])          || null;
-  const tracksThPi   = (chrom && inv.tracks_thetapi  && inv.tracks_thetapi[chrom])  || null;
-  if (tracksZ || tracksThPi) {
-    legacy.data = Object.assign({}, tracksZ || {}, tracksThPi || {});
-    if (legacy.data.theta_pi_cusum && legacy.data.cusum_theta === undefined) {
-      legacy.data.cusum_theta = legacy.data.theta_pi_cusum;
-    }
-  } else {
-    legacy.data = null;
-  }
-  // Mark theta-pi layers as present so _refreshThetaPiLayerStatus shows
-  // the green-dot 'loaded' state instead of the 'not loaded' placeholder.
-  // We mutate the same Set (already attached to inv.layersPresent) so
-  // local_pca_dosage sees the update too — the layer-availability check on the
-  // color-mode picker uses the same Set across pages.
-  if (tracksThPi) {
-    const tpiLayerKeys = [
-      ['theta_pi_per_window', 'theta_pi_per_window'],
-      ['theta_pi_local_pca',  'theta_pi_local_pca'],
-      ['theta_pi_envelopes',  'theta_pi_envelopes'],
-      ['cusum_theta',         'theta_pi_cusum'],
-    ];
-    for (const [layerName, srcField] of tpiLayerKeys) {
-      if (tracksThPi[srcField] != null) legacy.layersPresent.add(layerName);
-    }
-  }
-
-  // Geometry caches — written by the renderers, read by hit-test handlers.
-  legacy._simGeom    = inv._simGeom    || null;
-  legacy._thSimGeom  = inv._thSimGeom  || null;
-  legacy._zGeom      = inv._zGeom      || null;
-  return legacy;
-}

@@ -66,6 +66,13 @@ function _canListen(t) {
  * Build the candidate-select <option> list from state.candidateList.
  * Marks the active candidate as selected; appends ✓ to entries that
  * already carry a saved boundary.
+ *
+ * 2026-05-21 perf: cache the rendered options HTML on
+ * (candidateList identity, boundary-set fingerprint). Each refresh —
+ * fired by every hotkey + every toolbar action — used to rebuild this
+ * even though candidate list rarely changes. The active-selection
+ * update is handled by setting sel.value directly (no innerHTML
+ * rewrite needed unless options actually changed).
  */
 export function populateCandidateSelect(state) {
   if (typeof document === 'undefined') return;
@@ -75,21 +82,42 @@ export function populateCandidateSelect(state) {
   const bs = ensureBoundariesState(state);
   const cur = bs ? bs.active_cand_id : null;
 
-  let html = '<option value="">— select candidate —</option>';
+  // Fingerprint that captures every input that changes the OPTION SET
+  // (not the active selection — that's handled below). Each candidate's
+  // id + boundary presence is included; new/removed candidates also
+  // change list.length.
+  let fp = list.length + '|';
   for (const c of list) {
     if (!c) continue;
     const id = (c.id != null) ? c.id : c.candidate_id;
     if (id == null) continue;
-    const span = (Number.isFinite(c.end_bp) && Number.isFinite(c.start_bp))
-      ? (c.end_bp - c.start_bp) : 0;
-    const spanMb = (span / 1e6).toFixed(2);
-    const hasBoundaries = !!(c.boundary_left || c.boundary_right);
-    const mark = hasBoundaries ? ' ✓' : '';
-    const label = _escape(id) + ' · ' + spanMb + ' Mb' + mark;
-    const selAttr = (id === cur) ? ' selected' : '';
-    html += '<option value="' + _escape(id) + '"' + selAttr + '>' + label + '</option>';
+    const hasB = !!(c.boundary_left || c.boundary_right);
+    fp += id + (hasB ? 'B' : '') + ',';
   }
-  sel.innerHTML = html;
+
+  const cache = state && state._bndCandSelectCache;
+  let needsRebuild = !cache || cache.fp !== fp || cache.listRef !== list;
+  if (needsRebuild) {
+    let html = '<option value="">— select candidate —</option>';
+    for (const c of list) {
+      if (!c) continue;
+      const id = (c.id != null) ? c.id : c.candidate_id;
+      if (id == null) continue;
+      const span = (Number.isFinite(c.end_bp) && Number.isFinite(c.start_bp))
+        ? (c.end_bp - c.start_bp) : 0;
+      const spanMb = (span / 1e6).toFixed(2);
+      const hasBoundaries = !!(c.boundary_left || c.boundary_right);
+      const mark = hasBoundaries ? ' ✓' : '';
+      const label = _escape(id) + ' · ' + spanMb + ' Mb' + mark;
+      // selected attr omitted — we set sel.value below so the active
+      // candidate is reflected even when the cache is reused.
+      html += '<option value="' + _escape(id) + '">' + label + '</option>';
+    }
+    sel.innerHTML = html;
+    if (state) state._bndCandSelectCache = { fp, listRef: list };
+  }
+  // Always sync the active selection (cheap; no DOM rebuild).
+  sel.value = (cur != null) ? String(cur) : '';
 }
 
 /** Toggle .active on the radius buttons that match state's scan radius. */

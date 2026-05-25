@@ -50,9 +50,22 @@ function _candLockedLabels(c) {
 }
 
 // --- sigmaProfileCandidate — extracted from legacy ---
+// 2026-05-21 perf: cache the result on (cand, state.data, sigmaSpread)
+// identity. renderCandidateMetadata calls this every render; for a
+// stable candidate + chrom the inputs don't change. Cache lives on
+// state.data so re-mounting the page on the same chrom-and-cand reuses
+// the work (mirrors the haplotype + L2-cluster cache pattern).
 export function sigmaProfileCandidate(cand) {
   const state = _pageState;
   if (!cand) return null;
+  if (!state || !state.data) return null;
+  const sigInput = state.sigmaSpread || state._sigmaSpread || null;
+  if (!state.data._sigmaProfileCache) state.data._sigmaProfileCache = new Map();
+  const cacheKey = (cand.id || '') + '|' + (sigInput ? '1' : '0');
+  const _cached = state.data._sigmaProfileCache.get(cacheKey);
+  if (_cached && _cached.cand === cand && _cached.sigInput === sigInput) {
+    return _cached.result;
+  }
   const sd = sampleSpreadRange(state, cand.start_w, cand.end_w);
   if (!sd) return null;
   const vals = Array.from(sd).filter(v => isFinite(v));
@@ -100,18 +113,33 @@ export function sigmaProfileCandidate(cand) {
   const top_high = sortedIdx.slice(0, Math.min(12, n_high)).map(si => ({
     si, sigma: sd[si],
   }));
-  return {
+  const result = {
     sd, q50, q90, q95, n_high, ratio_high, bimodality_coef, is_bimodal,
     verdict, reason, top_high,
   };
+  state.data._sigmaProfileCache.set(cacheKey, { cand, sigInput, result });
+  return result;
 }
 
 // --- candidateBandComposition — extracted from legacy ---
+// 2026-05-21 perf: same identity-cache pattern as sigmaProfileCandidate.
+// Pre-fix: rebuilt the K-element output (each with families + ancestries
+// Maps) on every render. The output depends only on (cand.locked_labels,
+// cand.K, state.data.samples) — all stable per render cycle.
 export function candidateBandComposition(cand) {
   const state = _pageState;
   if (!cand || !cand.locked_labels) return null;
   const d = state.data;
   if (!d) return null;
+  if (!d._bandCompCache) d._bandCompCache = new Map();
+  const cacheKey = (cand.id || '') + '|' + (cand.K | 0)
+                 + '|' + cand.locked_labels.length;
+  const _cached = d._bandCompCache.get(cacheKey);
+  if (_cached &&
+      _cached.cand === cand &&
+      _cached.samplesRef === d.samples) {
+    return _cached.result;
+  }
   const K = cand.K;
   const out = [];
   for (let k = 0; k < K; k++) {
@@ -142,6 +170,9 @@ export function candidateBandComposition(cand) {
       .sort((a, b) => b.n - a.n);
     out.push({ k, n, members: memberIdx, families, ancestries });
   }
+  d._bandCompCache.set(cacheKey, {
+    cand, samplesRef: d.samples, result: out,
+  });
   return out;
 }
 
