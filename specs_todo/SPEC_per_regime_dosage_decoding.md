@@ -408,5 +408,397 @@ and supersedes any contradictory language elsewhere in the atlas.
 ---
 
 *End of SPEC. Authored from user feedback 2026-05-23. §9 added
-from user feedback 2026-05-26. Awaiting audit + implementation
-approval.*
+from user feedback 2026-05-26. §10 added from user feedback
+2026-05-26 (later). Awaiting audit + implementation approval.*
+
+---
+
+## 10. Segregation-state framing (added 2026-05-26, later)
+
+User feedback 2026-05-26 (later) — verbatim:
+
+> Instead of forcing every region into HOM_A / HET_AB / HOM_B
+> you describe a segregation-state system: This region contains
+> 5 or 6 recurrent dosage-supported states. Some states behave
+> like homozygous arrangement classes, and some behave like
+> heterokaryotype classes.
+>
+> Better vocabulary — do not call everything "K=6" biologically.
+> Say: segregation states / arrangement states / dosage-supported
+> states / candidate karyotype states. Then classify them as:
+> HOM-like state / HET-like state / complex state / unresolved
+> state.
+>
+> A 6-band region is not necessarily broken. It may mean: the
+> region is not a simple biallelic inversion but a multiallelic
+> structural haplotype system, with several homozygous and
+> heterozygous arrangement combinations.
+>
+> its really like some arrangement they can make HET with another
+> arrangement they are compatible. sometimes we observe them.
+> sometimes we don't observe. sometimes we observe them as HET
+> but not as HOM
+
+### 10.1 Two-stage output (replaces §9.3 step 3)
+
+The decoder must NOT directly emit `karyotype_call: "H_i/H_j"`.
+It emits two layers:
+
+**Layer A — segregation states (always emitted):**
+```
+{
+  state_id: "S1",
+  state_type: "HOM-like" | "HET-like" | "complex" | "unresolved",
+  state_size: <n samples>,
+  dosage_pattern: <vector summary>,
+  members: [<sample_ids>]
+}
+```
+
+**Layer B — putative arrangement combinations (emitted only
+when dosage + Mendelian support it):**
+```
+{
+  state_id: "S1",
+  putative_arrangement_combination: "A/A" | "A/B" | null,
+  evidence: {
+    dosage_consistent: true|false,
+    mendelian_support: <score 0..1 | null if untested>,
+    confidence: "high" | "medium" | "low" | "unsupported"
+  }
+}
+```
+
+If Layer B's evidence is weak, the state stays at Layer A
+(`state_type` only) and `putative_arrangement_combination`
+stays `null`. Do NOT invent an arrangement assignment just to
+fill the column.
+
+### 10.2 Table schema (binding for output serialisation)
+
+The per-regime decoder writes one row per state:
+
+| column | type | example |
+|--------|------|---------|
+| `regime_id` | string | `REG_014` |
+| `n_states_detected` | int | `6` |
+| `state_id` | string | `S2` |
+| `state_size` | int | `11` |
+| `state_type` | enum | `HET-like` |
+| `putative_arrangement_combination` | string \| null | `A/B` or `null` |
+| `dosage_pattern` | json | summary vector |
+| `mendelian_support` | float \| null | `0.83` |
+| `interpretation` | string | free-text, optional |
+
+Example for a 3-arrangement regime:
+
+```
+REG_014  6  S1  24  HOM-like  A/A    {...}  0.91  biallelic-like core
+REG_014  6  S2  11  HET-like  A/B    {...}  0.87  observed het, A and B HOM also observed
+REG_014  6  S3  23  HOM-like  B/B    {...}  0.92  biallelic-like core
+REG_014  6  S4  4   HET-like  A/C    {...}  0.78  HET observed, but no C/C HOM in cohort
+REG_014  6  S5  3   HET-like  B/C    {...}  0.71  HET observed, but no C/C HOM in cohort
+REG_014  6  S6  null complex  null   {...}  null  unresolved residual cluster
+```
+
+### 10.3 Observed-as-HET-but-not-HOM inference rule
+
+User stated: "sometimes we observe them as HET but not as HOM."
+
+If the decoder finds two HET-like states that share a "shoulder"
+arrangement with already-confirmed HOM states (e.g. `A/B` and
+`A/C` exist; `A/A` is HOM-confirmed) but the third arrangement
+(`C`) is never observed homozygous, the decoder MAY infer that
+arrangement `C` exists in the cohort only in heterozygous form.
+
+Rules:
+1. The inferred arrangement (`C`) is labelled with a trailing
+   `?` for one release cycle: `A/C?` → makes clear the `C`
+   identity is HET-only inferred, not HOM-anchored.
+2. `evidence.confidence` for HET-only-inferred states is capped
+   at `"medium"`.
+3. The cohort-frequency layer must record `hom_observed = 0`
+   for `C` so downstream readers (popstats) know to treat the
+   arrangement as cohort-limited.
+4. If subsequent cohorts (e.g. cmac_wild) DO show a `C/C`
+   homozygote, the `?` is dropped and confidence is recomputed.
+
+### 10.4 Updated thesis sentence (for manuscript)
+
+Verbatim from user, preserved for use in manuscript draft:
+
+> Rather than assuming a fixed three-band inversion model,
+> candidate regimes were treated as dosage-supported segregation
+> systems. Simple regimes were consistent with three karyotype
+> states, whereas complex regimes contained five to six recurrent
+> states, suggesting multiallelic or nested structural haplotype
+> systems capable of producing multiple heterokaryotype classes.
+
+### 10.5 Decoder output contract (supersedes §4.2's `regime._decoded`)
+
+Replace:
+```js
+regime._decoded = {
+  K: decoded.K,
+  labels: decoded.labels,
+  karyotype_classes: decoded.classes,
+  confidence,
+};
+```
+
+with:
+```js
+regime._decoded = {
+  n_states_detected: <int>,
+  states: [
+    {
+      state_id: "S1",
+      state_type: "HOM-like" | "HET-like" | "complex" | "unresolved",
+      state_size: <int>,
+      dosage_pattern: <vector summary>,
+      members: [<sample_ids>],
+      putative_arrangement_combination: <string|null>,
+      evidence: {
+        dosage_consistent: <bool>,
+        mendelian_support: <float|null>,
+        confidence: "high"|"medium"|"low"|"unsupported"
+      }
+    },
+    ...
+  ],
+  interpretation_summary: <string>
+};
+```
+
+### 10.6 Master doc update
+
+The canonical vocabulary in `docs/ARCHITECTURE_MASTER.md` §2
+gains:
+
+- `segregation_state` (replaces "K class" as the unit of decoder
+  output);
+- `state_type ∈ {HOM-like, HET-like, complex, unresolved}`;
+- `arrangement_combination` (the putative mapping from state to
+  arrangement pair, evidence-gated);
+- the explicit rule that `karyotype_call` is Layer B only —
+  Layer A (the segregation state) always exists.
+
+That update is made in the same commit as this §10.
+
+---
+
+## 11. Arrangement compatibility graph (added 2026-05-26, later)
+
+User feedback 2026-05-26 (later) — verbatim excerpts:
+
+> For the long-range regime + dosage system, the right object
+> is an arrangement compatibility graph. Not just state = HOM
+> or HET but state = combination of arrangements. So the graph
+> represents which hidden arrangements can combine to produce
+> the observed dosage states.
+>
+> For each long-range regime, dosage-supported states were
+> represented as nodes in an arrangement compatibility graph.
+> Candidate hidden arrangements were inferred by testing whether
+> the observed states could be explained as diploid combinations
+> of two or more arrangements. This generalized the simple
+> three-state HOM/HET/HOM model to complex regimes with multiple
+> homozygote-like and heterozygote-like states.
+>
+> need graph of compatibility for haplotype regime page. but
+> need as floating panel because its so crowded.
+
+### 11.1 Two graphs per regime (binding)
+
+The decoder emits TWO graphs per regime. Both are derived from
+the Layer A states and the Layer B putative assignments.
+
+**Graph A — arrangement graph (hidden arrangements as nodes):**
+
+- Nodes: the inferred hidden arrangements `A, B, C, …` for the
+  regime.
+- Edges: `A — B` iff a HET-like state `A/B` was observed in the
+  cohort.
+- Edge weight: `n_samples` carrying that het.
+- Self-loops: optional, indicate the HOM-like state for that
+  arrangement (`A — A` with weight `n_samples` of `A/A`).
+
+Interpretation: if A connects to B and C but B and C never meet,
+the cohort lacks the `B/C` heterozygote — either by sampling,
+selection, or meiotic incompatibility.
+
+**Graph B — dosage-state graph (observed states as nodes):**
+
+- Nodes: the observed segregation states `S1, S2, …, Sk`.
+- Edges: `S_i — S_j` iff they share exactly one hidden
+  arrangement in their `arrangement_combination`.
+- Edge label: the shared arrangement.
+- Edge weight: structural similarity of the two states'
+  dosage_pattern (a 0–1 score from the decoder).
+
+Interpretation: this graph tells you which states are
+biologically related (share an arrangement) without forcing a
+linear HOM-HET-HOM topology.
+
+### 11.2 Model selection by graph fit
+
+For each regime, sweep candidate `n_arrangements ∈ {2, 3, 4}`
+and pick the model whose predicted state-set best matches the
+observed states.
+
+```
+predicted_n_states(m) = m * (m + 1) / 2
+
+m = 2 → 3 predicted states (A/A, A/B, B/B)
+m = 3 → 6 predicted states (… + A/C, B/C, C/C)
+m = 4 → 10 predicted states
+```
+
+Scoring per candidate `m`:
+
+```
+score(m) = w1 * state_match_fraction
+         + w2 * dosage_consistency
+         + w3 * mendelian_consistency
+         - w4 * missing_state_penalty
+         - w5 * extra_state_penalty
+```
+
+`missing_state_penalty` is *soft* — missing HET states may
+reflect incompatibility, not model failure (per §9.2 and §10.3).
+
+### 11.3 Decoder output contract (extends §10.5)
+
+```js
+regime._decoded = {
+  n_states_detected: <int>,
+  best_n_arrangements: <int>,
+  states: [ … as in §10.5 … ],
+
+  arrangement_graph: {
+    nodes: [
+      { id: "A", hom_observed: true,  n_samples_hom: 24 },
+      { id: "B", hom_observed: true,  n_samples_hom: 23 },
+      { id: "C", hom_observed: false, n_samples_hom: 0,
+        het_only_inferred: true }
+    ],
+    edges: [
+      { a: "A", b: "B", n_samples: 11, state_id: "S2" },
+      { a: "A", b: "C", n_samples: 4,  state_id: "S4" },
+      { a: "B", b: "C", n_samples: 3,  state_id: "S5" }
+    ]
+  },
+
+  dosage_state_graph: {
+    nodes: [
+      { id: "S1", state_type: "HOM-like", n_samples: 24,
+        arrangement_combination: "A/A" },
+      { id: "S2", state_type: "HET-like", n_samples: 11,
+        arrangement_combination: "A/B" },
+      …
+    ],
+    edges: [
+      { a: "S1", b: "S2", shared_arrangement: "A",
+        weight: 0.94 },
+      { a: "S2", b: "S3", shared_arrangement: "B",
+        weight: 0.91 },
+      { a: "S1", b: "S3", shared_arrangement: null,
+        relation: "opposite_homozygotes", weight: 0.88 }
+    ]
+  },
+
+  interpretation_summary: <string>
+};
+```
+
+### 11.4 Edge-table view (as user requested)
+
+```
+regime_id  state_1  state_2  shared_arrangement  compatibility_type        weight
+REG_12     S1       S2       A                   shares_one_arrangement    0.94
+REG_12     S2       S3       B                   shares_one_arrangement    0.91
+REG_12     S1       S3       —                   opposite_homozygotes      0.88
+```
+
+### 11.5 Rich per-regime table (replaces §10.2 schema)
+
+| column | type |
+|--------|------|
+| `regime_id` | string |
+| `n_observed_states` | int |
+| `best_n_arrangements` | int |
+| `state_id` | string |
+| `assigned_arrangement_combination` | string \| null |
+| `state_type` | enum |
+| `n_samples` | int |
+| `dosage_confidence` | enum (high/medium/low) |
+| `arrangement_graph_confidence` | enum |
+| `mendelian_confidence` | enum |
+| `final_call` | string |
+
+Example:
+
+```
+REG_21  3  2  S1  A/A  HOM-like  41  high    high    high    A/A
+REG_21  3  2  S2  A/B  HET-like  106 high    high    high    A/B
+REG_21  3  2  S3  B/B  HOM-like  37  high    high    high    B/B
+
+REG_44  6  3  S1  A/A  HOM-like  24  medium  medium  medium  A/A
+REG_44  6  3  S2  A/B  HET-like  11  high    high    high    A/B
+REG_44  6  3  S3  B/B  HOM-like  23  medium  medium  medium  B/B
+REG_44  6  3  S4  A/C? HET-like  4   medium  medium  low     A/C?
+REG_44  6  3  S5  B/C? HET-like  3   low     low     low     B/C?
+REG_44  6  3  S6  C/C? HOM-like  2   low     low     unsupp  unresolved
+```
+
+### 11.6 UI — floating panel (binding requirement)
+
+User instruction: "need graph of compatibility for haplotype
+regime page. but need as floating panel because its so crowded."
+
+The arrangement compatibility graph is rendered in a **floating,
+draggable, dismissable panel** on the `haplotype_regimes` page,
+NOT inline.
+
+Requirements:
+
+1. **Floating**: absolute / fixed position, top-right by default,
+   above the page chrome (z-index above the seeds table but
+   below modals).
+2. **Draggable**: header is a drag handle; position persisted in
+   `localStorage` per regime.
+3. **Dismissable**: × button in the panel header closes it;
+   reopened from the regimes-table row context menu ("show
+   compatibility graph").
+4. **Resizable**: bottom-right resize handle; min ~ 320×240,
+   default ~ 480×360.
+5. **Two-tab toggle**:
+   - Tab 1 — *arrangement graph* (Graph A from §11.1). Nodes:
+     `A, B, C…`. Edges: observed HET pairs. Het-only-inferred
+     arrangements (no HOM observed) are drawn dashed.
+   - Tab 2 — *dosage-state graph* (Graph B from §11.1). Nodes:
+     `S1..Sk` coloured by `state_type` (HOM-like / HET-like /
+     complex / unresolved). Edges labelled with the shared
+     arrangement.
+6. **Bound to the regimes table**: clicking a regime row updates
+   the panel to that regime; the panel header shows `REG_id ·
+   chrom · bp span · best_n_arrangements`.
+7. **No mandatory render**: panel is closed by default. Page
+   load does not pay the layout cost.
+
+Implementation note: re-use any existing floating-panel
+primitive in `atlases/inversion/shared/` if one exists; do not
+introduce a new floating-panel framework just for this. Use SVG
+for the graph (the regime is small — ≤ 10 nodes).
+
+### 11.7 Master doc additions
+
+Add to `docs/ARCHITECTURE_MASTER.md` §2 vocabulary:
+
+- `arrangement_graph` (Graph A — hidden arrangements as nodes,
+  observed HET pairs as edges);
+- `dosage_state_graph` (Graph B — observed states as nodes,
+  shared-arrangement edges);
+- `compatibility_edge` (edge in either graph, with weight and
+  compatibility_type ∈ {shares_one_arrangement,
+  opposite_homozygotes, hom_evidence, het_evidence}).
