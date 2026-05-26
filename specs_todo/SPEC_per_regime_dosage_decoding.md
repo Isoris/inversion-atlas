@@ -802,3 +802,290 @@ Add to `docs/ARCHITECTURE_MASTER.md` §2 vocabulary:
 - `compatibility_edge` (edge in either graph, with weight and
   compatibility_type ∈ {shares_one_arrangement,
   opposite_homozygotes, hom_evidence, het_evidence}).
+
+---
+
+## 12. Biological foundation (added 2026-05-26, biological pass)
+
+This section grounds the data model in the biology that makes
+it work. None of the decoder's choices are arbitrary — each is
+a consequence of one of the following facts.
+
+### 12.1 Why arrangements stay distinct: recombination suppression
+
+A regime exists at all because **recombination is suppressed
+between non-homologous arrangements** inside an inversion. A
+heterozygote `A/B` forms an inversion loop at meiosis; single
+crossovers inside the loop produce unbalanced (duplicated /
+deleted) gametes that are largely inviable. Net effect:
+
+- Inside the inverted span, the two arrangements **do not
+  recombine** at appreciable rates over many generations.
+- They therefore accumulate distinct SNP haplotypes that
+  segregate together — this is what the dosage_heatmap reads.
+- At the **breakpoints and flanks** recombination resumes, so
+  the regime has soft edges. The transition zones from §5 are
+  the biological boundary, not a clustering artefact.
+
+Consequences for the decoder:
+
+1. Inside a regime, **diagnostic SNPs are in tight LD with the
+   arrangement identity.** This is what makes per-regime
+   dosage clustering work at all.
+2. Within an arrangement, recombination still proceeds between
+   *its own* haplotypes (allelic at the same arrangement). So
+   intra-arrangement diversity is normal genome-wide diversity;
+   inter-arrangement divergence is the inversion signal.
+3. A regime should be **internally LD-coherent.** If LD drops
+   in the middle of a candidate_region, that drop is itself a
+   segmentation cue (cluster 3 should already use it; see
+   `docs/PIPELINE_ANALYSIS_ORDER.md`).
+4. Occasional **gene conversion / double crossovers** do
+   introduce small patches of one arrangement into another.
+   These show up as samples whose dosage profile is "mostly
+   A/A but with a B-like stretch." Flag as
+   `state_type: complex` with sub-flag `gene_conversion_suspect`.
+
+### 12.2 Mendelian segregation as decoder validation
+
+Once Layer B has assigned `arrangement_combination`s, the
+classical Mendelian ratios apply *per regime* (each regime
+inherits as one locus, because recombination is suppressed
+inside it):
+
+| Cross | Expected offspring (per regime) |
+|-------|---------------------------------|
+| `A/A × A/A` | 100% `A/A` |
+| `A/A × B/B` | 100% `A/B` |
+| `A/A × A/B` | 50% `A/A`, 50% `A/B` |
+| `A/B × A/B` | 25% `A/A`, 50% `A/B`, 25% `B/B` |
+| `A/B × A/C` | 25% `A/A`, 25% `A/B`, 25% `A/C`, 25% `B/C` |
+| `A/B × B/C` | 25% `A/B`, 25% `A/C`, 25% `B/B`, 25% `B/C` |
+
+`mendelian_support` per regime (used in §11.5 confidence
+columns) is `1 − χ² p-value` of observed vs expected counts
+across all family trios in the cohort. Drop trios whose parents
+are themselves unresolved.
+
+Selection against heterokaryotypes (underdominance) appears as
+a systematic deficit of HET-like states. The decoder should
+NOT correct for this — record it as a separate field
+`het_deficit` and let downstream popstats interpret.
+
+### 12.3 Hardy-Weinberg as a cohort-level sanity check
+
+Within a panmictic cohort with arrangement frequencies
+`p_A, p_B, p_C, …` (Σ p_i = 1), the expected state frequencies
+under HWE are:
+
+```
+freq(A_i / A_i) = p_i²
+freq(A_i / A_j) = 2 · p_i · p_j   (i ≠ j)
+```
+
+The decoder emits, per regime:
+
+```
+hwe: {
+  p_arrangement: { A: 0.43, B: 0.51, C: 0.06 },
+  expected_state_freqs: { …HWE prediction… },
+  observed_state_freqs: { …from layer A… },
+  chisq_p: <float>,
+  inbreeding_F: <float>     // optional, multi-locus
+}
+```
+
+Deviation from HWE flags:
+
+- **Excess homozygotes** → assortative mating, population
+  substructure, or null allele.
+- **Excess heterozygotes** → balancing selection or
+  laboratory-bias of the F1 cohort (expected for `f1_hybrid`).
+- **Missing one or more het classes** → meiotic incompatibility
+  or sampling.
+
+HWE expectations apply to `cgar_hatchery_226` and `cmac_wild`,
+NOT to `f1_hybrid` (which by construction has known parents).
+
+### 12.4 Polarisation: which arrangement is ancestral?
+
+The decoder labels arrangements `A, B, C` arbitrarily (by
+sample-set order or frequency rank). The **identity of which
+is ancestral** is a separate question handled by the
+`evolution` atlas using:
+
+- outgroup synteny vote (the arrangement matching outgroup
+  gene order is ancestral);
+- BUSCO 4D-site age estimates inside the inverted span;
+- doubleton SFS pattern.
+
+This SPEC's decoder MUST emit `arrangement_id` as opaque
+labels `A, B, C`. It MUST NOT assign "ancestral / derived"
+itself. The evolution atlas reads `regime._decoded.states` and
+annotates per-regime polarity in a separate layer
+(`inversion.arrangement_polarity_v1`, future SPEC).
+
+### 12.5 Nested regimes and compound heterozygotes
+
+A candidate_region may contain a **nested inversion** —
+arrangement `B` itself carries an inner inversion that
+arrangement `A` does not. Then within `B/B` samples, an inner
+biallelic system `B_inner1 / B_inner2` segregates.
+
+Handling:
+
+1. The segmentation step (cluster 3) MUST detect the inner
+   regime as a child of the outer regime (smaller bp span,
+   sample subset = the `B/B` carriers only).
+2. The decoder runs **independently** on the inner regime,
+   using only the sample subset that carries `B` at the outer
+   regime.
+3. The output graph at the candidate_region level has a
+   parent-child link:
+
+   ```
+   regime_outer: A/A, A/B, B/B
+                                 │
+                                 └── child regime_inner (active only in B/B carriers):
+                                       B_inner1/B_inner1,
+                                       B_inner1/B_inner2,
+                                       B_inner2/B_inner2
+   ```
+
+4. A `compound_heterozygote` is a sample heterozygous at both
+   the outer and an inner regime (e.g., `A/B` outer AND
+   `B_inner1/B_inner2` inner). Emit as a structured combined
+   call:
+
+   ```
+   { regime_outer: "A/B",
+     regime_inner: { active: false, reason: "only_active_in_B/B" } }
+
+   { regime_outer: "B/B",
+     regime_inner: "B_inner1/B_inner2" }
+   ```
+
+5. NEVER collapse outer+inner into one ad-hoc K. Nesting must
+   be visible in the data model and the graph.
+
+### 12.6 Cohort-specific signal (binding)
+
+Each cohort answers a different question. The decoder must NOT
+pool them.
+
+| Cohort | What it tells you | What it cannot tell you |
+|--------|------------------|------------------------|
+| `f1_hybrid` | Mendelian inheritance, parent-offspring transmission, recombinant detection inside transition zones | Population frequencies, ancestral state |
+| `cgar_hatchery_226` | Cohort-level arrangement frequencies, HWE deviation, selection signatures, het_deficit | Truly wild frequencies (hatchery bias), cross-species comparison |
+| `cmac_wild` | Wild-type frequencies, ancestral arrangement (with outgroup), cross-species polarisation | Mendelian (no known pedigree), F1-specific recombinants |
+
+The decoder runs per cohort and emits one
+`regime._decoded[<cohort_id>]` per regime per cohort. The
+inter-regime / inter-graph comparison code runs WITHIN one
+cohort by default. Cross-cohort comparison is a separate
+explicit operation (`compareCohorts(regime, cohorts)`).
+
+### 12.7 Pseudo-arrangements (false positives)
+
+Not every multi-state cluster is an arrangement system. The
+decoder must reject these false positives:
+
+| Pattern | Looks like | Actually is | Test |
+|---------|-----------|-------------|------|
+| State_set correlates with `q_ancestry` | 2-3 arrangement system | population structure | per-state ancestry homogeneity ≥ 0.85 |
+| State_set correlates with sequencing batch / lane | arrangements | batch effect | per-batch state-frequency χ² |
+| HOM-like states with very low intra-state diversity | arrangements | inbred lines | π_within / π_between ratio < 0.1 → suspicious |
+| State boundaries aligned with chrom ends / N-gaps | regime | assembly artefact | overlap with N-mask > 50% → reject |
+| Sex-correlated state frequencies on autosome | arrangement | sex-linked variant mismapped | per-sex χ² |
+| State == single rare family | arrangement | family structure | one family contributes ≥ 50% of a state's members → flag |
+
+Each failed test emits a flag in
+`regime._decoded.false_positive_flags[]`. The decoder still
+emits the states (do not silently drop), but downstream
+consumers (popstats, manuscript) skip flagged regimes by
+default.
+
+### 12.8 Sex chromosomes and ploidy
+
+For sex chromosomes (LG identity TBD per Cgar / Cmac
+karyotypes — TODO: add the LG mapping when available):
+
+1. The heterogametic sex carries **one** arrangement per
+   regime, not two. Emit `state_type: hemizygous_X` or
+   `hemizygous_Z` per the system's sex determination.
+2. The homogametic sex behaves normally (two arrangements,
+   standard Mendelian).
+3. The pseudoautosomal region (PAR), if any, behaves as
+   autosomal.
+4. The decoder MUST take `sex` from the sample metadata layer
+   and treat hemizygous-sex samples as a separate stratum;
+   do not let them pull a HOM-like cluster into a false HET
+   shape.
+
+For mitochondrial-only regimes: out of scope of this SPEC
+(uniparental inheritance, no diploid states). If a candidate
+region falls on a mitochondrial contig, skip with reason
+`uniparental_locus`.
+
+### 12.9 Detection limits
+
+The decoder honestly reports when a regime is below resolution
+(extending §5):
+
+| Limit | Threshold | Action |
+|-------|-----------|--------|
+| `n_windows` in regime | < 5 | skip, mark `below_resolution` |
+| `n_diagnostic_snps` | < 20 | skip, mark `below_snp_resolution` |
+| `n_samples` per candidate state | < 3 | merge into nearest state OR mark `unresolved` |
+| `regime_bp_span` | < 50 kb | flag `short_regime` — still decode but cap confidence at `medium` |
+| Best `n_arrangements` requires ≥ 5 missing het classes | always | reject the model in favour of the next-smaller m |
+
+### 12.10 Implications for §11's compatibility graph
+
+Cross-reference biology back into the graph contract:
+
+- Edges in the `arrangement_graph` weighted by `n_samples`
+  reflect **mating compatibility × population frequency**. An
+  absent edge is informative (incompatibility OR sampling).
+- The `dosage_state_graph` topology distinguishes:
+  - **Linear** path (`A/A — A/B — B/B`) → biallelic.
+  - **Triangle of HOMs with HETs on edges** → 3-arrangement.
+  - **Disconnected components** → either pseudo-arrangements
+    OR truly disjoint sub-cohorts that should be analysed
+    separately (likely §12.7 population structure).
+- A `compatibility_edge` of type `opposite_homozygotes` (e.g.
+  `A/A — B/B`) does NOT imply mating impossibility, only that
+  the two states share zero arrangements. The actual `A × B`
+  mating produces `A/B` which appears as a separate node.
+
+---
+
+## 13. Open biological questions (extends §7)
+
+Carried over from §7 plus new ones from §12:
+
+5. **Inversion size cutoff for confident decoding.** Below ~50
+   kb, dosage signal is weak. Should we run a chrom-wide power
+   analysis to set the threshold per cohort instead of a
+   constant?
+6. **Underdominance vs sampling missingness.** When a het class
+   is absent, how do we distinguish meiotic incompatibility
+   from "we just didn't sample enough"? Need a power model
+   conditional on cohort sample size and observed HOM
+   frequencies.
+7. **Polarisation when no outgroup is available** for a regime
+   (cmac_wild only). Fall back to derived-allele frequency
+   skew? Or refuse to polarise and label `ancestral: unknown`?
+8. **Recombinant vs gene-conversion in transition zones.**
+   §12.1 lumps them. Are the bp-scales separable (gene
+   conversion is < 1 kb, recombination products span the full
+   regime tail)?
+9. **Cohort weighting in the cross-cohort summary.** When
+   merging `cgar_hatchery_226` and `cmac_wild`, do we weight
+   by sample count, by population effective size, or report
+   both separately?
+10. **Inversion-on-inversion (compound heterozygote)
+    confidence ceiling.** When BOTH outer and inner regimes
+    are HET in the same sample, the dosage signal is the sum
+    of both layers; can we separate them, or do we cap
+    confidence at `medium` and label `compound_het_observed`?
