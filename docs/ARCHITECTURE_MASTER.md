@@ -46,7 +46,7 @@ Each cohort plays a different role and must not be pooled:
 | `cgar_hatchery_226` | Cohort frequencies, HWE deviation, selection signals |
 | `cmac_wild` | Wild frequencies, ancestral state via outgroup |
 
-## 1. Master rule
+## 1. Master rule (5-stage pipeline)
 
 > Long-range regime detection **segments** the genome. Each
 > regime gets its own dosage heatmap. The dosage heatmap assigns
@@ -54,18 +54,43 @@ Each cohort plays a different role and must not be pooled:
 > validation tests those calls. Breakpoints support regime
 > boundaries. PODs are created only after validated regimes.
 
+**Proposal vs validation is a hard separation.** Stages 1–3
+propose a model from dosage alone; Stage 4 tests it
+independently with families; Stage 5 combines them into a
+verdict.
+
+| # | Stage | Input | Output | Uses Mendelian? |
+|---|-------|-------|--------|-----------------|
+| 1 | Long-range regime detection | candidate_region | regime boundaries | no |
+| 2 | Dosage heatmap | regime + samples × diagnostic SNPs | segregation_states `S1..Sk` (Layer A) | no |
+| 3 | Arrangement compatibility graph | states from Stage 2 | hidden arrangements `A, B, C, …` + arrangement_combinations (Layer B) | no |
+| 4 | Mendelian validation | proposed model from Stage 3 + pedigree | validated / likely / complex / unresolved per regime | yes (f1_hybrid only) |
+| 5 | Final classification | Stages 3 + 4 | POD-eligible flag | combines |
+
 In one line:
 
 ```
-candidate_region → regimes → dosage_heatmap (per regime)
-                          → segregation_states (Layer A)
-                          → arrangement_combinations (Layer B, evidence-gated)
-                          → Mendelian + HWE validation
-                          → POD
+candidate_region
+  → regimes (Stage 1)
+  → dosage_heatmap → segregation_states (Stage 2)
+  → arrangement_compatibility_graph → arrangement_combinations (Stage 3)   ─── proposal
+  → mendelian_validation_graph → verdict (Stage 4)                          ─── validation
+  → final_classification (Stage 5)
+  → POD (only if validated)
 ```
 
+The two graphs (`arrangement_compatibility_graph`,
+`mendelian_validation_graph`) live in different stages and
+serve different roles: the first **proposes** hidden
+arrangements from dosage states, the second **tests** whether
+the proposed arrangements transmit correctly in families. They
+are related but not the same.
+
 Breakpoints (cross-species atlas) feed **into boundaries**, not
-into karyotypes. A breakpoint is an edge, not a state.
+into karyotypes. A breakpoint is an edge, not a state. HWE
+(§12.3 of SPEC) is a cohort-level sanity check on Stage 3
+output for `cgar_hatchery_226` / `cmac_wild`; it does NOT
+override Stage 4 Mendelian validation.
 
 ## 2. Canonical vocabulary (binding)
 
@@ -85,9 +110,9 @@ Do not let any session redefine them.
 | `POD` (point of diagnosis) | A regime that has passed Mendelian validation. Only PODs are used for cargo/phenotype interpretation downstream. | `popstats` atlas validates → `inversion` flag |
 | `cargo` | Genes / features physically contained inside a POD. | `evolution` / annotation layer |
 | `breakpoint` | A bp coordinate where two arrangements differ in genomic order, supported by cross-species evidence. Supports regime BOUNDARIES, never karyotypes. | `cross-species` atlas |
-| `arrangement_graph` | Per-regime graph; nodes are hidden arrangements (`A, B, C, …`), edges are observed HET pairs. Edge weight = `n_samples` carrying that het. (Graph A.) | per-regime decoder, `haplotype_regimes` UI |
-| `dosage_state_graph` | Per-regime graph; nodes are observed `segregation_state`s, edges link states that share one hidden arrangement. (Graph B.) | per-regime decoder, `haplotype_regimes` UI |
-| `compatibility_edge` | An edge in either graph; carries `compatibility_type ∈ {shares_one_arrangement, opposite_homozygotes, hom_evidence, het_evidence}` and a weight. | per-regime decoder |
+| `arrangement_compatibility_graph` | The Stage-3 **proposal** graph. Built from dosage states. Has two layout views: *arrangement view* (nodes = hidden arrangements `A, B, C, …`, edges = observed HET pairs) and *state view* (nodes = `segregation_state`s, edges = shared-arrangement links). One graph, two views. | per-regime decoder, `haplotype_regimes` UI |
+| `mendelian_validation_graph` | The Stage-4 **test** graph. Built from family transmissions, not from dosage. Has two layout views: *trio view* (nodes = samples coloured by Mendelian consistency, edges = parent-offspring pedigree links) and *transmission-table view* (bipartite: parent state pairs → offspring states with observed/expected counts). Only meaningful when pedigree is available (currently `f1_hybrid`). | per-regime decoder, `haplotype_regimes` UI |
+| `compatibility_edge` | An edge in either graph's layouts; carries a `compatibility_type` and a weight. For arrangement_compatibility_graph: `shares_one_arrangement` / `opposite_homozygotes` / `hom_evidence` / `het_evidence`. For mendelian_validation_graph: `parent_offspring_consistent` / `parent_offspring_inconsistent` / `parent_offspring_ambiguous`. | per-regime decoder |
 | `recombination_suppression` | The biological reason a regime exists: in an arrangement heterozygote, crossovers inside the inversion produce inviable gametes, so the two arrangements do not recombine and accumulate distinct haplotypes. | basis of the whole framework |
 | `transition_zone` | The bp range at a regime's flank where recombination resumes — the soft edge between regimes. Not a clustering artefact, biological reality. | `inversion` atlas, per-regime decoder |
 | `compound_heterozygote` | A sample heterozygous at BOTH an outer regime and a nested inner regime (e.g. `A/B` outer + `B_inner1/B_inner2` inner). Emitted as a structured combined call, NEVER as a single ad-hoc K class. | per-regime decoder, nested-regime path |
@@ -116,6 +141,12 @@ Do not let any session redefine them.
 - Do not describe a 5-state or 6-state regime as "K=3 failed".
   Such a regime is a multiallelic structural haplotype system
   with multiple HOM-like and HET-like states.
+- Do not use Mendelian inheritance as part of arrangement
+  *proposal* (Stages 1–3). It is *validation* only (Stage 4).
+  The proposal step has no access to the pedigree.
+- Do not draw the `arrangement_compatibility_graph` and the
+  `mendelian_validation_graph` as variants of the same object.
+  They live in different stages and use different inputs.
 
 ## 3. Pipeline order (binding)
 

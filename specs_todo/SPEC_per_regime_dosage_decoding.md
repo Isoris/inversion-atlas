@@ -534,6 +534,16 @@ Verbatim from user, preserved for use in manuscript draft:
 > states, suggesting multiallelic or nested structural haplotype
 > systems capable of producing multiple heterokaryotype classes.
 
+Second manuscript sentence added 2026-05-26 (verbatim from
+user), to be used together with the above to make the
+proposal-vs-validation separation explicit:
+
+> We first inferred candidate arrangement states from dosage
+> heatmaps within long-range regimes. Mendelian inheritance was
+> then used as an independent validation layer to evaluate
+> whether the inferred states were compatible with diploid
+> transmission.
+
 ### 10.5 Decoder output contract (supersedes §4.2's `regime._decoded`)
 
 Replace:
@@ -751,14 +761,151 @@ REG_44  6  3  S5  B/C? HET-like  3   low     low     low     B/C?
 REG_44  6  3  S6  C/C? HOM-like  2   low     low     unsupp  unresolved
 ```
 
-### 11.6 UI — floating panel (binding requirement)
+### 11.6 Two graphs, two pipeline stages (corrected 2026-05-26)
+
+User correction 2026-05-26 — verbatim:
+
+> actually its 2 graphs in the floating panel, not 1.
+>
+> Long-range + dosage proposes the model. Mendelian tests the
+> model.
+>
+> Arrangement compatibility graph: built from dosage states →
+> propose hidden arrangements.
+> Mendelian validation graph: built from family transmissions →
+> test if proposed arrangements inherit correctly.
+> They are related but not the same.
+
+This corrects an earlier conflation. The two graphs live in
+**different pipeline stages**:
+
+| # | Stage | What it produces | Graph emitted |
+|---|-------|------------------|---------------|
+| 1 | Long-range regime detection | Coherent segment (boundaries) | — |
+| 2 | Dosage heatmap | Candidate states `S1..Sk` | — |
+| 3 | **Arrangement compatibility graph (proposal)** | Hidden arrangements `A, B, C, …` inferred from dosage states | **arrangement_compatibility_graph** |
+| 4 | **Mendelian validation (test)** | Pass/fail/likely for each proposed arrangement model | **mendelian_validation_graph** |
+| 5 | Final classification | `validated / likely / complex / unresolved` | — |
+
+Steps 1–3 are **proposal** (dosage-based, no Mendelian).
+Step 4 is **independent validation** (family-based, no dosage).
+Step 5 combines them into a verdict.
+
+### 11.7 Arrangement compatibility graph (the proposal graph)
+
+Sections §11.1–§11.5 describe ONE object: the
+**arrangement_compatibility_graph**. It has two layout views,
+both rendered from the same underlying data:
+
+- **arrangement view** (formerly "Graph A"): nodes are hidden
+  arrangements `A, B, C, …`; edges are observed HET pairs;
+  het-only-inferred arrangements drawn dashed. Best for
+  reading "which arrangements does this regime contain?".
+- **state view** (formerly "Graph B"): nodes are observed
+  segregation_states `S1..Sk` coloured by `state_type`; edges
+  link states that share one hidden arrangement, labelled with
+  the shared arrangement. Best for reading "which observed
+  clusters are biologically related?".
+
+These are not two graphs. They are two layouts of the same
+graph. The floating panel switches layouts with a sub-toggle.
+
+The §11.3 decoder output contract is unchanged; `arrangement_graph`
+and `dosage_state_graph` are now understood as the two layout
+projections of the single `arrangement_compatibility_graph`
+object. (Renaming the keys is deferred to implementation; the
+JSON shape is fine.)
+
+### 11.8 Mendelian validation graph (the test graph)
+
+Built **only after** the arrangement compatibility graph
+proposes a model. Uses pedigree information that exists only
+for `f1_hybrid`.
+
+Two layout views of one object:
+
+- **trio view**: nodes are samples (one per F1 trio member);
+  edges are parent-offspring relationships drawn from the
+  pedigree; each node carries its assigned arrangement
+  combination from §10/§11; edge colour = Mendelian
+  consistency:
+  - green = transmission consistent with the proposed model;
+  - red = transmission impossible under the proposed model
+    (e.g. `A/A × B/B` parents producing a `C/C` offspring);
+  - amber = transmission possible but unlikely given expected
+    1:1 / 1:2:1 ratios.
+- **transmission-table view**: bipartite. Top nodes are parent
+  state pairs (`A/A × A/B`, `A/B × A/B`, `A/B × A/C`, …);
+  bottom nodes are offspring states; edges carry
+  `n_observed / n_expected` and the per-edge χ² contribution.
+
+Per-regime emitted object (sibling of `arrangement_compatibility_graph`
+in `regime._decoded`):
+
+```js
+mendelian_validation_graph: {
+  cohort_id: "f1_hybrid",
+  n_trios_total:        <int>,
+  n_trios_evaluable:    <int>,   // both parents resolved
+  n_trios_consistent:   <int>,
+  n_trios_inconsistent: <int>,
+  n_trios_ambiguous:    <int>,
+  per_cross: [
+    { parents: "A/B × A/B",
+      n_offspring: 24,
+      expected: { "A/A": 6, "A/B": 12, "B/B": 6 },
+      observed: { "A/A": 7, "A/B": 11, "B/B": 6 },
+      chisq_p: 0.92,
+      verdict: "consistent" },
+    { parents: "A/B × A/C",
+      n_offspring: 8,
+      expected: { "A/A": 2, "A/B": 2, "A/C": 2, "B/C": 2 },
+      observed: { "A/A": 2, "A/B": 1, "A/C": 3, "B/C": 2 },
+      chisq_p: 0.77,
+      verdict: "consistent" },
+    …
+  ],
+  overall_chisq_p: 0.85,
+  verdict: "validated" | "likely" | "complex" | "unresolved",
+  impossibilities: [
+    { trio_id: "T_42", parent_states: "A/A × A/A",
+      offspring_state: "A/B", reason: "forbidden_under_model" }
+  ]
+}
+```
+
+`impossibilities[]` are the model-killing observations: if
+non-empty, the proposed arrangement model is **rejected** and
+the regime drops to `final_classification: "complex"` or
+`"unresolved"` even if the dosage clustering looked clean.
+
+### 11.9 Final classification (Stage 5)
+
+Per regime, combine the two graphs:
+
+| arrangement_compatibility_graph fit | mendelian_validation_graph verdict | final_classification |
+|-------------------------------------|------------------------------------|----------------------|
+| high | validated | `validated` |
+| high | likely | `likely` |
+| high | complex / impossibilities present | `complex` |
+| medium | validated | `likely` |
+| medium | likely | `likely` |
+| medium | complex | `complex` |
+| low / unsupported | any | `unresolved` |
+| any | n_trios_evaluable < 5 (e.g. `cmac_wild`) | inherit dosage confidence, label `dosage_only` |
+
+Only regimes reaching `validated` are eligible to become POD
+(see master rule).
+
+### 11.10 UI — floating panel (binding requirement)
 
 User instruction: "need graph of compatibility for haplotype
-regime page. but need as floating panel because its so crowded."
+regime page. but need as floating panel because its so crowded.
+actually its 2 graphs in the floating panel, not 1."
 
-The arrangement compatibility graph is rendered in a **floating,
-draggable, dismissable panel** on the `haplotype_regimes` page,
-NOT inline.
+The floating panel holds **two graphs** corresponding to
+Stage 3 (proposal) and Stage 4 (validation). It is the
+single panel — not two separate windows.
 
 Requirements:
 
@@ -769,27 +916,34 @@ Requirements:
    `localStorage` per regime.
 3. **Dismissable**: × button in the panel header closes it;
    reopened from the regimes-table row context menu ("show
-   compatibility graph").
-4. **Resizable**: bottom-right resize handle; min ~ 320×240,
-   default ~ 480×360.
-5. **Two-tab toggle**:
-   - Tab 1 — *arrangement graph* (Graph A from §11.1). Nodes:
-     `A, B, C…`. Edges: observed HET pairs. Het-only-inferred
-     arrangements (no HOM observed) are drawn dashed.
-   - Tab 2 — *dosage-state graph* (Graph B from §11.1). Nodes:
-     `S1..Sk` coloured by `state_type` (HOM-like / HET-like /
-     complex / unresolved). Edges labelled with the shared
-     arrangement.
-6. **Bound to the regimes table**: clicking a regime row updates
-   the panel to that regime; the panel header shows `REG_id ·
-   chrom · bp span · best_n_arrangements`.
-7. **No mandatory render**: panel is closed by default. Page
+   regime graphs").
+4. **Resizable**: bottom-right resize handle; min ~ 320×320,
+   default ~ 520×480 (taller than the §11.6 first draft, to
+   fit both graphs).
+5. **Top-level tab toggle (two graphs)**:
+   - Tab 1 — **Arrangement compatibility** (Stage 3). Sub-toggle
+     switches between *arrangement view* (nodes = `A,B,C…`,
+     edges = observed HETs) and *state view* (nodes = `S1..Sk`,
+     edges = shared arrangement).
+   - Tab 2 — **Mendelian validation** (Stage 4). Sub-toggle
+     switches between *trio view* (pedigree colored by
+     consistency) and *transmission-table view* (parent-cross
+     bipartite with χ²). Disabled / "no pedigree" placeholder
+     when the active cohort is not `f1_hybrid` or
+     `n_trios_evaluable < 5`.
+6. **Panel header shows the verdict pipeline left-to-right**:
+   `REG_id · best_n_arrangements · dosage_conf · mendelian_verdict · final_classification`.
+   This makes the proposal-vs-validation separation visible at
+   a glance.
+7. **Bound to the regimes table**: clicking a regime row updates
+   the panel to that regime.
+8. **No mandatory render**: panel is closed by default. Page
    load does not pay the layout cost.
 
 Implementation note: re-use any existing floating-panel
 primitive in `atlases/inversion/shared/` if one exists; do not
 introduce a new floating-panel framework just for this. Use SVG
-for the graph (the regime is small — ≤ 10 nodes).
+for both graphs (regime ≤ 10 nodes, family ≤ ~200 nodes).
 
 ### 11.7 Master doc additions
 
@@ -846,7 +1000,28 @@ Consequences for the decoder:
    A/A but with a B-like stretch." Flag as
    `state_type: complex` with sub-flag `gene_conversion_suspect`.
 
-### 12.2 Mendelian segregation as decoder validation
+### 12.2 Mendelian segregation as independent validation (NOT inference)
+
+Mendelian inheritance is the **validation layer**, never part
+of proposal. The user is explicit (2026-05-26):
+
+> Long-range + dosage proposes the model. Mendelian tests the
+> model.
+
+So:
+
+- Stages 1–3 (regime, dosage states, arrangement compatibility
+  graph) run **without** Mendelian. They produce a proposed
+  model from dosage alone.
+- Stage 4 takes the proposed model AS GIVEN and asks: do
+  observed family transmissions fit?
+- A failed Mendelian test does NOT modify the proposed model;
+  it labels it `complex` or `unresolved` and lets the operator
+  inspect.
+
+This decoupling lets the same proposal be re-tested when the
+pedigree expands (e.g. an F2 generation arrives), without
+re-running dosage clustering.
 
 Once Layer B has assigned `arrangement_combination`s, the
 classical Mendelian ratios apply *per regime* (each regime
