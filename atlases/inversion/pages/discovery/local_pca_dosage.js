@@ -798,7 +798,11 @@ function _buildLegacyState(atlasState) {
     activeSampleSet: null,
     activeSampleReasons: new Map(),
     activeSampleRules: [],
-    viewControls: { pcaXY: ['pc1', 'pc2'], linesYsources: ['pc1'], linked: true },
+    // 2026-05-26: linked default flipped to false so changing PCA scatter
+    // axes doesn't drag the per-sample lines panel along with it (the
+    // auto-sync at setPcaXY was force-adding PC2 to linesYsources).
+    // Quentin: "by default in per sample lines only PC1 is active."
+    viewControls: { pcaXY: ['pc1', 'pc2'], linesYsources: ['pc1'], linked: false },
     // L3 / clustering
     k: 3,
     kMode: 'fixed',
@@ -1160,6 +1164,7 @@ function _openDosageDebugModal(state) {
       <div style="margin-bottom: 8px; font-size: 11px; color: var(--ink-dim);">
         <b>Cached chunk keys (${(r.lruKeys || []).length}):</b> ${lruHtml}
       </div>
+      ${_renderMarkerStats(r.markerStats, r.range)}
       ${_renderIdProjectionDetails(r.idProjection)}
       <table style="width: 100%; border-collapse: collapse; font-size: 11.5px;">
         <thead>
@@ -1251,6 +1256,64 @@ function _escHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
+}
+
+// Render the chunk marker / non-NA forensic block. Tells the user
+// whether the chunk for the active bp range has (a) any markers AT ALL,
+// (b) markers but no non-NA dosage cells. Auto-open the <details> when
+// something looks off so the user doesn't have to expand it.
+function _renderMarkerStats(ms, range) {
+  if (!ms) {
+    return '<div class="dim" style="margin-bottom: 8px; font-size: 10.5px;">'
+         + 'No chunk loaded — marker-range stats unavailable.</div>';
+  }
+  const startBp = range && Number.isFinite(range.startBp) ? range.startBp : null;
+  const endBp   = range && Number.isFinite(range.endBp)   ? range.endBp   : null;
+  const cspan = ms.chunk_bp_span;
+  const inRangePct = ms.markers_total > 0
+    ? (ms.markers_in_range / ms.markers_total * 100).toFixed(1) : '0';
+  const nonNaPct = (ms.non_na_pct * 100).toFixed(1);
+  const inRangeColour = ms.markers_in_range === 0
+    ? '#d94f4f'
+    : ms.markers_in_range < 5 ? 'var(--accent, #f5a524)'
+    : 'var(--good, #3cc08a)';
+  const nonNaColour = ms.cells_non_na === 0
+    ? '#d94f4f'
+    : ms.non_na_pct < 0.1 ? 'var(--accent, #f5a524)'
+    : 'var(--good, #3cc08a)';
+  const lowMarkers = ms.markers_in_range < 5;
+  const lowNonNa   = ms.cells_non_na === 0 || ms.non_na_pct < 0.1;
+  const openAttr = (lowMarkers || lowNonNa) ? ' open' : '';
+  return `<details${openAttr} style="margin-bottom: 12px;">
+    <summary style="cursor: pointer; font-size: 11px; color: var(--ink-dim);">
+      <b>Chunk marker stats:</b>
+      <span style="color: ${inRangeColour};">${ms.markers_in_range}/${ms.markers_total} markers in range</span>
+      · <span style="color: ${nonNaColour};">${ms.cells_non_na}/${ms.cells_total} non-NA dosage cells (${nonNaPct}%)</span>
+    </summary>
+    <div style="margin-top: 6px; padding: 8px 10px;
+                background: var(--panel-3, #232a36);
+                border: 1px solid var(--rule); border-radius: 2px;
+                font-family: var(--mono); font-size: 10.5px; line-height: 1.6;">
+      ${cspan
+        ? `<div><b>Chunk declared bp span:</b> ${cspan.start} – ${cspan.end}</div>`
+        : ''}
+      <div><b>Requested bp range:</b> ${startBp != null ? startBp : '?'} – ${endBp != null ? endBp : '?'}</div>
+      <div><b>Markers (overall):</b> ${ms.first_marker_overall_bp ?? '?'} – ${ms.last_marker_overall_bp ?? '?'}
+        (${ms.markers_total} total)</div>
+      <div><b>Markers in requested range:</b>
+        ${ms.markers_in_range > 0
+          ? `${ms.first_marker_in_range_bp} – ${ms.last_marker_in_range_bp} (${ms.markers_in_range})`
+          : '<span style="color:#d94f4f;">none</span>'}</div>
+      <div><b>Dosage cells in range:</b>
+        ${ms.cells_total} total, <span style="color: ${nonNaColour};">${ms.cells_non_na} non-NA (${nonNaPct}%)</span></div>
+      ${lowMarkers
+        ? '<div style="margin-top: 6px; color: var(--accent, #f5a524);">⚠ Few/no markers in this bp range — the chunk fetcher requested too narrow a region, or markers are sparser than the L2 envelope. Try moving the cursor to a different window.</div>'
+        : ''}
+      ${ms.markers_in_range > 0 && lowNonNa
+        ? '<div style="margin-top: 6px; color: var(--accent, #f5a524);">⚠ Markers present but every dosage cell is -1 (NA) — server-side dosage TSV has no calls in this region. Pick a different range.</div>'
+        : ''}
+    </div>
+  </details>`;
 }
 
 // Render the id-projection forensic block. Collapsed <details> when the

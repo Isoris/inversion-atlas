@@ -115,6 +115,7 @@
         </select>
         <button id="catExportBreedingHTML" class="export export-fmt" title="Combined HTML document (one card per A4 page, with a table-of-contents page first). Open in a browser to scroll, or Ctrl/Cmd+P → Save as PDF for distribution.">HTML</button>
         <button id="catExportBreedingJSON" class="export export-fmt" title="JSON bundle — { schema, generated_at, chrom, n_cards, filter, cards: [...] }. Each card entry is the exact _buildBreedingCard output. Round-trippable for downstream pipelines.">JSON</button>
+        <button id="catExportKaryotypesTSV" class="export export-fmt" title="Long-format karyotype TSV (sample_id, inversion_id, karyotype ∈ {0/0, 0/1, 1/1, NA}, quality, chromosome, notes). Schema matches the relatedness-atlas inversion_karyotypes layer — drop the file at the path the relatedness registry references and the Mendelian / Karyotypes pages there will read live karyotypes instead of demo data.">Karyotypes TSV</button>
       </span>
       <span class="sel-info" id="catSelInfo" title="Live counts of selected rows / visible rows / total rows in the catalogue.">0 selected of 0</span>
     </div>

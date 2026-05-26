@@ -1,25 +1,23 @@
-// Atlas/inversion_discovery/local_pca_theta_pi.js
+// atlases/inversion/pages/discovery/local_pca_theta_pi.js
 //
-// Same six-panel layout as local_pca_dosage but driven by θπ.
-// Empty-state until R-pipeline ships theta_pi layers.
+// 2026-05-26: this is a PANEL-RENDERER MODULE, not a page. The 8
+// underscore-prefixed _drawTh* / _refreshThetaPi* helpers below are
+// imported by local_pca_dosage.js and invoked when state.activeMode ===
+// 'theta_pi'. There is no manifest.json entry for `local_pca_theta_pi` —
+// the file used to also export a mount/unmount lifecycle for a planned
+// standalone page that never shipped, plus a layer of non-underscore
+// alias wrappers; both were removed (verified-equivalent runtime
+// behaviour because no router could reach the mount, and no external
+// importer referenced the aliases).
 //
-// Extracted LITERALLY from legacy/Inversion_atlas.html.
-// Per HANDOFF_BATCH_1: state is now passed as first arg (was a global in legacy).
+// Each helper takes `state` as its explicit first argument — bodies are
+// verbatim from the chat-33 extraction (legacy line refs in entry-point
+// list below). All 13 TODO_MISSING markers from earlier rounds were
+// resolved as closure-scoped false positives.
 //
-// Round 5 step 10 (chat 36, 2026-05-07): all 13 TODO_MISSING markers
-// confirmed as closure-scoped false positives — every name (showHide,
-// xToPx, kColor, q, colorFor, palette, has, xAt, yAt, toX, toY, fillFor,
-// yToPx) is locally declared as `const NAME = ...` (or `let NAME` for
-// xAt) inside the calling function. The chat-33 extractor produced the
-// markers because it didn't model lexical scope. Per the local_pca_dosage round-2
-// finding (recipe step 2.5), the markers are deleted; the bodies are
-// unchanged.
-//
-// Round 5 step 10 (chat 36, 2026-05-07): added _pageState live-binding
-// + atlas-router lifecycle (mount/unmount/_buildLegacyState) +
-// state-aware wrappers for every renderer so callers can pass state
-// explicitly OR rely on _pageState. Verbatim bodies of the 8 helpers
-// are unchanged.
+// External consumer (verified 2026-05-26):
+//   - local_pca_dosage.js imports all 8 underscore-prefixed exports.
+//   - Nothing else imports anything from this file.
 //
 // Entry points (in extraction order):
   // _refreshThetaPiLayerStatus() — legacy lines 53045-53061

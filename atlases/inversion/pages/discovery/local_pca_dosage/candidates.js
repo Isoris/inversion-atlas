@@ -933,7 +933,9 @@ export function loadCandidateList(state) {
 // --- candidateToJSON / candidateFromJSON ---
 // Minimal JSON roundtrip — locked_labels needs to survive as Int8Array,
 // everything else is plain serializable.
-function candidateToJSON(cand) {
+// 2026-05-21: exported for karyotype_tier's candidate-list import/export
+// handlers (Group 4 of dead-button audit — bulk-action toolbar wired).
+export function candidateToJSON(cand) {
   if (!cand) return null;
   const out = { ...cand };
   if (cand.locked_labels instanceof Int8Array) {
@@ -941,7 +943,7 @@ function candidateToJSON(cand) {
   }
   return out;
 }
-function candidateFromJSON(obj) {
+export function candidateFromJSON(obj) {
   if (!obj) return null;
   const out = { ...obj };
   if (Array.isArray(obj.locked_labels)) {

@@ -64,18 +64,15 @@
 <div class="wrap">
   <aside>
     <button id="sidebarToggleBtn" title="Collapse / expand the parameters pane">‹</button>
-    <!-- 2026-05-26: float-mode toggle (Quentin's "settings bar should be
-         floating, not on the left"). Click to detach the sidebar into a
-         draggable floating panel; click again to dock back. State + last
-         position persisted to localStorage by atlas-core's
-         core/sidebar_floating.js (shell auto-installs on every page mount;
-         this button is the opt-in entry point). -->
-    <button id="sidebarFloatBtn"
-            title="Detach sidebar as a floating panel (drag from the first heading). Click again to re-dock."
-            style="position: absolute; top: 8px; right: 28px; background: transparent;
-                   color: var(--ink-dim); border: 1px solid var(--rule);
-                   border-radius: 3px; padding: 0 6px; font-family: var(--mono);
-                   font-size: 11px; cursor: pointer; line-height: 18px;">📌</button>
+    <!-- 2026-05-26 (later): #sidebarFloatBtn moved into ctrlBar (the page's
+         top toolbar) so it stays visible when the sidebar is closed (the
+         default state). Previously the button lived in the aside top-right
+         corner — when display:none hid the aside, the button was hidden
+         too and the user had no way to re-open the settings panel.
+         The sidebar_floating.js install resolves the button via
+         document.getElementById('sidebarFloatBtn') so it works wherever
+         the markup places it. -->
+
     <!-- v3.51: sim minimap — sticky panel at top of sidebar, hidden by default.
          When user clicks "Move to minimap" on the sim panel, this becomes
          visible and the main sim panel hides. -->
@@ -407,17 +404,6 @@
 
   <div id="pagesArea" style="overflow: hidden;">
   <main id="local_pca_dosage" class="page active">
-    <!-- Mode-B freshness badge (2026-05-20).
-         2026-05-24: was first grid child of <main> with margin: 4px 8px.
-         When `display: none` (no data yet) it took no row and the 9 panels
-         filled the 9 template rows correctly; when it gained content +
-         visibility it grabbed row 1 and pushed ctrlBar → simPanel → ... →
-         l3Panel down by one row, causing the L3 reflow Quentin reported.
-         Pinned with position: absolute now so it sits OVER the page corner
-         and never enters grid auto-placement. -->
-    <div id="lpdModeBBadge" class="data-source-badge"
-         style="position: absolute; top: 4px; right: 8px; z-index: 5;
-                font-size: 10px; max-width: 60ch; opacity: 0.85;"></div>
     <div id="ctrlBar">
       <button class="play" id="playBtn">▶ Play</button>
       <input type="range" id="scrubber" min="0" max="0" value="0" step="1" disabled />
@@ -494,6 +480,29 @@
       <div id="winLabel"><span class="dim">window</span>
         <span class="big" id="winIdx">—</span>
         <span class="dim" id="winBp"></span></div>
+      <!-- 2026-05-26: Mode-B freshness badge moved inline into ctrlBar
+           (was position:absolute top-right inside <main>, which overlapped
+           the |z| panel's L2 indicator strip — Quentin's complaint).
+           Nested inside ctrlBar so it doesn't enter the page-level grid
+           auto-placement, which was the original reason for going absolute.
+           margin-left:auto pushes it to the right edge of the bar. -->
+      <div id="lpdModeBBadge" class="data-source-badge"
+           style="margin-left: auto; font-size: 10px; max-width: 60ch;
+                  opacity: 0.85;"></div>
+      <!-- 2026-05-26 (later): floating-sidebar toggle promoted from inside
+           the aside (where it was hidden when the aside was closed) into
+           the page's top toolbar. Click opens the settings as a draggable
+           floating panel; click again closes it. State + position persisted
+           by core/sidebar_floating.js. Label rewrites itself ('📌' = open,
+           '⊟' = close) via _syncBtnLabel. -->
+      <button id="sidebarFloatBtn"
+              title="Open the settings panel (draggable; drag from the first heading). Click again to close."
+              style="background: transparent; color: var(--ink-dim);
+                     border: 1px solid var(--rule); border-radius: 2px;
+                     padding: 0 8px; height: 22px; font-family: var(--mono);
+                     font-size: 12px; cursor: pointer; box-sizing: border-box;
+                     display: inline-flex; align-items: center;
+                     line-height: 1;">📌</button>
       <!-- Schema + JS scripts badges live in the shell header now
            (atlas-core/index.html). The local_pca_dosage applyData path writes to
            #schemaBadge by ID and the badge is found there. -->
@@ -1168,7 +1177,7 @@
                       color: var(--ink-dim); text-transform: uppercase;
                       letter-spacing: 0.05em; font-size: 9.5px;
                       display: flex; justify-content: space-between; align-items: center;">
-            <span>tracked samples</span>
+            <span title="Samples pinned to the PCA scatter so you can follow them as the cursor scrubs through windows.">tracked samples</span>
             <div style="display: flex; gap: 4px; align-items: center;">
               <span id="trackedCountInfoAsideCompact"
                     style="color: var(--ink-dim); font-size: 9.5px;
@@ -1176,36 +1185,85 @@
                            letter-spacing: 0;">0/10</span>
               <!-- 2026-05-18: settings popup toggle. Opens #tPanelOverlay so
                    the secondary tracked-samples controls (trails / sign-align
-                   PC1 / lasso / scree / trail-back / N tracked) live in a
-                   floating tab instead of crowding the aside. Hotkey 't'. -->
+                   PC1 / lasso / scree / trail-back / N tracked / color-mode
+                   picker / manual groups) live in a floating tab instead of
+                   crowding the aside. Hotkey 't'. -->
               <button id="tPanelOpenBtn"
-                      title="Tracked-samples settings (t)"
+                      title="Tracked-samples settings (t) — opens the floating popup with trails, sign-align, lasso, scree, color-mode picker, and manual groups."
                       style="background: transparent; border: 1px solid var(--rule);
                              color: var(--ink-dim); border-radius: 3px;
                              padding: 0 5px; font-family: var(--mono); font-size: 9.5px;
                              cursor: pointer; line-height: 14px;">▾</button>
             </div>
           </div>
+          <!-- 2026-05-26: explanatory blurb. The tracked-samples PCA is the
+               most powerful surface on this page but its purpose isn't
+               obvious from the controls alone. Inline help replaces the
+               equivalent doc that would otherwise live in /help. -->
+          <details id="trackedHelpAside"
+                   style="padding: 4px 8px; border-bottom: 1px solid var(--rule);
+                          background: var(--panel-2); color: var(--ink-dim);
+                          font-family: var(--mono); font-size: 9.5px; line-height: 1.45;">
+            <summary style="cursor: pointer; color: var(--ink-dim);
+                            font-size: 9.5px; text-transform: uppercase;
+                            letter-spacing: 0.04em;">what is this panel? <span style="color: var(--ink-dimmer); text-transform: none; letter-spacing: 0;">(click)</span></summary>
+            <div style="padding-top: 4px; color: var(--ink-dim);">
+              The big plot above is the <b style="color: var(--ink);">tracked-samples
+              PCA scatter</b>. It pins a set of samples to the same canvas
+              as the cohort cloud, so you can watch them move as you scrub
+              the cursor through windows.
+              <ul style="margin: 4px 0 4px 14px; padding: 0;">
+                <li><b>Click</b> a point to add/remove it from the tracked set</li>
+                <li><b>Shift+drag</b> to lasso a region → creates a manual group <code>lasso_N</code></li>
+                <li><b>Lasso toggle</b> (in ▾ settings): plain drag becomes a tracked-samples lasso instead</li>
+                <li><b>Trails</b> (▾ settings): connect each tracked sample's position back N windows</li>
+                <li><b>K-band buttons</b> below: pre-pick samples from one K-means cluster only</li>
+                <li><b>Auto-pick</b>: spread the picks radially across PC1/PC2 so all bands are represented</li>
+              </ul>
+              Colour mode is controlled from the ▾ settings (family /
+              ancestry / het / dosage / θπ / GHSL / manual). Shift+drag
+              creates a manual group but no longer hijacks the colour
+              mode — you keep whatever colouring you picked.
+            </div>
+          </details>
           <div style="padding: 4px 8px; display: flex; flex-direction: column; gap: 4px;">
             <!-- Inline (main) controls — kept always-visible:
                  K-cycle + K-band buttons + Auto-pick / Clear.
                  Secondary controls moved to #tPanelOverlay (toggle: ▾ button). -->
-            <!-- Lasso confirm/clear (hidden until a selection exists). Stays
-                 inline because it's transient state, not a setting. -->
-            <div id="pcaLassoBar" style="display: none; gap: 4px; align-items: center; font-size: 10px;">
+            <!-- Lasso action bar — visible when a Shift+drag selection
+                 (state.selectionGroup) is active. The selection is what
+                 the amber halo highlights on the PCA. Quick-actions let
+                 the user DO something with the selection without
+                 navigating to the ▾ popup's manual-groups list.
+                 2026-05-26: added Track/+Track/Clear buttons (previously
+                 the bar was a dead badge after the old Confirm/Clear
+                 pair was removed). -->
+            <div id="pcaLassoBar" style="display: none; gap: 4px; align-items: center; font-size: 10px; flex-wrap: wrap;">
               <span id="pcaLassoBadge"
-                    title="Number of samples currently lassoed (not yet committed)"
+                    title="Number of samples in the active selection (the amber-haloed set)."
                     style="font-family: var(--mono); font-size: 10px;
                            padding: 1px 6px; border-radius: 3px;
                            background: rgba(245,165,36,0.15);
                            border: 1px solid rgba(245,165,36,0.5);
                            color: var(--accent); white-space: nowrap;">0 selected</span>
-              <!-- 2026-05-26: removed #pcaLassoConfirmBtn + #pcaLassoClearBtn.
-                   The lasso now auto-commits on pointer-up (pca_panel.js:1545)
-                   and there's no in-flight rectangle to "clear" — these
-                   buttons were leftovers from an earlier confirm-on-button
-                   design that never had handlers. Matching compact pair
-                   (Confirm/Clear inside the popover) removed below. -->
+              <button id="pcaSelToTrackedBtn"
+                      title="Replace the tracked-samples list with the current selection."
+                      style="padding: 1px 8px; background: var(--accent); color: #0e1116;
+                             border: 1px solid var(--accent); border-radius: 3px;
+                             font-family: var(--mono); font-size: 10px;
+                             cursor: pointer; font-weight: 600;">Track</button>
+              <button id="pcaSelAddToTrackedBtn"
+                      title="Merge the current selection into the tracked-samples list (capped at N tracked)."
+                      style="padding: 1px 8px; background: var(--panel-2); color: var(--ink);
+                             border: 1px solid var(--rule); border-radius: 3px;
+                             font-family: var(--mono); font-size: 10px;
+                             cursor: pointer;">+ Track</button>
+              <button id="pcaSelClearBtn"
+                      title="Clear the amber halo (selection) without deleting the lasso_N manual group."
+                      style="padding: 1px 8px; background: transparent; color: var(--ink-dim);
+                             border: 1px solid var(--rule); border-radius: 3px;
+                             font-family: var(--mono); font-size: 10px;
+                             cursor: pointer;">Clear</button>
             </div>
             <!-- Row D: K(N) cycle button + 6 K-colored band buttons.
                  Each button shows just the K-index ("1".."6") in its actual
@@ -1314,11 +1372,12 @@
                     padding: 14px 18px; border-bottom: 1px solid var(--rule);">
           <div>
             <div style="font-size: 13px; font-weight: 600; color: var(--accent);">
-              T · tracked samples settings
+              T · tracked samples — controls + settings
             </div>
             <div style="font-size: 10.5px; color: var(--ink-dim); margin-top: 3px;">
-              scope knobs for the tracked-samples PCA scatter. Main controls
-              (K-cycle · K-band · auto-pick · clear) stay in the aside.
+              Quick actions (K-cycle · band-picker · auto-pick · clear)
+              plus scope knobs (trails · lasso · scree · color mode ·
+              manual groups). Hotkey: <b>t</b>.
             </div>
           </div>
           <button id="tPanelClose"
@@ -1330,6 +1389,86 @@
         <!-- Body -->
         <div style="padding: 14px 18px; display: flex; flex-direction: column; gap: 10px;
                     font-size: 11px;">
+          <!-- 2026-05-26: quick-actions section — relocated here from
+               the inline #trackedSamplesPanelCompactBody so the compact
+               panel under the PCA stays minimal (status + selection
+               actions only). The buttons mirror the fixed-mode aside's
+               #kCycleBtnAside / data-band-aside="..." / #autoPickRadialAside
+               / #clearPicksAside; same handlers work because the sidebar
+               wires bind by data-attribute selectors that match these. -->
+          <div style="display: flex; flex-direction: column; gap: 6px;
+                      padding-bottom: 10px; border-bottom: 1px solid var(--rule);">
+            <div style="font-size: 10px; color: var(--ink-dim); text-transform: uppercase;
+                        letter-spacing: 0.05em;">quick actions</div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+              <button id="kCycleBtnPopup"
+                      title="Click to cycle K (number of K-means clusters): 3 → 4 → 5 → 6 → 2 → 3. Mirrors the sidebar K selector."
+                      style="flex: 0 0 auto; padding: 3px 8px;
+                             background: linear-gradient(180deg, rgba(245,165,36,0.30), rgba(245,165,36,0.10));
+                             color: var(--ink); border: 1px solid var(--accent);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10.5px;
+                             cursor: pointer; font-weight: 600;">K=3</button>
+              <button data-band-popup="all" class="active"
+                      title="Pick samples from any K-cluster"
+                      style="flex: 1 1 auto; padding: 3px 8px;
+                             background: var(--panel-2); color: var(--ink);
+                             border: 1px solid var(--rule); border-radius: 3px;
+                             font-family: var(--mono); font-size: 10.5px;
+                             cursor: pointer;">all</button>
+              <button data-band-popup="0" data-k-band="0"
+                      title="Pick from K-cluster 1"
+                      style="flex: 0 0 26px; padding: 3px 0;
+                             background: var(--panel-2); border: 1px solid var(--rule);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10.5px;
+                             cursor: pointer;">1</button>
+              <button data-band-popup="1" data-k-band="1"
+                      title="Pick from K-cluster 2"
+                      style="flex: 0 0 26px; padding: 3px 0;
+                             background: var(--panel-2); border: 1px solid var(--rule);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10.5px;
+                             cursor: pointer;">2</button>
+              <button data-band-popup="2" data-k-band="2"
+                      title="Pick from K-cluster 3"
+                      style="flex: 0 0 26px; padding: 3px 0;
+                             background: var(--panel-2); border: 1px solid var(--rule);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10.5px;
+                             cursor: pointer;">3</button>
+              <button data-band-popup="3" data-k-band="3"
+                      title="Pick from K-cluster 4 (only at K=4+)"
+                      style="flex: 0 0 26px; padding: 3px 0;
+                             background: var(--panel-2); border: 1px solid var(--rule);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10.5px;
+                             cursor: pointer;">4</button>
+              <button data-band-popup="4" data-k-band="4"
+                      title="Pick from K-cluster 5 (only at K=5+)"
+                      style="flex: 0 0 26px; padding: 3px 0;
+                             background: var(--panel-2); border: 1px solid var(--rule);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10.5px;
+                             cursor: pointer;">5</button>
+              <button data-band-popup="5" data-k-band="5"
+                      title="Pick from K-cluster 6 (only at K=6)"
+                      style="flex: 0 0 26px; padding: 3px 0;
+                             background: var(--panel-2); border: 1px solid var(--rule);
+                             border-radius: 3px; font-family: var(--mono); font-size: 10.5px;
+                             cursor: pointer;">6</button>
+            </div>
+            <div style="display: flex; gap: 4px;">
+              <button id="autoPickRadialPopup"
+                      title="Auto-pick samples spread radially across PC1/PC2 so every K-band is represented."
+                      style="flex: 1 1 auto; padding: 3px 8px;
+                             background: var(--panel-2); color: var(--ink);
+                             border: 1px solid var(--rule); border-radius: 3px;
+                             font-family: var(--mono); font-size: 10.5px;
+                             cursor: pointer;">Auto-pick</button>
+              <button id="clearPicksPopup"
+                      title="Clear all tracked samples (does not affect the lasso selection)."
+                      style="flex: 0 0 auto; padding: 3px 12px;
+                             background: #0a0d12; color: var(--ink-dim);
+                             border: 1px solid #1a1f26; border-radius: 3px;
+                             font-family: var(--mono); font-size: 10.5px;
+                             cursor: pointer;">Clear</button>
+            </div>
+          </div>
           <!-- Row 1: trails / sign-align PC1 / lasso / scree -->
           <div style="display: flex; gap: 14px; flex-wrap: wrap;">
             <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
@@ -1448,22 +1587,26 @@
                          padding: 0 6px; font-family: var(--mono); font-size: 9.5px;
                          cursor: pointer; line-height: 14px;"
                   onclick="event.stopPropagation();">&times; clear</button>
-          <!-- 2026-05-18 — settings popup toggle (parity with the fixed-mode
-               aside's tPanelOpenBtn). Opens the same #tPanelOverlay; secondary
-               controls (trails / sign-align PC1 / lasso / scree / trail-back
-               / N tracked) live there. Mirrors the existing T-panel hotkey. -->
+          <!-- 2026-05-26: redundant ▾ #tPanelOpenBtnCompact hidden —
+               the ▼ arrow below now opens the same floating #tPanelOverlay
+               instead of toggling an inline body. One trigger, one panel.
+               Kept in DOM (display:none) so sidebar.js's mirror wires that
+               target it during transition don't ReferenceError. -->
           <button id="tPanelOpenBtnCompact"
-                  title="Tracked-samples settings (t)"
+                  style="display: none;"
+                  onclick="event.stopPropagation();">▾</button>
+          <!-- 2026-05-26: was an inline collapse arrow. Now opens the
+               floating #tPanelOverlay (all settings + quick actions live
+               there). Wired in pca_panel.js#_wireLassoBarHandlers'
+               siblings, idempotent. The compact panel body below this
+               head stays minimal (help + lasso action bar + tracked list). -->
+          <button id="trackedSamplesPanelCompactArrow"
+                  title="Open tracked-samples controls (K-band picker · auto-pick · trails · color mode · manual groups). Hotkey: t."
                   style="background: transparent; border: 1px solid var(--rule);
                          color: var(--ink-dim); border-radius: 3px;
-                         padding: 0 5px; font-family: var(--mono); font-size: 9.5px;
+                         padding: 0 6px; font-family: var(--mono); font-size: 11px;
                          cursor: pointer; line-height: 14px;"
-                  onclick="event.stopPropagation();">▾</button>
-          <!-- v3.99 turn 4: collapse arrow. Toggles
-               #trackedSamplesPanelCompactBody display between block and none.
-               Default expanded; persisted in localStorage. -->
-          <span id="trackedSamplesPanelCompactArrow"
-                style="font-size: 9px; color: var(--ink-dim);">▼</span>
+                  onclick="event.stopPropagation();">▾ controls</button>
         </div>
       </div>
       <!-- v3.78: tightened spacing for the narrow column in compact mode.
@@ -1475,6 +1618,27 @@
            `renderTrackedList` mirror state from the sidebar. -->
       <div id="trackedSamplesPanelCompactBody"
            style="padding: 4px 8px; display: flex; flex-direction: column; gap: 4px;">
+        <!-- 2026-05-26: explanatory blurb. Same text as the aside's
+             #trackedHelpAside above so users on either layout-mode (fixed
+             with aside, or compact with this panel below) get the same
+             onboarding. Collapsed by default so it doesn't eat scroll. -->
+        <details style="padding: 0; background: var(--panel-2); color: var(--ink-dim);
+                        font-family: var(--mono); font-size: 9.5px; line-height: 1.45;
+                        border: 1px solid var(--rule); border-radius: 3px;">
+          <summary style="cursor: pointer; padding: 3px 6px; color: var(--ink-dim);
+                          font-size: 9.5px;">
+            what is this panel? <span style="color: var(--ink-dimmer);">(click)</span>
+          </summary>
+          <div style="padding: 4px 8px; color: var(--ink-dim);">
+            The PCA above is the <b style="color: var(--ink);">tracked-samples
+            scatter</b>. Click points to add/remove samples from the tracked
+            set; Shift+drag lassos a region into a manual group (the
+            tracked-samples-lasso variant lives in the ▾ settings popup).
+            Settings (trails, color mode, manual groups, scree inset)
+            live in the floating ▾ popup so this row stays focused on
+            the main band-picker + auto-pick controls.
+          </div>
+        </details>
         <!-- 2026-05-18 — compact-mode body slimmed to MAIN controls only.
              Secondary controls (trails / sign-align PC1 / lasso / scree /
              trail-back / N tracked) moved to the shared #tPanelOverlay popup
@@ -1517,85 +1681,31 @@
                note on the non-compact pair above. Lasso auto-commits on
                pointer-up; there's no in-flight rectangle to clear. -->
         </div>
-        <!-- 2026-05-18: trail-back + N-tracked sliders moved to #tPanelOverlay
-             popup. The compact body now jumps from the (hidden) input
-             remnants above straight to the K-cycle + band-pick row below. -->
-        <!-- K(N) cycle button + 6 K-colored band buttons. data-k-band="0..5"
-             matches the existing fixed-mode buttons so _syncTrackedCompactUI
-             auto-colors and auto-enables them based on state.k. The "all"
-             button uses data-band-compact="all" for the same handler.
-             K-cycle button id "kCycleBtnCompact" delegates to kCycleBtnAside. -->
-        <div style="display: flex; gap: 3px; align-items: center; font-size: 10px;">
-          <button id="kCycleBtnCompact"
-                  title="Click to cycle K (number of K-means clusters): 3 → 4 → 5 → 6 → 2 → 3. Recolors the PCA scatter, the per-sample lines, and all band buttons. Mirrors the sidebar K selector."
-                  style="flex: 0 0 auto; padding: 2px 6px;
-                         background: linear-gradient(180deg, rgba(245,165,36,0.30), rgba(245,165,36,0.10));
-                         color: var(--ink); border: 1px solid var(--accent);
-                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
-                         cursor: pointer; font-weight: 600;
-                         box-shadow: inset 0 0 6px rgba(245,165,36,0.18);
-                         text-shadow: 0 0 3px rgba(245,165,36,0.4);">K=3</button>
-          <button data-band-compact="all" class="active"
-                  title="Show all bands"
-                  style="flex: 1 1 auto; padding: 2px 6px;
-                         background: var(--panel-2); color: var(--ink);
-                         border: 1px solid var(--rule); border-radius: 3px;
-                         font-family: var(--mono); font-size: 10px;
-                         cursor: pointer;">all</button>
-          <button data-band-compact="0" data-k-band="0"
-                  title="Pick from K-cluster 1"
-                  style="flex: 0 0 22px; padding: 2px 0;
-                         background: var(--panel-2); border: 1px solid var(--rule);
-                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
-                         cursor: pointer;">1</button>
-          <button data-band-compact="1" data-k-band="1"
-                  title="Pick from K-cluster 2"
-                  style="flex: 0 0 22px; padding: 2px 0;
-                         background: var(--panel-2); border: 1px solid var(--rule);
-                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
-                         cursor: pointer;">2</button>
-          <button data-band-compact="2" data-k-band="2"
-                  title="Pick from K-cluster 3"
-                  style="flex: 0 0 22px; padding: 2px 0;
-                         background: var(--panel-2); border: 1px solid var(--rule);
-                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
-                         cursor: pointer;">3</button>
-          <button data-band-compact="3" data-k-band="3"
-                  title="Pick from K-cluster 4 (only available at K=4+)"
-                  style="flex: 0 0 22px; padding: 2px 0;
-                         background: var(--panel-2); border: 1px solid var(--rule);
-                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
-                         cursor: pointer;">4</button>
-          <button data-band-compact="4" data-k-band="4"
-                  title="Pick from K-cluster 5 (only available at K=5+)"
-                  style="flex: 0 0 22px; padding: 2px 0;
-                         background: var(--panel-2); border: 1px solid var(--rule);
-                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
-                         cursor: pointer;">5</button>
-          <button data-band-compact="5" data-k-band="5"
-                  title="Pick from K-cluster 6 (only available at K=6)"
-                  style="flex: 0 0 22px; padding: 2px 0;
-                         background: var(--panel-2); border: 1px solid var(--rule);
-                         border-radius: 3px; font-family: var(--mono); font-size: 10px;
-                         cursor: pointer;">6</button>
+        <!-- 2026-05-26: K-cycle + band-picker + auto-pick + Clear MOVED
+             to the floating #tPanelOverlay (opened by the ▾ controls button
+             in the panel head above). The compact panel body now stays
+             minimal: help blurb + tracked-list. The hidden remnants below
+             retain the legacy *Compact ids so sidebar.js mirror loops
+             don't ReferenceError during the transition. -->
+        <div style="display: none;">
+          <button id="kCycleBtnCompact">K=3</button>
+          <button data-band-compact="all">all</button>
+          <button data-band-compact="0" data-k-band="0">1</button>
+          <button data-band-compact="1" data-k-band="1">2</button>
+          <button data-band-compact="2" data-k-band="2">3</button>
+          <button data-band-compact="3" data-k-band="3">4</button>
+          <button data-band-compact="4" data-k-band="4">5</button>
+          <button data-band-compact="5" data-k-band="5">6</button>
         </div>
-        <div style="display: flex; gap: 3px;">
-          <button id="autoPickRadialCompact"
-                  title="Auto-pick samples spread radially across PC1/PC2"
-                  style="flex: 1 1 auto; padding: 2px 6px;
-                         background: var(--panel-2); color: var(--ink);
-                         border: 1px solid var(--rule); border-radius: 3px;
-                         font-family: var(--mono); font-size: 10px;
-                         cursor: pointer;">Auto-pick</button>
-          <button id="clearPicksCompact"
-                  title="Clear all tracked samples"
-                  style="flex: 0 0 auto; padding: 2px 8px;
-                         background: #0a0d12; color: var(--ink-dim);
-                         border: 1px solid #1a1f26; border-radius: 3px;
-                         font-family: var(--mono); font-size: 10px;
-                         cursor: pointer;">Clear</button>
+        <!-- 2026-05-26: autoPickRadialCompact / clearPicksCompact moved
+             to #tPanelOverlay (▾ controls popup). Hidden stub IDs kept
+             so sidebar.js mirror wires don't ReferenceError. -->
+        <div style="display: none;">
+          <button id="autoPickRadialCompact">Auto-pick</button>
+          <button id="clearPicksCompact">Clear</button>
         </div>
-        <div style="font-size: 9.5px; color: var(--ink-dim); line-height: 1.3;">
+        <div style="font-size: 9.5px; color: var(--ink-dim); line-height: 1.3;
+                    padding: 2px 4px;">
           tracked: <span id="trackedCountInfoCompact">0</span> /
           <span id="trackedNInfoCompact">10</span>
         </div>
@@ -1920,38 +2030,22 @@
             </span>
           </div>
         </div>
-        <!-- v4 turn 5 ask 1: Promote-to-candidate button. Builds a candidate
-             from the current focal L2 (or pinned-L2 merge when Dual is active),
-             marks confirmed:true, adds to state.candidateList, persists. The
-             candidate bar atop L1/L2 already renders confirmed candidates as
-             gold-shiny-with-star (drawCandidateBar), so visual update is
-             automatic on the next draw cycle. Also auto-favorites the L2 row
-             in the catalogue (one source of truth: confirmed in candidateList
-             ⇔ favorited star in catalogue). Quentin: "We need a button
-             Promote to candidate (golden) ... appears in the Candidate page
-             and also in the catalogue." -->
-        <button id="l3PromoteCandBtn"
-                title="Promote the current focal L2 to a confirmed candidate. Adds to the candidate list, marks it gold with a ★ on the candidate bar, and appears as a starred row in the Catalogue + on the Candidate Focus page."
-                style="background: linear-gradient(180deg, rgba(245,200,60,0.95), rgba(190,145,25,0.95));
-                       color: #2a1a02; border: 1px solid rgba(140,95,10,0.85);
-                       border-radius: 3px; padding: 3px 10px; font-family: var(--mono);
-                       font-size: 10.5px; cursor: pointer; font-weight: 600;
-                       margin-left: 8px; white-space: nowrap; flex: 0 0 auto;
-                       box-shadow: inset 0 0 6px rgba(255,230,130,0.35);
-                       text-shadow: 0 0 3px rgba(255,250,230,0.5);">★ promote</button>
-        <!-- v3.75: detailed toggle. When active, focal pane reveals the
-             tracked-samples readout (CGA### → g# rows for every watchlist
-             sample). Hidden by default to keep the focal pane compact —
-             tracked samples can take many vertical lines when there are 20+
-             on the watchlist. Persisted via localStorage. -->
+        <!-- 2026-05-21: l3PromoteCandBtn DELETED. It was a duplicate of
+             #promoteCandidateBtn (the working golden promote button wired
+             via sidebar.js / candidates.js). Per dead-button audit Group 5:
+             "duplicate of the working promoteCandidateBtn — delete." -->
+        <!-- 2026-05-21: l3DetailedBtn HIDDEN. The state.l3Detailed slot only
+             participates in the L3 render fingerprint (l3_panel.js#1760)
+             — there's no rendering branch that actually shows the
+             tracked-samples-to-group readout. Wiring the button alone
+             would force a re-render with no visible change. Hide until
+             the rendering branch is implemented. Quentin: "Group 5
+             needs individual judgement." -->
         <button id="l3DetailedBtn"
                 class="l3-more-item"
-                title="Show detailed view: reveals the per-tracked-sample → group readout in the focal pane"
-                style="background: var(--panel-2); color: var(--ink-dim);
-                       border: 1px solid var(--rule); border-radius: 3px;
-                       padding: 3px 10px; font-family: var(--mono);
-                       font-size: 10.5px; cursor: pointer;
-                       margin-left: 8px; white-space: nowrap; flex: 0 0 auto;">detailed</button>
+                style="display: none;"
+                title="(not yet wired) detailed-view rendering branch missing"
+                >detailed</button>
         <!-- v4 turn 6: Show tracked + Clear spotlight buttons. Show tracked
              toggles state.spotlightTrackedAll — when ON, every tracked
              sample gets a label in every L3 mini-PCA pane and its cell in
@@ -1982,17 +2076,21 @@
                                        font-size: 10.5px; cursor: pointer;
                                        margin-left: 8px; white-space: nowrap; flex: 0 0 auto;"
                 title="Pin current L2 as 2nd focal for direct comparison">📌 pin 2nd</button>
-        <!-- v3.94: live dosage heatmap toggle. Opens/closes the docked strip
-             below the L3 contingency. Strip is hidden by default — only
-             useful when dosage_chunks index is loaded. -->
+        <!-- 2026-05-21: dhCursorToggleBtn HIDDEN per Quentin's directive
+             ("live dosage ... must be made floating or move to tooling bc
+             later tooling becomes floating"). The feature itself is real
+             and useful (cursor-tracking ±5-window heatmap), but it
+             doesn't belong in the L3 toolbar — it should land as either:
+               (a) a floating panel users can keep open while scrubbing
+               (b) a tooling-stage page that will become floating later
+             For now, keep the button hidden + leave the renderer
+             (redrawCursorHeatmap in events.js#208) wired. The follow-up
+             port will surface it from the new home. -->
         <button id="dhCursorToggleBtn"
                 class="l3-more-item"
-                title="Toggle live dosage heatmap (±5 windows around cursor). Requires dosage_chunks layer."
-                style="background: var(--panel-2); color: var(--ink-dim);
-                       border: 1px solid var(--rule); border-radius: 3px;
-                       padding: 3px 10px; font-family: var(--mono);
-                       font-size: 10.5px; cursor: pointer;
-                       margin-left: 6px; white-space: nowrap; flex: 0 0 auto;">▦ live dosage</button>
+                style="display: none;"
+                title="(deferred) live dosage view — moving to tooling/floating"
+                >▦ live dosage</button>
         <!-- turn 147 — ⋯ more disclosure. Toggles the secondary
              cluster of L3 controls (color / K-mode / het / L2-sweep /
              G-panel / b.continuity / scale / detailed / spotlights /

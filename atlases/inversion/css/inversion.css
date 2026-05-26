@@ -556,10 +556,6 @@ main#local_pca_dosage { grid-template-rows: 40px        /* ctrlBar */
                                  minmax(160px, 1.6fr)  /* pcaPanel */
                                  minmax(180px, 1.6fr); /* l3Panel */
              overflow: hidden;
-             position: relative; /* 2026-05-24: anchor for #lpdModeBBadge
-                                    (position:absolute, top-right corner).
-                                    Without this the badge anchors to the
-                                    viewport and collides with the header. */
 }
 /* v3.62: free layout mode. main becomes a normal block-flow scrollable
    container, panels stack at their natural / minimum heights, mouse wheel

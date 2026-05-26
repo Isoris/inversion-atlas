@@ -48,11 +48,14 @@ fully shipped: move to `specs_done/` with an `Implemented in:` block.
 | ~~`SPEC_registry_write_and_page_isolation.md`~~ | page-isolation discipline (zero cross-page imports as of commit `4e695f7`; re-grep-confirmed 2026-05-20) | none — the SPEC is companion-not-parallel to `SPEC_registry_v2.md` which already lives in `specs_done/`; both halves accounted for | **ARCHIVED 2026-05-20** — moved to `specs_done/`; mis-categorised as HALF SHIPPED previously |
 | ~~`SPEC_xpehh_per_window_track.md`~~ | `shared/xpehh_per_window.js` (15 exports — schema validator, state I/O, query helpers, outliers, track-header, alignment check) + 1 test + downstream `inversion_classification_axes.js` (XPEHH_SELECTION_SIGNAL axis) | page-8 popstats / ancestry track UI + cluster-side producer — both tracked in the archived SPEC | **ARCHIVED 2026-05-20** — moved to `specs_done/`; compute surface complete with real consumer |
 | `mgl_adapter/` | self-contained spec sub-tree (SPEC_0_master + 10 numbered HANDOFFs + 2 READMEs); per-page consumer pages all ship (HANDOFF_5 → tree_panel, HANDOFF_6 → fingerprint_track, etc. — see page contracts) | full cluster-side producer pipeline + atlas-core promotion | **PARTIAL — library complete, integration in flight** |
+| `SPEC_catalogue_gallery_exports.md` | none | full implementation — 3 dead toolbar buttons (`catExportGallerySVG/PNG/PDF` in `catalogue.html`); SPEC authored 2026-05-21 from dead-button audit Group 3. Reuses `manuscript_bundle.js` candidate-filter pattern. v1 ships Option A summary cards; v1.1 adds sigma chart; v2 adds mini-PCA. | **SPEC ONLY** |
+| `SPEC_catalogue_regime_registry.md` | partial — data layer exists (`shared/regimes_registry.js` + `regime_topology.js`); annotation Layers 1+2 archived as `SPEC_regime_annotation_v34.md`. Pure-compute infrastructure complete. | catalogue-side modal editor + bulk-assign flow — 2 dead toolbar buttons (`catRegimeRegistry`, `catRegimeAssignSel`). SPEC authored 2026-05-21 from dead-button audit Group 3. | **PARTIAL** |
+| `SPEC_catalogue_view_modes.md` | none | 2 dead view-mode buttons (`catViewL1`, `catViewL3` in `catalogue.html`); SPEC authored 2026-05-21 from dead-button audit Group 3. L1 = concord-merged chains; L3 = per-band rows. Reuses existing per-L2 cluster cache + concord helpers. | **SPEC ONLY** |
 
 ### Net audit summary
 
-- **3 SPEC ONLY** (explicit in their status lines): `SPEC_copy_origin_painting`, `SPEC_regime_annotation_v34`, `SPEC_msmc_per_founder_background`
-- **0 PARTIAL** remaining (all PARTIAL entries archived 2026-05-20 with per-slice status matrices)
+- **5 SPEC ONLY** (explicit in their status lines): `SPEC_copy_origin_painting`, `SPEC_regime_annotation_v34`, `SPEC_msmc_per_founder_background`, `SPEC_catalogue_gallery_exports`, `SPEC_catalogue_view_modes`
+- **1 PARTIAL** (data layer ships, UI surface needed): `SPEC_catalogue_regime_registry`
 - **1 AMENDMENT to a parent at `specs_done/`** (`SPEC_inversion_age_atlas_surface_AMENDMENT`) — most prescribed slices still deferred per the parent SPEC's §3 status matrix; AMENDMENT stays in `specs_todo/` until those slices land
 - **1 SUPERSEDED** (`SPEC_registry_v1`)
 - **1 self-contained sub-library** (`mgl_adapter/`) — moves between todo/done as a unit

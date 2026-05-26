@@ -39,6 +39,7 @@ import { persistActiveCandidateId } from '../../shared/active_candidate.js';
 import { ensureChromTracks } from '../../shared/ensure_chrom_tracks.js';
 import { resolve as _registryResolve, getState as _getState } from '../../../../core/atlas_api.js';
 import { probeModeB, renderModeBBadge } from '../../../../core/mode_b_badge.js';
+import { activatePopstatsPanels } from './candidate_focus/_popstats_panels.js';
 import { getMacrostripeIdPerSample } from '../../shared/macrostripe.js';
 
 import { _setActiveState, _pageState } from './candidate_focus/_state.js';
@@ -506,6 +507,14 @@ export async function mount(root, atlasState, registry) {
   _renderCandidateLineageBadge(atlasState, registry).catch((e) => {
     console.warn('candidate_focus.mount: lineage badge probe threw —', e);
   });
+
+  // 2026-05-26: activate the four pop-stats stub panels (θ per band,
+  // heterozygosity per band, Fst Hom1/Hom2, θπ IVGT). Fires after the
+  // candidate has rendered + scrubber_main has bootstrapped (sample IDs
+  // come from state.data.samples). Each panel is fail-soft — server
+  // unreachable → the stub fallback stays in place.
+  try { activatePopstatsPanels(legacyState); }
+  catch (e) { console.warn('candidate_focus.mount: activatePopstatsPanels threw —', e); }
 }
 
 async function _renderCandidateLineageBadge(atlasState, registry) {

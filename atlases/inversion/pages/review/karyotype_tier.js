@@ -100,6 +100,15 @@
 
 import { _pageState, _setActiveState } from './karyotype_tier/_state.js';
 import { renderCandidateNavInline } from '../../shared/candidate_nav.js';
+// 2026-05-21 dead-button audit Group 4: wire the candListPane bulk-action
+// buttons. Pull the canonical list-management helpers from the page that
+// OWNS the candidate list (local_pca_dosage), so import/export/clear go
+// through the same persistCandidateList + addCandidateToList paths users
+// already trust on the discovery scrubber.
+import {
+  candidateToJSON, candidateFromJSON,
+  persistCandidateList, addCandidateToList, makeCandidateId,
+} from '../discovery/local_pca_dosage/candidates.js';
 import { renderTierAxesGrid as _renderTierAxesGrid, TIER_AXES, TIER_GROUPS, tierAxisValueColor } from './karyotype_tier/tier_axes.js';
 import {
   renderKaryotypeBody as _renderCandidateKaryotypeBody,
@@ -483,7 +492,376 @@ export async function mount(root, atlasState, registry) {
   try { renderCandidateKaryotype(); }
   catch (e) { console.warn('karyotype_tier.mount: renderCandidateKaryotype threw —', e); }
 
+  // 2026-05-21 dead-button audit (Group 4): wire the 7 bulk-action
+  // buttons in #candListPane. 4 ship with real handlers (import / export
+  // / clear / bundle); 3 are explicitly disabled with explanatory titles
+  // because they require registry / enrichment schemas not yet shipped.
+  try { _wireCandListActions(root, legacyState, atlasState); }
+  catch (e) { console.warn('karyotype_tier.mount: _wireCandListActions threw —', e); }
+
+  // Same audit: pop-out floating mode for the candidate-management pane.
+  // Detaches #candListPane from the page grid so the user can keep the
+  // bulk-action toolbar visible while navigating to other pages in the
+  // same tab (e.g. promoting on haplotype_regimes). Persists position
+  // + floating state across page mounts.
+  try { _wireCandListPaneFloater(); }
+  catch (e) { console.warn('karyotype_tier.mount: _wireCandListPaneFloater threw —', e); }
+
   if (atlasState.inversion) atlasState.inversion._page4State = legacyState;
+}
+
+// =============================================================================
+// _wireCandListActions — bulk-action toolbar (Group 4 of dead-button audit)
+// =============================================================================
+// 4 of the 7 buttons get real handlers using the discovery scrubber's
+// canonical list-management helpers (persistCandidateList, addCandidateToList,
+// candidateToJSON, candidateFromJSON, makeCandidateId). The remaining 3
+// (registry-export, registry-load, enrichment-import) are explicitly
+// disabled with explanatory titles — they need server-side schemas that
+// haven't shipped. Better to show them dimmed-and-tooltipped than dead.
+// =============================================================================
+function _wireCandListActions(root, state, atlasState) {
+  if (typeof document === 'undefined') return;
+  const $ = (id) => document.getElementById(id);
+
+  // ----- Group 4a: SAFELY WIRED (4 buttons) -----
+
+  // ⬇ export JSON — serialize state.candidateList to JSON + download
+  const exp = $('candListExportBtn');
+  if (exp && exp.dataset.wired !== '1') {
+    exp.addEventListener('click', () => {
+      try {
+        const list = (state && state.candidateList) || [];
+        const arr  = list.map(candidateToJSON).filter(Boolean);
+        const chrom = (state && state.data && state.data.chrom) || 'unknown_chrom';
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const name  = `candidates_${chrom}_${stamp}.json`;
+        _downloadBlob(name, JSON.stringify(arr, null, 2), 'application/json');
+      } catch (e) { console.warn('candListExportBtn:', e); }
+    });
+    exp.dataset.wired = '1';
+  }
+
+  // ⬆ import JSON — pick file → parse → addCandidateToList for each entry
+  const imp = $('candListImportBtn');
+  const impInput = $('candListImportInput');
+  if (imp && impInput && imp.dataset.wired !== '1') {
+    imp.addEventListener('click', () => impInput.click());
+    impInput.addEventListener('change', (ev) => {
+      const f = ev.target.files && ev.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const arr = JSON.parse(reader.result);
+          if (!Array.isArray(arr)) {
+            console.warn('candListImportBtn: file did not contain a JSON array');
+            return;
+          }
+          let added = 0;
+          for (const raw of arr) {
+            const c = candidateFromJSON(raw);
+            if (!c) continue;
+            // makeCandidateId only when the imported entry has no id —
+            // preserves cross-session identity when the user re-imports
+            // their own previous export.
+            if (!c.id) c.id = makeCandidateId();
+            addCandidateToList(state, c);   // dedup'd by id internally
+            added++;
+          }
+          console.log(`[candListImportBtn] imported ${added} of ${arr.length} entries`);
+        } catch (e) { console.warn('candListImportBtn parse:', e); }
+        // Reset so re-importing the same file fires a fresh change event.
+        ev.target.value = '';
+      };
+      reader.readAsText(f);
+    });
+    imp.dataset.wired = '1';
+  }
+
+  // ✕ clear all — confirm + clear + persist
+  const clr = $('candListClearBtn');
+  if (clr && clr.dataset.wired !== '1') {
+    clr.addEventListener('click', () => {
+      const n = (state && state.candidateList && state.candidateList.length) || 0;
+      if (n === 0) return;
+      const chrom = (state && state.data && state.data.chrom) || 'this chromosome';
+      if (typeof window !== 'undefined' && window.confirm
+          && !window.confirm(`Clear all ${n} saved candidates for ${chrom}?`)) return;
+      state.candidateList = [];
+      try { persistCandidateList(state); } catch (e) { console.warn('persistCandidateList:', e); }
+      // Refresh the inline candidate list panel + the karyotype body
+      // (which goes empty when no candidate is active).
+      try { renderCandidateKaryotype(); } catch (_) {}
+    });
+    clr.dataset.wired = '1';
+  }
+
+  // 📝 manuscript bundle — markdown + TSV bundle for paste-into-LLM
+  const bdl = $('candListBundleBtn');
+  if (bdl && bdl.dataset.wired !== '1') {
+    bdl.addEventListener('click', () => {
+      try {
+        const list = (state && state.candidateList) || [];
+        const chrom = (state && state.data && state.data.chrom) || 'unknown_chrom';
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const md  = _buildBundleMarkdown(chrom, list);
+        const tsv = _buildBundleTSV(list);
+        const name = `manuscript_bundle_${chrom}_${stamp}.md`;
+        _downloadBlob(name,
+          md + '\n\n## TSV (paste into a spreadsheet)\n\n```tsv\n' + tsv + '\n```\n',
+          'text/markdown');
+      } catch (e) { console.warn('candListBundleBtn:', e); }
+    });
+    bdl.dataset.wired = '1';
+  }
+
+  // ----- Group 4b: DISABLED WITH EXPLANATION (3 buttons) -----
+  // These three need server-side schemas / cluster artifacts that haven't
+  // shipped. Better to show them as "soon" with the reason in the
+  // tooltip than as dead buttons users click in vain.
+  const _disabled = [
+    ['candListRegistryBtn',
+      'Not yet wired: needs the per-cohort candidate registry schema (SCHEMA §20). ' +
+      'Use ⬇ export JSON for the per-chrom list in the meantime.'],
+    ['loadRegistryBtn',
+      'Not yet wired: needs the multi-file registry loader (sample_groups.tsv, ' +
+      'candidate_intervals.tsv, results_registry/manifest.tsv, evidence_registry/...). ' +
+      'Tracked in registry loader spec.'],
+    ['enrichmentImportBtn',
+      'Not yet wired: needs the enrichment JSON schema (cluster phases 6+: ' +
+      'breakpoints_refined, groups_validated). Load the corresponding raw ' +
+      'JSON via /file/ if you need to inspect it today.'],
+  ];
+  for (const [id, why] of _disabled) {
+    const b = $(id);
+    if (!b) continue;
+    b.disabled = true;
+    b.title = '(not yet wired) ' + why;
+    b.style.opacity = '0.45';
+    b.style.cursor = 'not-allowed';
+  }
+}
+
+// =============================================================================
+// Bundle + download helpers (Group 4 wiring support)
+// =============================================================================
+
+function _downloadBlob(filename, content, mime) {
+  if (typeof document === 'undefined' || typeof URL === 'undefined') return;
+  const blob = new Blob([content], { type: mime || 'application/octet-stream' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // Defer revoke so the browser has time to start the download.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function _buildBundleMarkdown(chrom, list) {
+  const n = list.length;
+  const lines = [];
+  lines.push(`# Candidate inventory — ${chrom}`);
+  lines.push('');
+  lines.push(`${n} candidate${n === 1 ? '' : 's'} saved as of ` +
+             new Date().toISOString());
+  lines.push('');
+  if (n === 0) {
+    lines.push('_No candidates saved on this chromosome._');
+    return lines.join('\n');
+  }
+  lines.push('## Summary');
+  lines.push('');
+  lines.push('| # | id | chrom | start (Mb) | end (Mb) | span (Mb) | K | source | confirmed |');
+  lines.push('|---|----|-------|-----------:|---------:|----------:|--:|--------|:---------:|');
+  list.forEach((c, i) => {
+    const startMb = Number.isFinite(c.start_bp) ? (c.start_bp / 1e6).toFixed(2) : '?';
+    const endMb   = Number.isFinite(c.end_bp)   ? (c.end_bp   / 1e6).toFixed(2) : '?';
+    const span    = (Number.isFinite(c.start_bp) && Number.isFinite(c.end_bp))
+      ? ((c.end_bp - c.start_bp) / 1e6).toFixed(2) : '—';
+    const src = c.source || '—';
+    const conf = c.confirmed ? '✓' : '';
+    lines.push(`| ${i + 1} | ${c.id || '?'} | ${c.chrom || '?'} | ${startMb} | ${endMb} | ${span} | ${c.K | 0} | ${src} | ${conf} |`);
+  });
+  return lines.join('\n');
+}
+
+// =============================================================================
+// _wireCandListPaneFloater — pop-out floating mode for #candListPane
+// =============================================================================
+// Injects a 📌 toggle into the candListPane header. Click → flip
+// `data-floating="1"` on the aside + style it as `position: fixed` so
+// the user can drag it around. Position + floating state persist in
+// localStorage. Drag handle = the .cand-list-head element (cursor:grab).
+//
+// Pattern mirrors atlas-core/core/sidebar_floating.js (same LS shape:
+// {left, top}) but scoped to this one aside instead of the generic
+// `.wrap > aside`. We don't reuse sidebar_floating.js directly because
+// it queries a different DOM tree. If a future audit identifies a
+// second aside that wants the same behaviour, the right call is to
+// parameterise sidebar_floating to accept a custom aside selector + LS
+// key namespace; for now, a 60-line local wirer is the right size.
+// =============================================================================
+
+const _CL_FLOAT_LS_MODE = 'atlas.candListFloat.mode';   // 'docked' | 'floating'
+const _CL_FLOAT_LS_POS  = 'atlas.candListFloat.pos';    // JSON {left, top}
+
+function _wireCandListPaneFloater() {
+  if (typeof document === 'undefined') return;
+  const aside = document.getElementById('candListPane');
+  if (!aside) return;
+  const head  = aside.querySelector('.cand-list-head');
+  if (!head) return;
+
+  _ensureCandListFloatCss();
+
+  // Inject the toggle button into the header once per aside instance.
+  let btn = document.getElementById('candListFloatBtn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'candListFloatBtn';
+    btn.type = 'button';
+    btn.title = 'Detach the candidate-management pane so you can keep ' +
+                'it open while working in another tab. Drag the header to ' +
+                'reposition. Click again to re-dock.';
+    btn.textContent = '📌';
+    btn.style.cssText =
+      'margin-left: auto; padding: 1px 6px; font-size: 11px; ' +
+      'background: transparent; border: 1px solid var(--rule); ' +
+      'border-radius: 3px; color: var(--ink-dim); cursor: pointer;';
+    head.appendChild(btn);
+  }
+
+  // Restore persisted mode + position on every mount.
+  const mode = _clReadMode();
+  _clApplyMode(aside, mode);
+  btn.textContent = (mode === 'floating') ? '📍' : '📌';
+
+  if (btn.dataset.wired !== '1') {
+    btn.dataset.wired = '1';
+    btn.addEventListener('click', () => {
+      const next = (aside.dataset.floating === '1') ? 'docked' : 'floating';
+      _clWriteMode(next);
+      _clApplyMode(aside, next);
+      btn.textContent = (next === 'floating') ? '📍' : '📌';
+    });
+  }
+  if (head.dataset.dragWired !== '1') {
+    _clInstallDrag(aside, head);
+    head.dataset.dragWired = '1';
+  }
+}
+
+function _ensureCandListFloatCss() {
+  if (document.getElementById('candListFloatCss')) return;
+  const style = document.createElement('style');
+  style.id = 'candListFloatCss';
+  style.textContent = `
+    #candListPane[data-floating="1"] {
+      position: fixed;
+      z-index: 9000;
+      width: 320px;
+      max-height: 80vh;
+      overflow: auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px var(--accent, #f5a524);
+      background: var(--bg-card, #161a22);
+      border-radius: 4px;
+    }
+    #candListPane[data-floating="1"] .cand-list-head { cursor: grab; }
+    #candListPane[data-floating="1"] .cand-list-head:active { cursor: grabbing; }
+  `;
+  document.head.appendChild(style);
+}
+
+function _clReadMode() {
+  try {
+    return localStorage.getItem(_CL_FLOAT_LS_MODE) === 'floating'
+      ? 'floating' : 'docked';
+  } catch (_) { return 'docked'; }
+}
+
+function _clWriteMode(mode) {
+  try { localStorage.setItem(_CL_FLOAT_LS_MODE, mode); } catch (_) {}
+}
+
+function _clApplyMode(aside, mode) {
+  if (mode === 'floating') {
+    aside.dataset.floating = '1';
+    // Apply persisted position, defaulting to top-right if absent or off-screen.
+    let pos = null;
+    try { pos = JSON.parse(localStorage.getItem(_CL_FLOAT_LS_POS) || 'null'); }
+    catch (_) {}
+    const ww = window.innerWidth  || 1200;
+    const wh = window.innerHeight || 800;
+    let left = (pos && Number.isFinite(pos.left)) ? pos.left : (ww - 340);
+    let top  = (pos && Number.isFinite(pos.top))  ? pos.top  : 80;
+    // Off-screen guard (window resized between sessions).
+    if (left < 0 || left > ww - 60) left = ww - 340;
+    if (top  < 0 || top  > wh - 60) top  = 80;
+    aside.style.left = left + 'px';
+    aside.style.top  = top + 'px';
+  } else {
+    aside.dataset.floating = '';
+    aside.style.left = '';
+    aside.style.top  = '';
+  }
+}
+
+function _clInstallDrag(aside, head) {
+  let dragging = false;
+  let dx = 0, dy = 0;
+  head.addEventListener('pointerdown', (ev) => {
+    if (aside.dataset.floating !== '1') return;
+    // Don't start drag on the toggle button itself or other interactives.
+    if (ev.target && ev.target.closest('button, input, select, a')) return;
+    dragging = true;
+    const r = aside.getBoundingClientRect();
+    dx = ev.clientX - r.left;
+    dy = ev.clientY - r.top;
+    try { head.setPointerCapture(ev.pointerId); } catch (_) {}
+  });
+  head.addEventListener('pointermove', (ev) => {
+    if (!dragging) return;
+    const left = Math.max(0, Math.min(window.innerWidth  - 60, ev.clientX - dx));
+    const top  = Math.max(0, Math.min(window.innerHeight - 60, ev.clientY - dy));
+    aside.style.left = left + 'px';
+    aside.style.top  = top + 'px';
+  });
+  const _release = (ev) => {
+    if (!dragging) return;
+    dragging = false;
+    try { head.releasePointerCapture(ev.pointerId); } catch (_) {}
+    // Persist the final position.
+    try {
+      const r = aside.getBoundingClientRect();
+      localStorage.setItem(_CL_FLOAT_LS_POS,
+        JSON.stringify({ left: Math.round(r.left), top: Math.round(r.top) }));
+    } catch (_) {}
+  };
+  head.addEventListener('pointerup',     _release);
+  head.addEventListener('pointercancel', _release);
+}
+
+function _buildBundleTSV(list) {
+  const headers = ['idx', 'id', 'chrom', 'start_bp', 'end_bp', 'span_bp', 'K',
+                   'source', 'confirmed', 'ref_window', 'notes'];
+  const rows = [headers.join('\t')];
+  list.forEach((c, i) => {
+    const span = (Number.isFinite(c.start_bp) && Number.isFinite(c.end_bp))
+      ? (c.end_bp - c.start_bp) : '';
+    const row = [
+      i + 1, c.id || '', c.chrom || '',
+      c.start_bp ?? '', c.end_bp ?? '', span,
+      c.K | 0, c.source || '', c.confirmed ? '1' : '0',
+      c.ref_window ?? '',
+      (c.notes || '').replace(/[\t\r\n]/g, ' '),
+    ];
+    rows.push(row.join('\t'));
+  });
+  return rows.join('\n');
 }
 
 /**

@@ -412,13 +412,11 @@
     "candidate_karyotype_per_sample": {
       "tier": "warm",
       "preload_on": "candidate_change",
-      "disabled": true,
-      "_disabled_reason": "2026-05-26: analysis/karyotype_assignment.js is TODO (see analysis/README.md). Disabled to silence 404s on every candidate_change; re-enable once the analysis module is implemented.",
       "source": "analysis",
       "analysis": "analysis/karyotype_assignment.js#assignKaryotypes",
       "schema": "schemas/karyotype_assignment.schema.json",
       "cache_key": "kar:{candidate_id}",
-      "_doc": "Per-sample HOM_REF/HET/HOM_INV assignment derived from local PCA on dosage. Browser-side compute (k-means + Hungarian + purity threshold). Cached because used by mendelian, by per-sample lines panel, by marker assay design. NOT the file-cached candidate_final_class \u2014 that's the manuscript-frozen version; this is the live per-session compute."
+      "_doc": "Per-sample HOM_REF/HET/HOM_INV/AMBIGUOUS assignment derived from local PCA on dosage. Browser-side compute (k-means K=3 on PC1/PC2 across the candidate's slab + per-sample purity gate; sort-by-PC1 maps label 0/1/2 to HOM_REF/HET/HOM_INV). Cached because used by mendelian, by per-sample lines panel, by marker assay design. NOT the file-cached candidate_final_class \u2014 that's the manuscript-frozen version; this is the live per-session compute. 2026-05-26 RE-ENABLED \u2014 analysis module at atlases/inversion/analysis/karyotype_assignment.js is a shim re-exporting from atlases/popstats/analysis/karyotype_assignment.js."
     },
     "mendelian_test": {
       "tier": "warm",
@@ -426,17 +424,15 @@
       "analysis": "analysis/mendelian.js#runMendelianTest",
       "schema": "schemas/mendelian_test.schema.json",
       "cache_key": "mendelian:{candidate_id}",
-      "_doc": "Mendelian inheritance test for the candidate inversion across cohort trios. Inputs: candidate_karyotype_per_sample, cohort_relatedness. Browser-side; results cached so flipping pages doesn't recompute. See analysis/mendelian.js."
+      "_doc": "Mendelian inheritance test for the candidate inversion across cohort trios. Inputs: candidate_karyotype_per_sample, cohort_relatedness. Browser-side; results cached so flipping pages doesn't recompute. The analysis module at atlases/inversion/analysis/mendelian.js is a shim that re-exports from atlases/popstats/analysis/mendelian.js (the canonical implementation co-located with mendelian_inheritance.js orchestrator). 2026-05-26 RE-ENABLED — _findTrios now implemented + tested. Disabled blocker: candidate_karyotype_per_sample (still TODO, see analysis/README.md). Once that lands this layer becomes resolvable end-to-end."
     },
     "trio_inventory": {
       "tier": "warm",
       "preload_on": "page_mount",
-      "disabled": true,
-      "_disabled_reason": "2026-05-26: analysis/trio_finder.js is TODO (see analysis/README.md). Disabled to silence 404s on every page mount; re-enable once the analysis module is implemented.",
       "source": "analysis",
-      "analysis": "analysis/trio_finder.js#findTrios",
+      "analysis": "analysis/trio_finder.js#findCohortTrios",
       "cache_key": "trios:1st_degree",
-      "_doc": "List of (father, mother, offspring) trios in the cohort, derived from cohort_relatedness. Cached once at startup; reused by mendelian, by linkage analysis, by inheritance-pattern visualizations."
+      "_doc": "List of (father, mother, offspring) trios in the cohort, derived from cohort_relatedness. Cached once at startup; reused by mendelian, by linkage analysis, by inheritance-pattern visualizations. 2026-05-26 RE-ENABLED — analysis module at atlases/inversion/analysis/trio_finder.js is a shim re-exporting from atlases/popstats/analysis/trio_finder.js#findCohortTrios. Default threshold = '1st_degree' (permissive); pass ctx.relatedness_threshold='parent_offspring' for strict mode. See popstats/analysis/mendelian.js findTrios for the algorithm + known 3-gen limitation."
     },
     "_doc_relatedness_block": "==== Relatedness domain (Mode B \u2014 raw folder interface) \u2014 see data/relatedness/README.md ====",
     "relatedness_ngsrelate": {

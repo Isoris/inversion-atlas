@@ -498,28 +498,28 @@ export function candidateRichCardHtml(c) {
           title: 'θ per band',
           subtitle: 'nucleotide diversity per K-means cluster',
           dataReady: false,
-          dataNote: 'needs --track_theta_per_band from C++ pop-stats engine (LANTA)',
+          dataNote: 'loading from popstats server (/api/popstats/groupwise · metric: theta_pi)…',
         })}
         ${candidatePanelStubHtml({
           id: 'cp-het',
           title: 'heterozygosity per band',
           subtitle: 'mean per-sample H grouped by band',
           dataReady: false,
-          dataNote: 'needs --track_h_persample from pop-stats engine',
+          dataNote: 'loading from popstats server (/api/popstats/hobs_groupwise)…',
         })}
         ${candidatePanelStubHtml({
           id: 'cp-fst',
           title: 'Fst Hom1 vs Hom2',
           subtitle: 'between-arrangement Fst (excludes het band)',
           dataReady: false,
-          dataNote: 'needs --track_fst_K1K3 (with K1=Hom1, K3=Hom2) from pop-stats engine',
+          dataNote: 'loading from popstats server (/api/popstats/groupwise · metric: fst · groups: Hom1, Hom2)…',
         })}
         ${candidatePanelStubHtml({
           id: 'cp-thetapi',
           title: 'θπ IVGT',
           subtitle: 'pairwise diversity for inverted vs standard arrangements',
           dataReady: false,
-          dataNote: 'needs --track_pi_arrangement from pop-stats engine',
+          dataNote: 'loading from popstats server (/api/popstats/groupwise · metric: theta_pi · groups: INV, STD)…',
         })}
       </div>
     </div>

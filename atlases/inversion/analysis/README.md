@@ -86,11 +86,11 @@ named export with `(reg, ctx)`.
 
 | File | Status | Purpose |
 |---|---|---|
-| `mendelian.js` | partial — chi-sq + p-value need finishing | Mendelian inheritance test across trios |
-| `karyotype_assignment.js` | TODO | Per-sample HOM_REF/HET/HOM_INV from local PCA |
-| `trio_finder.js` | TODO | Identify (father, mother, offspring) from relatedness |
+| `mendelian.js` | shim → popstats | Re-exports `runMendelianTest` from `atlases/popstats/analysis/mendelian.js`. Chi-sq + p-value + `findTrios` all implemented (2026-05-26). End-to-end Mendelian pipeline now resolves: candidate → karyotypes → trios → chi-sq → verdict. |
+| `karyotype_assignment.js` | shim → popstats | Re-exports `assignKaryotypes` from `atlases/popstats/analysis/karyotype_assignment.js` (2026-05-26). K-means K=3 on per-sample mean (PC1, PC2) across the candidate's slab; centroids auto-sorted by PC1; per-sample purity gates AMBIGUOUS calls. Supports `ctx.invert_orientation` for candidates whose PC1 sign is flipped vs reference. |
+| `trio_finder.js` | shim → popstats | Re-exports `findCohortTrios` from `atlases/popstats/analysis/trio_finder.js` (2026-05-26). Thin analysis-shape wrapper around `findTrios` (the public export from mendelian.js); resolves cohort_relatedness via the registry, writes back to warm cache so siblings hit cache. |
 | `linkage.js` | future | Linkage of inversion karyotype with phenotype |
-| `purity_score.js` | future | Per-cluster purity (uses `purity_threshold = 0.80`) |
+| `purity_score.js` | future | Per-cluster purity (uses `purity_threshold = 0.80`). NB: karyotype_assignment.js already returns per-sample purity-derived AMBIGUOUS flags; this module would expose the raw scalar purity values for downstream visualisations. |
 
 ## Anti-patterns (don't do these)
 

@@ -55,7 +55,8 @@
       "id": "sv_evidence",
       "slug": "sv_evidence",
       "label": "SV evidence",
-      "stage": "discovery",
+      "stage": "tooling",
+      "_stage_moved_2026_05_21": "Was 'discovery'; relocated to 'tooling' per Quentin — SV-call inspection is conceptually a per-candidate validation cartridge, not a discovery surface. Sits alongside tree_panel / fingerprint_track / similarity_matrix / pca_scatter_per_window / dosage_heatmap / nested_inversion_detector / dosage_cluster_adaptive_k as an inspector that helps characterise a candidate. The 'discovery' stage's _doc previously billed it as a 'last-step validation' page, but the validation framing fits 'tooling' better since SV evidence is opened ON DEMAND per candidate rather than walked through linearly with the other discovery pages.",
       "fragment": "atlases/inversion/pages/review/sv_evidence.html",
       "module": "atlases/inversion/pages/review/sv_evidence.js",
       "_was_id": "page_sv_evidence"
@@ -289,13 +290,13 @@
       "id": "discovery",
       "label": "discovery",
       "order": 1,
-      "_doc": "End-to-end discovery: |z|-based local-PCA detection, per-candidate deep-dive, haplotype regimes, cross-evidence PCA comparator, and the final-step candidate validation (boundary refinement + SV evidence). Merged from 'discovery 1' + 'discovery 2' on 2026-05-20 — the two-stage split was a legacy artifact; a single discovery stage matches the actual workflow (find → focus → refine → validate). Pages: local_pca_dosage (find), candidate_focus (focus), haplotype_regimes (regimes), pca_comparator (cross-axis check), boundary_refinement (last-step: where exactly does it start/end), sv_evidence (last-step: do SV callers agree). Per-window summary table + negative regions catalogue live in 'catalogue'. Utility / inspector cartridges (tree panel, fingerprint track, similarity matrix, PCA scatter, dosage heatmap, nested detector, dosage cluster) live in 'tooling'."
+      "_doc": "End-to-end discovery: |z|-based local-PCA detection, per-candidate deep-dive, haplotype regimes, cross-evidence PCA comparator, and the final-step boundary refinement. Merged from 'discovery 1' + 'discovery 2' on 2026-05-20 — the two-stage split was a legacy artifact; a single discovery stage matches the actual workflow (find → focus → refine). Pages: local_pca_dosage (find), candidate_focus (focus), haplotype_regimes (regimes), pca_comparator (cross-axis check), boundary_refinement (last-step: where exactly does it start/end). 2026-05-21: sv_evidence moved to 'tooling' (per-candidate inspector cartridge, not a linear discovery step). Per-window summary table + negative regions catalogue live in 'catalogue'. Utility / inspector cartridges (tree panel, fingerprint track, similarity matrix, PCA scatter, dosage heatmap, nested detector, dosage cluster, SV evidence) live in 'tooling'."
     },
     {
       "id": "tooling",
       "label": "tooling",
       "order": 2.5,
-      "_doc": "Utility / inspector cartridges. Open these to characterise a candidate, debug a layer, or compare evidence axes. Distinct from discovery_2's workflow pages. Pages currently in this stage: tree_panel, fingerprint_track, similarity_matrix, pca_scatter_per_window, dosage_heatmap, nested_inversion_detector, dosage_cluster_adaptive_k (re-staged from discovery_2 on 2026-05-16 per AUDIT_local_pca_merge_vs_rename.md §Q3). Future additions: page_pca_comparator (per SPEC_local_pca_comparator.md). Atlas-core shell may render this stage as a vertical sidebar rather than horizontal pills — that's a shell-side change tracked separately."
+      "_doc": "Utility / inspector cartridges. Open these to characterise a candidate, debug a layer, or compare evidence axes. Distinct from discovery_2's workflow pages. Pages currently in this stage: tree_panel, fingerprint_track, similarity_matrix, pca_scatter_per_window, dosage_heatmap, nested_inversion_detector, dosage_cluster_adaptive_k (re-staged from discovery_2 on 2026-05-16 per AUDIT_local_pca_merge_vs_rename.md §Q3), sv_evidence (re-staged from discovery on 2026-05-21 — SV-call inspection is a per-candidate validation cartridge). Future additions: page_pca_comparator (per SPEC_local_pca_comparator.md). Atlas-core shell may render this stage as a vertical sidebar rather than horizontal pills — that's a shell-side change tracked separately."
     },
     {
       "id": "catalogue",

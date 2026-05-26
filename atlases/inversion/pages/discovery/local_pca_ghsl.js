@@ -1,55 +1,30 @@
-// Atlas/inversion_discovery/local_pca_ghsl.js
+// atlases/inversion/pages/discovery/local_pca_ghsl.js
 // =============================================================================
-// local_pca_ghsl — GHSL haplotype-divergence page (planned six-panel scanner; currently
-//          empty-state with layer-status indicators only)
-// (`<div id="local_pca_ghsl">` — empty-state shell with five [data-gh-layer]
-//  indicator chips: ghsl_panel, ghsl_kstripes, ghsl_karyotype_runs,
-//  ghsl_d17_envelopes, cusum_ghsl)
+// 2026-05-26: GHSL panel-renderer module. NOT a page.
 //
-// Source: legacy/Inversion_atlas.html lines 7180-7247 (HTML shell) + lines
-// 53065-53081 (the one extracted helper _refreshGhslLayerStatus).
+// `_refreshGhslLayerStatus` (line 84) is consumed by local_pca_dosage.js
+// — it toggles the five `[data-gh-layer]` indicator chips between
+// "🟢 loaded" / "⚪ not loaded" based on `state.layersPresent`.
 //
-// Same orthogonal-validation rationale as local_pca_theta_pi (θπ scanner): local_pca_ghsl is
-// designed as a third evidence axis — GHSL haplotype divergence — that
-// will eventually run the same six-panel pipeline (per-window analysis →
-// window×window similarity → MDS → cluster → candidate intervals) but
-// driven by haplotype-pair sequence divergence rather than dosage (local_pca_dosage)
-// or per-sample θπ (local_pca_theta_pi). Regions hit by all three scrubbers are
-// near-certainly real biology; regions hit by GHSL only are
-// haplotype-specific divergence invisible to dosage-or-diversity scans.
+// The remaining 6 underscore-prefixed exports (`_refreshGhslPanelVisibility`,
+// `_renderGhslCtrlBar`, `_drawGhslMeanStrip`, `_drawGhslHeatmap`,
+// `_drawGhslLines`, `_renderGhslSampleTable`) are scaffolding for a
+// future standalone GHSL scanner — no current importer. They render
+// the documented `ghsl_panel` / `ghsl_kstripes` data shapes (via the
+// `shared/ghsl_panel.js` accessors); none of them invent data.
 //
-// Round-5-step-15 status: local_pca_ghsl currently ships only the layer-status
-// indicator wiring. The five [data-gh-layer] chips toggle between
-// "🟢 loaded" and "⚪ not loaded" based on whether each GHSL layer is
-// present in state.layersPresent (a Set). Empty-state placeholder visible
-// until at least one of the GHSL layers ships from the R pipeline; full
-// six-panel renderers (mirroring local_pca_dosage's drawZ/drawSim/drawLinesPanel/
-// drawAnchorStrip/drawPca/drawL3) are TODO_MISSING — see CONTINUE_HERE
-// "stub-preserving + one wired entry" pattern.
+// The file used to also carry a mount/unmount/_buildLegacyState
+// lifecycle + non-underscore alias wrappers for atlas_router; both
+// were removed (the page-id was never registered in manifest.json so
+// the router couldn't reach the mount, and no external importer
+// referenced the aliases). The accompanying .html fragment was
+// deleted in the same pass.
 //
-// External dependencies (when wired up):
-//   TODO_MISSING(_drawGhslZPanel + 5 sibling panel renderers) — six-panel
-//                                  pipeline mirroring local_pca_dosage / local_pca_theta_pi.
-//   TODO_MISSING(_refreshGhslPanelVisibility) — empty-state vs panels
-//                                  visibility toggle (mirrors local_pca_theta_pi's
-//                                  _refreshThetaPiPanelVisibility).
-//   global `state`              — the chat-33 helper reads
-//                                  state.layersPresent (Set<layerName>);
-//                                  future panel renderers will read the
-//                                  per-window GHSL data slots once they
-//                                  ship from R.
-//
-// Decision for this round (chat 38 round 5 step 15, 2026-05-07): preserve
-// the chat-33 _refreshGhslLayerStatus body VERBATIM (it already takes
-// state as an explicit arg per HANDOFF_BATCH_1 convention), add a
-// state-aware public wrapper refreshGhslLayerStatus that mirrors confirmed_carousel's
-// refreshConfirmedCarousel pattern, and call it from mount() so the chips
-// render at mount time. This is the "stub-preserving + one wired entry"
-// hybrid pattern (pattern 4 in CONTINUE_HERE, first instance).
-//
-// **Closing the discovery group**: with this round, local_pca_dosage, candidate_focus, window_summary_table,
-// local_pca_theta_pi, local_pca_ghsl, negative_regions are all migrated — discovery group is COMPLETE
-// (6 of 6).
+// Orthogonal-validation rationale for the planned scanner: regions
+// hit by all three discovery axes (dosage local_pca_dosage + θπ
+// local_pca_theta_pi + GHSL local_pca_ghsl) are near-certainly real
+// biology; regions hit by GHSL only are haplotype-specific divergence
+// invisible to dosage-or-diversity scans.
 // =============================================================================
 
 // 2026-05-15: panel renderers consume the documented ghsl_panel +

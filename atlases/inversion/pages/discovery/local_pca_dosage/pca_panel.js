@@ -746,6 +746,10 @@ export function drawPCA(state) {
       && state.selectionGroup.ids.length && _pcaScreenXY) {
     _drawSelectionHalo(ctx, state.selectionGroup.ids, _pcaScreenXY);
   }
+  // 2026-05-26: keep the lasso action-bar (#pcaLassoBar) visibility +
+  // badge in sync with state.selectionGroup. Cheap (just a display
+  // toggle + textContent write).
+  try { refreshLassoActionBar(state); } catch (_) {}
   // 2026-05-20: K-cluster colour legend. User: "can we get a scale or
   // smth to know a bit our colors correspond to what in the tracked
   // samples pca". Renders a small chip row at the top-right of the
@@ -1718,12 +1722,35 @@ export function attachPcaLasso(state) {
     let n = 1, name;
     do { name = 'lasso_' + n++; } while (groups.some(g => g.name === name) && n < 1000);
     const g = addToManualGroup(name, samples);
-    if (g && st.colorMode !== 'manual') {
-      // Flip to manual mode so user immediately sees the result of the lasso
-      st.colorMode = 'manual';
-      const bar = document.querySelectorAll('#colorModeBar button');
-      bar.forEach(b => b.classList.toggle('active', b.dataset.mode === 'manual'));
-      drawPCA(st);
+    // 2026-05-26: NO LONGER force-flip colorMode to 'manual'. Previously
+    // the lasso hijacked the user's color preference (family / kmeans /
+    // het / dosage) and dropped every non-lassoed sample to muted grey —
+    // a confusing side-effect that hid the very signal the user picked
+    // their color mode to see. The lassoed samples are still added to
+    // a manual group + visible in the tracked list; switching to 'manual'
+    // coloring is the user's choice via the color-mode picker.
+    //
+    // 2026-05-26 (later): also stash the lassoed sample ids on
+    // state.selectionGroup so the amber halo overlay (rendered after
+    // drawPCA's main loop, line ~747) fires and gives the user an
+    // immediate visual confirmation of WHICH samples got lassoed —
+    // independent of color mode. The halo is transient; it gets
+    // replaced by the next lasso, or cleared by the U-key selection
+    // mode toggle. The persistent manual_group stays in state.manualGroups
+    // for later use via the ▾ popup's manual-groups list.
+    if (g) {
+      st.selectionGroup = {
+        ids:           samples.slice(),
+        source_atlas:  'inversion',
+        source_page:   'local_pca_dosage',
+        source_window: (st.cur | 0),
+        source_chrom:  (st.data && st.data.chrom) || null,
+        ts:            Date.now(),
+        manual_group_name: name,   // breadcrumb back to the persisted group
+      };
+      // Re-render so the new manual group entry appears in the manual-groups
+      // list, the tracked-aside count refreshes, and the halo paints.
+      try { drawPCA(st); } catch (_) {}
       try { renderL3Panel(st); } catch (_) {}
       try { drawLinesPanel(st); } catch (_) {}
     }
@@ -1732,8 +1759,100 @@ export function attachPcaLasso(state) {
   canvas.addEventListener('pointercancel', endDrag);
   // Hint the user that Shift activates lasso — title attribute on the canvas
   if (!canvas.title) {
-    canvas.title = 'Click to track a sample · Shift+drag to lasso into a new manual group · checkbox in tracked-samples panel = lasso into tracked';
+    canvas.title = [
+      'Click a sample → add/remove from tracked list',
+      'Shift+drag a rectangle → lasso a new manual group (amber halo shows what was selected; colour mode stays the same)',
+      'Lasso toggle (▾ popup) → plain drag becomes a tracked-samples lasso instead of a manual-group lasso',
+    ].join('\n');
   }
+
+  // 2026-05-26: wire #pcaLassoBar quick-action buttons. Idempotent via
+  // dataset.wired so re-mount doesn't double-bind. The bar is shown/hidden
+  // by _refreshLassoBar (called from drawPCA's post-pass) based on whether
+  // state.selectionGroup is non-empty.
+  _wireLassoBarHandlers();
+}
+
+// =============================================================================
+// 2026-05-26: lasso action-bar visibility + handlers
+// =============================================================================
+// The #pcaLassoBar is hidden by default. It becomes visible (display: flex)
+// whenever state.selectionGroup.ids has entries — the amber halo on the
+// scatter is what visually marks the selection; this bar gives the user
+// quick actions on it (Track / +Track / Clear) without navigating to the
+// ▾ popup's manual-groups list.
+export function refreshLassoActionBar(state) {
+  if (typeof document === 'undefined' || !document.getElementById) return;
+  const bar = document.getElementById('pcaLassoBar');
+  if (!bar) return;
+  const sg = state && state.selectionGroup;
+  const n = (sg && Array.isArray(sg.ids)) ? sg.ids.length : 0;
+  if (n > 0) {
+    bar.style.display = 'flex';
+    const badge = document.getElementById('pcaLassoBadge');
+    if (badge) {
+      const groupName = sg.manual_group_name;
+      badge.textContent = groupName
+        ? `${n} selected · ${groupName}`
+        : `${n} selected`;
+    }
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function _wireLassoBarHandlers() {
+  if (typeof document === 'undefined' || !document.getElementById) return;
+  const trackBtn   = document.getElementById('pcaSelToTrackedBtn');
+  const addBtn     = document.getElementById('pcaSelAddToTrackedBtn');
+  const clearBtn   = document.getElementById('pcaSelClearBtn');
+  // Idempotent — re-mount won't double-bind.
+  if (trackBtn && trackBtn.dataset.wired !== '1') {
+    trackBtn.dataset.wired = '1';
+    trackBtn.addEventListener('click', () => {
+      const st = _pageState;
+      if (!st || !st.selectionGroup || !st.selectionGroup.ids) return;
+      const cap = Math.max(1, st.trackedN | 0);
+      st.tracked = st.selectionGroup.ids.slice(0, cap);
+      if (st.selectionGroup.ids.length > cap) {
+        st.trackedN = Math.min(50, st.selectionGroup.ids.length);
+      }
+      _afterSelectionAction(st);
+    });
+  }
+  if (addBtn && addBtn.dataset.wired !== '1') {
+    addBtn.dataset.wired = '1';
+    addBtn.addEventListener('click', () => {
+      const st = _pageState;
+      if (!st || !st.selectionGroup || !st.selectionGroup.ids) return;
+      const cap = Math.max(1, st.trackedN | 0);
+      const seen = new Set(st.tracked || []);
+      const merged = (st.tracked || []).slice();
+      for (const si of st.selectionGroup.ids) {
+        if (merged.length >= cap) break;
+        if (!seen.has(si)) { seen.add(si); merged.push(si); }
+      }
+      st.tracked = merged;
+      _afterSelectionAction(st);
+    });
+  }
+  if (clearBtn && clearBtn.dataset.wired !== '1') {
+    clearBtn.dataset.wired = '1';
+    clearBtn.addEventListener('click', () => {
+      const st = _pageState;
+      if (!st) return;
+      st.selectionGroup = null;
+      _afterSelectionAction(st);
+    });
+  }
+}
+
+function _afterSelectionAction(st) {
+  try {
+    if (typeof renderTrackedList === 'function') renderTrackedList(st);
+  } catch (_) {}
+  try { drawPCA(st); } catch (_) {}
+  try { refreshLassoActionBar(st); } catch (_) {}
 }
 
 // =============================================================================

@@ -971,6 +971,112 @@ export function _exportBreedingCardsJSON(opts) {
   return _breedingExportTrigger(blob, fname);
 }
 
+// --- _exportInversionKaryotypesTSV — 2026-05-26 ---
+//
+// Long-format karyotype matrix export, in the schema the relatedness
+// atlas's mendelian / karyotypes / inversions pages expect:
+//
+//   sample_id   inversion_id   karyotype   quality
+//   CGA0001     LG01_inv_3     0/0         high
+//   CGA0001     LG02_inv_1     0/1         high
+//   CGA0002     LG01_inv_3     NA          low
+//
+// Karyotype mapping (from _breedingCardKaryotypePerSample's labels):
+//   HOM_REF              → 0/0   quality=high
+//   HET                  → 0/1   quality=high
+//   HOM_INV              → 1/1   quality=high
+//   HOM (ambiguous role) → NA    quality=low  — single HOM band, no REF/INV direction
+//   HOM_MID              → NA    quality=low  — multi-haplotype, not a clean call
+//   null / unclassified  → NA    quality=low
+//
+// Inversion id: prefer candidate.id when set, otherwise synthesize
+// `<chrom>_<start_mb>_<end_mb>_<K>` so consumer IDs are stable across
+// runs even on candidates that haven't been named yet.
+//
+// Consumed by relatedness-atlas via
+//   shared/loaders/inversion_karyotypes.js → loadInversionKaryotypes()
+// which is fed by the `inversion_karyotypes` registry layer. The
+// mendelian.js page's Mode-B probe pulls this same matrix to run
+// dyad/triad tests against real karyotypes instead of DEMO data.
+export function _exportInversionKaryotypesTSV(opts) {
+  const _opts = opts || {};
+  const _state = _pageState;
+  if (!_state || !_state.data || !Array.isArray(_state.data.samples)) {
+    if (typeof alert === 'function') {
+      alert('Karyotype TSV export: no chromosome loaded.');
+    }
+    return false;
+  }
+  const samples = _state.data.samples;
+  const allCands = Array.isArray(_state.candidateList) ? _state.candidateList.slice() : [];
+  const tierMode = _opts.tierMode || 'tier_1_2';
+  const fr = _filterCandsForBreedingExport(allCands, tierMode);
+  if (fr.kept.length === 0) {
+    const reason = (allCands.length === 0)
+      ? 'No saved candidates on this chromosome. Promote at least one candidate first.'
+      : 'No candidates matched the active tier filter (' + fr.mode + '). ' +
+        'Saved: ' + allCands.length + '. ' +
+        'Try changing the tier dropdown to "all" or "tier_1_2_3".';
+    if (typeof alert === 'function') alert(reason);
+    return false;
+  }
+
+  const KAR_MAP = {
+    HOM_REF: { kt: '0/0', q: 'high' },
+    HET:     { kt: '0/1', q: 'high' },
+    HOM_INV: { kt: '1/1', q: 'high' },
+    HOM:     { kt: 'NA',  q: 'low'  },  // ambiguous-role single HOM
+    HOM_MID: { kt: 'NA',  q: 'low'  },  // multi-haplotype
+  };
+  const FALLBACK = { kt: 'NA', q: 'low' };
+
+  const chrom = (_state.data.chrom) || 'cohort';
+  const rows = ['sample_id\tinversion_id\tkaryotype\tquality\tchromosome\tnotes'];
+  let n_emit = 0, n_skip_no_calls = 0;
+
+  for (const c of fr.kept) {
+    let karyo = null;
+    try { karyo = _breedingCardKaryotypePerSample(c); } catch (_) {}
+    if (!karyo || !Array.isArray(karyo.karyotype)) {
+      n_skip_no_calls++;
+      continue;
+    }
+    // Inversion id — prefer explicit candidate.id; synthesize otherwise so
+    // every row in the export has a stable, joinable identifier.
+    const invId = c.id
+      || (chrom + '_' + (Number.isFinite(c.start_bp) ? (c.start_bp / 1e6).toFixed(2) : '?') +
+          '_' + (Number.isFinite(c.end_bp) ? (c.end_bp / 1e6).toFixed(2) : '?') +
+          '_K' + (c.K || _state.k || '?'));
+    const notes = karyo.ambiguous_role ? 'ambiguous_role'
+                : karyo.multi_haplotype ? 'multi_haplotype'
+                : '';
+    for (let si = 0; si < karyo.karyotype.length; si++) {
+      const samp = samples[si];
+      if (!samp) continue;
+      const cga = (typeof samp.cga === 'string' && samp.cga) ? samp.cga.toUpperCase() : null;
+      if (!cga) continue;
+      const lab = karyo.karyotype[si];
+      const m = (lab != null && KAR_MAP[lab]) || FALLBACK;
+      rows.push([cga, invId, m.kt, m.q, chrom, notes].join('\t'));
+      n_emit++;
+    }
+  }
+
+  if (n_emit === 0) {
+    const msg = 'Karyotype TSV export: ' + fr.kept.length +
+                ' candidate(s) passed the tier filter but none produced ' +
+                'per-sample karyotype calls (h_classification missing). ' +
+                'Open each candidate in Catalogue to trigger the classification.';
+    if (typeof alert === 'function') alert(msg);
+    return false;
+  }
+
+  const tsv = rows.join('\n') + '\n';
+  const fname = chrom + '_inversion_karyotypes_' + fr.mode + '.tsv';
+  const blob = new Blob([tsv], { type: 'text/tab-separated-values' });
+  return _breedingExportTrigger(blob, fname);
+}
+
 // --- _wireCatalogueBreedingExportBtns — extracted from legacy ---
 export function _wireCatalogueBreedingExportBtns() {
   if (typeof document === 'undefined') return;
@@ -1005,6 +1111,16 @@ export function _wireCatalogueBreedingExportBtns() {
     jsonBtn.dataset._wired = '1';
     jsonBtn.addEventListener('click', () => {
       _exportBreedingCardsJSON({ tierMode: _currentTier() });
+    });
+  }
+  // 2026-05-26: karyotype TSV export — long-format sample × inversion
+  // matrix that the relatedness atlas mendelian / karyotypes pages
+  // consume via the inversion_karyotypes registry layer.
+  const ktBtn = document.getElementById('catExportKaryotypesTSV');
+  if (ktBtn && !ktBtn.dataset._wired) {
+    ktBtn.dataset._wired = '1';
+    ktBtn.addEventListener('click', () => {
+      _exportInversionKaryotypesTSV({ tierMode: _currentTier() });
     });
   }
 }

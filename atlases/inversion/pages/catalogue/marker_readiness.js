@@ -768,7 +768,12 @@ function _mpRenderMethods() {
     'routine breeding deployment. No marker on this panel constitutes a guarantee of genotype-' +
     'phenotype association without independent validation in the target population. ' +
     '<br><br>' +
-    'See also: <a href="Population_atlas.html#window_summary_table" style="color:#7ad3db; text-decoration:none;">' +
+    // 2026-05-26: was href="Population_atlas.html#window_summary_table" \u2014
+    // legacy URL format (atlas-core uses hash routing), AND window_summary_table
+    // is an inversion-atlas page, not population. The link text always meant
+    // the Population atlas's breeding page (see Population manifest \u2192
+    // page_breeding). Fixed URL to match the text.
+    'See also: <a href="#/population/page_breeding" style="color:#7ad3db; text-decoration:none;">' +
     'Population Atlas \u2192 Breeding</a> for sample-level highlights of marker-validation control ' +
     'samples and other broodstock flagged for committee review.' +
     '</div>';

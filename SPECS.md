@@ -63,10 +63,12 @@ That doesn't happen again.
 
 See `specs_todo/README.md` for the per-SPEC status table.
 Highlights:
-- 1 SPEC ONLY (confirmed unimplemented; depends on cluster-side primitives that don't exist): `SPEC_msmc_per_founder_background.md` — 2026-05-21 audit documented in-SPEC with a 5-step blocker matrix; recommended sequencing (Step 1 regime-sharing matrix first as standalone deliverable)
+- 3 SPEC ONLY (no shipped surface yet): `SPEC_msmc_per_founder_background.md` (depends on cluster-side primitives that don't exist; 2026-05-21 audit added 5-step blocker matrix), `SPEC_catalogue_gallery_exports.md` (SVG/PNG/PDF gallery export trio — authored 2026-05-21 from dead-button audit Group 3), `SPEC_catalogue_view_modes.md` (L1-merged + L3 catalogue view-mode toggles — same audit Group 3)
+- 1 PARTIAL (data layer ships, UI surface pending): `SPEC_catalogue_regime_registry.md` — `shared/regimes_registry.js` + `regime_topology.js` exist; the catalogue-side modal editor + bulk-assign flow are missing. Authored 2026-05-21 from dead-button audit Group 3.
 - 1 AMENDMENT to a parent at `specs_done/`: `SPEC_inversion_age_atlas_surface_AMENDMENT.md` (most prescribed slices still deferred per the parent SPEC's §3 status matrix)
 - 1 superseded: `SPEC_registry_v1.md` (superseded by `specs_done/SPEC_registry_v2.md`; kept for historical reference)
 - 1 sub-library: `mgl_adapter/` (self-contained spec sub-tree; moves between todo/done as a unit)
+- **Dead-button audit 2026-05-21** (`docs/DEAD_BUTTON_AUDIT_2026-05-21.md`): 31 buttons reviewed across 8 page HTMLs → 1 false positive, 30 acted upon. 6 wired, 5 disabled-with-reason, 1 deleted, 8 self-admitted TODOs left in place, 7 caught here as SPECs above (3 new specs_todo entries), 3 wrapped under the audit doc's recovery notes (2 hidden + the existing TODO group).
 - **Audit-sweep 2026-05-20 + 2026-05-21 archived 16 SPECs total**:
   - 2026-05-20 morning (4): `SPEC_arrangement_color_mode_and_arrangement_calls_v1`, `SPEC_busco_4d_age_brackets`, `SPEC_busco_anchors_v1`, `SPEC_mendelian_inheritance_para_vs_peri_v1`
   - 2026-05-20 afternoon 1 (5): `SPEC_fish_ancestry_scroller`, `SPEC_functional_burden_per_candidate_v1`, `SPEC_page1_candidate_mode_ui`, `SPEC_xpehh_per_window_track`, `SPEC_registry_write_and_page_isolation`

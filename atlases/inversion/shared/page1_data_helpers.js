@@ -153,7 +153,12 @@ export function currentMbRange(state) {
   return { mbMin: Math.max(genomeMin, lo - pad), mbMax: Math.min(genomeMax, hi + pad) };
 }
 
-const VIEW_CONTROLS_STORAGE_KEY = 'scrubber_v3_viewControls';
+// 2026-05-26: bumped from scrubber_v3_viewControls to *_v4 to reset users
+// who had the linked-auto-sync default carrying PC2 into the per-sample
+// lines panel. Quentin: "by default in per sample lines only PC1 is
+// active." Old key is no longer read — users with persisted PC2 just see
+// the new default on next load and can re-enable PC2 manually if wanted.
+const VIEW_CONTROLS_STORAGE_KEY = 'scrubber_v4_viewControls';
 
 // --- inferLayersFromV1(data) — legacy lines 52588-52600 ---
 function inferLayersFromV1(data) {
@@ -966,7 +971,7 @@ export function buildFamilyPalette(state) {
 
 // --- loadViewControls(state) — legacy lines 10020-10038 ---
 export function loadViewControls(state) {
-  if (!state.viewControls) state.viewControls = { pcaXY: ['pc1', 'pc2'], linesYsources: ['pc1'], linked: true };
+  if (!state.viewControls) state.viewControls = { pcaXY: ['pc1', 'pc2'], linesYsources: ['pc1'], linked: false };
   try {
     const raw = localStorage.getItem(VIEW_CONTROLS_STORAGE_KEY);
     if (!raw) return;
@@ -1014,7 +1019,7 @@ export function setViewControlsLinked(state, b) {
 
 // --- reconcileViewControlsForData(state) — legacy lines 10043-10059 ---
 export function reconcileViewControlsForData(state) {
-  if (!state.viewControls) state.viewControls = { pcaXY: ['pc1', 'pc2'], linesYsources: ['pc1'], linked: true };
+  if (!state.viewControls) state.viewControls = { pcaXY: ['pc1', 'pc2'], linesYsources: ['pc1'], linked: false };
   const avail = availablePCs(state);
   const isPCAxis = (s) => /^pc[1-4]$/.test(s);
   const cur = state.viewControls.pcaXY;

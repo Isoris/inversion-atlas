@@ -302,26 +302,73 @@ function _paintAll(state) {
   paintPanel(state, 'dosage');
   paintPanel(state, 'theta_pi');
   paintPanel(state, 'ghsl');
-  paintHeatmap(state);
-  _scheduleLinesPaint(state);
+  // 2026-05-26: heatmap moved off the sync path. paintHeatmap builds an
+  // Int8Array(nWin×nSam) + per-pixel ImageData fill (~2M writes on LG01)
+  // and was blocking first paint right next to paintLines. Both now go
+  // through _scheduleHeavyPaints — 3 scatters reveal instantly, heatmap
+  // fills in on the next idle tick, lines on the one after.
+  _paintPlaceholder('pcaCompHeatmapCanvas', 'computing band heatmap…');
+  _paintPlaceholder('pcaCompLinesCanvas',   'computing per-sample lines…');
+  _scheduleHeavyPaints(state);
   _refreshLinesStatus(state);
 }
 
-let _linesPaintScheduled = 0;
-function _scheduleLinesPaint(state) {
-  if (_linesPaintScheduled) return;
+// Quick "computing…" placeholder so the user sees feedback during the
+// idle-callback gap before the real paint runs. Only fires once per
+// mount — subsequent refresh() calls have a cached paint and don't
+// need the placeholder. Cheap (single text draw); never blocks.
+function _paintPlaceholder(canvasId, msg) {
+  if (typeof document === 'undefined') return;
+  const c = document.getElementById(canvasId);
+  if (!c) return;
+  // Skip if the canvas already has content (cached paint from a prior
+  // refresh — no point flashing the placeholder over a finished image).
+  if (c.dataset.painted === '1') return;
+  const ctx = c.getContext('2d');
+  if (!ctx) return;
+  const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+  const cssW = Math.max(1, c.clientWidth  | 0);
+  const cssH = Math.max(1, c.clientHeight | 0);
+  if (c.width !== cssW * dpr || c.height !== cssH * dpr) {
+    c.width  = cssW * dpr;
+    c.height = cssH * dpr;
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+  ctx.fillStyle = 'rgba(160,180,200,0.55)';
+  ctx.font = '11px ui-monospace, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(msg, cssW / 2, cssH / 2);
+}
+
+let _heavyPaintScheduled = 0;
+function _scheduleHeavyPaints(state) {
+  if (_heavyPaintScheduled) return;
   const run = () => {
-    _linesPaintScheduled = 0;
-    try { paintLines(state, state.linesAxis || 'pc1'); }
-    catch (e) { console.warn('pca_comparator: paintLines threw —', e); }
+    _heavyPaintScheduled = 0;
+    try { paintHeatmap(state); }
+    catch (e) { console.warn('pca_comparator: paintHeatmap threw —', e); }
+    const heatCanvas = document.getElementById('pcaCompHeatmapCanvas');
+    if (heatCanvas) heatCanvas.dataset.painted = '1';
+    // Lines piggyback on the next frame so the heatmap reveal isn't
+    // blocked by the polyline pass on a cold cache.
+    const runLines = () => {
+      try { paintLines(state, state.linesAxis || 'pc1'); }
+      catch (e) { console.warn('pca_comparator: paintLines threw —', e); }
+      const linesCanvas = document.getElementById('pcaCompLinesCanvas');
+      if (linesCanvas) linesCanvas.dataset.painted = '1';
+    };
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(runLines, { timeout: 200 });
+    } else {
+      requestAnimationFrame(runLines);
+    }
   };
-  // requestIdleCallback when available; rAF fallback. Either way the
-  // 3 scatters render synchronously above and the lines fill in on
-  // the next tick — the page becomes interactive immediately.
   if (typeof requestIdleCallback === 'function') {
-    _linesPaintScheduled = requestIdleCallback(run, { timeout: 120 });
+    _heavyPaintScheduled = requestIdleCallback(run, { timeout: 120 });
   } else {
-    _linesPaintScheduled = requestAnimationFrame(run);
+    _heavyPaintScheduled = requestAnimationFrame(run);
   }
 }
 

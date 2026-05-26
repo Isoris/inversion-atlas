@@ -139,6 +139,125 @@ group('_chiSqPValue — backed by shared chiSqSurvival');
 }
 
 // =====================================================================
+// 2026-05-26: _findTrios is now implemented (was a stub returning []).
+// Exercised through runMendelianTest since _findTrios is module-private.
+// MIN_TRIOS = 5, so each positive test below stages ≥5 trios to escape
+// the insufficient_data short-circuit.
+// =====================================================================
+group('runMendelianTest — single-family triad (parent_offspring labels)');
+{
+  // One full sibship: parents PA, PB (unrelated), 5 offspring O1..O5.
+  // All offspring are HET, both parents HOM_REF — Mendelian-impossible
+  // unless one of the parents is actually HET (i.e. classic non-mendelian
+  // signature). EXPECTED for HOM_REF × HOM_REF is HOM_REF=1.0.
+  const pairs = [];
+  for (let i = 1; i <= 5; i++) {
+    pairs.push({ sample_a: 'PA', sample_b: 'O' + i, relationship_class: 'parent_offspring' });
+    pairs.push({ sample_a: 'PB', sample_b: 'O' + i, relationship_class: 'parent_offspring' });
+    // sibs share full-sibling status (not PO, won't pollute trio finder)
+    for (let j = i + 1; j <= 5; j++) {
+      pairs.push({ sample_a: 'O' + i, sample_b: 'O' + j, relationship_class: 'full_sibling' });
+    }
+  }
+  const karyotypes = { PA: 'HOM_REF', PB: 'HOM_REF',
+                       O1: 'HET', O2: 'HET', O3: 'HET', O4: 'HET', O5: 'HET' };
+  const reg = makeRegistry({
+    candidate_karyotype_per_sample: karyotypes,
+    cohort_relatedness: { pairs },
+  });
+  const result = await runMendelianTest(reg, { candidate_id: 'cand_singlefam' });
+  check('n_trios = 5 (one per offspring)',   result.n_trios === 5);
+  check('verdict NOT insufficient_data',     result.verdict !== 'insufficient_data');
+  check('p_value is finite',                 Number.isFinite(result.p_value));
+  // 5 HET offspring with HOM_REF×HOM_REF parents → all 5 in an
+  // expected-zero cell → impossible-sentinel chi_sq (1e6 per offspring) →
+  // p_value should round to 0 → verdict 'non-mendelian'.
+  check('verdict = non-mendelian',           result.verdict === 'non-mendelian');
+  check('observed has HOM_REF_x_HOM_REF key',
+        result.observed && 'HOM_REF_x_HOM_REF' in result.observed);
+  check('observed HET count = 5',
+        result.observed.HOM_REF_x_HOM_REF.HET === 5);
+}
+
+// =====================================================================
+group('runMendelianTest — sibling-only family rejects all trios');
+{
+  // 6 full siblings (all 1st_degree to each other) and NO parents in the
+  // cohort. Triple enumeration over each sample's neighbors finds candidate
+  // (sib_i, sib_j, sib_k), but the "P1↔P2 not PO" filter kills every one
+  // because all sib pairs are themselves 1st_degree (and we accept
+  // 1st_degree as PO under default threshold).
+  const sibs = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6'];
+  const pairs = [];
+  for (let i = 0; i < sibs.length; i++) {
+    for (let j = i + 1; j < sibs.length; j++) {
+      pairs.push({ sample_a: sibs[i], sample_b: sibs[j], relationship_class: '1st_degree' });
+    }
+  }
+  const karyotypes = {};
+  sibs.forEach(s => karyotypes[s] = 'HET');
+  const reg = makeRegistry({
+    candidate_karyotype_per_sample: karyotypes,
+    cohort_relatedness: { pairs },
+  });
+  const result = await runMendelianTest(reg, { candidate_id: 'cand_sibsonly' });
+  check('sibling-only → 0 trios',           result.n_trios === 0);
+  check('verdict = insufficient_data',      result.verdict === 'insufficient_data');
+}
+
+// =====================================================================
+group('runMendelianTest — true mendelian family verdict = mendelian');
+{
+  // HET × HET cross: expected 1:2:1 ratio across HOM_REF:HET:HOM_INV.
+  // Stage 12 offspring (3:6:3 split — perfectly on the expected ratio).
+  // Should produce a high p-value → verdict 'mendelian'.
+  const offspring = [];
+  for (let i = 1; i <= 12; i++) offspring.push('O' + i);
+  const pairs = [];
+  for (const o of offspring) {
+    pairs.push({ sample_a: 'PA', sample_b: o, relationship_class: 'parent_offspring' });
+    pairs.push({ sample_a: 'PB', sample_b: o, relationship_class: 'parent_offspring' });
+  }
+  const karyotypes = { PA: 'HET', PB: 'HET' };
+  // 3 HOM_REF, 6 HET, 3 HOM_INV — exact mendelian ratio
+  ['O1', 'O2', 'O3'].forEach(o => karyotypes[o] = 'HOM_REF');
+  ['O4', 'O5', 'O6', 'O7', 'O8', 'O9'].forEach(o => karyotypes[o] = 'HET');
+  ['O10', 'O11', 'O12'].forEach(o => karyotypes[o] = 'HOM_INV');
+  const reg = makeRegistry({
+    candidate_karyotype_per_sample: karyotypes,
+    cohort_relatedness: { pairs },
+  });
+  const result = await runMendelianTest(reg, { candidate_id: 'cand_classic' });
+  check('n_trios = 12',                       result.n_trios === 12);
+  check('chi_sq ≈ 0 on exact ratio',          result.chi_sq < 0.001);
+  check('p_value ≈ 1 (perfect fit)',          result.p_value > 0.99);
+  check('verdict = mendelian',                result.verdict === 'mendelian');
+}
+
+// =====================================================================
+group('runMendelianTest — parent_offspring strict mode rejects 1st_degree');
+{
+  // Same single family but pairs are labelled only as '1st_degree'.
+  // Default threshold '1st_degree' accepts; explicit 'parent_offspring'
+  // rejects (strict mode).
+  const pairs = [];
+  for (let i = 1; i <= 5; i++) {
+    pairs.push({ sample_a: 'PA', sample_b: 'O' + i, relationship_class: '1st_degree' });
+    pairs.push({ sample_a: 'PB', sample_b: 'O' + i, relationship_class: '1st_degree' });
+  }
+  const karyotypes = { PA: 'HET', PB: 'HET',
+                       O1: 'HET', O2: 'HET', O3: 'HET', O4: 'HET', O5: 'HET' };
+  const reg = makeRegistry({
+    candidate_karyotype_per_sample: karyotypes,
+    cohort_relatedness: { pairs },
+  });
+  const result = await runMendelianTest(reg,
+    { candidate_id: 'cand_strict', relatedness_threshold: 'parent_offspring' });
+  check('strict mode rejects 1st_degree-only pairs',  result.n_trios === 0);
+  check('strict mode → insufficient_data',            result.verdict === 'insufficient_data');
+}
+
+// =====================================================================
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

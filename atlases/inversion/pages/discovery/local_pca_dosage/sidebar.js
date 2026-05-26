@@ -451,6 +451,67 @@ function _wireL3Controls(state) {
     });
   }
 
+  // 2026-05-21 dead-button audit (Group 5): wire the two L3 spotlight
+  // buttons. Rendering already branches on state.spotlightTrackedAll
+  // (l3_panel.js:3003, 3184) + state.spotlight (l3_panel.js:3015) —
+  // the buttons just needed handlers. Flipping the state slot +
+  // re-rendering the L3 panel is enough; the rendering code does
+  // the rest. Persisted state.spotlightTrackedAll so the choice
+  // survives reload.
+  const l3SpotTracked = document.getElementById('l3SpotlightTrackedBtn');
+  if (l3SpotTracked && l3SpotTracked.dataset.l3Wired !== '1') {
+    l3SpotTracked.dataset.l3Wired = '1';
+    try {
+      const saved = localStorage.getItem('pca_scrubber_v3.l3SpotlightTrackedAll');
+      if (saved === '1') state.spotlightTrackedAll = true;
+    } catch (_) {}
+    // Reflect initial state in the button styling.
+    const _syncTrackedBtn = () => {
+      if (state.spotlightTrackedAll) {
+        l3SpotTracked.classList.add('active');
+        l3SpotTracked.style.background = 'var(--accent, #f5a524)';
+        l3SpotTracked.style.color = '#0e1116';
+      } else {
+        l3SpotTracked.classList.remove('active');
+        l3SpotTracked.style.background = 'var(--panel-2)';
+        l3SpotTracked.style.color = 'var(--ink-dim)';
+      }
+    };
+    _syncTrackedBtn();
+    l3SpotTracked.addEventListener('click', () => {
+      state.spotlightTrackedAll = !state.spotlightTrackedAll;
+      persistDebounced('pca_scrubber_v3.l3SpotlightTrackedAll',
+                       state.spotlightTrackedAll ? '1' : '0');
+      _syncTrackedBtn();
+      try { renderL3Panel(state); } catch (e) {
+        console.warn('[l3SpotlightTrackedBtn] renderL3Panel:', e);
+      }
+    });
+  }
+
+  const l3SpotClear = document.getElementById('l3SpotlightClearBtn');
+  if (l3SpotClear && l3SpotClear.dataset.l3Wired !== '1') {
+    l3SpotClear.dataset.l3Wired = '1';
+    l3SpotClear.addEventListener('click', () => {
+      // Single-sample spotlight: clear the marker entirely.
+      state.spotlight = null;
+      // Cross-pane tracked spotlight: turn off + persist.
+      if (state.spotlightTrackedAll) {
+        state.spotlightTrackedAll = false;
+        persistDebounced('pca_scrubber_v3.l3SpotlightTrackedAll', '0');
+      }
+      // Re-sync the tracked button if it's present (else no-op).
+      if (l3SpotTracked) {
+        l3SpotTracked.classList.remove('active');
+        l3SpotTracked.style.background = 'var(--panel-2)';
+        l3SpotTracked.style.color = 'var(--ink-dim)';
+      }
+      try { renderL3Panel(state); } catch (e) {
+        console.warn('[l3SpotlightClearBtn] renderL3Panel:', e);
+      }
+    });
+  }
+
   // L3 ⋯ more disclosure (#l3MoreToggleBtn) — toggles
   // `.l3-more-collapsed` on #l3Panel. CSS hides `.l3-more-item` children
   // when collapsed. Persisted to localStorage so the user's choice
@@ -997,11 +1058,14 @@ function _wireSelectionModeHotkey(state) {
 }
 
 // ---------------------------------------------------------------------------
-// Tracked-samples compact panel collapse arrow. The head + arrow live
-// in #trackedSamplesPanelCompactHead / #trackedSamplesPanelCompactArrow;
-// the CSS already supports body[data-tracked-compact-collapsed="1"]
-// (inversion.css L733) but no JS was setting the attribute. Restore
-// from localStorage on mount; flip on click. Idempotent.
+// Tracked-samples compact panel header arrow.
+// 2026-05-26: was an inline collapse toggle that hid/showed the panel body
+// below the PCA. Now repurposed to open the floating #tPanelOverlay popup
+// (which carries both the K-band quick actions AND the secondary settings).
+// The inline body is permanently visible — slimmed to just the help blurb
+// + tracked-list + lasso action bar — so the ▶/▼ collapse state is moot.
+// The localStorage key + the CSS body[data-tracked-compact-collapsed="1"]
+// rule are retained as no-ops in case a user has a stale persisted value.
 // ---------------------------------------------------------------------------
 const _TRACKED_COMPACT_LS_KEY = 'inversion_atlas.trackedCompactCollapsed';
 
@@ -1009,46 +1073,31 @@ function _wireCompactTrackedCollapse(state) {
   if (typeof document === 'undefined') return;
   const head = document.getElementById('trackedSamplesPanelCompactHead');
   const arrow = document.getElementById('trackedSamplesPanelCompactArrow');
-  const body = document.getElementById('trackedSamplesPanelCompactBody');
-  if (!head || !body) return;
+  if (!head) return;
 
-  // Restore persisted state on first wire.
-  // 2026-05-20: default to collapsed on fresh load. The compact tracked
-  // panel hosts a long stack of controls (band picker, manual groups,
-  // color-mode picker, ...) most users don't need open while scrubbing.
-  // Returning users keep their saved choice.
-  let collapsed = true;
-  try {
-    const v = localStorage.getItem(_TRACKED_COMPACT_LS_KEY);
-    if (v === '0') collapsed = false;
-    else if (v === '1') collapsed = true;
-  } catch (_) {}
-
-  const apply = () => {
-    body.style.display = collapsed ? 'none' : '';
-    if (arrow) arrow.textContent = collapsed ? '▶' : '▼';
-    // The CSS rule body[data-tracked-compact-collapsed="1"] hides the
-    // panel's grid row entirely so the adjacent PCA + lines grow into
-    // the freed space.
-    if (document.body && document.body.dataset) {
-      document.body.dataset.trackedCompactCollapsed = collapsed ? '1' : '0';
-    }
-  };
-  apply();
+  // 2026-05-26: clear any stale collapsed-data flag so the body is visible.
+  if (document.body && document.body.dataset) {
+    document.body.dataset.trackedCompactCollapsed = '0';
+  }
+  // Wipe a previously-persisted collapsed=1 — user's old preference is
+  // moot now that the inline body has no toggleable section.
+  try { localStorage.removeItem(_TRACKED_COMPACT_LS_KEY); } catch (_) {}
 
   if (head.dataset.wired === '1') return;
-  head.addEventListener('click', () => {
-    collapsed = !collapsed;
-    persistDebounced(_TRACKED_COMPACT_LS_KEY, collapsed ? '1' : '0');
-    apply();
-    // Repaint adjacent panels since the freed/claimed space changes
-    // their bounds — same chain the ResizeObserver uses.
-    requestAnimationFrame(() => {
-      try { drawPCA(state); }        catch (_) {}
-      try { drawLinesPanel(state); } catch (_) {}
-    });
-  });
   head.dataset.wired = '1';
+  // Open #tPanelOverlay on header click (anywhere in the header). The
+  // arrow button itself also opens — same target. Clear-button child
+  // stops propagation so it won't fire here.
+  const openPopup = (ev) => {
+    if (ev) ev.stopPropagation();
+    const overlay = document.getElementById('tPanelOverlay');
+    if (overlay) overlay.style.display = 'flex';
+  };
+  head.addEventListener('click', openPopup);
+  if (arrow && arrow.dataset.wired !== '1') {
+    arrow.dataset.wired = '1';
+    arrow.addEventListener('click', openPopup);
+  }
 
   // 2026-05-20: clear-all button on the panel header. Stops propagation
   // so the header's collapse toggle doesn't fire. Mirrors the existing
@@ -1534,7 +1583,7 @@ function _wireSnpDensityButtons(state) {
 function _refreshBandPickAsideColors(state) {
   if (typeof document === 'undefined') return;
   // Update the K-cycle button label on every refresh (legacy 55970-55974).
-  for (const id of ['kCycleBtnAside', 'kCycleBtnCompact']) {
+  for (const id of ['kCycleBtnAside', 'kCycleBtnCompact', 'kCycleBtnPopup']) {
     const btn = document.getElementById(id);
     if (btn) btn.textContent = `K=${state.k}`;
   }
@@ -1578,7 +1627,9 @@ function _refreshBandPickAsideColors(state) {
   // got knocked out by a K decrease. Targets both surfaces (the aside
   // [data-band-aside="all"] and the compact [data-band-compact="all"]).
   if (anyDisabledActive) {
-    document.querySelectorAll('[data-band-aside="all"], [data-band-compact="all"]').forEach(allBtn => {
+    document.querySelectorAll(
+      '[data-band-aside="all"], [data-band-compact="all"], [data-band-popup="all"]'
+    ).forEach(allBtn => {
       allBtn.classList.add('active');
     });
   }
@@ -1594,7 +1645,11 @@ function _wireTrackedAside(state) {
   // K-cycle button — legacy 56536-56565. Delegates to cycleKAside (already
   // exported from pca_panel.js — handles state.k bump, cache bust, kSelect
   // mirror, and full repaint), then repaints the K-band button colors.
-  for (const id of ['kCycleBtnAside', 'kCycleBtnCompact']) {
+  // 2026-05-21: added 'kCycleBtnPopup' — the popup mirror existed in the
+  // HTML + got label-updates from _refreshBandPickAsideColors (above), but
+  // its click handler was never wired. Same handler as the aside / compact
+  // twins; one-line fix.
+  for (const id of ['kCycleBtnAside', 'kCycleBtnCompact', 'kCycleBtnPopup']) {
     const btn = $(id);
     if (!btn || btn.dataset.wired === '1') continue;
     btn.addEventListener('click', () => {
@@ -1636,18 +1691,72 @@ function _wireTrackedAside(state) {
   // 2026-05-18: "in the settings or anywhere when we push the 'remove
   // the group' button or clear tracked samples. nothing happens."
   const compactClicks = [
-    { id: 'clearPicksAside',       fn: () => clearPicks(state) },
-    { id: 'clearPicksCompact',     fn: () => clearPicks(state) },
-    { id: 'clearPicksCompact2',    fn: () => clearPicks(state) },
-    { id: 'autoPickRadialAside',   fn: () => _autoPickRadialBridge(state, state.trackedN) },
-    { id: 'autoPickRadialCompact', fn: () => _autoPickRadialBridge(state, state.trackedN) },
-    { id: 'autoPickRadialCompact2',fn: () => _autoPickRadialBridge(state, state.trackedN) },
+    { id: 'clearPicksAside',        fn: () => clearPicks(state) },
+    { id: 'clearPicksCompact',      fn: () => clearPicks(state) },
+    { id: 'clearPicksCompact2',     fn: () => clearPicks(state) },
+    // 2026-05-21: popup mirror — was dead in the audit. Same handler.
+    { id: 'clearPicksPopup',        fn: () => clearPicks(state) },
+    { id: 'autoPickRadialAside',    fn: () => _autoPickRadialBridge(state, state.trackedN) },
+    { id: 'autoPickRadialCompact',  fn: () => _autoPickRadialBridge(state, state.trackedN) },
+    { id: 'autoPickRadialCompact2', fn: () => _autoPickRadialBridge(state, state.trackedN) },
+    // 2026-05-21: popup mirror — was dead in the audit. Same handler.
+    { id: 'autoPickRadialPopup',    fn: () => _autoPickRadialBridge(state, state.trackedN) },
   ];
   for (const { id, fn } of compactClicks) {
     const btn = $(id);
     if (!btn || btn.dataset.wired === '1') continue;
     btn.addEventListener('click', () => { try { fn(); } catch (_) {} });
     btn.dataset.wired = '1';
+  }
+
+  // 2026-05-26 — popup quick-actions (relocated from inline compact body
+  // into #tPanelOverlay). IDs: kCycleBtnPopup, [data-band-popup],
+  // autoPickRadialPopup, clearPicksPopup. Same handlers as the aside
+  // mirrors above; sync .active state across [data-band-aside],
+  // [data-band-compact], [data-band-popup] so all three surfaces agree.
+  const kCyclePopup = $('kCycleBtnPopup');
+  if (kCyclePopup && kCyclePopup.dataset.wired !== '1') {
+    kCyclePopup.addEventListener('click', () => {
+      try { cycleKAside(state); } catch (e) {
+        console.warn('[kCycleBtnPopup] cycleKAside:', e);
+      }
+      _refreshBandPickAsideColors(state);
+    });
+    kCyclePopup.dataset.wired = '1';
+  }
+
+  document.querySelectorAll('[data-band-popup]').forEach(btn => {
+    if (btn.dataset.wired === '1') return;
+    btn.addEventListener('click', () => {
+      const v = btn.dataset.bandPopup;
+      document.querySelectorAll(
+        '[data-band-aside], [data-band-compact], [data-band-popup]'
+      ).forEach(b => b.classList.remove('active'));
+      // Mark the matching button(s) on all three surfaces so subsequent
+      // sync stays consistent (legacy aside path only re-marked aside).
+      document.querySelectorAll(
+        `[data-band-aside="${v}"], [data-band-compact="${v}"], [data-band-popup="${v}"]`
+      ).forEach(b => b.classList.add('active'));
+      if (v === 'all') pickFromFocalBand(state, 'all');
+      else             pickFromFocalBand(state, parseInt(v, 10));
+    });
+    btn.dataset.wired = '1';
+  });
+
+  const autoPickPopup = $('autoPickRadialPopup');
+  if (autoPickPopup && autoPickPopup.dataset.wired !== '1') {
+    autoPickPopup.addEventListener('click', () => {
+      try { _autoPickRadialBridge(state, state.trackedN); } catch (_) {}
+    });
+    autoPickPopup.dataset.wired = '1';
+  }
+
+  const clearPicksPopupBtn = $('clearPicksPopup');
+  if (clearPicksPopupBtn && clearPicksPopupBtn.dataset.wired !== '1') {
+    clearPicksPopupBtn.addEventListener('click', () => {
+      try { clearPicks(state); } catch (_) {}
+    });
+    clearPicksPopupBtn.dataset.wired = '1';
   }
 }
 

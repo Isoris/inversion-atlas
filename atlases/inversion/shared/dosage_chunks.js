@@ -800,6 +800,57 @@ export function buildDosageDebugReport(state, trackedIdx, range) {
   const lru = state.__dosageChunkLru;
   const lruKeys = lru ? Array.from(lru.keys()) : [];
 
+  // 2026-05-26: marker-range forensic — when id projection is 100% but
+  // every cohort value is NaN, the failure is either (a) markers fall
+  // outside the bp range or (b) every dosage cell is -1 NA. Count both
+  // so the modal can show the user WHICH branch.
+  let markerStats = null;
+  try {
+    const chunkForStats = (typeof state._linesPanelGetCachedChunk === 'function')
+      ? state._linesPanelGetCachedChunk(startBp, endBp) : null;
+    if (chunkForStats && Array.isArray(chunkForStats.markers)
+        && Array.isArray(chunkForStats.dosage)) {
+      const markersTotal = chunkForStats.markers.length;
+      let markersInRange = 0;
+      let cellsTotal = 0;
+      let cellsNonNa = 0;
+      let firstMarkerInRange = null;
+      let lastMarkerInRange  = null;
+      let firstMarkerOverall = null;
+      let lastMarkerOverall  = null;
+      for (let mi = 0; mi < markersTotal; mi++) {
+        const m = chunkForStats.markers[mi];
+        if (!m || !Number.isFinite(m.pos_bp)) continue;
+        if (firstMarkerOverall == null) firstMarkerOverall = m.pos_bp;
+        lastMarkerOverall = m.pos_bp;
+        if (m.pos_bp < startBp || m.pos_bp > endBp) continue;
+        markersInRange++;
+        if (firstMarkerInRange == null) firstMarkerInRange = m.pos_bp;
+        lastMarkerInRange = m.pos_bp;
+        const row = chunkForStats.dosage[mi];
+        if (!row) continue;
+        for (let ci = 0; ci < row.length; ci++) {
+          cellsTotal++;
+          const v = row[ci];
+          if (v != null && Number.isFinite(v) && v >= 0) cellsNonNa++;
+        }
+      }
+      markerStats = {
+        chunk_bp_span: chunkForStats.start_bp != null && chunkForStats.end_bp != null
+          ? { start: chunkForStats.start_bp, end: chunkForStats.end_bp } : null,
+        markers_total: markersTotal,
+        markers_in_range: markersInRange,
+        first_marker_overall_bp: firstMarkerOverall,
+        last_marker_overall_bp:  lastMarkerOverall,
+        first_marker_in_range_bp: firstMarkerInRange,
+        last_marker_in_range_bp:  lastMarkerInRange,
+        cells_total:    cellsTotal,
+        cells_non_na:   cellsNonNa,
+        non_na_pct:     cellsTotal > 0 ? cellsNonNa / cellsTotal : 0,
+      };
+    }
+  } catch (_) { /* forensic only */ }
+
   // 2026-05-26: id-projection forensic — when the diagnosis lands on
   // "sample-id mismatch", the user wants to SEE which chunk ids didn't
   // match which cohort ids. Walks the same matcher (_buildSampleIdMap +
@@ -886,12 +937,49 @@ export function buildDosageDebugReport(state, trackedIdx, range) {
     diagnosis = 'All tracked samples have dosage + het values — the PCA scatter should be coloured. If it isn\'t, check state.colorMode / state._pcaModePsVals.mode parity.';
   }
 
+  // Refine the diagnosis when markerStats are available — points at
+  // (a) no markers in range vs (b) markers present but all dosage NA.
+  let refinedDiagnosis = diagnosis;
+  if (markerStats && (idProjection && idProjection.match_rate >= 0.5)) {
+    const nNaN = trackedRows.filter(r => !Number.isFinite(r.dosage)).length;
+    if (nNaN > 0 && nNaN === trackedRows.length) {
+      if (markerStats.markers_in_range === 0) {
+        const cspan = markerStats.chunk_bp_span;
+        const overall = markerStats.first_marker_overall_bp != null
+          ? `${markerStats.first_marker_overall_bp}–${markerStats.last_marker_overall_bp}`
+          : '?';
+        refinedDiagnosis = 'IDs match BUT no chunk markers fall in this bp range '
+          + `(${markerStats.markers_total} chunk markers cover ${overall}; `
+          + `requested range ${startBp}–${endBp}). `
+          + (cspan
+              ? `Chunk's declared bp span is ${cspan.start}–${cspan.end} — `
+              : '')
+          + 'Either the chunk fetcher requested too narrow a region for this L2 '
+          + 'envelope, or markers are sparser than the L2 boundaries.';
+      } else if (markerStats.non_na_pct === 0) {
+        refinedDiagnosis = 'IDs match + markers in range '
+          + `(${markerStats.markers_in_range}/${markerStats.markers_total}) `
+          + `BUT every dosage cell is -1 NA for this region `
+          + `(${markerStats.cells_non_na}/${markerStats.cells_total} non-NA). `
+          + 'Server-side: the dosage TSV has no calls here; per-sample mean '
+          + 'genuinely is NaN. Pick a different bp range / cursor window.';
+      } else {
+        refinedDiagnosis = 'IDs match + markers in range '
+          + `(${markerStats.markers_in_range}/${markerStats.markers_total}) `
+          + `+ some non-NA dosage cells (${(markerStats.non_na_pct * 100).toFixed(1)}%) — `
+          + 'but tracked-sample means came out NaN. Likely a per-cohort-idx issue '
+          + '(specific tracked samples have 0 non-NA calls). Check the per-row dosage column.';
+      }
+    }
+  }
+
   return {
     range: { startBp, endBp, startW, endW, chrom: d.chrom || null },
     lruKeys,
     trackedRows,
     idProjection,
-    diagnosis,
+    markerStats,
+    diagnosis: refinedDiagnosis,
   };
 }
 
