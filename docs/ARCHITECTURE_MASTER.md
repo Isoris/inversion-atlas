@@ -40,13 +40,19 @@ Do not let any session redefine them.
 | Term | Definition | Where it lives |
 |------|------------|----------------|
 | `candidate_region` | A broad bp interval flagged as potentially carrying structural variation. Pre-segmentation. Produced by the candidate-detector. | `inversion` atlas, discovery pages |
-| `arrangement` | A discrete sequence configuration at a regime. Labelled `H1, H2, H3, …`. The atomic unit of karyotype. | `inversion` atlas, regime decoder |
+| `arrangement` | A discrete sequence configuration at a regime. Labelled `A, B, C, …` (or `H1, H2, H3, …`). The atomic unit of karyotype. | `inversion` atlas, regime decoder |
 | `regime` | An internally coherent segregation segment inside a candidate_region. Carries `n_arrangements ≥ 2`. Produced by long-range regime detection (segmentation). | `inversion` atlas, `haplotype_regimes` |
 | `dosage_heatmap` | The (samples × diagnostic_SNPs) matrix computed for ONE regime. NEVER spans multiple regimes. | `inversion` atlas, per-regime decoder |
-| `karyotype_call` | A sample's unordered arrangement pair at one regime: `{H_i, H_j}`. Labelled `H_i/H_j` (or `COMPLEX` or `NO_CALL`). | `inversion` atlas, per-regime decoder |
+| `segregation_state` | One of the recurrent dosage-supported sample-grouping classes found inside a regime. Labelled `S1, S2, …`. The unit of decoder output. Always emitted. | `inversion` atlas, per-regime decoder (Layer A) |
+| `state_type` | Classification of a `segregation_state`: one of `HOM-like`, `HET-like`, `complex`, `unresolved`. Behaviour, not identity. | per-regime decoder (Layer A) |
+| `arrangement_combination` | The putative mapping from a `segregation_state` to an arrangement pair (`A/A`, `A/B`, `A/C?`, …). Emitted only when dosage + Mendelian support it; otherwise `null`. | per-regime decoder (Layer B) |
+| `karyotype_call` | A sample's unordered arrangement pair at one regime: `{A_i, A_j}`. This is **Layer B** of the decoder — it depends on a supported `arrangement_combination`. If unsupported, the sample carries `state_id` only. | per-regime decoder (Layer B) |
 | `POD` (point of diagnosis) | A regime that has passed Mendelian validation. Only PODs are used for cargo/phenotype interpretation downstream. | `popstats` atlas validates → `inversion` flag |
 | `cargo` | Genes / features physically contained inside a POD. | `evolution` / annotation layer |
 | `breakpoint` | A bp coordinate where two arrangements differ in genomic order, supported by cross-species evidence. Supports regime BOUNDARIES, never karyotypes. | `cross-species` atlas |
+| `arrangement_graph` | Per-regime graph; nodes are hidden arrangements (`A, B, C, …`), edges are observed HET pairs. Edge weight = `n_samples` carrying that het. (Graph A.) | per-regime decoder, `haplotype_regimes` UI |
+| `dosage_state_graph` | Per-regime graph; nodes are observed `segregation_state`s, edges link states that share one hidden arrangement. (Graph B.) | per-regime decoder, `haplotype_regimes` UI |
+| `compatibility_edge` | An edge in either graph; carries `compatibility_type ∈ {shares_one_arrangement, opposite_homozygotes, hom_evidence, het_evidence}` and a weight. | per-regime decoder |
 
 ### 2.1 Forbidden usages
 
@@ -57,6 +63,15 @@ Do not let any session redefine them.
   Use the table above.
 - A "POD" is **not** the same as a "regime". A regime becomes a
   POD only after Mendelian validation passes.
+- A `segregation_state` is **not** the same as an
+  `arrangement_combination`. The state is the empirical cluster
+  (`S1, S2, …` with a `state_type`); the arrangement_combination
+  (`A/A`, `A/B`, …) is the *interpretation* of that state and
+  is emitted only when evidence supports it. Do not collapse
+  Layer A and Layer B.
+- Do not describe a 5-state or 6-state regime as "K=3 failed".
+  Such a regime is a multiallelic structural haplotype system
+  with multiple HOM-like and HET-like states.
 
 ## 3. Pipeline order (binding)
 
@@ -99,23 +114,46 @@ into another atlas's internals.
 ## 4. Arrangement reality (do not regress to biallelic-only)
 
 A regime may carry `n_arrangements ∈ {2, 3, 4, …}`. The number
-of observed karyotype classes K relates to `N = n_arrangements`
-by `K_max = N · (N+1) / 2`. Some heterozygous classes may be
-absent (meiotic incompatibility or demographic absence) — that is
-**information**, not failure.
+of observed segregation states relates to `N = n_arrangements`
+by `n_states_max = N · (N+1) / 2`. Some heterozygous states may
+be absent (meiotic incompatibility, demographic absence,
+selection) — that is **information**, not failure.
 
-| N | hom states | het states | K_max | comment |
-|---|------------|------------|-------|---------|
-| 2 | 2          | 1          | 3     | classic biallelic |
-| 3 | 3          | 3          | 6     | real K=6 — do NOT mistake for two-regimes-glued |
-| 4 | 4          | 6          | 10    | rare, possible |
+| N | HOM-like (max) | HET-like (max) | n_states_max | comment |
+|---|----------------|----------------|--------------|---------|
+| 2 | 2              | 1              | 3            | classic biallelic |
+| 3 | 3              | 3              | 6            | real 6-state regime — NOT a "K=3 failure" |
+| 4 | 4              | 6              | 10           | rare, possible |
 
-Disambiguation rule: if classes split into two **disjoint bp
-clusters** along the regime, this is a segmentation failure
-(under-split) — recommend split. If classes are **bp-mixed**
-across the regime, this is a real multi-arrangement regime.
-See `specs_todo/SPEC_per_regime_dosage_decoding.md` §9 for the
-decoder spec.
+### 4.1 Asymmetric observability
+
+Per architect 2026-05-26: "sometimes we observe them as HET
+but not as HOM."
+
+- A HET-like state can exist without the matching HOM-like
+  state in the cohort. The het pair `A/C` may be observed even
+  if no `C/C` homozygote is sampled.
+- A HOM-like state can exist without all its possible het
+  partners.
+- The decoder emits each segregation_state on its own evidence.
+  Arrangement-set inference (Layer B) may flag arrangements as
+  HET-only-observed; see SPEC §10.3.
+
+### 4.2 Disambiguation rules
+
+- **bp-disjoint states** along the regime → segmentation
+  failure (under-split). Recommend split.
+- **bp-mixed states** across the regime → real multi-arrangement
+  regime.
+- **n_states > n_arrangements·(n_arrangements+1)/2** for any
+  reasonable N → recheck dosage / window choice; likely noise
+  or a true `complex` state was mis-split.
+
+See `specs_todo/SPEC_per_regime_dosage_decoding.md` §9–§11 for
+the decoder spec, the two-layer output contract, the
+`HET-only-observed` inference rule, the per-regime table schema,
+the arrangement / dosage-state graphs, and the floating-panel UI
+contract for `haplotype_regimes`.
 
 ## 5. Three-cohort discipline (binding)
 
