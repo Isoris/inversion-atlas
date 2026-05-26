@@ -12,6 +12,40 @@ explicit, signed-off user message updating this file.
 
 ---
 
+## 0. Biological foundation (one-screen orientation)
+
+The whole framework rests on one biological fact: in an
+arrangement heterozygote, crossovers inside the inversion
+produce unbalanced gametes, so **recombination is suppressed
+between non-homologous arrangements**. Two consequences make
+the data model possible:
+
+1. Distinct arrangements accumulate distinct SNP haplotypes
+   inside the inverted span → the dosage_heatmap can separate
+   them.
+2. Recombination resumes at the breakpoints / flanks → regimes
+   have soft, real edges (`transition_zone`s), not clustering
+   artefacts.
+
+Therefore:
+
+- A **regime** behaves like a single Mendelian locus with
+  `n_arrangements ≥ 2` alleles.
+- The number of observed segregation states relates to N by
+  `n_states_max = N·(N+1)/2` (2→3, 3→6, 4→10). Missing states
+  are informative (incompatibility or sampling), not failure.
+- The arrangement labels `A, B, C` are opaque. Ancestral
+  identity is assigned by the `evolution` atlas, NOT by the
+  decoder.
+
+Each cohort plays a different role and must not be pooled:
+
+| Cohort | Role |
+|--------|------|
+| `f1_hybrid` | Mendelian inheritance, recombinants, breakpoint refinement |
+| `cgar_hatchery_226` | Cohort frequencies, HWE deviation, selection signals |
+| `cmac_wild` | Wild frequencies, ancestral state via outgroup |
+
 ## 1. Master rule
 
 > Long-range regime detection **segments** the genome. Each
@@ -24,8 +58,9 @@ In one line:
 
 ```
 candidate_region → regimes → dosage_heatmap (per regime)
-                          → karyotype_calls (per sample, per regime)
-                          → Mendelian validation
+                          → segregation_states (Layer A)
+                          → arrangement_combinations (Layer B, evidence-gated)
+                          → Mendelian + HWE validation
                           → POD
 ```
 
@@ -53,6 +88,15 @@ Do not let any session redefine them.
 | `arrangement_graph` | Per-regime graph; nodes are hidden arrangements (`A, B, C, …`), edges are observed HET pairs. Edge weight = `n_samples` carrying that het. (Graph A.) | per-regime decoder, `haplotype_regimes` UI |
 | `dosage_state_graph` | Per-regime graph; nodes are observed `segregation_state`s, edges link states that share one hidden arrangement. (Graph B.) | per-regime decoder, `haplotype_regimes` UI |
 | `compatibility_edge` | An edge in either graph; carries `compatibility_type ∈ {shares_one_arrangement, opposite_homozygotes, hom_evidence, het_evidence}` and a weight. | per-regime decoder |
+| `recombination_suppression` | The biological reason a regime exists: in an arrangement heterozygote, crossovers inside the inversion produce inviable gametes, so the two arrangements do not recombine and accumulate distinct haplotypes. | basis of the whole framework |
+| `transition_zone` | The bp range at a regime's flank where recombination resumes — the soft edge between regimes. Not a clustering artefact, biological reality. | `inversion` atlas, per-regime decoder |
+| `compound_heterozygote` | A sample heterozygous at BOTH an outer regime and a nested inner regime (e.g. `A/B` outer + `B_inner1/B_inner2` inner). Emitted as a structured combined call, NEVER as a single ad-hoc K class. | per-regime decoder, nested-regime path |
+| `nested_regime` | A regime whose dosage system is conditional on a parent regime's state (e.g. inner inversion only present in `B/B` carriers). Has a parent-child link in the data model. | per-regime decoder |
+| `polarisation` / `ancestral_arrangement` | The determination of which arrangement at a regime is ancestral. NOT done by this atlas's decoder — done by the `evolution` atlas via outgroup synteny + BUSCO 4D + doubleton SFS. | `evolution` atlas |
+| `pseudo_arrangement` | A multi-state cluster that looks like an arrangement system but is actually population structure, batch effect, sex confound, family structure, or assembly artefact. Flagged in `false_positive_flags[]`. | per-regime decoder, validation |
+| `mendelian_support` | A per-regime score `1 − χ²(observed vs expected segregation)` over family trios in `f1_hybrid`. Independent of HWE; tests inheritance, not panmixia. | per-regime decoder, `popstats` validator |
+| `hwe` | Cohort-level Hardy-Weinberg expectations for the segregation states given arrangement frequencies. Applies to `cgar_hatchery_226` / `cmac_wild`; NOT to `f1_hybrid`. | per-regime decoder, popstats |
+| `het_deficit` | Systematic deficit of HET-like states across a cohort, suggesting underdominance / selection against heterokaryotypes. Recorded, NOT corrected. | per-regime decoder |
 
 ### 2.1 Forbidden usages
 
@@ -182,6 +226,14 @@ the cohort it came from.
 - Treat a regime as a POD before Mendelian validation has run.
 - Promote any of its own SPECs from `specs_todo/` to binding
   architecture. Only the user does that, by editing this file.
+- Polarise arrangements (decide ancestral identity) inside the
+  `inversion` atlas decoder. That is the `evolution` atlas's
+  job.
+- Pool cohorts (`f1_hybrid` / `cgar_hatchery_226` / `cmac_wild`)
+  for any per-regime statistic without an explicit cross-cohort
+  comparison call. The default is per-cohort.
+- Silently drop regimes flagged as `pseudo_arrangement`. Emit
+  the states + the flags; let downstream decide.
 
 ## 8. Where to look first
 
