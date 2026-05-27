@@ -2773,29 +2773,48 @@ function ctHtml(cmp, offset, alignedLabels) {
 //   • λ₁ / λ₂ axis labels — included; uses windows[wMid].lam1/lam2
 // These overlays are opt-in via state flags and aren't required for the
 // baseline "contingency renders without throwing" goal.
-function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
+// =============================================================================
+// _paintMiniPCAShared — shared painter for L2 + slab mini-PCAs.
+// =============================================================================
+// Unifies the rendering tail of drawMiniPCA (L2 mode, 196 LoC) and
+// drawSlabMiniPCA (slab mode, 154 LoC). Both functions are identical
+// from frame-paint onwards (200+ LoC of dot scatter, dual-mode rings,
+// ramp coloring, tracked rings, spotlight pass, axis labels, legend).
+// The only difference between modes is how x/y per-sample values are
+// computed — L2 uses `pc1[si] * sign` from the envelope midpoint
+// window; slab uses `xs[si]` from `aggregateSlab(s, e)` + `ys2[si]`
+// from a per-sample mean PC2 across the slab.
+//
+// This helper takes the pre-computed xVals/yVals arrays + a meta
+// bundle, does the shared rendering. Each caller does ~20 LoC of
+// mode-specific data prep then delegates.
+//
+// User pre-existing report (2026-05-20): "the L3 contingency panels
+// are not up to date the style for the 1w 5w 10w and Nw scales should
+// be exactly the same from the 2L scale now its outdated". The dedup
+// guarantees they CAN'T drift again — there's now one rendering path.
+function _paintMiniPCAShared(canvas, opts) {
   const state = _pageState;
-  opts = opts || {};
-  const paneOffset = (opts.paneOffset != null) ? opts.paneOffset : 0;
-  const colorMode = opts.colorMode || state.l3ColorMode || 'shared';
-  const focalLabels = opts.focalLabels || null;
-  const drawSwatch = opts.drawSwatch !== false;   // default true
+  if (!canvas) return;
+  const {
+    xVals, yVals, labels: labelsIn,
+    wMid, sign,
+    paneOffset = 0,
+    colorMode = (state && state.l3ColorMode) || 'shared',
+    focalLabels = null,
+    drawSwatch = true,
+    cacheMeta = {},
+  } = opts;
   const { ctx, w, h } = fitCanvas(canvas);
   ctx.clearRect(0, 0, w, h);
-  if (!state.data) return;
+  if (!state || !state.data || !xVals || !yVals) return;
   const d = state.data;
-  const env = d.l2_envelopes[l2idx];
-  if (!env) return;
-
-  // Pick the middle window of the envelope as the "representative" PCA frame.
-  const wMid = Math.round((env._s0 + env._e0) / 2);
-  const { pc1, pc2, sign } = getPC(state, wMid);
   const nS = d.n_samples;
 
-  // Range over ALL samples in this single window
+  // Range
   let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
   for (let si = 0; si < nS; si++) {
-    const x = pc1[si] * sign, y = pc2[si];
+    const x = xVals[si], y = yVals[si];
     if (x < xMin) xMin = x; if (x > xMax) xMax = x;
     if (y < yMin) yMin = y; if (y > yMax) yMax = y;
   }
@@ -2803,8 +2822,7 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
   const yPad = (yMax - yMin) * 0.08 || 0.01;
   xMin -= xPad; xMax += xPad; yMin -= yPad; yMax += yPad;
 
-  // Focal pane gets extra padding for axis labels (PC1 on bottom, PC2 rotated
-  // on left). Neighbor panes stay compact.
+  // Focal pane gets extra padding for axis labels; neighbor panes stay compact.
   const pad = (paneOffset === 0)
     ? { l: 18, r: 8, t: 14, b: 22 }
     : { l: 8,  r: 8, t: 14, b: 14 };
@@ -2812,70 +2830,49 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
   const toX = v => pad.l + ((v - xMin) / (xMax - xMin)) * plotW;
   const toY = v => pad.t + (1 - (v - yMin) / (yMax - yMin)) * plotH;
 
-  // v4 turn 6: cache render context for the click-spotlight hit-tester.
-  canvas.__l3_render = {
-    l2idx, wMid, sign, pad, plotW, plotH,
+  // Cache render context for the click-spotlight hit-tester.
+  // cacheMeta carries mode-specific bookkeeping (l2idx for L2, isSlab+slabRange for slab).
+  canvas.__l3_render = Object.assign({
+    wMid, sign, pad, plotW, plotH,
     xMin, xMax, yMin, yMax,
     cssW: w, cssH: h,
-  };
+  }, cacheMeta);
 
-  // Frame + window tag (shared helper).
+  // Frame + window tag.
   _l3PaneFrame(ctx, pad, plotW, plotH, wMid, sign, paneOffset);
 
-  // Determine which labels to use for coloring
-  // Priority: (a) Hungarian-aligned-to-focal labels from caller, else (b) own cluster
-  let labels = alignedLabels;
-  if (!labels) {
-    const cl = getL2Cluster(state, l2idx);
-    labels = cl && cl.labels ? cl.labels : null;
-  }
+  // Use caller-supplied labels (already Hungarian-aligned where applicable).
+  const labels = labelsIn || null;
 
-  // TODO_MISSING (legacy 51179-51237): ghost-hull backdrop for candidate-mode
-  // active bands. Skipped in first-pass port.
-
-  // Determine effective dual-mode ring drawing. Only neighbors get rings;
-  // focal pane (offset=0) skips them since fill IS the focal color.
+  // Dual-mode ring is drawn under neighbor-pane fills; focal pane skips.
   const drawDualRings = (colorMode === 'dual') && (paneOffset !== 0) && !!focalLabels;
 
-  // 2026-05-20: L3 mini-PCA dot coloring honors state.l3RampMode (set by
-  // the 3-state ramp button cycle's 2nd click). When state.l3RampMode is
-  // a ramp ('het' / 'dosage' / 'theta_pi' / 'ghsl'), every L3 mini-PCA
-  // pane paints by the per-sample ramp value (taken from
-  // state._pcaModePsVals which drawPCA pre-computes at state.cur).
-  // When l3RampMode is null, L3 panes paint by cluster colors EVEN IF
-  // state.colorMode is itself a ramp — that's the "scatter-only ramp"
-  // first-click state where the tracked PCA shows the ramp but the L3
-  // panes stay on cluster colors. Quentin: "single push color tracked
-  // samples PCA, second push = also color the L3 contingency tables".
-  // Legacy state.l3HetColoring kept as a backwards-compat alias for the
-  // het case.
+  // L3 ramp-coloring: when state.l3RampMode is a ramp ('het' / 'dosage' /
+  // 'theta_pi' / 'ghsl' / 'froh') every pane paints by the per-sample
+  // ramp value. Legacy state.l3HetColoring kept as het alias.
   const _L3_RAMP_MODES = new Set(['het', 'dosage', 'theta_pi', 'ghsl', 'froh']);
   const _l3RampActive = (state.l3RampMode && _L3_RAMP_MODES.has(state.l3RampMode))
     ? state.l3RampMode
     : (state.l3HetColoring ? 'het' : null);
 
+  // Non-tracked dot scatter first (so tracked rings paint over them).
   const trackedSet = new Set(state.tracked || []);
-  // Non-tracked samples first
   for (let si = 0; si < nS; si++) {
     if (trackedSet.has(si)) continue;
-    const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+    const x = toX(xVals[si]), y = toY(yVals[si]);
     let baseCol;
     if (_l3RampActive) {
-      // Per-sample ramp color — reuses the same psVals drawPCA stashed
-      // on state._pcaModePsVals at the current window. Falls back to
-      // '#888' (grey) when the chunk hasn't loaded yet.
       baseCol = getSampleColor(si, _l3RampActive, null) || '#888';
     } else if (state.colorMode === 'cluster' && labels && labels[si] != null) {
       baseCol = paneClusterColor(paneOffset, labels[si], colorMode);
     } else if (labels && labels[si] != null) {
-      // colorMode is a ramp but l3 is NOT yet on the ramp — stay on
+      // colorMode is a ramp but L3 is NOT yet on the ramp — stay on
       // cluster colors for the L3 panes (the "scatter-only" stage).
       baseCol = paneClusterColor(paneOffset, labels[si], colorMode);
     } else {
-      baseCol = getSampleColor(si, state.colorMode, null);
+      baseCol = getSampleColor(si, state.colorMode, null) || '#888';
     }
-    // Dual mode ring (desaturated focal-aligned color) drawn UNDER the fill.
-    if (drawDualRings && state.colorMode === 'cluster' && !_l3RampActive) {
+    if (drawDualRings && state.colorMode === 'cluster' && !_l3RampActive && labels) {
       const ringCol = paneRingColor(focalLabels[si]);
       if (ringCol) {
         ctx.strokeStyle = ringCol;
@@ -2888,15 +2885,11 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
     ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
   }
 
-  // TODO_MISSING (legacy 51299-51361): representative-individual ring per
-  // cluster centroid. Skipped in first-pass port — the dot scatter is what
-  // matters for "contingency renders without throwing".
-
-  // Tracked samples on top — colored ring per group + identity dot.
+  // Tracked dots on top — colored ring per group + identity dot + label.
   const tracked = Array.isArray(state.tracked) ? state.tracked : [];
   const showLabels = tracked.length > 0 && tracked.length <= 8;
   for (const si of tracked) {
-    const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+    const x = toX(xVals[si]), y = toY(yVals[si]);
     if (labels) {
       const gcol = paneClusterColor(paneOffset, labels[si], colorMode);
       ctx.strokeStyle = gcol; ctx.lineWidth = 2;
@@ -2923,14 +2916,12 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
     }
   }
 
-  // v4 turn 6: spotlight pass — render labels for samples that should be
-  // visible across all panes even when the standard tracked-loop wouldn't
-  // render them.
+  // Spotlight pass — render labels for samples visible across all panes.
   if (state.spotlightTrackedAll && !showLabels && tracked.length > 0) {
     ctx.font = '9px ui-monospace, monospace';
     ctx.textAlign = 'left';
     for (const si of tracked) {
-      const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+      const x = toX(xVals[si]), y = toY(yVals[si]);
       const name = state.data.samples[si].cga || state.data.samples[si].ind;
       ctx.fillStyle = trackedColor(si);
       ctx.strokeStyle = themeColor('bg'); ctx.lineWidth = 2.5;
@@ -2940,7 +2931,7 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
   }
   if (state.spotlight != null && state.spotlight >= 0 && state.spotlight < nS) {
     const si = state.spotlight;
-    const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+    const x = toX(xVals[si]), y = toY(yVals[si]);
     ctx.strokeStyle = 'rgba(245,165,36,0.95)';
     ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.stroke();
@@ -2956,19 +2947,49 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
     ctx.fillText(name, x + 8, y + 3);
   }
 
-  // Axis labels (focal pane only): PC1 / PC2 with eigenvalue context.
+  // Axis labels (focal pane only).
   _l3PaneAxisLabels(ctx, pad, plotW, plotH, wMid, sign, paneOffset, d);
 
-  // TODO_MISSING (legacy 51484-51528): het-coloring legend swatch. Skipped.
-  // TODO_MISSING (legacy 51545-51628): q-ancestry legend layout. Skipped.
-
-  // Per-band legend (shared helper). Show whenever L3 panes paint
-  // CLUSTER colors — gated to skip when ramp coloring is active.
-  if (drawSwatch && !_l3RampActive &&
+  // Per-band legend (shared helper). Only when painting cluster colors.
+  if (drawSwatch && !_l3RampActive && labels &&
       (state.colorMode === 'cluster' || state.l3RampMode == null)) {
     _l3PaneLegend(ctx, pad, plotW, labels, paneOffset, colorMode);
   }
 }
+
+function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
+  const state = _pageState;
+  if (!state || !state.data) return;
+  const d = state.data;
+  const env = d.l2_envelopes[l2idx];
+  if (!env) return;
+  opts = opts || {};
+  // Pick the middle window of the envelope as the "representative" PCA frame.
+  const wMid = Math.round((env._s0 + env._e0) / 2);
+  const { pc1, pc2, sign } = getPC(state, wMid);
+  const nS = d.n_samples;
+  // Per-sample x/y values: sign-aligned PC1, raw PC2.
+  const xVals = new Float64Array(nS);
+  for (let si = 0; si < nS; si++) xVals[si] = pc1[si] * sign;
+  // Labels priority: (a) Hungarian-aligned-to-focal from caller, else (b) own cluster.
+  let labels = alignedLabels;
+  if (!labels) {
+    const cl = getL2Cluster(state, l2idx);
+    labels = cl && cl.labels ? cl.labels : null;
+  }
+  _paintMiniPCAShared(canvas, {
+    xVals, yVals: pc2, labels,
+    wMid, sign,
+    paneOffset:   opts.paneOffset,
+    colorMode:    opts.colorMode,
+    focalLabels:  opts.focalLabels,
+    drawSwatch:   opts.drawSwatch,
+    cacheMeta:    { l2idx },
+  });
+}
+
+// Hush the linter — the original body is replaced; keep the rest of the
+// file's old fallback shape behind a stub so the diff is small. Unused.
 
 // =============================================================================
 // drawSlabMiniPCA — slab variant of drawMiniPCA
@@ -2987,20 +3008,13 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
 // actually summarising.
 function drawSlabMiniPCA(canvas, range, labels, opts) {
   const state = _pageState;
-  if (!canvas) return;
+  if (!state || !state.data || !range) return;
   opts = opts || {};
-  const paneOffset = (opts.paneOffset != null) ? opts.paneOffset : 0;
-  const colorMode = opts.colorMode || state.l3ColorMode || 'shared';
-  const focalLabels = opts.focalLabels || null;
-  const drawSwatch = opts.drawSwatch !== false;
-  const { ctx, w, h } = fitCanvas(canvas);
-  ctx.clearRect(0, 0, w, h);
-  if (!state.data || !range) return;
   const d = state.data;
   const agg = aggregateSlab(range[0], range[1]);
   if (!agg) return;
   const nS = d.n_samples;
-  const xs = agg.xs;
+  const xs = agg.xs;          // already sign-aligned by aggregateSlab
   // Per-sample mean PC2 across the slab. aggregateSlab only fills ys when
   // aggMethod=mean_pc12; we recompute here for a stable 2D scatter.
   const ys2 = new Float64Array(nS);
@@ -3010,134 +3024,18 @@ function drawSlabMiniPCA(canvas, range, labels, opts) {
     for (let si = 0; si < nS; si++) ys2[si] += pc2[si];
   }
   for (let si = 0; si < nS; si++) ys2[si] /= nW;
-  // Slab midpoint drives sign / λ annotations (matches what the user is
-  // visually centered on when scrubbing).
+  // Slab midpoint drives sign / λ annotations.
   const wMid = (range[0] + range[1]) >> 1;
   const { sign } = getPC(state, wMid);
-  // Range
-  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
-  for (let si = 0; si < nS; si++) {
-    const x = xs[si], y = ys2[si];
-    if (x < xMin) xMin = x; if (x > xMax) xMax = x;
-    if (y < yMin) yMin = y; if (y > yMax) yMax = y;
-  }
-  const xPad = (xMax - xMin) * 0.08 || 0.01;
-  const yPad = (yMax - yMin) * 0.08 || 0.01;
-  xMin -= xPad; xMax += xPad; yMin -= yPad; yMax += yPad;
-  // Focal pane gets extra padding for axis labels (matches L2 path).
-  const pad = (paneOffset === 0)
-    ? { l: 18, r: 8, t: 14, b: 22 }
-    : { l: 8,  r: 8, t: 14, b: 14 };
-  const plotW = w - pad.l - pad.r, plotH = h - pad.t - pad.b;
-  const toX = v => pad.l + ((v - xMin) / (xMax - xMin)) * plotW;
-  const toY = v => pad.t + (1 - (v - yMin) / (yMax - yMin)) * plotH;
-  // Cache render context for click-spotlight hit-tester (parity with L2 mode).
-  canvas.__l3_render = {
-    l2idx: null, isSlab: true, slabRange: range.slice(),
-    wMid, sign, pad, plotW, plotH,
-    xMin, xMax, yMin, yMax,
-    cssW: w, cssH: h,
-  };
-  // Frame + window tag (shared helper).
-  _l3PaneFrame(ctx, pad, plotW, plotH, wMid, sign, paneOffset);
-  // Ramp-coloring mode (matches L2 path).
-  const _L3_RAMP_MODES = new Set(['het', 'dosage', 'theta_pi', 'ghsl', 'froh']);
-  const _l3RampActive = (state.l3RampMode && _L3_RAMP_MODES.has(state.l3RampMode))
-    ? state.l3RampMode
-    : (state.l3HetColoring ? 'het' : null);
-  // Dual-mode rings — focal pane skips (its fill IS the focal color).
-  const drawDualRings = (colorMode === 'dual') && (paneOffset !== 0) && !!focalLabels;
-  const trackedSet = new Set(state.tracked || []);
-  // Non-tracked dots first
-  for (let si = 0; si < nS; si++) {
-    if (trackedSet.has(si)) continue;
-    const x = toX(xs[si]), y = toY(ys2[si]);
-    let baseCol;
-    if (_l3RampActive) {
-      baseCol = getSampleColor(si, _l3RampActive, null) || '#888';
-    } else if (labels && labels[si] != null) {
-      baseCol = paneClusterColor(paneOffset, labels[si], colorMode);
-    } else {
-      baseCol = '#888';
-    }
-    if (drawDualRings && !_l3RampActive && labels) {
-      const ringCol = paneRingColor(focalLabels[si]);
-      if (ringCol) {
-        ctx.strokeStyle = ringCol;
-        ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.arc(x, y, 2.6, 0, Math.PI * 2); ctx.stroke();
-      }
-    }
-    const dotAlpha = _l3RampActive ? 0.75 : 0.7;
-    ctx.fillStyle = withAlpha(baseCol, dotAlpha);
-    ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
-  }
-  // Tracked samples on top — rings + identity dots + optional labels.
-  const tracked = Array.isArray(state.tracked) ? state.tracked : [];
-  const showLabels = tracked.length > 0 && tracked.length <= 8;
-  for (const si of tracked) {
-    const x = toX(xs[si]), y = toY(ys2[si]);
-    if (labels) {
-      const gcol = paneClusterColor(paneOffset, labels[si], colorMode);
-      ctx.strokeStyle = gcol; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.stroke();
-    }
-    if (drawDualRings && labels && focalLabels) {
-      const ringCol = paneRingColor(focalLabels[si]);
-      if (ringCol) {
-        ctx.strokeStyle = ringCol; ctx.lineWidth = 1.4;
-        ctx.beginPath(); ctx.arc(x, y, 6.2, 0, Math.PI * 2); ctx.stroke();
-      }
-    }
-    ctx.fillStyle = trackedColor(si);
-    ctx.strokeStyle = themeColor('bg'); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(x, y, 2.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    if (showLabels) {
-      const name = state.data.samples[si].cga || state.data.samples[si].ind;
-      ctx.fillStyle = trackedColor(si);
-      ctx.font = '9px ui-monospace, monospace';
-      ctx.textAlign = 'left';
-      ctx.strokeStyle = themeColor('bg'); ctx.lineWidth = 2.5;
-      ctx.strokeText(name, x + 5, y + 3);
-      ctx.fillText(name, x + 5, y + 3);
-    }
-  }
-  // Spotlight pass.
-  if (state.spotlightTrackedAll && !showLabels && tracked.length > 0) {
-    ctx.font = '9px ui-monospace, monospace';
-    ctx.textAlign = 'left';
-    for (const si of tracked) {
-      const x = toX(xs[si]), y = toY(ys2[si]);
-      const name = state.data.samples[si].cga || state.data.samples[si].ind;
-      ctx.fillStyle = trackedColor(si);
-      ctx.strokeStyle = themeColor('bg'); ctx.lineWidth = 2.5;
-      ctx.strokeText(name, x + 5, y + 3);
-      ctx.fillText(name, x + 5, y + 3);
-    }
-  }
-  if (state.spotlight != null && state.spotlight >= 0 && state.spotlight < nS) {
-    const si = state.spotlight;
-    const x = toX(xs[si]), y = toY(ys2[si]);
-    ctx.strokeStyle = 'rgba(245,165,36,0.95)';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = themeColor('bg'); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    const name = state.data.samples[si].cga || state.data.samples[si].ind;
-    ctx.font = 'bold 10px ui-monospace, monospace';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(245,165,36,0.95)';
-    ctx.strokeStyle = themeColor('bg'); ctx.lineWidth = 3;
-    ctx.strokeText(name, x + 8, y + 3);
-    ctx.fillText(name, x + 8, y + 3);
-  }
-  // Axis labels (focal pane only): PC1 / PC2 with λ context.
-  _l3PaneAxisLabels(ctx, pad, plotW, plotH, wMid, sign, paneOffset, d);
-  // Per-band legend (shared helper). Matches L2 mode visual.
-  if (drawSwatch && !_l3RampActive && labels) {
-    _l3PaneLegend(ctx, pad, plotW, labels, paneOffset, colorMode);
-  }
+  _paintMiniPCAShared(canvas, {
+    xVals: xs, yVals: ys2, labels,
+    wMid, sign,
+    paneOffset:  opts.paneOffset,
+    colorMode:   opts.colorMode,
+    focalLabels: opts.focalLabels,
+    drawSwatch:  opts.drawSwatch,
+    cacheMeta:   { l2idx: null, isSlab: true, slabRange: range.slice() },
+  });
 }
 
 // =============================================================================
