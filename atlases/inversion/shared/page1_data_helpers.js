@@ -862,23 +862,111 @@ export function buildIndexes(state) {
 }
 
 // --- computePC1Signs(state) — legacy lines 9932-9950 ---
+//
+// 2026-05-27 rewrite: the legacy walking algorithm correlated each
+// window's PC1 with its *immediate predecessor* and flipped sign on a
+// negative correlation. That fails — visibly — when a window pair is
+// nearly uncorrelated (|cor| → 0): the sign choice is essentially
+// random, the chosen sign persists for every downstream window, and
+// the per-sample line traces in the lines panel cross each other to
+// form X-shaped braids instead of staying parallel.
+//
+// New algorithm: two passes anchored to a per-sample reference vector
+// built from the data itself.
+//
+//   Pass 1 (seed) — walking correlation, same as the legacy code, to
+//   produce a rough sign sequence we can use as a building block.
+//
+//   Pass 2 (reference) — for each sample, take the mean PC1 across
+//   all windows using the seed signs. That gives a stable per-sample
+//   "canonical PC1" — the long-term direction the sample sits on,
+//   averaged across the chromosome. Now correlate every window's RAW
+//   PC1 against that reference and flip when negative. This is
+//   independent per-window (no error propagation), and the reference
+//   is built from N windows so it's robust to per-window noise.
+//
+//   Hysteresis: when |cor against ref| < 0.10 the window has no
+//   reliable signal — keep the previous window's sign rather than
+//   flipping on noise. This stops the residual X-flips that survived
+//   pass 1.
 export function computePC1Signs(state) {
   if (!state || !state.data) return;
   const wins = state.data.windows;
-  const n = wins.length;
+  const n = wins ? wins.length : 0;
+  if (n === 0) { state.pc1Sign = new Float32Array(0); return; }
+
   const signs = new Float32Array(n);
+  // Pass 1: walking seed.
   signs[0] = 1;
-  let prev = wins[0].pc1;
+  let prev = wins[0] && wins[0].pc1;
   for (let i = 1; i < n; i++) {
-    const cur = wins[i].pc1;
+    const cur = wins[i] && wins[i].pc1;
+    if (!cur || !prev || cur.length === 0 || prev.length === 0) {
+      signs[i] = signs[i - 1] || 1;
+      if (cur) prev = cur;
+      continue;
+    }
+    const L = Math.min(prev.length, cur.length);
     let dot = 0, mp = 0, mc = 0;
-    for (let j = 0; j < cur.length; j++) {
-      dot += prev[j] * cur[j]; mp += prev[j] * prev[j]; mc += cur[j] * cur[j];
+    for (let j = 0; j < L; j++) {
+      const a = prev[j], b = cur[j];
+      if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+      dot += a * b; mp += a * a; mc += b * b;
     }
     const cor = dot / Math.sqrt(mp * mc + 1e-9);
-    signs[i] = (cor >= 0 ? 1 : -1) * signs[i - 1];
+    signs[i] = (cor >= 0 ? 1 : -1) * (signs[i - 1] || 1);
     prev = cur;
   }
+
+  // Pass 2: build a per-sample reference vector from the seed-aligned
+  // windows. ref[s] = mean over windows of (signs[w] * pc1[w][s]).
+  const nS = (wins[0] && wins[0].pc1 && wins[0].pc1.length) | 0;
+  if (nS === 0) { state.pc1Sign = signs; return; }
+  const ref = new Float32Array(nS);
+  const refN = new Int32Array(nS);
+  for (let i = 0; i < n; i++) {
+    const w = wins[i] && wins[i].pc1;
+    if (!w) continue;
+    const s = signs[i];
+    const L = Math.min(nS, w.length);
+    for (let j = 0; j < L; j++) {
+      const v = w[j];
+      if (!Number.isFinite(v)) continue;
+      ref[j] += s * v;
+      refN[j]++;
+    }
+  }
+  for (let j = 0; j < nS; j++) {
+    if (refN[j] > 0) ref[j] /= refN[j];
+  }
+
+  // Pass 3: re-align each window against the reference. Hysteresis on
+  // low-|cor| windows keeps them in line with their neighbour instead
+  // of being flipped by noise.
+  let lastSign = 1;
+  for (let i = 0; i < n; i++) {
+    const cur = wins[i] && wins[i].pc1;
+    if (!cur || cur.length === 0) {
+      signs[i] = lastSign;
+      continue;
+    }
+    const L = Math.min(ref.length, cur.length);
+    let dot = 0, mp = 0, mc = 0;
+    for (let j = 0; j < L; j++) {
+      const a = ref[j], b = cur[j];
+      if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+      dot += a * b; mp += a * a; mc += b * b;
+    }
+    const denom = Math.sqrt(mp * mc + 1e-9);
+    const cor = denom > 0 ? dot / denom : 0;
+    if (Math.abs(cor) < 0.10) {
+      signs[i] = lastSign;             // hysteresis — too noisy to call
+    } else {
+      signs[i] = (cor >= 0 ? 1 : -1);
+      lastSign = signs[i];
+    }
+  }
+
   state.pc1Sign = signs;
 }
 
