@@ -1131,6 +1131,22 @@ export function renderPage12(state) {
  * and pre-allocated geometry caches (_simGeom, _thSimGeom, _zGeom).
  */
 export async function mount(root, atlasState, registry) {
+  // 2026-05-27: this page used to assume local_pca_dosage had already
+  // mounted and pre-warmed inv.tracks[chrom] + inv.tracks_thetapi[chrom]
+  // via the registry. When the user navigates here directly (no prior
+  // local_pca_dosage visit) the slots are empty and the page renders
+  // blank with no error. Make the page self-sufficient: resolve the
+  // two scrubber_* layers ourselves before _buildLegacyState reads
+  // them. The registry's hot-tier cache hands back the cached value
+  // synchronously on the second call, so this is free when the
+  // prewarm did happen.
+  const chrom = atlasState.shared && atlasState.shared.activeChrom;
+  if (chrom && registry && typeof registry.resolve === 'function') {
+    await Promise.all([
+      Promise.resolve(registry.resolve('scrubber_main',    { chrom })).catch(() => null),
+      Promise.resolve(registry.resolve('scrubber_thetapi', { chrom })).catch(() => null),
+    ]);
+  }
   const legacyState = _buildLegacyState(atlasState);
   _setActiveState(legacyState);
 

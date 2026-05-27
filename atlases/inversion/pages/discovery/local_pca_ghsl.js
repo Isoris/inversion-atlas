@@ -617,6 +617,18 @@ export function renderGhslPanels(state) {
  * populate the five [data-gh-layer] indicator chips at mount time.
  */
 export async function mount(root, atlasState, registry) {
+  // 2026-05-27: same self-sufficiency fix as local_pca_theta_pi — when the
+  // user navigates here directly without first opening local_pca_dosage,
+  // the inv.tracks_ghsl[chrom] slot is empty and every GHSL panel
+  // renders the not-loaded chip. Resolve our two scrubber_* layers
+  // explicitly; hot-tier cache returns instantly on the second call.
+  const chrom = atlasState.shared && atlasState.shared.activeChrom;
+  if (chrom && registry && typeof registry.resolve === 'function') {
+    await Promise.all([
+      Promise.resolve(registry.resolve('scrubber_main', { chrom })).catch(() => null),
+      Promise.resolve(registry.resolve('scrubber_ghsl', { chrom })).catch(() => null),
+    ]);
+  }
   const legacyState = _buildLegacyState(atlasState);
   _setActiveState(legacyState);
 
@@ -656,11 +668,28 @@ export async function unmount(root) {
 
 function _buildLegacyState(atlasState) {
   const inv = atlasState.inversion || {};
+  const sh  = atlasState.shared    || {};
   const legacy = Object.assign({}, inv);
   // layersPresent: Set<layerName> — read by _refreshGhslLayerStatus.
   // Default to an empty Set so the chat-33 helper's `.has(layerName)`
   // call doesn't blow up on an undefined slot.
   legacy.layersPresent = inv.layersPresent || new Set();
-  legacy.activeChrom   = inv.activeChrom   || null;
+  legacy.activeChrom   = sh.activeChrom    || inv.activeChrom || null;
+  // 2026-05-27: actually populate legacy.data — the renderers read
+  // state.data.ghsl_panel + state.data.ghsl_kstripes, and the old
+  // _buildLegacyState left legacy.data undefined so every panel
+  // saw `undefined.ghsl_panel` and rendered the not-loaded state.
+  // Pull the chrom precomp from inv.tracks_ghsl[chrom] (pinned by
+  // the registry's scrubber_ghsl layer) merged with the dosage
+  // chrom precomp from inv.tracks[chrom] so shared fields
+  // (samples, windows, n_samples) survive.
+  const chrom = legacy.activeChrom;
+  const tracksZ    = (chrom && inv.tracks       && inv.tracks[chrom])       || null;
+  const tracksGhsl = (chrom && inv.tracks_ghsl  && inv.tracks_ghsl[chrom])  || null;
+  if (tracksZ || tracksGhsl) {
+    legacy.data = Object.assign({}, tracksZ || {}, tracksGhsl || {});
+  } else {
+    legacy.data = null;
+  }
   return legacy;
 }
