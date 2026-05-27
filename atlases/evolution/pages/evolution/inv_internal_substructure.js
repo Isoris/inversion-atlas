@@ -14,6 +14,11 @@ import { paintCanvasAxes } from '../../shared/canvas_axes.js';
 // — at that point this becomes evolution → cross-species cross-atlas.
 import { pcaForWindow } from '../../../cross-species/shared/mgl_pca_compute.js';
 
+/** Array-or-TypedArray guard — see evolution/shared/mgl_haplotype_network.js. */
+function _isVec(x) {
+  return Array.isArray(x) || (x != null && ArrayBuffer.isView(x) && typeof x.length === 'number');
+}
+
 export function refreshInternalHistory(state) {
   if (state) _setActiveState(state);
   _renderHeader(_pageState);
@@ -50,7 +55,7 @@ function _buildPageState(atlasState) {
   const src = inv.internal_history_state || null;
   // Slice dosage to inv-only columns, then call pcaForWindow.
   let pca = null;
-  if (src && src.dosage && Array.isArray(src.inv_idx) && src.inv_idx.length >= 2) {
+  if (src && src.dosage && _isVec(src.inv_idx) && src.inv_idx.length >= 2) {
     const isFlat = src.dosage instanceof Float64Array || ArrayBuffer.isView(src.dosage);
     const n_inv = src.inv_idx.length;
     const dosage_slice = new Float64Array(src.n_markers * n_inv);

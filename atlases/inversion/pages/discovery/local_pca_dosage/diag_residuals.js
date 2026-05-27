@@ -25,6 +25,16 @@
 
 import { kmeans2D } from '../../../shared/kmeans.js';
 
+/**
+ * Array-or-TypedArray guard. `Array.isArray(new Float32Array(...))` is
+ * **false**, so a plain `Array.isArray(w.pc1)` check silently skips the
+ * compute path for the production pc1 / pc2 / band_residual_z arrays
+ * (all of which are TypedArrays from kmeans2D / PCA / R precomp).
+ */
+function _isVec(x) {
+  return Array.isArray(x) || (x != null && ArrayBuffer.isView(x) && typeof x.length === 'number');
+}
+
 // =====================================================================
 // Thresholds (legacy lines 36341-36342)
 // =====================================================================
@@ -91,7 +101,7 @@ export function diagResidualColor(z) {
 export function diagComputeWindowResiduals(state, winIdx, k) {
   if (!state || !state.data || !state.data.windows) return null;
   const w = state.data.windows[winIdx];
-  if (!w || !Array.isArray(w.pc1) || !Array.isArray(w.pc2)) return null;
+  if (!w || !_isVec(w.pc1) || !_isVec(w.pc2)) return null;
   k = k || (state.k || 3);
   const cacheKey = winIdx + ':' + k;
   if (!state._diagCache) state._diagCache = {};
@@ -100,7 +110,7 @@ export function diagComputeWindowResiduals(state, winIdx, k) {
   // PRECOMP-PROVIDED PATH: w.band_residual_z is the eigenvalue-derived
   // residual from the R-side precomp. Same shape + semantics, more
   // robust than the atlas-side estimate.
-  if (Array.isArray(w.band_residual_z) && w.band_residual_z.length === w.pc1.length) {
+  if (_isVec(w.band_residual_z) && w.band_residual_z.length === w.pc1.length) {
     const result = {
       residuals: Float32Array.from(w.band_residual_z),
       labels: w.band ? Int8Array.from(w.band) : null,
@@ -218,7 +228,7 @@ export function diagComputeCandidateSuspicion(state, winLo, winHi, k) {
   const nWin = winHi - winLo + 1;
   if (nWin < 1) return null;
   const w0 = state.data.windows[winLo];
-  if (!w0 || !Array.isArray(w0.pc1)) return null;
+  if (!w0 || !_isVec(w0.pc1)) return null;
   const nS = w0.pc1.length;
 
   const sumZ = new Float64Array(nS);

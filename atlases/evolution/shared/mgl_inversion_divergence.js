@@ -24,6 +24,11 @@
 // Pure compute. No DOM.
 // =====================================================================
 
+/** Array-or-TypedArray guard — see mgl_haplotype_network.js for why. */
+function _isVec(x) {
+  return Array.isArray(x) || (x != null && ArrayBuffer.isView(x) && typeof x.length === 'number');
+}
+
 export const MGL_DIVERGENCE_DEFAULTS = Object.freeze({
   fix_threshold:       0.95,      // freq ≥ thr or ≤ 1-thr = "fixed"
   min_called_per_class: 4,
@@ -56,7 +61,7 @@ export function perSiteClassFrequencies(args) {
   const get = (mi, si) => isFlat ? a.dosage[mi * n_samples + si] : (a.dosage[mi] && a.dosage[mi][si]);
   for (let mi = 0; mi < n_markers; mi++) {
     let si_sum = 0, si_n = 0;
-    if (Array.isArray(a.inv_idx)) {
+    if (_isVec(a.inv_idx)) {
       for (const s of a.inv_idx) {
         const v = get(mi, s);
         if (v == null || !Number.isFinite(v) || v < 0) continue;
@@ -64,7 +69,7 @@ export function perSiteClassFrequencies(args) {
       }
     }
     let st_sum = 0, st_n = 0;
-    if (Array.isArray(a.std_idx)) {
+    if (_isVec(a.std_idx)) {
       for (const s of a.std_idx) {
         const v = get(mi, s);
         if (v == null || !Number.isFinite(v) || v < 0) continue;
@@ -237,7 +242,7 @@ export function ageClass(metrics) {
 export function computeDivergence(args) {
   const a = args || {};
   if (!a.dosage || !(a.n_markers > 0) || !(a.n_samples > 0)
-      || !Array.isArray(a.inv_idx) || !Array.isArray(a.std_idx)) {
+      || !_isVec(a.inv_idx) || !_isVec(a.std_idx)) {
     return {
       pi_inv: NaN, pi_std: NaN, dxy: NaN, fst_hudson: NaN,
       private_inv: 0, private_std: 0, fixed_differences: 0,

@@ -17,6 +17,17 @@
 // Pure compute. No DOM, no fetch.
 // =====================================================================
 
+/**
+ * Array-or-TypedArray guard. `Array.isArray(new Int32Array(...))` is
+ * **false**, so a plain `Array.isArray(a.inv_idx)` check silently
+ * rejects autoSeedInvIdx output (Int32Array) and every other typed
+ * caller. The JSDoc on this module says `number[]` for historical
+ * reasons, but in practice both shapes show up at the boundary.
+ */
+function _isVec(x) {
+  return Array.isArray(x) || (x != null && ArrayBuffer.isView(x) && typeof x.length === 'number');
+}
+
 export const MGL_HAPNET_DEFAULTS = Object.freeze({
   hamming_radius:        2,        // samples within this distance collapse
   carrier_threshold:     0.5,
@@ -44,7 +55,7 @@ export function buildCarrierMatrix(args) {
   const o = a.opts || {};
   const D = MGL_HAPNET_DEFAULTS;
   const thr = Number.isFinite(o.carrier_threshold) ? o.carrier_threshold : D.carrier_threshold;
-  if (!a.dosage || !Array.isArray(a.inv_idx)) {
+  if (!a.dosage || !_isVec(a.inv_idx)) {
     return new Uint8Array(0);
   }
   const n = a.inv_idx.length;
@@ -297,7 +308,7 @@ export function buildHaplotypeNetwork(args) {
   const o = a.opts || {};
   const D = MGL_HAPNET_DEFAULTS;
   const radius = Number.isFinite(o.hamming_radius) ? o.hamming_radius : D.hamming_radius;
-  if (!a.dosage || !Array.isArray(a.inv_idx) || a.inv_idx.length === 0) {
+  if (!a.dosage || !_isVec(a.inv_idx) || a.inv_idx.length === 0) {
     return { nodes: [], edges: [], sample_labels: new Int32Array(0),
              carrier_matrix: new Uint8Array(0),
              inter_distance: new Float64Array(0),

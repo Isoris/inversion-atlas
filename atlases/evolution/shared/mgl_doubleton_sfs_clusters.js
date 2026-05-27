@@ -25,6 +25,11 @@
 // Pure compute. No DOM, no fetch.
 // =====================================================================
 
+/** Array-or-TypedArray guard — see mgl_haplotype_network.js for why. */
+function _isVec(x) {
+  return Array.isArray(x) || (x != null && ArrayBuffer.isView(x) && typeof x.length === 'number');
+}
+
 /** Defaults. */
 export const MGL_DOUBLETON_DEFAULTS = Object.freeze({
   K_min:                 2,
@@ -72,7 +77,7 @@ export function buildDoubletonShareMatrix(args) {
   const D = MGL_DOUBLETON_DEFAULTS;
   const thr = Number.isFinite(o.carrier_threshold) ? o.carrier_threshold : D.carrier_threshold;
   const kTarget = Number.isFinite(o.k_target) ? o.k_target : D.k_target;
-  if (!a.dosage || !Array.isArray(a.inv_idx) || a.inv_idx.length < 2) {
+  if (!a.dosage || !_isVec(a.inv_idx) || a.inv_idx.length < 2) {
     return { shared: new Float64Array(0), per_sample_carrier: new Int32Array(0),
              n_doubleton_sites: 0 };
   }
@@ -241,7 +246,7 @@ export function clusterInvByDoubletonSharing(args) {
   const Kmax = Number.isFinite(o.K_max) ? o.K_max : D.K_max;
   const minGrp = Number.isFinite(o.min_group_size) ? o.min_group_size : D.min_group_size;
   const r = buildDoubletonShareMatrix(args);
-  const n = Array.isArray(a.inv_idx) ? a.inv_idx.length : 0;
+  const n = _isVec(a.inv_idx) ? a.inv_idx.length : 0;
   if (n < 2) {
     return {
       shared: r.shared, distance: new Float64Array(0),
@@ -290,7 +295,7 @@ export function clusterInvByDoubletonSharing(args) {
  */
 export function perClusterMeanDosage(args) {
   const a = args || {};
-  if (!a.dosage || !(a.n_markers > 0) || !Array.isArray(a.inv_idx)
+  if (!a.dosage || !(a.n_markers > 0) || !_isVec(a.inv_idx)
       || !a.labels || !(a.K_actual > 0)) return [];
   const out = new Array(a.K_actual);
   for (let k = 0; k < a.K_actual; k++) out[k] = new Float64Array(a.n_markers);

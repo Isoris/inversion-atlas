@@ -19,6 +19,11 @@
 // Pure compute. No DOM.
 // =====================================================================
 
+/** Array-or-TypedArray guard — see mgl_haplotype_network.js for why. */
+function _isVec(x) {
+  return Array.isArray(x) || (x != null && ArrayBuffer.isView(x) && typeof x.length === 'number');
+}
+
 export const MGL_MOSAICISM_DEFAULTS = Object.freeze({
   window_size_markers:    20,
   carrier_threshold:      0.5,
@@ -49,7 +54,7 @@ export function classMeansPerSite(args) {
   const get = (mi, si) => isFlat ? a.dosage[mi * n_samples + si] : (a.dosage[mi] && a.dosage[mi][si]);
   for (let mi = 0; mi < n_markers; mi++) {
     let si_sum = 0, si_n = 0;
-    if (Array.isArray(a.inv_idx)) {
+    if (_isVec(a.inv_idx)) {
       for (const s of a.inv_idx) {
         const v = get(mi, s);
         if (v == null || !Number.isFinite(v) || v < 0) continue;
@@ -58,7 +63,7 @@ export function classMeansPerSite(args) {
     }
     inv_mean[mi] = si_n > 0 ? si_sum / si_n : NaN;
     let st_sum = 0, st_n = 0;
-    if (Array.isArray(a.std_idx)) {
+    if (_isVec(a.std_idx)) {
       for (const s of a.std_idx) {
         const v = get(mi, s);
         if (v == null || !Number.isFinite(v) || v < 0) continue;
@@ -98,7 +103,7 @@ export function perWindowLeakage(args) {
   const wsize = Number.isFinite(o.window_size_markers) ? o.window_size_markers : D.window_size_markers;
   const minInf = Number.isFinite(o.min_informative) ? o.min_informative : D.min_informative;
   const leakThr = Number.isFinite(o.per_window_leak_thresh) ? o.per_window_leak_thresh : D.per_window_leak_thresh;
-  if (!a.dosage || !Array.isArray(a.inv_idx) || a.inv_idx.length === 0) {
+  if (!a.dosage || !_isVec(a.inv_idx) || a.inv_idx.length === 0) {
     return { per_sample_per_window: new Float64Array(0),
              per_sample_leakage: new Float64Array(0),
              per_window_mean: new Float64Array(0),
