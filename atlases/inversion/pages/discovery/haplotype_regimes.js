@@ -61,6 +61,7 @@ export async function mount(root, atlasState, registry) {
   // Build the legacy-shape state object the panels expect.
   const state = _buildLegacyState(atlasState);
   state._atlasState = atlasState;       // ref so afterPipelineRun can stash
+  state._pageId = 'haplotype_regimes';  // namespaces stash slot + localStorage keys
   _pageState = state;
 
   const chrom = atlasState.shared && atlasState.shared.activeChrom;
@@ -108,6 +109,9 @@ export async function mount(root, atlasState, registry) {
   // with the stored result so all 4 panels + seed strip + L3 pairs
   // table reappear without re-running the (slow) pipeline.
   const stash = atlasState.inversion && atlasState.inversion._haplotype_regimes_stash;
+  // (kept the literal slot name here for back-compat with the
+  // pre-rename localStorage / atlasState reads; afterPipelineRun now
+  // writes the same slot via the state._pageId namespacing.)
   if (stash && stash.chrom === chrom && stash.result) {
     try {
       // afterPipelineRun reads from state._regimesResult downstream

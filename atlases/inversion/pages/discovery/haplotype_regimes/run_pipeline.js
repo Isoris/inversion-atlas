@@ -260,11 +260,15 @@ export function afterPipelineRun(root, state, result, opts) {
     });
   } catch (e) { console.warn('renderL3PairsTable:', e); }
 
-  // Stash on atlasState for cross-mount restore.
+  // Stash on atlasState for cross-mount restore. Slot is namespaced by
+  // state._pageId so haplotype_regimes (long/het modes) and
+  // candidate_regimes (short mode) don't overwrite each other's
+  // cached result when the user tabs between them.
   try {
     const atlas = state && state._atlasState;
     if (atlas && atlas.inversion) {
-      atlas.inversion._haplotype_regimes_stash = {
+      const pageId = state._pageId || 'haplotype_regimes';
+      atlas.inversion['_' + pageId + '_stash'] = {
         chrom:  state.activeChrom,
         result: result,
         opts:   opts || {},

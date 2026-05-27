@@ -38,14 +38,27 @@ export function wireActionBar(root, state, atlasState) {
   //   'long'  — V-walker (runBandingPipeline Stages 1-4)
   //   'short' — curated candidates from local_pca_dosage
   //   'het'   — het-skeleton (Cluster 1 Path B)
+  //
+  // 2026-05-27 Part A: the candidate_regimes page forces 'short' mode
+  // (no mode toggle visible). The page sets state._regimesMode before
+  // wiring; we only fall through to the default + localStorage restore
+  // when the mode bar exists in the DOM (i.e., haplotype_regimes is
+  // mounted).
   // -------------------------------------------------------------------
-  state._regimesMode = state._regimesMode || 'long';
-  try {
-    const saved = localStorage.getItem('haplotype_regimes.mode');
-    if (saved === 'short' || saved === 'long' || saved === 'het') {
-      state._regimesMode = saved;
-    }
-  } catch (_) {}
+  const pageId = state._pageId || 'haplotype_regimes';
+  const modeKey = pageId + '.mode';
+  const hasModeBar = !!root.querySelector('#rgModeBar');
+  if (hasModeBar) {
+    state._regimesMode = state._regimesMode || 'long';
+    try {
+      const saved = localStorage.getItem(modeKey);
+      if (saved === 'short' || saved === 'long' || saved === 'het') {
+        state._regimesMode = saved;
+      }
+    } catch (_) {}
+  } else if (!state._regimesMode) {
+    state._regimesMode = 'short';
+  }
   const runBtnTooltip = (mode) => {
     if (mode === 'short') return "Build seeds from the local_pca_dosage candidate list (no auto-discovery — review what you've drafted).";
     if (mode === 'het')   return "Het-skeleton mode: per-window K-means → het_detect_candidate_band → het_track_skeleton → hom_anchor_to_het → cramers_v_merge. Then breadth voting + refineRegimesFromIntervals.";
@@ -61,7 +74,7 @@ export function wireActionBar(root, state, atlasState) {
       b.classList.toggle('active', b.dataset.rgMode === state._regimesMode);
       b.addEventListener('click', () => {
         state._regimesMode = b.dataset.rgMode;
-        try { localStorage.setItem('haplotype_regimes.mode', state._regimesMode); } catch (_) {}
+        try { localStorage.setItem(modeKey, state._regimesMode); } catch (_) {}
         modeBar.querySelectorAll('button[data-rg-mode]').forEach(b2 => {
           b2.classList.toggle('active', b2 === b);
         });
@@ -77,8 +90,9 @@ export function wireActionBar(root, state, atlasState) {
   // View toggle (independent of mode).
   // -------------------------------------------------------------------
   state._regimesView = state._regimesView || 'seeds';
+  const viewKey = pageId + '.view';
   try {
-    const savedView = localStorage.getItem('haplotype_regimes.view');
+    const savedView = localStorage.getItem(viewKey);
     if (savedView === 'seeds' || savedView === 'regimes') {
       state._regimesView = savedView;
     }
@@ -89,7 +103,7 @@ export function wireActionBar(root, state, atlasState) {
       b.classList.toggle('active', b.dataset.rgView === state._regimesView);
       b.addEventListener('click', () => {
         state._regimesView = b.dataset.rgView;
-        try { localStorage.setItem('haplotype_regimes.view', state._regimesView); } catch (_) {}
+        try { localStorage.setItem(viewKey, state._regimesView); } catch (_) {}
         viewBar.querySelectorAll('button[data-rg-view]').forEach(b2 => {
           b2.classList.toggle('active', b2 === b);
         });
