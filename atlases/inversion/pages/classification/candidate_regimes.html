@@ -1,7 +1,7 @@
-  <div id="haplotype_regimes" class="page">
+  <div id="candidate_regimes" class="page">
     <div class="rg-content" style="display: flex; flex-direction: column; height: 100%; min-height: 0; position: relative;">
 
-      <!-- Header bar: focal voter info + mode toggles + compute genome button -->
+      <!-- Header bar -->
       <div id="regimesPageHeader" class="rg-header" style="
         flex: 0 0 auto;
         padding: 8px 12px;
@@ -15,38 +15,31 @@
         align-items: center;
         flex-wrap: wrap;
       ">
-        <!-- Auto-populated by _renderHeader() in regimes_page.js -->
-        <span style="color: var(--ink-dim, #8895a8);">Long-range haplotype regimes — load a chromosome and run the pipeline.</span>
+        <span style="color: var(--ink-dim, #8895a8);">Candidate regimes — refine local_pca_dosage candidates into multi-arrangement regimes.</span>
       </div>
 
-      <!-- Caution banner explaining what this page shows -->
+      <!-- Caution / orientation banner -->
       <div class="caution-banner" role="note" style="margin: 8px 12px;">
         <div class="caution-banner-icon" aria-hidden="true">&#9888;</div>
         <div class="caution-banner-body">
-          <div class="caution-banner-title">Stage 4 bruteforce projection &mdash; per-band voters across the genome</div>
+          <div class="caution-banner-title">Refine the user-curated candidate list, not the whole-chromosome scan</div>
           <div>
-            Each panel below shows where one <b>focal voter</b> (a stable
-            band of a seed locus) lands across target windows. Use the
-            arrow keys to navigate seeds (<code>&larr;/&rarr;</code>),
-            band combos (<code>&uarr;/&darr;</code>), and chromosomes
-            (<code>c</code>). Press <code>g</code> to enable the
-            genome-scope panels (right column). The "you are here" rectangle
-            tints by macro-band dosage class when a dosage source is wired.
+            This page consumes the <b>candidates</b> you promoted in
+            <code>local_pca_dosage</code> (lock&nbsp;colors&nbsp;→&nbsp;★&nbsp;promote
+            or L3-draft confirm) and runs Cluster&nbsp;2&nbsp;+&nbsp;3
+            (breadth voting, refineRegimesFromIntervals, topology chains,
+            annotations) against them. No V-walker. No auto-discovery.
+            Use the <i>adjacent-L2 V table</i> below to spot boundary
+            merges, and <i>auto-merge V</i> to fuse chains of related
+            candidates.
+            <br/>
+            For long-range chromosome-wide discovery, go to the
+            <b>haplotype_regimes</b> page (V-walker / het-skeleton).
           </div>
         </div>
       </div>
 
-      <!-- 2026-05-20: "what to do next" interpretation drawer. Hidden
-           until the pipeline has run and produced at least one seed
-           (toggled visible by _renderSeedsStrip in haplotype_regimes.js
-           when seeds.length > 0). Quentin's feedback: "we have some
-           results but like idk what to do" — this drawer answers that
-           by mapping discovered artifacts (seeds / loci / regimes) to
-           concrete next actions (inspect / promote / merge / export).
-           Post-feedback 2026-05-20: collapsed into a small ? icon
-           pinned to the page's top-right corner (position: absolute
-           relative to .rg-content). Click the icon to expand the
-           full reading guide as a popover card. -->
+      <!-- Interpretation drawer (collapsed ? icon) -->
       <details id="rgInterpretDrawer" style="
         position: absolute;
         top: 14px;
@@ -87,58 +80,33 @@
         ">
           <div style="margin-bottom: 6px;">
             <b style="color: var(--accent, #f5a524);">Each chip in the seeds strip below</b>
-            is one <b>Stage&nbsp;1 seed</b> the pipeline discovered — a
-            window range where the K-band labels shift consistently
-            enough to suggest a haplotype regime boundary. Use
-            <code>←</code>/<code>→</code> or click a chip to set the
-            <b>focal&nbsp;seed</b>; the 4 panels below repaint to show
-            how that seed's voter projects across the chromosome.
+            is one <b>candidate</b> you promoted in local_pca_dosage,
+            wrapped as a pipeline pseudo-locus so the Cluster&nbsp;2&nbsp;+&nbsp;3
+            tail can refine it. Use <code>←</code>/<code>→</code> or
+            click a chip to set the <b>focal&nbsp;candidate</b>.
           </div>
           <div style="margin-bottom: 6px;">
-            <b style="color: var(--accent, #f5a524);">Top-left panel (chrom · target-band lanes):</b>
-            for the focal seed's voter (a chosen subset of bands), where does each
-            target window classify? Solid bands = clean projection;
-            scattered = noisy. <b style="color: var(--accent, #f5a524);">Bottom-left
-            (chrom · PC1 lines):</b> the raw per-sample PC1 with the
-            voter samples highlighted in gold. Genome-scope panels
-            (right column) only appear after <i>Show genome view</i> +
-            <i>Compute genome view</i>.
+            <b style="color: var(--accent, #f5a524);">L3 adjacent-pair Cramér's V table:</b>
+            high V = the two L2 envelopes see the same haplotype
+            structure across their boundary. Click <i>merge</i> on a
+            high-V row to fuse them into a single candidate.
           </div>
           <div style="margin-bottom: 4px;">
             <b style="color: var(--accent, #f5a524);">Action menu:</b>
           </div>
           <ul style="margin: 0 0 0 18px; padding: 0;">
-            <li><b>★ promote seed</b> — turn the focal seed into a
-              tracked candidate inversion (appears in local_pca_dosage's
-              candidate carousel and is persisted to localStorage).</li>
-            <li><b>↻ auto-merge V</b> — walk every adjacent seed pair
-              and auto-promote consecutive-MERGE chains as candidates
-              (Cramér's V on Hungarian-aligned labels).</li>
-            <li><b>↻ auto-merge V<sub style="font-size:8px;">macro</sub></b> — same,
-              but bounded WITHIN each Stage&nbsp;3 macrostripe so the
-              walker never crosses locus boundaries.</li>
-            <li><b>export catalogue…</b> — serialize the in-memory
-              pipeline result (seeds + loci + regimes + topology) to
-              a regime-catalogue JSON for archival / downstream tools.</li>
-            <li><b>switch view → long-range regimes</b> — replace the
-              seeds strip with the refined regime blocs (Cluster&nbsp;3
-              output) when you want the consolidated picture instead of
-              raw seed-by-seed inspection.</li>
+            <li><b>build regimes</b> — run Cluster&nbsp;2&nbsp;+&nbsp;3
+              against your candidate list. Output: refined regimes +
+              topology chains + annotations.</li>
+            <li><b>↻ auto-merge V</b> — walk adjacent candidate seeds,
+              auto-promote consecutive-MERGE chains as new candidates.</li>
+            <li><b>export catalogue…</b> — serialize the in-memory result
+              (manifest + knobs + catalogue.json triple).</li>
           </ul>
-          <div style="margin-top: 8px; color: var(--ink-dim, #8895a8); font-size: 9.5px;">
-            Don't see anything useful? Try a different <b>seed mode</b>
-            (long-range / short-range / het-skeleton) in the top-left
-            pill group, then click <b>run pipeline</b> again. Each mode
-            uses a different seed-discovery strategy.
-          </div>
         </div>
       </details>
 
-      <!-- 2026-05-20: seeds inspector strip. Horizontal scrollable chip
-           list — one chip per Stage 1 seed produced by the pipeline.
-           Click a chip to set focal_seed_index + repaint the 4 panels.
-           Hidden until the pipeline produces seeds; populated by
-           _renderSeedsStrip() in haplotype_regimes.js. -->
+      <!-- Seeds inspector strip (one chip per candidate) -->
       <div id="rgSeedsStripWrap" style="
         flex: 0 0 auto;
         margin: 0 12px 8px 12px;
@@ -160,16 +128,11 @@
           color: var(--ink-dimmer, #5a6472);
           letter-spacing: 0.05em;
           text-transform: uppercase;
-        ">seeds:</span>
+        ">candidates:</span>
         <div id="rgSeedsStripList" style="display: inline-flex; gap: 4px; align-items: center;"></div>
       </div>
 
-      <!-- 2026-05-20: refined long-range regime blocs (Cluster 3 output).
-           Visible only when the view toggle is set to 'regimes'. One row
-           per refined regime from haplotype_regime.refineRegimesFromIntervals,
-           showing bp span + member intervals + HOM/HET core sizes +
-           cross-regime topology chain id. Populated by
-           _renderRegimesSummary() in haplotype_regimes.js. -->
+      <!-- Refined regimes summary table -->
       <div id="rgRegimesWrap" style="
         flex: 0 0 auto;
         margin: 0 12px 8px 12px;
@@ -194,10 +157,10 @@
           letter-spacing: 0.05em;
           text-transform: uppercase;
         ">
-          <span>long-range regimes</span>
+          <span>regimes</span>
           <span id="rgRegimesCount" style="font-weight: 600; text-transform: none;"></span>
           <span style="margin-left: auto; font-weight: 400; text-transform: none; color: var(--ink-dim, #8895a8);"
-                title="Refined regimes from haplotype_regime.refineRegimesFromIntervals + regime_topology cross-regime chains. Each row is one regime; columns are: id, bp span, n_intervals, HOM_A / HOM_B / HET core sizes, chain id (if part of a cross-regime CHAINED chain).">columns: id / chrom / bp span / n_intervals / hom_a / hom_b / het / chain</span>
+                title="Refined regimes from haplotype_regime.refineRegimesFromIntervals. Each row is one regime; columns are: id, bp span, n_intervals, HOM_A / HOM_B / HET core sizes, chain id.">columns: id / chrom / bp span / n_intervals / hom_a / hom_b / het / chain</span>
         </div>
         <table id="rgRegimesTable" style="
           width: 100%;
@@ -221,7 +184,6 @@
         margin: 0 12px 12px 12px;
         border: 1px solid var(--rule, #2a3242);
       ">
-        <!-- Top-left: chrom-scope target-band lanes (always visible) -->
         <div id="regimesPanel" style="
           background: var(--panel-1, #0f141d);
           display: flex;
@@ -237,7 +199,6 @@
           <div id="regimesCanvasContainer" style="flex: 1 1 0; min-height: 0; position: relative;"></div>
         </div>
 
-        <!-- Top-right: genome-scope target-band lanes (opt-in via 'g' key) -->
         <div id="regimesGenomePanel" style="
           background: var(--panel-1, #0f141d);
           display: none;
@@ -253,7 +214,6 @@
           <div id="regimesGenomeCanvasContainer" style="flex: 1 1 0; min-height: 0; position: relative;"></div>
         </div>
 
-        <!-- Bottom-left: chrom-scope PC1 lines (always visible) -->
         <div id="regimesPC1Panel" style="
           background: var(--panel-1, #0f141d);
           display: flex;
@@ -269,7 +229,6 @@
           <div id="regimesPC1CanvasContainer" style="flex: 1 1 0; min-height: 0; position: relative;"></div>
         </div>
 
-        <!-- Bottom-right: genome-scope PC1 lines (opt-in) -->
         <div id="regimesPC1GenomePanel" style="
           background: var(--panel-1, #0f141d);
           display: none;
@@ -286,13 +245,7 @@
         </div>
       </div>
 
-      <!-- 2026-05-20: L3 adjacent-pair Cramér's V mini-table. Shown
-           ONLY in short-range mode — surfaces every adjacent (L2_i,
-           L2_{i+1}) pair on the active chromosome with its Cramér's V
-           between Hungarian-aligned K-means labels. High V = the two
-           L2s see the same haplotype structure → candidate merge. A
-           "merge" button per row promotes the joined range as a new
-           candidate via the existing addCandidateToList plumbing. -->
+      <!-- L3 adjacent-pair Cramér's V mini-table — visible in short mode -->
       <div id="rgL3PairsWrap" style="
         flex: 0 0 auto;
         margin: 0 12px 12px 12px;
@@ -349,7 +302,7 @@
         </div>
       </div>
 
-      <!-- Bottom action bar: catalogue export + status -->
+      <!-- Action bar — no mode-toggle bar (this page is always short mode) -->
       <div class="rg-actionbar" style="
         flex: 0 0 auto;
         padding: 8px 12px;
@@ -362,40 +315,7 @@
         gap: 12px;
         align-items: center;
       ">
-        <!-- 2026-05-20: mode toggle. Long-range = the V-walker Stage 1
-             seed discovery + Stage 3 locus construction (the default
-             pipeline). Short-range = use the user's curated candidate
-             list as seeds — no V-walker, no auto-discovery. Helpful for
-             reviewing user-flagged regions instead of waiting for the
-             whole-chrom sweep. -->
-        <span id="rgModeBar" title="Seed source for the pipeline."
-              style="display: inline-flex; align-items: center; gap: 2px;
-                     background: var(--panel-2, #181d27);
-                     border: 1px solid var(--rule, #2a3242);
-                     border-radius: 3px; padding: 1px 2px;
-                     font: 10px ui-monospace, monospace;">
-          <span style="color: var(--ink-dimmer, #5a6472); padding: 0 6px 0 4px;">seeds:</span>
-          <button type="button" data-rg-mode="long" class="active"
-                  title="Stage 1 V-walker: anchor sweep + Cramér's V boundary detection across the whole chromosome.">long-range</button>
-          <button type="button" data-rg-mode="het"
-                  title="Het-skeleton: per-window K-means → het_detect_candidate_band → het_track_skeleton → hom_anchor_to_het → cramers_v_merge. No band_quality gate, no V-walker. Matches the band_tracking/index.js Layer 1 order.">het-skeleton</button>
-          <!-- 2026-05-27: short-range mode lifted out to its own page
-               (classification / candidate_regimes). The pill below is
-               just a navigation hint — click it to jump there. -->
-          <a class="rg-mode-link" href="#/inversion/candidate_regimes"
-             title="Short-range — refine the local_pca_dosage candidate list. Now its own page in the classification stage."
-             style="text-decoration: none; display: inline-block;
-                    padding: 0 8px; line-height: 22px;
-                    color: var(--accent, #f5a524);
-                    border-left: 1px solid var(--rule, #2a3242);">
-            short-range &rarr;
-          </a>
-        </span>
-        <!-- View toggle: independent of seed source. Switches the
-             below-the-fold section between the per-seed strip
-             (seeds view) and the refined long-range regime blocs
-             (regimes view). The 4 canvases above stay the same in
-             both views. -->
+        <!-- View toggle (independent of mode). -->
         <span id="rgViewBar" title="What to show below the 4 panels."
               style="display: inline-flex; align-items: center; gap: 2px;
                      background: var(--panel-2, #181d27);
@@ -404,12 +324,12 @@
                      font: 10px ui-monospace, monospace;">
           <span style="color: var(--ink-dimmer, #5a6472); padding: 0 6px 0 4px;">view:</span>
           <button type="button" data-rg-view="seeds" class="active"
-                  title="Show the per-seed strip (raw seeds + their anchor band-quality).">seeds</button>
+                  title="Show the per-candidate chip strip.">seeds</button>
           <button type="button" data-rg-view="regimes"
-                  title="Show the refined long-range regime blocs from Cluster 3 (haplotype_regime.refineRegimesFromIntervals + regime_topology cross-regime chains).">long-range regimes</button>
+                  title="Show the refined regimes table.">regimes</button>
         </span>
         <button id="rgExportCatalogueBtn" class="rg-tb-btn" disabled
-          title="Serialize the in-memory pipeline result to a regime catalogue JSON. Disabled until the pipeline has run."
+          title="Serialize the in-memory pipeline result to a regime catalogue JSON. Disabled until 'build regimes' has run."
           style="
             background: var(--panel-3, #232a36);
             color: var(--ink, #e6edf6);
@@ -419,7 +339,7 @@
             cursor: pointer;
           ">export catalogue&hellip;</button>
         <button id="rgRunPipelineBtn" class="rg-tb-btn"
-          title="Run runBandingPipeline against the active chromosome's per-window labels."
+          title="Run Cluster 2 + 3 against your local_pca_dosage candidate list. Builds refined regimes + topology + annotations."
           style="
             background: var(--panel-3, #232a36);
             color: var(--ink, #e6edf6);
@@ -427,15 +347,9 @@
             padding: 4px 10px;
             font: inherit;
             cursor: pointer;
-          ">run pipeline</button>
-        <!-- 2026-05-20: promote the focal Stage 1 seed to a candidate inversion.
-             Disabled until the pipeline has run AND a seed is focal (the
-             keyboard nav selects one by default after init). Reuses the
-             addCandidateToList + setCandidate plumbing local_pca_dosage uses
-             for lock-based promotions, so a promoted seed shows up in the
-             same candidate carousel + persists to localStorage. -->
+          ">build regimes</button>
         <button id="rgPromoteSeedBtn" class="rg-tb-btn" disabled
-          title="Promote the focal Stage 1 seed to a candidate inversion. The seed's anchor labels become the candidate's locked labels; the seed footprint becomes start_w/end_w. Disabled until 'run pipeline' produces a seed."
+          title="Re-promote the focal candidate (sets it active in the candidate carousel). Disabled until 'build regimes' has run."
           style="
             background: var(--panel-3, #232a36);
             color: var(--ink, #e6edf6);
@@ -443,18 +357,9 @@
             padding: 4px 10px;
             font: inherit;
             cursor: pointer;
-          ">&#9733; promote seed&hellip;</button>
-        <!-- 2026-05-20: auto-merge adjacent Stage 1 seeds via Cramér's V
-             (Mode 1 = insulated_local). Walks every adjacent seed pair,
-             runs a Hungarian-aligned K×K contingency test, groups
-             consecutive MERGE verdicts into chains, then promotes each
-             multi-seed chain as a candidate spanning seeds[start].s_window
-             to seeds[end].e_window. SPEC_cramers_v_seed_merge.md Phase 1
-             deliverable #2 (the UI half — compute is in
-             shared/cramers_v_merge.js). Disabled until a pipeline run
-             produces ≥ 2 seeds. -->
+          ">&#9733; focal&hellip;</button>
         <button id="rgAutoMergeBtn" class="rg-tb-btn" disabled
-          title="Walk adjacent Stage 1 seeds, run the Cramér's V contingency test (Hungarian-aligned K-band labels), and auto-promote each consecutive-MERGE chain as a candidate inversion. Insulated_local: never compares non-adjacent seeds. Disabled until 'run pipeline' produces ≥ 2 seeds."
+          title="Walk adjacent candidates, run the Cramér's V contingency test, and auto-promote each consecutive-MERGE chain as a new candidate. Disabled until 'build regimes' produces ≥ 2 candidates."
           style="
             background: var(--panel-3, #232a36);
             color: var(--ink, #e6edf6);
@@ -463,19 +368,8 @@
             font: inherit;
             cursor: pointer;
           ">&#8634; auto-merge V&hellip;</button>
-        <!-- 2026-05-20: Mode 2 (post_long_range) — same Cramér's V
-             adjacent-pair test, but bounded WITHIN each Stage 3
-             macrostripe so the walker never compares seeds across
-             loci. Long-range Stage 2 voting has already established
-             macrostripe identity; this mode does the finer-grained
-             "where does the macrostripe START and STOP" boundary
-             refinement. SPEC_cramers_v_seed_merge.md Phase 1
-             deliverable #2 (Mode 2 UI half). Compute lives in
-             shared/cramers_v_merge.js#runCramersVMergeMacrostripe.
-             Disabled until a pipeline run produces ≥ 1 macrostripe
-             that contains ≥ 2 seeds. -->
         <button id="rgAutoMergeMacroBtn" class="rg-tb-btn" disabled
-          title="Walk adjacent Stage 1 seeds WITHIN each Stage 3 macrostripe, run the Cramér's V contingency test, and auto-promote each consecutive-MERGE chain as a candidate. Macrostripe-bounded: never crosses locus boundaries. Disabled until 'run pipeline' produces ≥ 1 macrostripe with ≥ 2 seeds inside."
+          title="Walk adjacent candidates WITHIN each macrostripe, run the Cramér's V test, and auto-promote MERGE chains. Disabled until 'build regimes' produces ≥ 1 macrostripe with ≥ 2 candidates inside."
           style="
             background: var(--panel-3, #232a36);
             color: var(--ink, #e6edf6);
@@ -485,7 +379,7 @@
             cursor: pointer;
           ">&#8634; auto-merge V<sub style="font-size: 8px;">macro</sub>&hellip;</button>
         <span id="rgStatus" style="margin-left: auto; color: var(--ink-dim, #8895a8);">
-          idle &middot; pipeline not yet run
+          idle &middot; build regimes from your candidates
         </span>
       </div>
 
