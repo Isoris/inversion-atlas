@@ -114,3 +114,53 @@ export function regimeGroupsFromBands(bandPerSample, data, opts) {
     opts,
   );
 }
+
+// =============================================================================
+// regimeGroupsFromCalls — popstats-shaped groups from the regime-consistency
+// SAMPLE_REGIME_CALLS vocabulary (homA_like / het_like / homB_like / uncertain).
+// =============================================================================
+//
+// Input is the sample_regime_calls[] sub-array from the regime_summary_bundle
+// (one row per sample × candidate), filtered to a single candidate (or already
+// scoped to one). Output mirrors candidateGroupsFromLabels's shape so popstats
+// consumers don't need a special case:
+//
+//   { groups: { 'H1/H1': [sids…], 'H1/H2': [sids…], 'H2/H2': [sids…],
+//               'uncertain': [sids…] },
+//     n_per_group: {…},
+//     dropped_unknown: 0 }
+//
+// Mapping:
+//   homA_like → H1/H1
+//   het_like  → H1/H2
+//   homB_like → H2/H2
+//   uncertain → 'uncertain' (kept separate; popstats can drop or include)
+//
+// labelStyle: 'server' (default) emits the H1/H1 vocab popstats expects;
+// 'regime_call' keeps the raw homA_like/het_like/homB_like/uncertain keys.
+
+const _REGIME_CALL_TO_SERVER = Object.freeze({
+  homA_like: 'H1/H1',
+  het_like:  'H1/H2',
+  homB_like: 'H2/H2',
+  uncertain: 'uncertain',
+});
+
+export function regimeGroupsFromCalls(sample_calls, opts) {
+  if (!Array.isArray(sample_calls) || sample_calls.length === 0) return null;
+  const style = (opts && opts.labelStyle) || 'server';
+  const map = (style === 'server') ? _REGIME_CALL_TO_SERVER : null;
+  const groups = Object.create(null);
+  const n_per_group = Object.create(null);
+  let dropped_unknown = 0;
+  for (const row of sample_calls) {
+    if (!row || !row.sample_id) { dropped_unknown++; continue; }
+    const raw = row.regime_call;
+    if (!raw) { dropped_unknown++; continue; }
+    const key = map ? (map[raw] || raw) : raw;
+    if (!groups[key]) { groups[key] = []; n_per_group[key] = 0; }
+    groups[key].push(row.sample_id);
+    n_per_group[key]++;
+  }
+  return { groups, n_per_group, dropped_unknown };
+}

@@ -474,6 +474,17 @@ export function buildCatalogue(bandingResult, args) {
         if (samplesByCand.has(key)) rec.regime_sample_calls      = samplesByCand.get(key);
         if (windowsByCand.has(key)) rec.regime_window_support    = windowsByCand.get(key);
         if (qcByCand.has(key))      rec.regime_qc                = qcByCand.get(key);
+
+        // Pre-aggregate sample IDs by regime call into the popstats group
+        // shape ({'H1/H1': [...], 'H1/H2': [...], 'H2/H2': [...], 'uncertain': [...]}).
+        // Downstream consumers (popstats, gene annotation, age inference)
+        // read rec.regime_groups directly instead of re-grouping
+        // rec.regime_sample_calls on every load.
+        if (rec.regime_sample_calls) {
+          const groups = _groupCallsByServerLabel(rec.regime_sample_calls);
+          rec.regime_groups = groups.groups;
+          rec.n_per_regime  = groups.n_per_group;
+        }
       }
     }
     records.push(rec);
@@ -516,6 +527,29 @@ export function buildCatalogue(bandingResult, args) {
     knobs: args.resolved_opts,
     catalogue: records,
   };
+}
+
+// 2026-05-27: Local copy of the regime_call → popstats-server label map
+// (kept in shared/candidate_groups.js as _REGIME_CALL_TO_SERVER). Duped
+// here so this module stays self-contained — no cross-import.
+const _REGIME_CALL_TO_SERVER_LABEL = Object.freeze({
+  homA_like: 'H1/H1',
+  het_like:  'H1/H2',
+  homB_like: 'H2/H2',
+  uncertain: 'uncertain',
+});
+
+function _groupCallsByServerLabel(sample_calls) {
+  const groups = Object.create(null);
+  const n_per_group = Object.create(null);
+  for (const row of sample_calls) {
+    if (!row || !row.sample_id || !row.regime_call) continue;
+    const key = _REGIME_CALL_TO_SERVER_LABEL[row.regime_call] || row.regime_call;
+    if (!groups[key]) { groups[key] = []; n_per_group[key] = 0; }
+    groups[key].push(row.sample_id);
+    n_per_group[key]++;
+  }
+  return { groups, n_per_group };
 }
 
 // ---------------------------------------------------------------------

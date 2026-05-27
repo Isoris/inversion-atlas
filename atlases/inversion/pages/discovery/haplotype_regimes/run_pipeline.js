@@ -331,6 +331,13 @@ async function _renderRegimeSummaryBundle(root, state, result, opts) {
   bundle.length_binned_aggregate = lengthBinAggregate(bundle.candidate_regime_summary);
   state._regimeSummaryBundle = bundle;
 
+  // 2026-05-27: auto-register confirmed candidates into the cross-atlas
+  // shared registry. Other atlases (popstats, gene annotation, age
+  // inference) read from atlasState.shared.registeredCandidates without
+  // having to re-run any compute or watch for export events.
+  try { _registerCandidatesIntoSharedState(state, bundle, onChrom); }
+  catch (e) { console.warn('[regime-summary] shared registry write threw —', e); }
+
   // Render via the page's panel module. Lazy import keeps the bundle
   // small for the haplotype_regimes page which doesn't need this yet.
   try {
@@ -341,6 +348,118 @@ async function _renderRegimeSummaryBundle(root, state, result, opts) {
   } catch (e) {
     console.warn('[regime-summary] panel render threw —', e);
   }
+}
+
+// Per-call → popstats-server label dict. Local copy (also lives in
+// regime_catalogue.js + candidate_groups.js) so this file has no new
+// cross-imports.
+const _REGIME_CALL_TO_SERVER = Object.freeze({
+  homA_like: 'H1/H1',
+  het_like:  'H1/H2',
+  homB_like: 'H2/H2',
+  uncertain: 'uncertain',
+});
+
+/**
+ * Write atlasState.shared.registeredCandidates with one record per
+ * confirmed candidate on this chromosome. Records carry everything
+ * downstream atlases need to run their analyses without re-running
+ * the regime pipeline:
+ *
+ *   { candidate_id, chrom, start_bp, end_bp, span_bp,
+ *     regime_class, confidence, support_score,
+ *     regime_groups: {H1/H1:[sids], H1/H2:[sids], H2/H2:[sids], uncertain:[sids]},
+ *     n_per_regime: {…},
+ *     supported_windows: [w_idx, …],
+ *     qc: { possible_ancestry_confounding, possible_family_confounding, missingness },
+ *     registered_at: ISO8601,
+ *     source_page: 'haplotype_regimes' | 'candidate_regimes' }
+ *
+ * Per-chromosome write: records from other chromosomes survive
+ * (registry is global; pipeline run is per-chrom).
+ */
+function _registerCandidatesIntoSharedState(state, bundle, candList) {
+  const atlas = state && state._atlasState;
+  if (!atlas) return;
+  if (!atlas.shared) atlas.shared = {};
+  const chrom = state.activeChrom;
+  const nowISO = new Date().toISOString();
+  const sourcePage = state._pageId || 'haplotype_regimes';
+
+  // Group sub-arrays by candidate_id for O(n) lookup.
+  const samplesByCand = new Map();
+  const windowsByCand = new Map();
+  const qcByCand      = new Map();
+  for (const r of bundle.sample_regime_calls || []) {
+    if (!r) continue;
+    const k = r.candidate_id;
+    if (!samplesByCand.has(k)) samplesByCand.set(k, []);
+    samplesByCand.get(k).push(r);
+  }
+  for (const r of bundle.window_regime_support || []) {
+    if (!r) continue;
+    const k = r.candidate_id;
+    if (!windowsByCand.has(k)) windowsByCand.set(k, []);
+    windowsByCand.get(k).push(r);
+  }
+  for (const r of bundle.regime_qc_summary || []) {
+    if (r) qcByCand.set(r.candidate_id, r);
+  }
+
+  // Build records for THIS chromosome.
+  const records = [];
+  for (const cand of bundle.candidate_regime_summary || []) {
+    if (!cand || !cand.candidate_id) continue;
+    const sCalls = samplesByCand.get(cand.candidate_id) || [];
+    const wRows  = windowsByCand.get(cand.candidate_id) || [];
+    const qcRow  = qcByCand.get(cand.candidate_id) || null;
+    const groups = Object.create(null);
+    const nPer   = Object.create(null);
+    for (const r of sCalls) {
+      if (!r.sample_id || !r.regime_call) continue;
+      const key = _REGIME_CALL_TO_SERVER[r.regime_call] || r.regime_call;
+      if (!groups[key]) { groups[key] = []; nPer[key] = 0; }
+      groups[key].push(r.sample_id);
+      nPer[key]++;
+    }
+    records.push({
+      candidate_id:     cand.candidate_id,
+      chrom:            cand.chrom || chrom,
+      start_bp:         cand.start,
+      end_bp:           cand.end,
+      span_bp:          (cand.end != null && cand.start != null) ? (cand.end - cand.start + 1) : null,
+      regime_class:     cand.regime_class,
+      confidence:       cand.confidence,
+      support_score:    cand.support_score,
+      heterozygote_band_present: !!cand.heterozygote_band_present,
+      regime_groups:    groups,
+      n_per_regime:     nPer,
+      supported_windows: wRows.filter(w => w.is_supported).map(w => w.window_id),
+      qc: qcRow ? {
+        possible_ancestry_confounding: !!qcRow.possible_ancestry_confounding,
+        possible_family_confounding:   !!qcRow.possible_family_confounding,
+        missingness:                   qcRow.missingness,
+      } : null,
+      registered_at:    nowISO,
+      source_page:      sourcePage,
+    });
+  }
+
+  // Merge into the cross-chromosome registry: drop prior records for
+  // this chrom (a re-run replaces them), keep records from others.
+  const prior = Array.isArray(atlas.shared.registeredCandidates)
+    ? atlas.shared.registeredCandidates : [];
+  const kept = prior.filter(r => r && r.chrom !== chrom);
+  atlas.shared.registeredCandidates = kept.concat(records);
+  // Idempotent: dispatch a custom event so any listening atlas can
+  // react without polling.
+  try {
+    if (typeof document !== 'undefined' && typeof CustomEvent === 'function') {
+      document.dispatchEvent(new CustomEvent('atlas:registeredCandidatesUpdated', {
+        detail: { chrom, n_added: records.length, total: atlas.shared.registeredCandidates.length },
+      }));
+    }
+  } catch (_) {}
 }
 
 /**
