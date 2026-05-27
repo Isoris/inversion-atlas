@@ -22,6 +22,7 @@
 
 import { _pageState, _setActiveState }
   from './polarize_msa_stacked/_state.js';
+import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
 import {
   buildPolarizeMsaRows,
   polarizationVerdict,
@@ -74,6 +75,7 @@ export function initPolarizeMsaToolbar() {
 // =====================================================================
 
 export async function mount(root, atlasState, registry) {
+  resetOnboarding('polarize_msa_stacked');
   const pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
   try { refreshPolarizeMsa(pageState); }
@@ -177,7 +179,7 @@ function _paintCanvas(state) {
   if (!canvas) return;
   const rows = state.stack && state.stack.rows;
   if (!rows || rows.length === 0) {
-    if (empty) empty.style.display = '';
+    if (empty) { empty.style.display = ''; applyOnboarding('polarize_msa_stacked'); }
     if (canvas.getContext) {
       const ctx = canvas.getContext('2d');
       if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, canvas.width || 600, canvas.height || 400);

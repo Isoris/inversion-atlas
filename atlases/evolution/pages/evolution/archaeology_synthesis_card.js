@@ -18,6 +18,7 @@
 
 import { _pageState, _setActiveState } from './archaeology_synthesis_card/_state.js';
 import { buildArchaeologyCard } from '../../shared/mgl_archaeology_classifier.js';
+import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
 
 const VERDICT_COLOR = Object.freeze({
   young_clean:       '#3074C8',
@@ -52,6 +53,7 @@ export function refreshArchaeology(state) {
 export function initArchaeologyToolbar() { /* none */ }
 
 export async function mount(root, atlasState, registry) {
+  resetOnboarding('archaeology_synthesis_card');
   const pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
   try { refreshArchaeology(pageState); }
@@ -99,7 +101,7 @@ function _renderBoxes(state) {
   if (!state.card) {
     if (reason) reason.textContent = '—';
     if (interp) interp.textContent = '—';
-    if (empty) empty.style.display = '';
+    if (empty) { empty.style.display = ''; applyOnboarding('archaeology_synthesis_card'); }
     return;
   }
   if (empty) empty.style.display = 'none';

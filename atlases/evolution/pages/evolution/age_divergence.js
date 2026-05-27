@@ -13,6 +13,8 @@
 
 import { _pageState, _setActiveState } from './age_divergence/_state.js';
 import { computeDivergence } from '../../shared/mgl_inversion_divergence.js';
+import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
+import { autoSeedDosageInput } from '../../shared/auto_seed_inv_idx.js';
 
 const AGE_CLASS_LABEL = Object.freeze({
   young_clean:        'Young, clean',
@@ -43,6 +45,8 @@ export function refreshAge(state) {
 export function initAgeToolbar() { /* no toolbar */ }
 
 export async function mount(root, atlasState, registry) {
+  resetOnboarding('age_divergence');
+  _autoSeedIfMissing(atlasState);
   const pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
   try { refreshAge(pageState); }
@@ -50,6 +54,15 @@ export async function mount(root, atlasState, registry) {
   if (atlasState.inversion) {
     atlasState.inversion._page_age_divergence_state = pageState;
   }
+}
+
+function _autoSeedIfMissing(atlasState) {
+  const inv = atlasState && atlasState.inversion;
+  if (!inv) return;
+  if (inv.age_state && inv.age_state.dosage) return;
+  const seeded = autoSeedDosageInput(atlasState);
+  if (!seeded) return;
+  inv.age_state = seeded;
 }
 export async function unmount(root) { _setActiveState(null); }
 
@@ -86,7 +99,7 @@ function _paintBars(state) {
   const empty  = document.getElementById('ageEmpty');
   if (!canvas) return;
   if (!state.metrics || state.metrics.n_sites_evaluated === 0) {
-    if (empty) empty.style.display = '';
+    if (empty) { empty.style.display = ''; applyOnboarding('age_divergence'); }
     if (canvas.getContext) {
       const ctx = canvas.getContext('2d');
       if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, canvas.width || 600, canvas.height || 220);

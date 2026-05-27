@@ -5,6 +5,8 @@
 // =====================================================================
 
 import { _pageState, _setActiveState } from './inv_internal_substructure/_state.js';
+import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
+import { autoSeedDosageInput } from '../../shared/auto_seed_inv_idx.js';
 // 2026-05-23 Phase 1c: mgl_pca_compute moved to cross-species atlas.
 // inv_internal_substructure will migrate to evolution atlas in Phase 2
 // — at that point this becomes evolution → cross-species cross-atlas.
@@ -20,6 +22,8 @@ export function refreshInternalHistory(state) {
 export function initInternalHistoryToolbar() { /* no toolbar */ }
 
 export async function mount(root, atlasState, registry) {
+  resetOnboarding('inv_internal_substructure');
+  _autoSeedIfMissing(atlasState);
   const pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
   try { refreshInternalHistory(pageState); }
@@ -27,6 +31,15 @@ export async function mount(root, atlasState, registry) {
   if (atlasState.inversion) {
     atlasState.inversion._page_inv_internal_substructure_state = pageState;
   }
+}
+
+function _autoSeedIfMissing(atlasState) {
+  const inv = atlasState && atlasState.inversion;
+  if (!inv) return;
+  if (inv.internal_history_state && inv.internal_history_state.dosage) return;
+  const seeded = autoSeedDosageInput(atlasState);
+  if (!seeded) return;
+  inv.internal_history_state = seeded;
 }
 export async function unmount(root) { _setActiveState(null); }
 
@@ -76,7 +89,7 @@ function _paintCanvas(state) {
   const empty  = document.getElementById('ihEmpty');
   if (!canvas) return;
   if (!state.pca || !state.pca.pc1) {
-    if (empty) empty.style.display = '';
+    if (empty) { empty.style.display = ''; applyOnboarding('inv_internal_substructure'); }
     if (canvas.getContext) {
       const ctx = canvas.getContext('2d');
       if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, canvas.width || 500, canvas.height || 400);

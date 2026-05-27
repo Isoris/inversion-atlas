@@ -19,10 +19,26 @@
           <input id="hapNetLayoutSeed" type="number" min="1" max="99999" value="12345"
                  style="width:64px;">
         </label>
+        <button id="hapNetReseed" type="button"
+                title="Try a new random layout seed"
+                style="padding:3px 8px; font: 10.5px var(--mono, ui-monospace, monospace);
+                       background: var(--panel-3); color: var(--ink);
+                       border: 1px solid var(--rule); border-radius: 4px; cursor: pointer;">
+          ↻ seed
+        </button>
         <label class="hnet-toggle">
           <input id="hapNetShowLabels" type="checkbox">
           Node labels
         </label>
+        <button id="hapNetRecompute" type="button"
+                title="Rebuild the network from the current dosage chunk + settings"
+                style="margin-left:6px; padding:3px 10px;
+                       font: 10.5px var(--mono, ui-monospace, monospace);
+                       background: rgba(79,163,255,0.18); color: var(--ink);
+                       border: 1px solid rgba(79,163,255,0.55); border-radius: 4px;
+                       cursor: pointer;">
+          Recompute
+        </button>
       </div>
     </header>
 

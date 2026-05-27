@@ -18,6 +18,7 @@
 // =====================================================================
 
 import { _pageState, _setActiveState } from './layer_cleaning/_state.js';
+import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
 import {
   computeSampleWeights,
   weightsSummary,
@@ -40,6 +41,7 @@ export function initLayerCleaningToolbar() {
 }
 
 export async function mount(root, atlasState, registry) {
+  resetOnboarding('layer_cleaning');
   const pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
   try { refreshLayerCleaning(pageState); }
@@ -118,7 +120,7 @@ function _paintCanvas(state) {
   if (!canvas) return;
   const w = state.weights;
   if (!w || w.length === 0) {
-    if (empty) empty.style.display = '';
+    if (empty) { empty.style.display = ''; applyOnboarding('layer_cleaning'); }
     if (canvas.getContext) {
       const ctx = canvas.getContext('2d');
       if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, canvas.width || 800, canvas.height || 300);

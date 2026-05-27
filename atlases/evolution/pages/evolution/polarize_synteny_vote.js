@@ -14,6 +14,7 @@
 
 import { _pageState, _setActiveState }
   from './polarize_synteny_vote/_state.js';
+import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
 import {
   normaliseSyntenyEntry,
   aggregateSyntenyVotes,
@@ -43,6 +44,7 @@ export function refreshSynteny(state) {
 export function initSyntenyToolbar() { /* no toolbar inputs */ }
 
 export async function mount(root, atlasState, registry) {
+  resetOnboarding('polarize_synteny_vote');
   const pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
   try { refreshSynteny(pageState); }
@@ -87,7 +89,7 @@ function _paintBar(state) {
   const empty  = document.getElementById('syntenyEmpty');
   if (!canvas) return;
   if (!state.entries || state.entries.length === 0) {
-    if (empty) empty.style.display = '';
+    if (empty) { empty.style.display = ''; applyOnboarding('polarize_synteny_vote'); }
     if (canvas.getContext) {
       const ctx = canvas.getContext('2d');
       if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, canvas.width || 600, canvas.height || 80);

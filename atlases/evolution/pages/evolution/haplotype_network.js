@@ -28,6 +28,8 @@ import {
   summariseNode,
   summariseNetwork,
 } from './haplotype_network/selection.js';
+import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
+import { autoSeedInvIdx, chromDosageMatrix } from '../../shared/auto_seed_inv_idx.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   hamming_radius:  2,
@@ -36,6 +38,29 @@ const DEFAULT_VIEW_STATE = Object.freeze({
   layout_width:    640,
   layout_height:   360,
 });
+
+const STORAGE_KEY = 'evolution.haplotype_network.view_state';
+
+function _loadPersistedViewState() {
+  try {
+    const raw = (typeof localStorage !== 'undefined')
+      ? localStorage.getItem(STORAGE_KEY) : null;
+    if (!raw) return {};
+    const p = JSON.parse(raw);
+    return (p && typeof p === 'object') ? p : {};
+  } catch (_) { return {}; }
+}
+function _persistViewState(vs) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const subset = {
+      hamming_radius: vs.hamming_radius,
+      layout_seed:    vs.layout_seed,
+      show_labels:    vs.show_labels,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(subset));
+  } catch (_) {}
+}
 
 // =====================================================================
 // Public entry
@@ -59,6 +84,11 @@ export function initHapNetToolbar() {
 // =====================================================================
 
 export async function mount(root, atlasState, registry) {
+  // Opportunistically seed haplotype_network_state from upstream data
+  // if it hasn't been set by an external caller. Median-PC1 split at
+  // the active candidate's window range — see auto_seed_inv_idx.js.
+  _autoSeedIfMissing(atlasState);
+
   const pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
   try { refreshHapNet(pageState); }
@@ -68,6 +98,26 @@ export async function mount(root, atlasState, registry) {
   if (atlasState.inversion) {
     atlasState.inversion._page_haplotype_network_state = pageState;
   }
+}
+
+function _autoSeedIfMissing(atlasState) {
+  const inv = atlasState && atlasState.inversion;
+  if (!inv) return;
+  if (inv.haplotype_network_state && inv.haplotype_network_state.dosage) return;
+  const seed = autoSeedInvIdx(atlasState);
+  if (!seed) return;
+  const dosage = chromDosageMatrix(seed.chrom_data);
+  if (!dosage) return;
+  inv.haplotype_network_state = {
+    dosage:          dosage.values,
+    n_markers:       dosage.n_markers,
+    n_samples:       dosage.n_samples,
+    inv_idx:         Array.from(seed.inv_idx),
+    sample_labels:   seed.sample_labels,
+    candidate_label: seed.candidate_label + '  (auto-derived inv_idx)',
+    view_state:      _loadPersistedViewState(),
+    _auto_seeded:    true,
+  };
 }
 
 export async function unmount(root) {
@@ -81,9 +131,13 @@ export async function unmount(root) {
 // =====================================================================
 
 function _buildPageState(atlasState) {
+  // Empty-state panel re-renders on each mount.
+  resetOnboarding('haplotype_network');
   const inv = (atlasState && atlasState.inversion) || {};
   const src = inv.haplotype_network_state || null;
-  const vs = Object.assign({}, DEFAULT_VIEW_STATE, (src && src.view_state) || {});
+  const vs = Object.assign({}, DEFAULT_VIEW_STATE,
+                           _loadPersistedViewState(),
+                           (src && src.view_state) || {});
   const network = (src && src.dosage && Array.isArray(src.inv_idx))
     ? buildHaplotypeNetwork({
         dosage: src.dosage, n_markers: src.n_markers, n_samples: src.n_samples,
@@ -160,7 +214,10 @@ function _paintCanvas(state) {
   if (!canvas) return;
   const network = state.network;
   if (!network || !network.nodes || network.nodes.length === 0) {
-    if (empty) empty.style.display = '';
+    if (empty) {
+      empty.style.display = '';
+      applyOnboarding('haplotype_network');
+    }
     if (canvas.getContext) {
       const ctx = canvas.getContext('2d');
       if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, canvas.width || 800, canvas.height || 400);
@@ -176,6 +233,7 @@ function _paintCanvas(state) {
   });
   state.node_hit_regions = paint.node_hit_regions;
 }
+
 
 // =====================================================================
 // Right panel
@@ -256,6 +314,7 @@ function _wireToolbar(state) {
     const v = parseInt(e && e.target && e.target.value, 10);
     if (Number.isFinite(v) && v >= 0 && v <= 20) {
       state.view_state.hamming_radius = v;
+      _persistViewState(state.view_state);
       _rebuildNetwork(state);
       repaintAll();
     }
@@ -264,13 +323,29 @@ function _wireToolbar(state) {
     const v = parseInt(e && e.target && e.target.value, 10);
     if (Number.isFinite(v) && v >= 1) {
       state.view_state.layout_seed = v;
+      _persistViewState(state.view_state);
       _rebuildNetwork(state);
       repaintAll();
     }
   };
   const onShowLabels = (e) => {
     state.view_state.show_labels = !!(e && e.target && e.target.checked);
+    _persistViewState(state.view_state);
     _paintCanvas(state);
+  };
+  const onRecompute = () => {
+    _rebuildNetwork(state);
+    repaintAll();
+  };
+  const onReseed = () => {
+    // Cycle to a new layout seed — keeps the user from typing a number.
+    const next = (Math.floor(Math.random() * 99000) + 1000) | 0;
+    state.view_state.layout_seed = next;
+    _persistViewState(state.view_state);
+    const inp = document.getElementById('hapNetLayoutSeed');
+    if (inp) inp.value = next;
+    _rebuildNetwork(state);
+    repaintAll();
   };
   const onCanvasMove = (ev) => {
     const c = document.getElementById('hapNetCanvas');
@@ -296,11 +371,14 @@ function _wireToolbar(state) {
 
   state._handlers = {
     onRadiusChange, onSeedChange, onShowLabels,
+    onRecompute, onReseed,
     onCanvasMove, onCanvasClick, unsub,
   };
   _addListener('hapNetHammingRadius', 'change',    onRadiusChange);
   _addListener('hapNetLayoutSeed',    'change',    onSeedChange);
   _addListener('hapNetShowLabels',    'change',    onShowLabels);
+  _addListener('hapNetRecompute',     'click',     onRecompute);
+  _addListener('hapNetReseed',        'click',     onReseed);
   _addListener('hapNetCanvas',        'mousemove', onCanvasMove);
   _addListener('hapNetCanvas',        'click',     onCanvasClick);
 }
@@ -311,6 +389,8 @@ function _teardownToolbar(state) {
   if (h.onRadiusChange) _removeListener('hapNetHammingRadius', 'change',    h.onRadiusChange);
   if (h.onSeedChange)   _removeListener('hapNetLayoutSeed',    'change',    h.onSeedChange);
   if (h.onShowLabels)   _removeListener('hapNetShowLabels',    'change',    h.onShowLabels);
+  if (h.onRecompute)    _removeListener('hapNetRecompute',     'click',     h.onRecompute);
+  if (h.onReseed)       _removeListener('hapNetReseed',        'click',     h.onReseed);
   if (h.onCanvasMove)   _removeListener('hapNetCanvas',        'mousemove', h.onCanvasMove);
   if (h.onCanvasClick)  _removeListener('hapNetCanvas',        'click',     h.onCanvasClick);
   if (typeof h.unsub === 'function') { try { h.unsub(); } catch (_) {} }

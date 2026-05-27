@@ -557,6 +557,106 @@ body[data-sim-in-minimap="1"] #simPanel {
   box-shadow: 0 14px 40px rgba(0,0,0,0.55),
               0 3px 12px rgba(0,0,0,0.40);
 }
+
+/* ---------------------------------------------------------------------
+   Onboarding empty-state panel — used across evolution-atlas pages
+   (haplotype_network, age_divergence, etc.) and any other page that
+   wants to replace developer-text empty messages with a real
+   onboarding card. Activated by `renderEmptyStatePanel(el, cfg)` in
+   atlases/evolution/shared/empty_state_panel.js.
+   --------------------------------------------------------------------- */
+.ev-empty-panel {
+  /* Container is the page's existing sentinel; we only override what's
+     necessary so existing display:none toggling still works. */
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  min-height: 260px;
+  background: transparent;
+}
+.ev-empty-card {
+  max-width: 540px;
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 24px 26px 22px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  position: relative;
+  font-family: var(--serif, ui-sans-serif, system-ui, sans-serif);
+}
+.ev-empty-card .ev-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
+  letter-spacing: 0;
+}
+.ev-empty-card .ev-empty-desc {
+  font-size: 13px;
+  color: var(--ink-dim);
+  line-height: 1.45;
+  margin-bottom: 18px;
+}
+.ev-empty-card .ev-empty-h {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 6px;
+}
+.ev-empty-card .ev-empty-list {
+  margin: 0 0 18px; padding: 0 0 0 18px;
+  font-size: 12.5px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+.ev-empty-card .ev-empty-list li {
+  margin: 2px 0;
+}
+.ev-empty-card .ev-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ev-empty-card .ev-empty-btn {
+  background: var(--panel-3);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+.ev-empty-card .ev-empty-btn:hover {
+  background: var(--panel);
+  border-color: var(--accent, #79a3ff);
+}
+.ev-empty-card .ev-empty-btn-primary {
+  background: rgba(79, 163, 255, 0.20);
+  border-color: rgba(79, 163, 255, 0.55);
+  color: var(--ink);
+}
+.ev-empty-card .ev-empty-btn-primary:hover {
+  background: rgba(79, 163, 255, 0.30);
+  border-color: rgba(79, 163, 255, 0.80);
+}
+.ev-empty-card .ev-empty-btn:focus-visible {
+  outline: 2px solid var(--accent, #79a3ff);
+  outline-offset: 1px;
+}
+.ev-empty-card .ev-empty-help {
+  position: absolute;
+  top: 10px; right: 14px;
+  color: var(--ink-dim);
+  font-size: 11px;
+  text-decoration: none;
+}
+.ev-empty-card .ev-empty-help:hover { color: var(--accent, #79a3ff); }
 /* v3.53: trackedList holds the CGA tag chips. Was previously style="display:flex"
    inline, which was higher specificity than the collapse rule above and caused
    the chips to leak out when the sidebar was collapsed. Moved to CSS here so the

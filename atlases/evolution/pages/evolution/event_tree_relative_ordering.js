@@ -16,6 +16,7 @@
 
 import { _pageState, _setActiveState } from './event_tree_relative_ordering/_state.js';
 import { buildEventTree } from '../../shared/mgl_event_tree.js';
+import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
 
 const REL_COLOR = Object.freeze({
   nested:           '#3074C8',
@@ -35,6 +36,7 @@ export function refreshEventTree(state) {
 export function initEventTreeToolbar() { /* no toolbar */ }
 
 export async function mount(root, atlasState, registry) {
+  resetOnboarding('event_tree_relative_ordering');
   const pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
   try { refreshEventTree(pageState); }
@@ -89,7 +91,7 @@ function _paintCanvas(state) {
   const empty  = document.getElementById('etEmpty');
   if (!canvas) return;
   if (!state.tree || !state.tree.pair_overlap || state.tree.pair_overlap.length === 0) {
-    if (empty) empty.style.display = '';
+    if (empty) { empty.style.display = ''; applyOnboarding('event_tree_relative_ordering'); }
     if (canvas.getContext) {
       const ctx = canvas.getContext('2d');
       if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, canvas.width || 600, canvas.height || 400);

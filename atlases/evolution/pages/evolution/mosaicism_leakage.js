@@ -13,6 +13,7 @@
 // =====================================================================
 
 import { _pageState, _setActiveState } from './mosaicism_leakage/_state.js';
+import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
 import {
   perWindowLeakage,
   integrityVerdict,
@@ -56,6 +57,7 @@ export function initMosaicismToolbar() {
 }
 
 export async function mount(root, atlasState, registry) {
+  resetOnboarding('mosaicism_leakage');
   const pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
   try { refreshMosaicism(pageState); }
@@ -134,7 +136,7 @@ function _paintCanvas(state) {
   if (!canvas) return;
   const L = state.leak;
   if (!L || L.n_inv === 0 || L.n_windows === 0) {
-    if (empty) empty.style.display = '';
+    if (empty) { empty.style.display = ''; applyOnboarding('mosaicism_leakage'); }
     if (canvas.getContext) {
       const ctx = canvas.getContext('2d');
       if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, canvas.width || 800, canvas.height || 320);
