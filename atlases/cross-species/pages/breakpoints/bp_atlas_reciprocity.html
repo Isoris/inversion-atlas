@@ -1,40 +1,34 @@
-  <div id="bp_atlas_reciprocity" class="page">
-    <header style="display: flex; align-items: center; justify-content: space-between;
-                   padding: 6px 14px; border-bottom: 1px solid var(--rule);
-                   font-family: var(--mono); font-size: 11px;">
-      <div style="display: flex; align-items: center; gap: 14px;">
-        <span style="font-size: 13px; font-weight: 600;">BP reciprocity (BP3c)</span>
-        <span id="bpRecStatus" style="color: var(--ink-dim);">—</span>
+  <div id="bp_atlas_reciprocity" class="page cs-bp-page">
+    <header class="cs-bp-header">
+      <div class="cs-bp-title">
+        <h2>BP reciprocity</h2>
+        <span class="cs-bp-meta">BP3c · both-anchor zones</span>
+        <span id="bpRecStatus" class="cs-bp-status">—</span>
       </div>
-      <div style="display: flex; align-items: center; gap: 10px;">
+      <div class="cs-bp-controls">
         <input id="bpRecFilter" type="search" placeholder="filter…"
-               style="background: var(--panel-2); color: var(--ink);
-                      border: 1px solid var(--rule); border-radius: 3px;
-                      padding: 2px 8px; font: 10.5px ui-monospace, monospace;
-                      width: 140px;">
-        <span id="bpRecCount" style="color: var(--ink-dim);"></span>
+               class="cs-bp-filter">
+        <span id="bpRecCount" class="cs-bp-count"></span>
       </div>
     </header>
     <div id="bpRecEmpty" style="display:none;"></div>
-    <div id="bpRecTableWrap" style="padding: 8px 14px; overflow-y: auto;">
-      <table id="bpRecTable" style="width: 100%; border-collapse: collapse;
-                                    font: 10.5px ui-monospace, monospace;">
+    <div id="bpRecTableWrap" class="cs-bp-table-wrap">
+      <table id="bpRecTable" class="cs-bp-table">
         <thead>
-          <tr style="border-bottom: 1px solid var(--rule);">
-            <th data-field="zone_id"          data-type="str" style="text-align: left;  padding: 4px 6px;">zone_id</th>
-            <th data-field="anchor_Cgar_pos"  data-type="num" style="text-align: left;  padding: 4px 6px;">anchor_Cgar pos</th>
-            <th data-field="anchor_Cmac_pos"  data-type="num" style="text-align: left;  padding: 4px 6px;">anchor_Cmac pos</th>
-            <th data-field="event_class"      data-type="str" style="text-align: left;  padding: 4px 6px;">event_class</th>
-            <th data-field="confidence_tier"  data-type="str" style="text-align: left;  padding: 4px 6px;">confidence</th>
-            <th data-field="backbone_support" data-type="str" style="text-align: left;  padding: 4px 6px;">backbone_support</th>
-            <th data-field="both_anchor"      data-type="str" style="text-align: left;  padding: 4px 6px;">both_anchor</th>
+          <tr>
+            <th data-field="zone_id"          data-type="str">zone_id</th>
+            <th data-field="anchor_Cgar_pos"  data-type="num">anchor_Cgar pos</th>
+            <th data-field="anchor_Cmac_pos"  data-type="num">anchor_Cmac pos</th>
+            <th data-field="event_class"      data-type="str">event_class</th>
+            <th data-field="confidence_tier"  data-type="str">confidence</th>
+            <th data-field="backbone_support" data-type="str">backbone_support</th>
+            <th data-field="both_anchor"      data-type="str">both_anchor</th>
           </tr>
         </thead>
         <tbody id="bpRecBody"></tbody>
       </table>
     </div>
-    <footer style="padding: 6px 14px; border-top: 1px solid var(--rule);
-                   font-family: var(--mono); font-size: 10px; color: var(--ink-dim);">
+    <footer class="cs-bp-footer">
       Source: <code>cross-species.bp_atlas_reciprocity_v1</code> (BP3c
       both-anchor table — strongest evidence tier, "supported from both
       directions"). Produced by <code>bp_atlas_pipeline</code> workflow.

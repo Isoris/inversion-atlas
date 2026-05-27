@@ -49,8 +49,9 @@ export function wireSortableHeaders(tableEl, opts) {
       const orig = (th.textContent || '').replace(/[  ]*[▲▼][  ]*$/, '');
       th.dataset.originalText = orig;
       th.textContent = orig;
-      th.style.cursor = 'pointer';
-      th.style.userSelect = 'none';
+      // cursor/user-select are owned by CSS
+      // (.cs-bp-table thead th[data-field]) — wiring them here
+      // would shadow the stylesheet rule.
     }
   }
 

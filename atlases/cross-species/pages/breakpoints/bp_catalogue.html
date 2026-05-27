@@ -1,57 +1,47 @@
-  <div id="bp_catalogue" class="page">
-    <header style="display: flex; align-items: center; justify-content: space-between;
-                   padding: 6px 14px; border-bottom: 1px solid var(--rule);
-                   font-family: var(--mono); font-size: 11px;">
-      <div style="display: flex; align-items: center; gap: 14px;">
-        <span style="font-size: 13px; font-weight: 600;">BP catalogue</span>
-        <span id="bpCatStatus" style="color: var(--ink-dim);">—</span>
+  <div id="bp_catalogue" class="page cs-bp-page">
+    <header class="cs-bp-header">
+      <div class="cs-bp-title">
+        <h2>BP catalogue</h2>
+        <span class="cs-bp-meta">tiered headline table</span>
+        <span id="bpCatStatus" class="cs-bp-status">—</span>
       </div>
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <span id="bpCatTierBar" title="Toggle which tier(s) are visible. Tier 1 = cross-method validated (gene_order AND wfmash agree); Tier 2 = recurrent single-method (≥ 3 species)."
-              style="display: inline-flex; align-items: center; gap: 2px;
-                     background: var(--panel-2, #181d27);
-                     border: 1px solid var(--rule, #2a3242);
-                     border-radius: 3px; padding: 1px 2px;
-                     font: 10px ui-monospace, monospace;">
-          <span style="color: var(--ink-dimmer, #5a6472); padding: 0 4px 0 2px;">tier:</span>
+      <div class="cs-bp-controls">
+        <span id="bpCatTierBar" class="cs-bp-tierbar"
+              title="Toggle which tier(s) are visible. Tier 1 = cross-method validated (gene_order AND wfmash agree); Tier 2 = recurrent single-method (≥ 3 species).">
+          <span class="cs-bp-tier-label">tier:</span>
           <button type="button" data-bpc-tier="all" class="active">all</button>
           <button type="button" data-bpc-tier="1">Tier 1 (cross-method)</button>
           <button type="button" data-bpc-tier="2">Tier 2 (recurrent)</button>
         </span>
         <input id="bpCatFilter" type="search" placeholder="filter…"
-               style="background: var(--panel-2); color: var(--ink);
-                      border: 1px solid var(--rule); border-radius: 3px;
-                      padding: 2px 8px; font: 10.5px ui-monospace, monospace;
-                      width: 140px;">
-        <span id="bpCatCount" style="color: var(--ink-dim);"></span>
+               class="cs-bp-filter">
+        <span id="bpCatCount" class="cs-bp-count"></span>
       </div>
     </header>
 
     <div id="bpCatEmpty" style="display:none;"></div>
-    <div id="bpCatTableWrap" style="padding: 8px 14px; overflow-y: auto;">
-      <table id="bpCatTable" style="width: 100%; border-collapse: collapse;
-                                    font: 10.5px ui-monospace, monospace;">
+    <div id="bpCatTableWrap" class="cs-bp-table-wrap">
+      <table id="bpCatTable" class="cs-bp-table">
         <thead>
-          <tr style="border-bottom: 1px solid var(--rule);">
-            <th data-field="cluster_id"     data-type="str" style="text-align: left;  padding: 4px 6px;">cluster_id</th>
-            <th data-field="chrom_focal"    data-type="str" style="text-align: left;  padding: 4px 6px;">chrom (focal)</th>
-            <th data-field="start_mb"       data-type="num" style="text-align: right; padding: 4px 6px;">start_mb</th>
-            <th data-field="end_mb"         data-type="num" style="text-align: right; padding: 4px 6px;">end_mb</th>
-            <th data-field="n_methods"      data-type="num" style="text-align: right; padding: 4px 6px;">n_methods</th>
-            <th data-field="methods_csv"    data-type="str" style="text-align: left;  padding: 4px 6px;">methods</th>
-            <th data-field="n_species"      data-type="num" style="text-align: right; padding: 4px 6px;">n_species</th>
-            <th data-field="cross_method"   data-type="str" style="text-align: left;  padding: 4px 6px;">cross_method</th>
-            <th data-field="confidence_tier" data-type="str" style="text-align: left;  padding: 4px 6px;">confidence</th>
-            <th data-field="backbone"       data-type="str" style="text-align: left;  padding: 4px 6px;">backbone</th>
-            <th data-field="stable_at_kb"   data-type="num" style="text-align: right; padding: 4px 6px;">stable_at_kb</th>
+          <tr>
+            <th data-field="cluster_id"      data-type="str">cluster_id</th>
+            <th data-field="chrom_focal"     data-type="str">chrom (focal)</th>
+            <th data-field="start_mb"        data-type="num">start_mb</th>
+            <th data-field="end_mb"          data-type="num">end_mb</th>
+            <th data-field="n_methods"       data-type="num">n_methods</th>
+            <th data-field="methods_csv"     data-type="str">methods</th>
+            <th data-field="n_species"       data-type="num">n_species</th>
+            <th data-field="cross_method"    data-type="str">cross_method</th>
+            <th data-field="confidence_tier" data-type="str">confidence</th>
+            <th data-field="backbone"        data-type="str">backbone</th>
+            <th data-field="stable_at_kb"    data-type="num">stable_at_kb</th>
           </tr>
         </thead>
         <tbody id="bpCatBody"></tbody>
       </table>
     </div>
 
-    <footer style="padding: 6px 14px; border-top: 1px solid var(--rule);
-                   font-family: var(--mono); font-size: 10px; color: var(--ink-dim);">
+    <footer class="cs-bp-footer">
       Read-only inspector. Source: <code>cross-species.breakpoints_consolidated_v1</code>
       (produced by <code>gene_order_consolidation</code> workflow). Click a row →
       sets <code>state.crossSpecies.activeBreakpointId</code> + linked panels follow.

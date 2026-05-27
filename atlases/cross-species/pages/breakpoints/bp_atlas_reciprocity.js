@@ -142,19 +142,18 @@ function _renderRows(root) {
 
 function _renderRow(r) {
   const tr = document.createElement('tr');
-  tr.style.borderBottom = '1px solid var(--rule)';
   const bothAnchor = r.both_anchor === 'TRUE' || r.both_anchor === '1';
   const baCell = bothAnchor
     ? '<span style="color: #3cc08a; font-weight: 600;">YES</span>'
     : '<span style="color: var(--ink-dim);">no</span>';
   tr.innerHTML =
-    `<td style="padding: 3px 6px; font-weight: 600;">${_esc(r.zone_id || r.cluster_id || '—')}</td>` +
-    `<td style="padding: 3px 6px;">${_esc(r.anchor_Cgar_pos || r.anchor_a_pos || '—')}</td>` +
-    `<td style="padding: 3px 6px;">${_esc(r.anchor_Cmac_pos || r.anchor_b_pos || '—')}</td>` +
-    `<td style="padding: 3px 6px;">${_esc(r.event_class || '—')}</td>` +
-    `<td style="padding: 3px 6px;">${_esc(r.confidence_tier || r.confidence || '—')}</td>` +
-    `<td style="padding: 3px 6px;">${_esc(r.backbone_support || '—')}</td>` +
-    `<td style="padding: 3px 6px;">${baCell}</td>`;
+    `<td style="font-weight: 600;">${_esc(r.zone_id || r.cluster_id || '—')}</td>` +
+    `<td class="cs-bp-num">${_esc(r.anchor_Cgar_pos || r.anchor_a_pos || '—')}</td>` +
+    `<td class="cs-bp-num">${_esc(r.anchor_Cmac_pos || r.anchor_b_pos || '—')}</td>` +
+    `<td>${_esc(r.event_class || '—')}</td>` +
+    `<td>${_esc(r.confidence_tier || r.confidence || '—')}</td>` +
+    `<td>${_esc(r.backbone_support || '—')}</td>` +
+    `<td>${baCell}</td>`;
   return tr;
 }
 

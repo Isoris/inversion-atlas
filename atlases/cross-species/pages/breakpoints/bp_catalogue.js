@@ -179,23 +179,32 @@ function _renderRow(r) {
     ? '<span style="color: #5fb3ff; font-weight: 600;">YES (Tier 1)</span>'
     : '<span style="color: var(--ink-dim);">no (Tier 2)</span>';
   const fmt = (v) => Number.isFinite(+v) ? (+v).toFixed(2) : (v || '—');
+  // Apply active-row class when this cluster is the active one — the
+  // CSS rule .cs-bp-active tints with the accent hue.
+  if (_pageState && _pageState.activeClusterId && _pageState.activeClusterId === r.cluster_id) {
+    tr.classList.add('cs-bp-active');
+  }
   tr.innerHTML =
-    `<td style="padding: 3px 6px; font-weight: 600;">${_esc(r.cluster_id || '—')}</td>` +
-    `<td style="padding: 3px 6px;">${_esc(r.chrom_focal || r.chrom || '—')}</td>` +
-    `<td style="padding: 3px 6px; text-align: right;">${fmt((+r.start_bp_focal || +r.start_bp) / 1e6)}</td>` +
-    `<td style="padding: 3px 6px; text-align: right;">${fmt((+r.end_bp_focal   || +r.end_bp)   / 1e6)}</td>` +
-    `<td style="padding: 3px 6px; text-align: right;">${_esc(r.n_methods || '—')}</td>` +
-    `<td style="padding: 3px 6px; color: var(--ink-dim);">${_esc(r.methods_csv || r.methods || '—')}</td>` +
-    `<td style="padding: 3px 6px; text-align: right;">${_esc(r.n_species || '—')}</td>` +
-    `<td style="padding: 3px 6px;">${xmCell}</td>` +
-    `<td style="padding: 3px 6px;">${_esc(r.confidence_tier || r.confidence || '—')}</td>` +
-    `<td style="padding: 3px 6px;">${_esc(r.backbone_support || '—')}</td>` +
-    `<td style="padding: 3px 6px; text-align: right;">${_esc(r.tolerance_kb_stable_at || '—')}</td>`;
+    `<td style="font-weight: 600;">${_esc(r.cluster_id || '—')}</td>` +
+    `<td>${_esc(r.chrom_focal || r.chrom || '—')}</td>` +
+    `<td class="cs-bp-num">${fmt((+r.start_bp_focal || +r.start_bp) / 1e6)}</td>` +
+    `<td class="cs-bp-num">${fmt((+r.end_bp_focal   || +r.end_bp)   / 1e6)}</td>` +
+    `<td class="cs-bp-num">${_esc(r.n_methods || '—')}</td>` +
+    `<td style="color: var(--ink-dim);">${_esc(r.methods_csv || r.methods || '—')}</td>` +
+    `<td class="cs-bp-num">${_esc(r.n_species || '—')}</td>` +
+    `<td>${xmCell}</td>` +
+    `<td>${_esc(r.confidence_tier || r.confidence || '—')}</td>` +
+    `<td>${_esc(r.backbone_support || '—')}</td>` +
+    `<td class="cs-bp-num">${_esc(r.tolerance_kb_stable_at || '—')}</td>`;
   tr.addEventListener('click', () => {
     if (_pageState) _pageState.activeClusterId = r.cluster_id;
     if (_pageState && _pageState.atlasState && _pageState.atlasState.shared) {
       _pageState.atlasState.shared.crossSpecies = _pageState.atlasState.shared.crossSpecies || {};
       _pageState.atlasState.shared.crossSpecies.activeBreakpointId = r.cluster_id;
+    }
+    // Repaint so the .cs-bp-active class lands on the right row.
+    if (_pageState && document.getElementById('bp_catalogue')) {
+      _renderRows(document.getElementById('bp_catalogue'));
     }
   });
   return tr;

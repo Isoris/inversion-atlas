@@ -6400,3 +6400,152 @@ details.sidebar-section > summary h2 {
   height: 100% !important;
   display: block;
 }
+
+/* ===== Cross-species BP inspector pages (visual consistency pass) =====
+   Mirrors the evolution-page header / controls / table vocabulary so
+   bp_atlas_reciprocity, bp_catalogue, and (where applicable)
+   bp_atlas_arcs read as siblings of the evolution pages instead of
+   raw HTML tables with inline styles.
+
+   Classes are namespaced .cs-bp-* so they don't collide with the
+   already-rich .cs-* classes in #cross_species_breakpoints. */
+.cs-bp-page {
+  display: flex; flex-direction: column; height: 100%;
+  min-height: 0;
+  background: var(--panel);
+}
+.cs-bp-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 10px 16px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel-2);
+  flex-shrink: 0;
+  font-family: var(--mono); font-size: 11px;
+}
+.cs-bp-title {
+  display: flex; align-items: baseline; gap: 12px; min-width: 0;
+}
+.cs-bp-title h2 {
+  font-family: var(--serif); font-weight: 500; font-size: 15px;
+  color: var(--ink); margin: 0; white-space: nowrap;
+}
+.cs-bp-meta {
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-dim); white-space: nowrap;
+}
+.cs-bp-controls {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-dim);
+  flex-wrap: wrap; flex-shrink: 0;
+}
+.cs-bp-filter {
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--rule); border-radius: 3px;
+  padding: 3px 8px; font: 10.5px var(--mono);
+  width: 160px;
+  transition: border-color 0.12s;
+}
+.cs-bp-filter:focus {
+  outline: none;
+  border-color: var(--accent, #79a3ff);
+}
+
+.cs-bp-table-wrap {
+  flex: 1; min-height: 0;
+  padding: 0; overflow-y: auto;
+  background: var(--panel);
+}
+.cs-bp-table {
+  width: 100%; border-collapse: collapse;
+  font: 10.5px var(--mono);
+  color: var(--ink);
+}
+.cs-bp-table thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+  padding: 6px 10px;
+  font-weight: 600; color: var(--ink-dim);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  user-select: none;
+}
+.cs-bp-table thead th[data-field] {
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.cs-bp-table thead th[data-field]:hover {
+  background: var(--panel-3);
+  color: var(--ink);
+}
+.cs-bp-table thead th[data-type="num"] { text-align: right; }
+.cs-bp-table tbody td {
+  padding: 4px 10px;
+  border-bottom: 1px solid rgba(80, 90, 110, 0.10);
+  vertical-align: middle;
+}
+.cs-bp-table tbody td.cs-bp-num { text-align: right; }
+.cs-bp-table tbody tr {
+  transition: background 0.08s;
+}
+.cs-bp-table tbody tr:hover {
+  background: rgba(79, 163, 255, 0.06);
+}
+.cs-bp-table tbody tr.cs-bp-active {
+  background: rgba(79, 163, 255, 0.14);
+}
+/* Alternating-row band — subtle, only on the dark theme. */
+.cs-bp-table tbody tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.015);
+}
+.cs-bp-table tbody tr:nth-child(even):hover {
+  background-color: rgba(79, 163, 255, 0.08);
+}
+
+/* Tier-bar (bp_catalogue) — pill row that visually groups Tier 1 /
+   Tier 2 / all. */
+.cs-bp-tierbar {
+  display: inline-flex; align-items: center; gap: 2px;
+  background: var(--panel-2);
+  border: 1px solid var(--rule);
+  border-radius: 4px; padding: 2px;
+  font: 10.5px var(--mono);
+}
+.cs-bp-tierbar .cs-bp-tier-label {
+  color: var(--ink-dim); padding: 0 6px 0 4px;
+}
+.cs-bp-tierbar button {
+  background: transparent; color: var(--ink-dim);
+  border: 1px solid transparent; border-radius: 3px;
+  padding: 2px 8px; cursor: pointer;
+  font: 10.5px var(--mono);
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.cs-bp-tierbar button:hover {
+  background: var(--panel-3); color: var(--ink);
+}
+.cs-bp-tierbar button.active {
+  background: var(--panel-3); color: var(--ink);
+  border-color: var(--rule);
+}
+
+.cs-bp-footer {
+  padding: 8px 16px;
+  border-top: 1px solid var(--rule);
+  background: var(--panel-2);
+  font: 10px var(--mono);
+  color: var(--ink-dim);
+  flex-shrink: 0;
+}
+.cs-bp-footer code {
+  background: var(--panel-3);
+  color: var(--ink);
+  padding: 0 4px; border-radius: 2px;
+  font-size: 9.5px;
+}
+
+/* Status text in the header (e.g. "12 zones", "loading…", "no data"). */
+.cs-bp-status { color: var(--ink-dim); }
+.cs-bp-count  { color: var(--ink-dim); }
