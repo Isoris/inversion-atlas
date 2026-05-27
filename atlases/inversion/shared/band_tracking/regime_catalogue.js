@@ -424,17 +424,59 @@ export function buildCatalogue(bandingResult, args) {
     }
   }
 
+  // 2026-05-27: optional regime_summary_bundle (output of
+  // shared/mgl_regime_consistency.buildRegimeTables) embedded into
+  // each record so downstream consumers (manuscript_bundle, exporters)
+  // don't have to re-run the stats compute. Bundle rows are matched
+  // to records by stage3 emission index (pre-sort).
+  const regimeBundle = args.regime_summary_bundle || null;
+  const candById = (regimeBundle && Array.isArray(regimeBundle.candidate_regime_summary))
+    ? regimeBundle.candidate_regime_summary : [];
+  const samplesByCand = new Map();
+  if (regimeBundle && Array.isArray(regimeBundle.sample_regime_calls)) {
+    for (const r of regimeBundle.sample_regime_calls) {
+      const key = r.candidate_id;
+      if (!samplesByCand.has(key)) samplesByCand.set(key, []);
+      samplesByCand.get(key).push(r);
+    }
+  }
+  const windowsByCand = new Map();
+  if (regimeBundle && Array.isArray(regimeBundle.window_regime_support)) {
+    for (const r of regimeBundle.window_regime_support) {
+      const key = r.candidate_id;
+      if (!windowsByCand.has(key)) windowsByCand.set(key, []);
+      windowsByCand.get(key).push(r);
+    }
+  }
+  const qcByCand = new Map();
+  if (regimeBundle && Array.isArray(regimeBundle.regime_qc_summary)) {
+    for (const r of regimeBundle.regime_qc_summary) qcByCand.set(r.candidate_id, r);
+  }
+
   const records = [];
   for (let i = 0; i < bandingResult.stage3.loci.length; i++) {
     const locus = bandingResult.stage3.loci[i];
-    records.push(buildLocusRecord({
+    const rec = buildLocusRecord({
       locus, locus_index: i,
       sample_ids: args.sample_ids,
       chromName: args.chromName,
       windowToBp: args.windowToBp,
       stage4_per_target,
       include_full_votes: !!args.include_full_votes,
-    }));
+    });
+    // Attach the matching regime-summary row (by stage3 index = locus.seed_id
+    // when available, else by index position into candidate_regime_summary).
+    if (candById.length > 0) {
+      const cand = candById[i] || candById.find(r => r && r.candidate_id === locus.seed_id);
+      if (cand) {
+        rec.regime_summary = cand;
+        const key = cand.candidate_id;
+        if (samplesByCand.has(key)) rec.regime_sample_calls      = samplesByCand.get(key);
+        if (windowsByCand.has(key)) rec.regime_window_support    = windowsByCand.get(key);
+        if (qcByCand.has(key))      rec.regime_qc                = qcByCand.get(key);
+      }
+    }
+    records.push(rec);
   }
 
   // Sort records by (chrom_idx, s_bp) for deterministic output. Avoids
@@ -463,6 +505,7 @@ export function buildCatalogue(bandingResult, args) {
     n_samples:        args.sample_ids.length,
     n_intervals:      records.length,
     has_stage4:       !!bandingResult.stage4,
+    has_regime_summary: !!regimeBundle,
     include_full_votes: !!args.include_full_votes,
     generated_at_utc: new Date().toISOString(),
     summary:          bandingResult.summary,

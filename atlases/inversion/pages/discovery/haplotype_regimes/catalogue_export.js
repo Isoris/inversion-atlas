@@ -85,6 +85,11 @@ export function exportCatalogue(state, atlasState) {
       windowToBp,
       resolved_opts,
       include_full_votes: false,
+      // 2026-05-27: embed regime-consistency summary into each record
+      // when the pipeline has computed it (candidate_regimes page sets
+      // state._regimeSummaryBundle in afterPipelineRun). Manifest gets
+      // has_regime_summary = true automatically.
+      regime_summary_bundle: state._regimeSummaryBundle || null,
     });
   } catch (e) {
     console.error('buildCatalogue threw:', e);
