@@ -302,6 +302,148 @@
         </div>
       </div>
 
+      <!-- Regime summary tables (per-candidate / per-sample / per-window /
+           QC) — populated by buildRegimeTables after the pipeline runs.
+           Hidden until results land. Each header has a "download TSV"
+           button that serialises that table via rowsToTsv. -->
+      <div id="rgSummaryTablesWrap" style="
+        display: none;
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px 16px;
+        border-top: 1px solid var(--rule, #2a3242);
+        background: var(--panel-1, #0f141d);
+        max-height: 50vh;
+        overflow: auto;
+      ">
+        <div style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--ink-dim, #8895a8);
+          font-family: ui-monospace, monospace;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        ">
+          <span>regime summary tables</span>
+          <span id="rgSummaryTablesCount" style="font-weight: 600; text-transform: none; color: var(--ink, #d4dae2);"></span>
+          <span style="margin-left: auto; font-style: italic; color: var(--ink-dimmer, #5a6472);">
+            long-range co-segregation patterns · not Mendelian validation
+          </span>
+        </div>
+
+        <!-- candidate_regime_summary -->
+        <details open style="border: 1px solid var(--rule, #2a3242); border-radius: 4px;">
+          <summary style="
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            background: var(--panel-2, #181d27);
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--ink, #d4dae2);
+          ">
+            <span>candidate_regime_summary</span>
+            <span id="rgSummaryCandCount" style="color: var(--ink-dim, #8895a8);"></span>
+            <button type="button" id="rgSummaryDownloadCand" class="rg-tb-btn"
+              style="margin-left: auto;"
+              title="Download as TSV">⬇ TSV</button>
+          </summary>
+          <div id="rgSummaryCandTable" style="overflow-x: auto; padding: 6px 10px;"></div>
+        </details>
+
+        <!-- sample_regime_calls -->
+        <details style="border: 1px solid var(--rule, #2a3242); border-radius: 4px;">
+          <summary style="
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            background: var(--panel-2, #181d27);
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--ink, #d4dae2);
+          ">
+            <span>sample_regime_calls</span>
+            <span id="rgSummarySampleCount" style="color: var(--ink-dim, #8895a8);"></span>
+            <button type="button" id="rgSummaryDownloadSample" class="rg-tb-btn"
+              style="margin-left: auto;"
+              title="Download as TSV">⬇ TSV</button>
+          </summary>
+          <div id="rgSummarySampleTable" style="overflow-x: auto; padding: 6px 10px; max-height: 280px; overflow-y: auto;"></div>
+        </details>
+
+        <!-- window_regime_support -->
+        <details style="border: 1px solid var(--rule, #2a3242); border-radius: 4px;">
+          <summary style="
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            background: var(--panel-2, #181d27);
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--ink, #d4dae2);
+          ">
+            <span>window_regime_support</span>
+            <span id="rgSummaryWindowCount" style="color: var(--ink-dim, #8895a8);"></span>
+            <button type="button" id="rgSummaryDownloadWindow" class="rg-tb-btn"
+              style="margin-left: auto;"
+              title="Download as TSV">⬇ TSV</button>
+          </summary>
+          <div id="rgSummaryWindowTable" style="overflow-x: auto; padding: 6px 10px; max-height: 280px; overflow-y: auto;"></div>
+        </details>
+
+        <!-- regime_qc_summary -->
+        <details style="border: 1px solid var(--rule, #2a3242); border-radius: 4px;">
+          <summary style="
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            background: var(--panel-2, #181d27);
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--ink, #d4dae2);
+          ">
+            <span>regime_qc_summary</span>
+            <span id="rgSummaryQcCount" style="color: var(--ink-dim, #8895a8);"></span>
+            <button type="button" id="rgSummaryDownloadQc" class="rg-tb-btn"
+              style="margin-left: auto;"
+              title="Download as TSV">⬇ TSV</button>
+          </summary>
+          <div id="rgSummaryQcTable" style="overflow-x: auto; padding: 6px 10px;"></div>
+        </details>
+
+        <!-- length-binned aggregate -->
+        <details style="border: 1px solid var(--rule, #2a3242); border-radius: 4px;">
+          <summary style="
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            background: var(--panel-2, #181d27);
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--ink, #d4dae2);
+          ">
+            <span>length_binned_aggregate</span>
+            <span id="rgSummaryLenCount" style="color: var(--ink-dim, #8895a8);"></span>
+            <button type="button" id="rgSummaryDownloadLen" class="rg-tb-btn"
+              style="margin-left: auto;"
+              title="Download as TSV">⬇ TSV</button>
+          </summary>
+          <div id="rgSummaryLenTable" style="overflow-x: auto; padding: 6px 10px;"></div>
+        </details>
+      </div>
+
       <!-- Action bar — no mode-toggle bar (this page is always short mode) -->
       <div class="rg-actionbar" style="
         flex: 0 0 auto;

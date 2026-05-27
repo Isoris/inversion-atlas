@@ -48,6 +48,8 @@ import {
 import { renderL3PairsTable } from './l3_pairs_table.js';
 import { renderRegimesSummary, applyViewToggle } from './regimes_summary.js';
 import { setStatus } from './util.js';
+import { buildRegimeTables, lengthBinAggregate }
+  from '../../../shared/mgl_regime_consistency.js';
 
 /**
  * Run the pipeline against the active chromosome's pre-wired ctx
@@ -275,6 +277,70 @@ export function afterPipelineRun(root, state, result, opts) {
       };
     }
   } catch (e) { console.warn('[stash] write failed:', e); }
+
+  // Build + render the 4-table regime summary bundle. Pure compute on
+  // top of the banding result + ctx — dosage_per_sample omitted in v1
+  // (homA/het/homB will read 0); a follow-up wires per-locus dosage in.
+  // The render is candidate_regimes-only for now: the panel HTML only
+  // exists on that page; haplotype_regimes will get its own panel in
+  // a follow-up.
+  try {
+    if (state._pageId === 'candidate_regimes') {
+      _renderRegimeSummaryBundle(root, state, result, opts);
+    }
+  } catch (e) {
+    console.warn('[regime-summary] build/render threw —', e);
+  }
+}
+
+// Lazy-loaded so haplotype_regimes (which doesn't have the panel HTML)
+// doesn't pull the renderer + palette modules at all.
+async function _renderRegimeSummaryBundle(root, state, result, opts) {
+  const ctx = state._regimesCtx;
+  if (!ctx || !result || !result.stage3) return;
+  // Map stage3 loci back to candidates from the local_pca_dosage stash
+  // (short-mode 1:1 — each candidate is one locus).
+  const atlas = state._atlasState;
+  const lpd = atlas && atlas.inversion && atlas.inversion._local_pca_dosage_state;
+  const candList = (lpd && Array.isArray(lpd.candidateList)) ? lpd.candidateList : [];
+  const chrom = state.activeChrom;
+  const onChrom = candList.filter(c => c && (!c.chrom || c.chrom === chrom));
+  const sample_ids = (state.data && Array.isArray(state.data.samples))
+    ? state.data.samples : null;
+  // Pull per-sample mean dosage from the candidate (when present) — used
+  // for homA/het/homB tier counts. Each candidate's mean_dosage_per_sample
+  // covers its own marker range, so we average over the candidates the
+  // sample is assigned to. v1 keeps it simple: pick the first candidate's
+  // array as the global reference. Follow-up: per-locus dosage.
+  let dosage_per_sample = null;
+  for (const c of onChrom) {
+    if (c && c.mean_dosage_per_sample && c.mean_dosage_per_sample.length > 0) {
+      dosage_per_sample = c.mean_dosage_per_sample;
+      break;
+    }
+  }
+  const bundle = buildRegimeTables({
+    result,
+    ctx,
+    dosage_per_sample,
+    candidates: onChrom,
+    sample_ids,
+    chromName: () => chrom,
+    opts: opts || {},
+  });
+  bundle.length_binned_aggregate = lengthBinAggregate(bundle.candidate_regime_summary);
+  state._regimeSummaryBundle = bundle;
+
+  // Render via the page's panel module. Lazy import keeps the bundle
+  // small for the haplotype_regimes page which doesn't need this yet.
+  try {
+    const mod = await import('../../classification/candidate_regimes/regime_summary_panel.js');
+    mod.renderRegimeSummaryPanel(root, bundle, {
+      downloadPrefix: `${chrom || 'chr'}_regime_`,
+    });
+  } catch (e) {
+    console.warn('[regime-summary] panel render threw —', e);
+  }
 }
 
 /**
