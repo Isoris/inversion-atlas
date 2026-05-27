@@ -224,9 +224,22 @@ export function wireCtxCallbacks(state, atlasState) {
     getBpFor,
   };
 
-  // PC1 accessor for the regimes_pc1_panel.
+  // PC1 accessor for the regimes_pc1_panel. Apply the per-window
+  // sign-flip from state.pc1Sign so this panel matches the per-sample
+  // lines panel on local_pca_dosage (which routes PC1 through
+  // getPCRender — see shared/pc_accessors.js). Without this, windows
+  // whose sign-align inverted PC1 are drawn with the opposite y-axis
+  // convention, producing the X-braid the user noticed.
   state._regimesGetPC1 = (w) => {
     const win = data.windows && data.windows[w];
-    return win ? win.pc1 : null;
+    if (!win || !win.pc1) return null;
+    const sign = (state.flipPC1 && state.pc1Sign) ? (state.pc1Sign[w] || 1) : 1;
+    if (sign === 1) return win.pc1;
+    // Return a flipped copy so callers see render-ready PC1. Algorithms
+    // that don't care about sign (het_detect_candidate_band etc.) still
+    // work — sign-flipping just permutes "low/high" labels symmetrically.
+    const out = new Float32Array(win.pc1.length);
+    for (let i = 0; i < win.pc1.length; i++) out[i] = -win.pc1[i];
+    return out;
   };
 }
