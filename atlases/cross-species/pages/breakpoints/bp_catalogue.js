@@ -12,6 +12,15 @@
 // Per docs/MIGRATION_4_ATLASES.md §1.3 + atlases/cross-species/README.md.
 
 import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
+import {
+  wireSortableHeaders,
+  wireRowFilter,
+  makeComparator,
+  filterRows,
+} from '../../shared/sortable_table.js';
+
+const FILTER_FIELDS = ['cluster_id', 'chrom_focal', 'chrom', 'methods_csv',
+                       'methods', 'confidence_tier', 'backbone'];
 
 let _pageState = null;
 
@@ -23,12 +32,18 @@ export async function mount(root, atlasState, registry) {
     rows: [],
     tierFilter: 'all',     // 'all' | '1' | '2'
     activeClusterId: null,
+    filterText: '',
+    sort: { field: null, dir: 'asc', type: null },
+    _teardowns: [],
   };
   _wireTierBar(root);
   await _loadCatalogue(root, atlasState, registry);
 }
 
 export async function unmount(_root) {
+  if (_pageState && Array.isArray(_pageState._teardowns)) {
+    for (const t of _pageState._teardowns) { try { t(); } catch (_) {} }
+  }
   _pageState = null;
 }
 
@@ -63,7 +78,32 @@ async function _loadCatalogue(root, atlasState, registry) {
   const wrap = root.querySelector('#bpCatTableWrap');
   if (wrap) wrap.style.display = '';
   if (statusEl) statusEl.textContent = `loaded ${rows.length} cluster${rows.length === 1 ? '' : 's'}`;
+  _wireTableControls(root);
   _renderRows(root);
+}
+
+function _wireTableControls(root) {
+  if (!_pageState || _pageState._teardowns.length > 0) return;
+  const table = root.querySelector('#bpCatTable');
+  const filterInput = root.querySelector('#bpCatFilter');
+  if (table) {
+    const r = wireSortableHeaders(table, {
+      onSort: (field, dir, type) => {
+        _pageState.sort = { field, dir, type };
+        _renderRows(root);
+      },
+    });
+    _pageState._teardowns.push(r.teardown);
+  }
+  if (filterInput) {
+    const r = wireRowFilter(filterInput, {
+      onChange: (text) => {
+        _pageState.filterText = text;
+        _renderRows(root);
+      },
+    });
+    _pageState._teardowns.push(r.teardown);
+  }
 }
 
 function _renderEmpty(root) {
@@ -99,7 +139,15 @@ function _renderRows(root) {
   const count = root.querySelector('#bpCatCount');
   if (!body) return;
   body.innerHTML = '';
-  const filtered = _pageState.rows.filter(_passesTierFilter);
+  // Tier-bar filter (Tier 1 / Tier 2 / all) composes with the text
+  // filter from the header search input.
+  let view = _pageState.rows.filter(_passesTierFilter);
+  view = filterRows(view, _pageState.filterText, FILTER_FIELDS);
+  if (_pageState.sort.field) {
+    view = view.slice();
+    view.sort(makeComparator(_pageState.sort.field, _pageState.sort.dir, _pageState.sort.type));
+  }
+  const filtered = view;
   for (const r of filtered) {
     body.appendChild(_renderRow(r));
   }

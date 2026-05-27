@@ -104,6 +104,7 @@ const {
   paintColorRamp,
 } = await import('../atlases/evolution/shared/canvas_axes.js');
 const csOnboarding = await import('../atlases/cross-species/shared/onboarding.js');
+const csTable      = await import('../atlases/cross-species/shared/sortable_table.js');
 
 // =====================================================================
 group('empty_state_panel.renderEmptyStatePanel');
@@ -404,6 +405,106 @@ csOnboarding.applyOnboarding('bp_atlas_reciprocity');
 check('cs apply idempotent same lifecycle',    csTarget.children.length === 1);
 csOnboarding.applyOnboarding('not_a_cs_page'); // no-op for unknown id
 check('cs apply unknown id is no-op',          csTarget.children.length === 1);
+
+// =====================================================================
+group('cross-species sortable_table');
+
+// makeComparator — string ascending.
+const strRows = [
+  { id: 'c', label: 'gamma' },
+  { id: 'a', label: 'alpha' },
+  { id: 'b', label: 'beta'  },
+];
+const strSorted = strRows.slice().sort(csTable.makeComparator('id', 'asc', 'str'));
+check('str asc sort by id',                 strSorted.map(r => r.id).join('') === 'abc');
+const strSortedDesc = strRows.slice().sort(csTable.makeComparator('id', 'desc', 'str'));
+check('str desc sort by id',                strSortedDesc.map(r => r.id).join('') === 'cba');
+
+// makeComparator — numeric (with empty cells sinking to bottom).
+const numRows = [
+  { id: 'a', n: '12'  },
+  { id: 'b', n: ''    },
+  { id: 'c', n: '3'   },
+  { id: 'd', n: '120' },
+];
+const numSorted = numRows.slice().sort(csTable.makeComparator('n', 'asc', 'num'));
+check('num asc keeps empties at bottom',    numSorted.map(r => r.id).join('') === 'cadb');
+const numSortedDesc = numRows.slice().sort(csTable.makeComparator('n', 'desc', 'num'));
+check('num desc keeps empties at bottom',   numSortedDesc.map(r => r.id).join('') === 'dacb');
+
+// filterRows — substring, case-insensitive, across listed fields.
+const filterPool = [
+  { id: 'r1', chrom: 'Chr1',  notes: 'high' },
+  { id: 'r2', chrom: 'Chr10', notes: 'low'  },
+  { id: 'r3', chrom: 'Chr2',  notes: 'HIGH' },
+];
+check('filterRows empty text → all',      csTable.filterRows(filterPool, '', ['chrom']).length === 3);
+check('filterRows by single field',       csTable.filterRows(filterPool, 'chr1', ['chrom']).length === 2);
+check('filterRows case-insensitive',      csTable.filterRows(filterPool, 'HIGH', ['notes']).length === 2);
+check('filterRows null rows → []',        csTable.filterRows(null, 'x', ['chrom']).length === 0);
+check('filterRows no fields → scan all',  csTable.filterRows(filterPool, 'r3').length === 1);
+
+// wireSortableHeaders — fake table with two header cells.
+fakeDocument._clear();
+const tbl = new FakeEl('table');
+const thead = new FakeEl('thead');
+const trh = new FakeEl('tr');
+const thA = new FakeEl('th');
+thA.attrs['data-field'] = 'id';
+thA.attrs['data-type']  = 'str';
+thA.textContent = 'ID';
+thA.dataset = {};
+const thB = new FakeEl('th');
+thB.attrs['data-field'] = 'n';
+thB.attrs['data-type']  = 'num';
+thB.textContent = 'count';
+thB.dataset = {};
+trh.appendChild(thA); trh.appendChild(thB);
+thead.appendChild(trh);
+tbl.appendChild(thead);
+// FakeEl's querySelectorAll needs to recognise `th[data-field]`.
+tbl.querySelectorAll = (sel) => {
+  if (sel === 'th[data-field]') return [thA, thB];
+  return [];
+};
+let lastSort = null;
+const ws = csTable.wireSortableHeaders(tbl, {
+  onSort: (f, d, t) => { lastSort = { f, d, t }; },
+});
+thA.click();
+check('sort asc on first click',          lastSort && lastSort.f === 'id' && lastSort.d === 'asc');
+check('thA shows ▲ glyph',                /▲/.test(thA.textContent));
+thA.click();
+check('sort desc on second click',        lastSort && lastSort.d === 'desc');
+check('thA shows ▼ glyph',                /▼/.test(thA.textContent));
+thB.click();
+check('switching field resets to asc',    lastSort && lastSort.f === 'n' && lastSort.d === 'asc');
+check('thA no longer has a glyph',        !/[▲▼]/.test(thA.textContent));
+check('thB has ▲ glyph',                  /▲/.test(thB.textContent));
+check('table data-sort-field set',        tbl.getAttribute('data-sort-field') === 'n');
+ws.teardown();
+// Post-teardown click should not change state.
+const before = lastSort;
+thA.click();
+check('teardown removes listener',        lastSort === before);
+
+// wireRowFilter debounce.
+const inp = new FakeEl('input');
+inp.value = '';
+let lastFilter = null;
+const rf = csTable.wireRowFilter(inp, {
+  onChange: (t) => { lastFilter = t; },
+  debounceMs: 30,
+});
+inp.value = 'foo';
+// Trigger the listener.
+const inputCb = inp._listeners.input && inp._listeners.input[0];
+check('wireRowFilter installs input listener', typeof inputCb === 'function');
+inputCb && inputCb();
+check('filter not fired immediately',          lastFilter === null);
+await new Promise((res) => setTimeout(res, 60));
+check('filter fires after debounce',           lastFilter === 'foo');
+rf.teardown();
 
 // =====================================================================
 console.log('\n=================');

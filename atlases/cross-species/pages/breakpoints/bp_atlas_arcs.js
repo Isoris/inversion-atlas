@@ -12,11 +12,23 @@ let _pageState = null;
 
 export async function mount(root, atlasState, registry) {
   resetOnboarding('bp_atlas_arcs');
-  _pageState = { atlasState, registry, arcs: null, meta: null };
+  _pageState = {
+    atlasState, registry,
+    arcs: null, meta: null,
+    hit_regions: [],    // [{x1, x2, midX, radius, arc}, ...]
+    hover_idx:   -1,
+    _teardowns:  [],
+  };
   await _load(root, registry);
+  _wireHover(root);
 }
 
-export async function unmount(_root) { _pageState = null; }
+export async function unmount(_root) {
+  if (_pageState && Array.isArray(_pageState._teardowns)) {
+    for (const t of _pageState._teardowns) { try { t(); } catch (_) {} }
+  }
+  _pageState = null;
+}
 
 export function refresh(_state) {
   if (typeof document === 'undefined') return;
@@ -110,18 +122,121 @@ function _paint(root) {
     if (x == null) continue;
     ctx.fillText(c, x, padT + plotH + 14);
   }
-  // Arcs
+  // Arcs — capture hit regions so onMove can identify the hovered arc.
+  _pageState.hit_regions = [];
   ctx.lineWidth = 1.5;
-  for (const a of arcList) {
+  for (let i = 0; i < arcList.length; i++) {
+    const a = arcList[i];
     const x1 = chromX(a.chrom_from || a.chrom);
     const x2 = chromX(a.chrom_to   || a.chrom);
     if (x1 == null || x2 == null) continue;
     const midX = (x1 + x2) / 2;
     const dist = Math.abs(x2 - x1);
     const radius = Math.max(20, dist / 2);
-    ctx.strokeStyle = a.color || 'rgba(95,179,255,0.45)';
+    const isHovered = (i === _pageState.hover_idx);
+    ctx.strokeStyle = isHovered
+      ? 'rgba(255,210,90,0.95)'
+      : (a.color || 'rgba(95,179,255,0.45)');
+    ctx.lineWidth = isHovered ? 2.5 : 1.5;
     ctx.beginPath();
     ctx.arc(midX, padT + plotH, radius, Math.PI, 0, false);
     ctx.stroke();
+    _pageState.hit_regions.push({
+      idx: i,
+      midX, radius,
+      baseY: padT + plotH,
+      arc: a,
+    });
   }
+  ctx.lineWidth = 1;
+  // Hovered-arc tooltip card, anchored above the arc apex.
+  if (_pageState.hover_idx >= 0) {
+    const hr = _pageState.hit_regions[_pageState.hover_idx];
+    if (hr) _paintArcTooltip(ctx, hr, cssW, cssH);
+  }
+}
+
+function _paintArcTooltip(ctx, hr, cssW, cssH) {
+  const a = hr.arc || {};
+  const lines = [];
+  if (a.chrom_from || a.chrom_to) {
+    lines.push(`${a.chrom_from || a.chrom} → ${a.chrom_to || a.chrom}`);
+  } else if (a.chrom) {
+    lines.push(String(a.chrom));
+  }
+  if (a.event_class) lines.push('class: ' + a.event_class);
+  if (Number.isFinite(a.from_bp) || Number.isFinite(a.to_bp)) {
+    const f = Number.isFinite(a.from_bp) ? (a.from_bp / 1e6).toFixed(2) + ' Mb' : '?';
+    const t = Number.isFinite(a.to_bp)   ? (a.to_bp   / 1e6).toFixed(2) + ' Mb' : '?';
+    lines.push(`${f} – ${t}`);
+  }
+  if (a.label) lines.push(String(a.label));
+  if (lines.length === 0) return;
+  ctx.font = '10px ui-monospace, monospace';
+  let maxW = 0;
+  for (const ln of lines) maxW = Math.max(maxW, Math.ceil(ctx.measureText ? ctx.measureText(ln).width : ln.length * 6));
+  const padPx = 6;
+  const lineH = 13;
+  const boxW = maxW + 2 * padPx;
+  const boxH = lines.length * lineH + 2 * padPx;
+  const apexY = hr.baseY - hr.radius;
+  let bx = hr.midX - boxW / 2;
+  let by = apexY - boxH - 8;
+  bx = Math.max(4, Math.min(cssW - boxW - 4, bx));
+  by = Math.max(4, by);
+  ctx.fillStyle = 'rgba(20, 25, 35, 0.95)';
+  ctx.strokeStyle = 'rgba(255, 210, 90, 0.9)';
+  ctx.lineWidth = 1;
+  if (typeof ctx.fillRect === 'function')   ctx.fillRect(bx, by, boxW, boxH);
+  if (typeof ctx.strokeRect === 'function') ctx.strokeRect(bx + 0.5, by + 0.5, boxW, boxH);
+  ctx.fillStyle = '#ffe6a8';
+  if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'top';
+  for (let i = 0; i < lines.length; i++) {
+    if (typeof ctx.fillText === 'function') {
+      ctx.fillText(lines[i], bx + padPx, by + padPx + i * lineH);
+    }
+  }
+  if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'alphabetic';
+}
+
+function _wireHover(root) {
+  if (!_pageState || typeof document === 'undefined') return;
+  const canvas = root && root.querySelector ? root.querySelector('#bpArcsCanvas') : null;
+  if (!canvas || typeof canvas.addEventListener !== 'function') return;
+  const onMove = (ev) => {
+    if (!_pageState || !_pageState.hit_regions || _pageState.hit_regions.length === 0) return;
+    const rect = typeof canvas.getBoundingClientRect === 'function'
+      ? canvas.getBoundingClientRect() : { left: 0, top: 0 };
+    const x = ((ev && ev.clientX) || 0) - (rect.left || 0);
+    const y = ((ev && ev.clientY) || 0) - (rect.top  || 0);
+    let hit = -1;
+    let bestDist = 8;     // px tolerance from the arc curve
+    for (const hr of _pageState.hit_regions) {
+      // Distance from (x,y) to the arc circle (centre = midX, baseY,
+      // radius). The arc is the upper half (y ≤ baseY) — only count
+      // hits above the baseline.
+      if (y > hr.baseY) continue;
+      const dx = x - hr.midX, dy = y - hr.baseY;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      const off = Math.abs(d - hr.radius);
+      if (off < bestDist) { bestDist = off; hit = hr.idx; }
+    }
+    if (hit !== _pageState.hover_idx) {
+      _pageState.hover_idx = hit;
+      _paint(root);
+    }
+  };
+  const onLeave = () => {
+    if (!_pageState) return;
+    if (_pageState.hover_idx !== -1) {
+      _pageState.hover_idx = -1;
+      _paint(root);
+    }
+  };
+  canvas.addEventListener('mousemove', onMove);
+  canvas.addEventListener('mouseleave', onLeave);
+  _pageState._teardowns.push(() => {
+    try { canvas.removeEventListener('mousemove', onMove); } catch (_) {}
+    try { canvas.removeEventListener('mouseleave', onLeave); } catch (_) {}
+  });
 }

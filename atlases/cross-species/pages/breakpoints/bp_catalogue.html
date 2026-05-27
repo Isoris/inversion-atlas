@@ -18,6 +18,11 @@
           <button type="button" data-bpc-tier="1">Tier 1 (cross-method)</button>
           <button type="button" data-bpc-tier="2">Tier 2 (recurrent)</button>
         </span>
+        <input id="bpCatFilter" type="search" placeholder="filter…"
+               style="background: var(--panel-2); color: var(--ink);
+                      border: 1px solid var(--rule); border-radius: 3px;
+                      padding: 2px 8px; font: 10.5px ui-monospace, monospace;
+                      width: 140px;">
         <span id="bpCatCount" style="color: var(--ink-dim);"></span>
       </div>
     </header>
@@ -28,17 +33,17 @@
                                     font: 10.5px ui-monospace, monospace;">
         <thead>
           <tr style="border-bottom: 1px solid var(--rule);">
-            <th style="text-align: left;  padding: 4px 6px;">cluster_id</th>
-            <th style="text-align: left;  padding: 4px 6px;">chrom (focal)</th>
-            <th style="text-align: right; padding: 4px 6px;">start_mb</th>
-            <th style="text-align: right; padding: 4px 6px;">end_mb</th>
-            <th style="text-align: right; padding: 4px 6px;">n_methods</th>
-            <th style="text-align: left;  padding: 4px 6px;">methods</th>
-            <th style="text-align: right; padding: 4px 6px;">n_species</th>
-            <th style="text-align: left;  padding: 4px 6px;">cross_method</th>
-            <th style="text-align: left;  padding: 4px 6px;">confidence</th>
-            <th style="text-align: left;  padding: 4px 6px;">backbone</th>
-            <th style="text-align: right; padding: 4px 6px;">stable_at_kb</th>
+            <th data-field="cluster_id"     data-type="str" style="text-align: left;  padding: 4px 6px;">cluster_id</th>
+            <th data-field="chrom_focal"    data-type="str" style="text-align: left;  padding: 4px 6px;">chrom (focal)</th>
+            <th data-field="start_mb"       data-type="num" style="text-align: right; padding: 4px 6px;">start_mb</th>
+            <th data-field="end_mb"         data-type="num" style="text-align: right; padding: 4px 6px;">end_mb</th>
+            <th data-field="n_methods"      data-type="num" style="text-align: right; padding: 4px 6px;">n_methods</th>
+            <th data-field="methods_csv"    data-type="str" style="text-align: left;  padding: 4px 6px;">methods</th>
+            <th data-field="n_species"      data-type="num" style="text-align: right; padding: 4px 6px;">n_species</th>
+            <th data-field="cross_method"   data-type="str" style="text-align: left;  padding: 4px 6px;">cross_method</th>
+            <th data-field="confidence_tier" data-type="str" style="text-align: left;  padding: 4px 6px;">confidence</th>
+            <th data-field="backbone"       data-type="str" style="text-align: left;  padding: 4px 6px;">backbone</th>
+            <th data-field="stable_at_kb"   data-type="num" style="text-align: right; padding: 4px 6px;">stable_at_kb</th>
           </tr>
         </thead>
         <tbody id="bpCatBody"></tbody>

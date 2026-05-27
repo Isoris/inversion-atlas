@@ -5,16 +5,35 @@
 // Phase 1a: page stub. Renders empty-state when data missing.
 
 import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
+import {
+  wireSortableHeaders,
+  wireRowFilter,
+  makeComparator,
+  filterRows,
+} from '../../shared/sortable_table.js';
+
+const FILTER_FIELDS = ['zone_id', 'event_class', 'confidence_tier', 'backbone_support'];
 
 let _pageState = null;
 
 export async function mount(root, atlasState, registry) {
   resetOnboarding('bp_atlas_reciprocity');
-  _pageState = { atlasState, registry, rows: [] };
+  _pageState = {
+    atlasState, registry,
+    rows: [],
+    filterText: '',
+    sort: { field: null, dir: 'asc', type: null },
+    _teardowns: [],
+  };
   await _loadReciprocity(root, registry);
 }
 
-export async function unmount(_root) { _pageState = null; }
+export async function unmount(_root) {
+  if (_pageState && Array.isArray(_pageState._teardowns)) {
+    for (const t of _pageState._teardowns) { try { t(); } catch (_) {} }
+  }
+  _pageState = null;
+}
 
 export function refresh(_state) {
   if (typeof document === 'undefined') return;
@@ -47,7 +66,32 @@ async function _loadReciprocity(root, registry) {
   const wrap = root.querySelector('#bpRecTableWrap');
   if (wrap) wrap.style.display = '';
   if (statusEl) statusEl.textContent = `${rows.length} zone${rows.length === 1 ? '' : 's'}`;
+  _wireTableControls(root);
   _renderRows(root);
+}
+
+function _wireTableControls(root) {
+  if (!_pageState || _pageState._teardowns.length > 0) return;
+  const table = root.querySelector('#bpRecTable');
+  const filterInput = root.querySelector('#bpRecFilter');
+  if (table) {
+    const r = wireSortableHeaders(table, {
+      onSort: (field, dir, type) => {
+        _pageState.sort = { field, dir, type };
+        _renderRows(root);
+      },
+    });
+    _pageState._teardowns.push(r.teardown);
+  }
+  if (filterInput) {
+    const r = wireRowFilter(filterInput, {
+      onChange: (text) => {
+        _pageState.filterText = text;
+        _renderRows(root);
+      },
+    });
+    _pageState._teardowns.push(r.teardown);
+  }
 }
 
 function _renderEmpty(root) {
@@ -77,8 +121,23 @@ function _renderRows(root) {
   if (!_pageState) return;
   const body = root.querySelector('#bpRecBody');
   if (!body) return;
+  // Apply filter + sort each repaint — the row count is small (≤
+  // hundreds), so re-sorting in place is cheaper than maintaining a
+  // parallel sorted view.
+  let view = filterRows(_pageState.rows, _pageState.filterText, FILTER_FIELDS);
+  if (_pageState.sort.field) {
+    view = view.slice();
+    view.sort(makeComparator(_pageState.sort.field, _pageState.sort.dir, _pageState.sort.type));
+  }
   body.innerHTML = '';
-  for (const r of _pageState.rows) body.appendChild(_renderRow(r));
+  for (const r of view) body.appendChild(_renderRow(r));
+  // Reflect the filtered-row count next to the header status.
+  const count = root.querySelector('#bpRecCount');
+  if (count) {
+    count.textContent = (view.length === _pageState.rows.length)
+      ? ''
+      : `${view.length} / ${_pageState.rows.length}`;
+  }
 }
 
 function _renderRow(r) {

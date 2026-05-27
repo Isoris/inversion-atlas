@@ -7,6 +7,11 @@
         <span id="bpRecStatus" style="color: var(--ink-dim);">—</span>
       </div>
       <div style="display: flex; align-items: center; gap: 10px;">
+        <input id="bpRecFilter" type="search" placeholder="filter…"
+               style="background: var(--panel-2); color: var(--ink);
+                      border: 1px solid var(--rule); border-radius: 3px;
+                      padding: 2px 8px; font: 10.5px ui-monospace, monospace;
+                      width: 140px;">
         <span id="bpRecCount" style="color: var(--ink-dim);"></span>
       </div>
     </header>
@@ -16,13 +21,13 @@
                                     font: 10.5px ui-monospace, monospace;">
         <thead>
           <tr style="border-bottom: 1px solid var(--rule);">
-            <th style="text-align: left;  padding: 4px 6px;">zone_id</th>
-            <th style="text-align: left;  padding: 4px 6px;">anchor_Cgar pos</th>
-            <th style="text-align: left;  padding: 4px 6px;">anchor_Cmac pos</th>
-            <th style="text-align: left;  padding: 4px 6px;">event_class</th>
-            <th style="text-align: left;  padding: 4px 6px;">confidence</th>
-            <th style="text-align: left;  padding: 4px 6px;">backbone_support</th>
-            <th style="text-align: left;  padding: 4px 6px;">both_anchor</th>
+            <th data-field="zone_id"          data-type="str" style="text-align: left;  padding: 4px 6px;">zone_id</th>
+            <th data-field="anchor_Cgar_pos"  data-type="num" style="text-align: left;  padding: 4px 6px;">anchor_Cgar pos</th>
+            <th data-field="anchor_Cmac_pos"  data-type="num" style="text-align: left;  padding: 4px 6px;">anchor_Cmac pos</th>
+            <th data-field="event_class"      data-type="str" style="text-align: left;  padding: 4px 6px;">event_class</th>
+            <th data-field="confidence_tier"  data-type="str" style="text-align: left;  padding: 4px 6px;">confidence</th>
+            <th data-field="backbone_support" data-type="str" style="text-align: left;  padding: 4px 6px;">backbone_support</th>
+            <th data-field="both_anchor"      data-type="str" style="text-align: left;  padding: 4px 6px;">both_anchor</th>
           </tr>
         </thead>
         <tbody id="bpRecBody"></tbody>
