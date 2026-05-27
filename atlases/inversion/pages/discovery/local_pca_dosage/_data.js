@@ -25,6 +25,7 @@ export {
   getPC,
   buildIndexes,
   computePC1Signs,
+  computePC2Signs,
   populateSimScales,
   buildFamilyPalette,
   loadViewControls,

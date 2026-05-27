@@ -13,14 +13,21 @@ function check(label, cond, extra) {
 }
 function group(name) { console.log('\n--- ' + name + ' ---'); }
 
-const { computePC1Signs } = await import('../atlases/inversion/shared/page1_data_helpers.js');
+const {
+  computePC1Signs,
+  computePC2Signs,
+  getLinesSignAt,
+} = await import('../atlases/inversion/shared/page1_data_helpers.js');
 
-function makeState(pc1Vectors) {
-  return {
-    data: {
-      windows: pc1Vectors.map((v) => ({ pc1: Float32Array.from(v) })),
-    },
-  };
+function makeState(pc1Vectors, pc2Vectors) {
+  const wins = pc1Vectors.map((v, i) => {
+    const w = { pc1: Float32Array.from(v) };
+    if (Array.isArray(pc2Vectors) && pc2Vectors[i]) {
+      w.pc2 = Float32Array.from(pc2Vectors[i]);
+    }
+    return w;
+  });
+  return { data: { windows: wins } };
 }
 
 // =====================================================================
@@ -136,6 +143,80 @@ check('NaN window: signs[0,2] = +1',    stNaN.pc1Sign[0] === 1 && stNaN.pc1Sign[
 // signs[1] inherits the previous sign (hysteresis when correlation is 0).
 check('NaN window: signs[1] inherits neighbour',
       stNaN.pc1Sign[1] === 1);
+
+// =====================================================================
+group('PC2 parallel sign-align — same algorithm, independent state');
+
+// Same shape as PC1 wobble test but on a different axis. PC2 should
+// be flipped on the same set of windows. The PC1 path must not see
+// PC2 in any way.
+const stPc2Wobble = makeState(
+  // PC1: stable across all windows
+  [
+    [-2, -1,  0,  1,  2],
+    [-2, -1,  0,  1,  2],
+    [-2, -1,  0,  1,  2],
+    [-2, -1,  0,  1,  2],
+  ],
+  // PC2: window 2 is flipped
+  [
+    [-1, -0.5,  0,  0.5,  1],
+    [-1, -0.5,  0,  0.5,  1],
+    [ 1,  0.5,  0, -0.5, -1],
+    [-1, -0.5,  0,  0.5,  1],
+  ]
+);
+computePC1Signs(stPc2Wobble);
+computePC2Signs(stPc2Wobble);
+check('PC1 signs unaffected by PC2',
+      Array.from(stPc2Wobble.pc1Sign).every(s => s === 1));
+check('PC2 signs[2] = -1',  stPc2Wobble.pc2Sign[2] === -1);
+check('PC2 signs[0,1,3] = +1',
+      stPc2Wobble.pc2Sign[0] === 1 &&
+      stPc2Wobble.pc2Sign[1] === 1 &&
+      stPc2Wobble.pc2Sign[3] === 1);
+
+// =====================================================================
+group('getLinesSignAt — PC1 + PC2 paths');
+
+const stMix = makeState(
+  [[-1, 1], [1, -1], [-1, 1]],   // PC1: flip in window 1
+  [[ 1, -1], [-1, 1], [ 1, -1]]   // PC2: flip in window 1 (same pattern)
+);
+computePC1Signs(stMix);
+computePC2Signs(stMix);
+stMix.flipPC1 = true;
+stMix.flipPC2 = true;
+check('getLinesSignAt PC1 returns pc1Sign',
+      getLinesSignAt(stMix, 1, 'pc1') === stMix.pc1Sign[1]);
+check('getLinesSignAt PC2 returns pc2Sign',
+      getLinesSignAt(stMix, 1, 'pc2') === stMix.pc2Sign[1]);
+check('getLinesSignAt unknown source = 1',
+      getLinesSignAt(stMix, 1, 'theta_pi') === 1);
+stMix.flipPC1 = false;
+check('flipPC1=false → getLinesSignAt PC1 = 1',
+      getLinesSignAt(stMix, 1, 'pc1') === 1);
+stMix.flipPC2 = false;
+check('flipPC2=false → getLinesSignAt PC2 = 1',
+      getLinesSignAt(stMix, 1, 'pc2') === 1);
+
+// =====================================================================
+group('PC2 sign-align — missing pc2 column safe');
+
+// PC1 only — windows have no pc2. computePC2Signs must not throw and
+// return a zero-or-undefined-safe pc2Sign.
+const stNoPc2 = makeState([
+  [-2, -1, 0, 1, 2],
+  [-2, -1, 0, 1, 2],
+]);
+computePC2Signs(stNoPc2);
+check('no-pc2 path: pc2Sign defined as Float32Array',
+      stNoPc2.pc2Sign instanceof Float32Array);
+// Either the function returns an all-1 vector or detects nS=0 and
+// returns just the seed signs. Either is acceptable as long as it
+// didn't throw.
+check('no-pc2 path: pc2Sign has expected length',
+      stNoPc2.pc2Sign.length === 2);
 
 // =====================================================================
 console.log('\n=================');

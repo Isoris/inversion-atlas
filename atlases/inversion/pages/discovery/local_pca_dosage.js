@@ -53,7 +53,7 @@ import {
 } from './local_pca_dosage/l2_sweep.js';
 import { idbPersistChrom } from './local_pca_dosage/idb.js';
 import { replayEnrichmentsFromIdb } from './local_pca_dosage/idb_restore.js';
-import { buildFamilyPalette, buildIndexes, computePC1Signs, detectSchemaAndLayers, getActiveModeView, listLayers, loadViewControls, populateSimScales, rebuildIndexesFromView, reconcileViewControlsForData } from './local_pca_dosage/_data.js';
+import { buildFamilyPalette, buildIndexes, computePC1Signs, computePC2Signs, detectSchemaAndLayers, getActiveModeView, listLayers, loadViewControls, populateSimScales, rebuildIndexesFromView, reconcileViewControlsForData } from './local_pca_dosage/_data.js';
 import { drawSim, drawSimMini } from './local_pca_dosage/sim_panel.js';
 import { drawZ } from './local_pca_dosage/z_panel.js';
 import { attachLinesLasso, buildLinesPanel, buildLinesPanelCheckboxes, drawLinesPanel, refreshLinesColorMode, setLinesPanelCandidateBands } from './local_pca_dosage/lines_panel.js';
@@ -249,6 +249,10 @@ export function applyData(state, data) {
   // in-legacy hooks and stay try/caught (silent no-op).
   buildIndexes(state);
   computePC1Signs(state);
+  // 2026-05-27: parallel PC2 sign-align. PC2's eigenvector sign is
+  // arbitrary too — without its own pass, the PC2 lines panel + PCA
+  // scatter Y-axis X-braid independently of PC1.
+  computePC2Signs(state);
   populateSimScales(state);
   buildFamilyPalette(state);
   try { refreshColorModeBar(state); } catch (_) {}
