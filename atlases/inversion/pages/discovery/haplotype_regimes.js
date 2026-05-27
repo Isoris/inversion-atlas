@@ -146,6 +146,38 @@ import { buildShortRangeResult as _buildShortRangeResult }
   from './haplotype_regimes/short_range.js';
 import { buildHetSkeletonResult as _buildHetSkeletonResult }
   from './haplotype_regimes/het_skeleton.js';
+import { renderL3PairsTable } from './haplotype_regimes/l3_pairs_table.js';
+import { runAutoMerge } from './haplotype_regimes/auto_merge.js';
+
+// Adapter: existing call sites pass (root, state) only; the new
+// module accepts an optional onAfterMerge callback so the L3-pair
+// "merge → candidate" button can re-run the pipeline. We wire the
+// callback here once.
+function _renderL3PairsTable(root, state) {
+  renderL3PairsTable(root, state, {
+    onAfterMerge: () => _runPipeline(root, state),
+  });
+}
+
+// Adapter for the two granularities. The shared driver lives in
+// haplotype_regimes/auto_merge.js; the wrappers keep the action-bar
+// wiring unchanged.
+async function _runAutoMergeCramersV(root, state, atlasState) {
+  return runAutoMerge(root, state, atlasState, 'local', {
+    onRefresh: () => {
+      try { _renderSeedsStrip(root, state); } catch (_) {}
+      try { _renderL3PairsTable(root, state); } catch (_) {}
+    },
+  });
+}
+async function _runAutoMergeCramersVMacro(root, state, atlasState) {
+  return runAutoMerge(root, state, atlasState, 'macrostripe', {
+    onRefresh: () => {
+      try { _renderSeedsStrip(root, state); } catch (_) {}
+      try { _renderL3PairsTable(root, state); } catch (_) {}
+    },
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Page-local state. Set on mount, cleared on unmount. The regime panels
@@ -865,183 +897,6 @@ function _afterPipelineRun(root, state, result, opts) {
 // Only painted in short-range mode (the long-range V-walker already
 // surfaces the same idea via its own seed boundaries).
 
-function _renderL3PairsTable(root, state) {
-  if (!root || typeof document === 'undefined') return;
-  const wrap = root.querySelector('#rgL3PairsWrap');
-  const body = root.querySelector('#rgL3PairsBody');
-  const countEl = root.querySelector('#rgL3PairsCount');
-  if (!wrap || !body) return;
-  if (state._regimesMode !== 'short') {
-    wrap.style.display = 'none';
-    body.innerHTML = '';
-    return;
-  }
-  const data = state.data;
-  if (!data || !Array.isArray(data.l2_envelopes) || data.l2_envelopes.length < 2) {
-    wrap.style.display = 'flex';
-    body.innerHTML =
-      '<tr><td colspan="5" style="padding: 8px 10px; color: var(--ink-dimmer);">' +
-      'Need at least 2 L2 envelopes on this chromosome to compute adjacent-pair V.' +
-      '</td></tr>';
-    if (countEl) countEl.textContent = '';
-    return;
-  }
-  wrap.style.display = 'flex';
-  body.innerHTML = '';
-  const envs = data.l2_envelopes;
-  const cache = state._regimesClusterCache;
-  const ctx   = state._regimesClusterCtx;
-  if (!cache || !ctx) {
-    body.innerHTML =
-      '<tr><td colspan="5" style="padding: 8px 10px; color: var(--ink-dimmer);">' +
-      'Cluster cache not wired — run the pipeline first.' +
-      '</td></tr>';
-    return;
-  }
-  const rows = [];
-  for (let i = 0; i + 1 < envs.length; i++) {
-    rows.push(_computePairRow(state, i, i + 1, envs, cache, ctx));
-  }
-  for (const r of rows) {
-    body.appendChild(_renderPairRow(state, r));
-  }
-  if (countEl) countEl.textContent = `${rows.length} pair${rows.length === 1 ? '' : 's'}`;
-}
-
-function _computePairRow(state, iA, iB, envs, cache, ctx) {
-  const envA = envs[iA], envB = envs[iB];
-  const clA = cache.getOrCompute(ctx, iA);
-  const clB = cache.getOrCompute(ctx, iB);
-  if (!clA || !clA.ok || !clA.labels || !clB || !clB.ok || !clB.labels) {
-    return {
-      iA, iB, envA, envB,
-      v: NaN, nSamples: 0, K: 0, reason: !clA?.ok ? `L2#${iA} cluster failed` : `L2#${iB} cluster failed`,
-    };
-  }
-  // Align labelsB onto labelsA's K-band frame so cluster ids correspond.
-  const K = Math.max(clA.usedK | 0, clB.usedK | 0);
-  let alignedB = clB.labels;
-  try {
-    const aligned = alignLabels(clA.labels, clB.labels, K);
-    if (aligned && aligned.aligned) alignedB = aligned.aligned;
-    else if (aligned && Array.isArray(aligned)) alignedB = aligned;
-  } catch (_) { /* fall through with raw labels */ }
-  // Intersect samples that have valid labels in BOTH L2s. -1 = absent.
-  const nS = state.data.n_samples | 0;
-  const valid = [];
-  for (let s = 0; s < nS; s++) {
-    if (clA.labels[s] >= 0 && alignedB[s] >= 0) valid.push(s);
-  }
-  if (valid.length < 4) {
-    return { iA, iB, envA, envB, v: NaN, nSamples: valid.length, K, reason: 'insufficient samples' };
-  }
-  const aSubset = new Int32Array(valid.length);
-  const bSubset = new Int32Array(valid.length);
-  for (let i = 0; i < valid.length; i++) {
-    aSubset[i] = clA.labels[valid[i]];
-    bSubset[i] = alignedB[valid[i]];
-  }
-  let v = NaN;
-  try {
-    const table = buildContingency(aSubset, bSubset, K, K);
-    v = cramersV(table, K, K);
-  } catch (_) {}
-  return { iA, iB, envA, envB, v, nSamples: valid.length, K };
-}
-
-function _renderPairRow(state, r) {
-  const tr = document.createElement('tr');
-  const mbA = (r.envA && Number.isFinite(r.envA.start_bp))
-    ? (r.envA.start_bp / 1e6).toFixed(2) : '—';
-  const mbB = (r.envB && Number.isFinite(r.envB.end_bp))
-    ? (r.envB.end_bp / 1e6).toFixed(2) : '—';
-  const span = `${mbA}–${mbB} Mb`;
-  let vCell, tier, vText;
-  if (Number.isFinite(r.v)) {
-    vText = r.v.toFixed(2);
-    tier  = r.v >= 0.7 ? 'high' : r.v >= 0.4 ? 'mid' : 'low';
-  } else {
-    vText = '—'; tier = 'na';
-  }
-  const idA = (r.envA && r.envA.id) || ('L2_' + r.iA);
-  const idB = (r.envB && r.envB.id) || ('L2_' + r.iB);
-  tr.innerHTML =
-    '<td><span style="color: var(--ink);">' + _esc(idA) + '</span> &rarr; <span style="color: var(--ink);">' + _esc(idB) + '</span></td>' +
-    '<td style="color: var(--ink-dim);">' + span + '</td>' +
-    '<td><span class="rg-l3-pair-v" data-tier="' + tier + '">' + vText + '</span></td>' +
-    '<td style="color: var(--ink-dim);">' + (r.nSamples | 0) + '</td>' +
-    '<td><button type="button" class="rg-l3-pair-merge" data-pair-a="' + r.iA +
-      '" data-pair-b="' + r.iB + '" ' + (r.envA && r.envB ? '' : 'disabled') +
-      ' title="Build a candidate inversion spanning both L2 envelopes. Lands in the local_pca_dosage candidate list + sets it active.">merge → candidate</button></td>';
-  const btn = tr.querySelector('button.rg-l3-pair-merge');
-  if (btn) {
-    btn.addEventListener('click', () => _mergePairToCandidate(state, r).catch(e => {
-      console.warn('merge pair failed:', e);
-    }));
-  }
-  return tr;
-}
-
-
-async function _mergePairToCandidate(state, r) {
-  const data = state.data;
-  if (!data || !r || !r.envA || !r.envB) return;
-  // The merged candidate's start_w/end_w span from envA's left edge to
-  // envB's right edge. ref_window = midpoint window. K = larger of the
-  // two L2s (Hungarian aligned to envA, so we use envA's K).
-  const start_w = Number.isFinite(r.envA._s0) ? r.envA._s0
-                : (Number.isFinite(r.envA.start_w) ? r.envA.start_w - 1 : 0);
-  const end_w   = Number.isFinite(r.envB._e0) ? r.envB._e0
-                : (Number.isFinite(r.envB.end_w) ? r.envB.end_w - 1 : (data.n_windows - 1));
-  const start_bp = Number.isFinite(r.envA.start_bp) ? r.envA.start_bp : null;
-  const end_bp   = Number.isFinite(r.envB.end_bp)   ? r.envB.end_bp   : null;
-  const ref_window = Math.round((start_w + end_w) / 2);
-  // Use the aligned labels at L2_A as locked_labels (the merge's
-  // reference K-band assignment). The shared per_l2_cluster cache
-  // already has them.
-  const cl = state._regimesClusterCache && state._regimesClusterCache.getOrCompute
-    ? state._regimesClusterCache.getOrCompute(state._regimesClusterCtx, r.iA)
-    : null;
-  const nS = data.n_samples | 0;
-  const locked = new Int8Array(nS).fill(-1);
-  if (cl && cl.labels) {
-    for (let s = 0; s < nS; s++) {
-      const k = cl.labels[s];
-      if (k >= 0) locked[s] = k;
-    }
-  }
-  const candMod = await import('./local_pca_dosage/candidates.js').catch(() => null);
-  if (!candMod || typeof candMod.makeCandidateId !== 'function') {
-    console.warn('candidates.js not available; cannot promote merge.');
-    return;
-  }
-  const cand = {
-    source:        'l3_pair_merge',
-    chrom:         data.chrom || state.activeChrom,
-    l2_indices:    [r.iA, r.iB],
-    ref_l2:        r.iA,
-    ref_window,
-    K:             (cl && cl.usedK) || r.K || 3,
-    locked_labels: locked,
-    start_w, end_w,
-    start_bp, end_bp,
-    created_at:    Date.now(),
-    notes: `Merged from L3 adjacent-pair V table (L2#${r.iA} → L2#${r.iB}, V=${
-      Number.isFinite(r.v) ? r.v.toFixed(3) : '—'
-    }, n=${r.nSamples}).`,
-    id:            candMod.makeCandidateId(),
-    _from_l3_pair: { iA: r.iA, iB: r.iB, v: r.v, n_samples: r.nSamples },
-  };
-  const inv = (typeof window !== 'undefined' && window.atlasState && window.atlasState.inversion) || {};
-  const page1State = inv._local_pca_dosage_state || { data, candidate: null, candidateList: [] };
-  try { candMod.addCandidateToList(page1State, cand); } catch (_) {}
-  try { candMod.setCandidate(page1State, cand); } catch (_) {}
-  inv._local_pca_dosage_state = page1State;
-  // Re-run short-range pipeline so the new candidate shows up as a
-  // seed chip in the same view.
-  const rootEl = document.getElementById('haplotype_regimes');
-  if (rootEl) { try { await _runPipeline(rootEl, state); } catch (_) {} }
-}
 
 // =========================================================================
 // Short-range pipeline result builder (2026-05-20)
@@ -1458,253 +1313,6 @@ async function _promoteFocalSeed(root, state, atlasState) {
  * per_band_samples — that's the chain's anchor frame, and Hungarian
  * alignment downstream keeps subsequent seeds in the same K-band space.
  */
-/**
- * Auto-merge V — single driver for both granularities (2026-05-27).
- *
- * Merges what used to be two near-identical 150 / 164 LoC functions
- * (`_runAutoMergeCramersV` and `_runAutoMergeCramersVMacro`) into one
- * dispatcher that selects (a) which walker to call and (b) how to map
- * chain indices back to actual seed objects, then runs a shared tail
- * that constructs candidate inversions and promotes them via the
- * local_pca_dosage candidates module.
- *
- * SPEC_cramers_v_seed_merge.md Phase 1 deliverable #2 covers both
- * modes; compute is in shared/cramers_v_merge.js
- * (runCramersVMergeLocal + runCramersVMergeMacrostripe).
- *
- * @param {HTMLElement} root         the page root (for #rgStatus + repaints)
- * @param {Object}      state        haplotype_regimes legacy state
- * @param {Object}      atlasState   atlas-core shared bucket
- * @param {'local'|'macrostripe'} granularity
- *     - `local` (Mode 1): walks every adjacent seed pair across the
- *       full Stage 1 seed list. Chains never bounded by macrostripes.
- *     - `macrostripe` (Mode 2): walks adjacent seed pairs WITHIN each
- *       Stage 3 locus; the macrostripe boundaries act as cut points.
- */
-async function _runAutoMerge(root, state, atlasState, granularity) {
-  const granLabel = (granularity === 'macrostripe')
-    ? 'V macrostripe' : 'V';
-  const result = state._regimesResult;
-  if (!result || !result.stage1 || !Array.isArray(result.stage1.seeds)) {
-    _setStatus(root, 'no pipeline result — run the pipeline first');
-    return;
-  }
-  const seeds = result.stage1.seeds;
-  if (granularity === 'local' && seeds.length < 2) {
-    _setStatus(root, `auto-merge V: need ≥ 2 seeds, have ${seeds.length}`);
-    return;
-  }
-  if (granularity === 'macrostripe' &&
-      (!result.stage3 || !Array.isArray(result.stage3.loci) || result.stage3.loci.length === 0)) {
-    _setStatus(root, 'no Stage 3 macrostripes — pipeline did not produce loci');
-    return;
-  }
-  const ctx = state._regimesCtx;
-  if (!ctx || typeof ctx.getLabels !== 'function') {
-    _setStatus(root, 'pipeline ctx not wired — reload the page');
-    return;
-  }
-
-  const loci = (granularity === 'macrostripe') ? result.stage3.loci : null;
-  const setupMsg = (granularity === 'macrostripe')
-    ? `auto-merge V macrostripe: walking ${loci.length} macrostripe${loci.length === 1 ? '' : 's'}…`
-    : `auto-merge V: walking ${seeds.length - 1} adjacent pair${seeds.length - 1 === 1 ? '' : 's'}…`;
-  _setStatus(root, setupMsg);
-  await new Promise(r => setTimeout(r, 0));
-  const t0 = performance.now();
-
-  let walker;
-  try {
-    walker = (granularity === 'macrostripe')
-      ? runCramersVMergeMacrostripe({
-          seeds, loci,
-          getLabels: ctx.getLabels, getK: ctx.getK,
-          opts: { emitSingletons: false },
-        })
-      : runCramersVMergeLocal({
-          seeds,
-          getLabels: ctx.getLabels, getK: ctx.getK,
-          opts: { emitSingletons: false },
-        });
-  } catch (e) {
-    console.error(`runCramersVMerge${granularity === 'macrostripe' ? 'Macrostripe' : 'Local'} threw:`, e);
-    _setStatus(root, `auto-merge ${granLabel} failed: ${e.message}`);
-    return;
-  }
-  const ms = (performance.now() - t0).toFixed(0);
-  const sum = walker.summary || {};
-  const multiChains = (walker.chains || []).filter(c => c && c.length > 1);
-  if (multiChains.length === 0) {
-    const noopStatus = (granularity === 'macrostripe')
-      ? `auto-merge V macrostripe ran in ${ms}ms · ${sum.n_loci || 0} loci · `
-        + `${sum.n_seeds_total || 0} seeds inside · ${sum.n_pairs || 0} pairs · `
-        + `${sum.n_merge || 0} MERGE · ${sum.n_separate || 0} SEPARATE · `
-        + `${sum.n_insufficient || 0} INSUFFICIENT · no multi-seed chains to promote`
-      : `auto-merge V ran in ${ms}ms · ${sum.n_pairs || 0} pairs · `
-        + `${sum.n_merge || 0} MERGE · ${sum.n_separate || 0} SEPARATE · `
-        + `${sum.n_insufficient || 0} INSUFFICIENT · no multi-seed chains to promote`;
-    _setStatus(root, noopStatus);
-    return;
-  }
-
-  // Promotion path — common to both granularities apart from how
-  // each chain's bookkeeping fields differ.
-  const candMod = await import('./local_pca_dosage/candidates.js').catch(() => null);
-  if (!candMod || typeof candMod.makeCandidateId !== 'function'
-      || typeof candMod.addCandidateToList !== 'function'
-      || typeof candMod.setCandidate !== 'function') {
-    _setStatus(root, 'local_pca_dosage/candidates.js helpers not available');
-    return;
-  }
-  const data = state.data;
-  const nS = data.n_samples | 0;
-  const inv = (atlasState && atlasState.inversion) || {};
-  const page1State = inv._local_pca_dosage_state || {
-    data, candidate: null, candidateList: [],
-  };
-
-  let lastCand = null;
-  let nPromoted = 0;
-  for (const chain of multiChains) {
-    // Granularity-specific reconstruction of (seedA, seedB, chainV).
-    let seedA, seedB, chainV;
-    if (granularity === 'macrostripe') {
-      const entry = walker.per_locus[chain.locus_idx];
-      if (!entry) continue;
-      const lS = entry.locus.s_window | 0;
-      const lE = entry.locus.e_window | 0;
-      const insideSeeds = [];
-      for (const sd of seeds) {
-        if (!sd) continue;
-        const aw = sd.anchor_w | 0;
-        if (aw >= lS && aw <= lE) insideSeeds.push(sd);
-      }
-      seedA = insideSeeds[chain.seed_start_i];
-      seedB = insideSeeds[chain.seed_end_i];
-      chainV = [];
-      const vs = entry.verdicts || [];
-      for (let i = chain.seed_start_i; i < chain.seed_end_i; i++) {
-        const ve = vs[i];
-        if (ve && Number.isFinite(ve.v)) chainV.push(ve.v.toFixed(3));
-      }
-    } else {
-      seedA = seeds[chain.start_i];
-      seedB = seeds[chain.end_i];
-      chainV = [];
-      for (let i = chain.start_i; i < chain.end_i; i++) {
-        const ve = walker.verdicts[i];
-        if (ve && Number.isFinite(ve.v)) chainV.push(ve.v.toFixed(3));
-      }
-    }
-    if (!seedA || !seedB) continue;
-
-    const start_w = seedA.s_window | 0;
-    const end_w   = seedB.e_window | 0;
-    const ref_window = Number.isFinite(seedA.anchor_w) ? seedA.anchor_w | 0
-                     : Math.round((start_w + end_w) / 2);
-    const winS = data.windows && data.windows[start_w];
-    const winE = data.windows && data.windows[end_w];
-    const start_bp = winS && Number.isFinite(winS.start_bp) ? winS.start_bp : null;
-    const end_bp   = winE && Number.isFinite(winE.end_bp)   ? winE.end_bp   : null;
-
-    const labelsA = ctx.getLabels(seedA.anchor_w | 0);
-    const K = (typeof ctx.getK === 'function' ? ctx.getK(seedA.anchor_w | 0) : 0)
-           || seedA.K_a || 0;
-    const locked = new Int8Array(nS).fill(-1);
-    if (labelsA && labelsA.length) {
-      for (let s = 0; s < Math.min(nS, labelsA.length); s++) {
-        const k = labelsA[s];
-        if (k >= 0 && k < K) locked[s] = k;
-      }
-    }
-    const wToL2 = state.windowToL2;
-    const ref_l2 = (wToL2 && ref_window >= 0 && ref_window < wToL2.length)
-      ? wToL2[ref_window] : null;
-    const l2_set = new Set();
-    if (wToL2) {
-      for (let w = start_w; w <= end_w; w++) {
-        const li = wToL2[w];
-        if (li >= 0) l2_set.add(li);
-      }
-    }
-    const l2_indices = [...l2_set].sort((a, b) => a - b);
-
-    // Granularity-specific provenance fields.
-    const sourceTag = (granularity === 'macrostripe')
-      ? 'auto_cramers_v_macrostripe' : 'auto_cramers_v_local';
-    const modeNote  = (granularity === 'macrostripe')
-      ? `Mode 2 post_long_range, locus ${chain.locus_idx}, ` +
-        `seeds ${chain.seed_start_i}..${chain.seed_end_i}`
-      : `Mode 1 insulated_local, seeds ${chain.start_i}..${chain.end_i}`;
-    const provKey = (granularity === 'macrostripe')
-      ? '_from_cramers_v_macrostripe' : '_from_cramers_v_local';
-    const provVal = (granularity === 'macrostripe')
-      ? {
-          locus_idx:      chain.locus_idx,
-          chain_start_i:  chain.seed_start_i,
-          chain_end_i:    chain.seed_end_i,
-          chain_length:   chain.length,
-          chain_v_values: chainV.map(v => Number(v)),
-          anchor_seed_id: seedA.seed_id,
-        }
-      : {
-          chain_start_i:  chain.start_i,
-          chain_end_i:    chain.end_i,
-          chain_length:   chain.length,
-          chain_v_values: chainV.map(v => Number(v)),
-          anchor_seed_id: seedA.seed_id,
-        };
-
-    const cand = {
-      source:        sourceTag,
-      chrom:         data.chrom || state.activeChrom,
-      l2_indices,
-      ref_l2:        (ref_l2 != null && ref_l2 >= 0) ? ref_l2 : null,
-      ref_window,
-      K,
-      locked_labels: locked,
-      start_w, end_w,
-      start_bp, end_bp,
-      created_at:    Date.now(),
-      notes: `Auto-merged from Cramér's V walker (${modeNote}, ` +
-             `${chain.length} seeds, V_chain=[${chainV.join(', ')}]).`,
-      id:            candMod.makeCandidateId(),
-      [provKey]:     provVal,
-    };
-    try { candMod.addCandidateToList(page1State, cand); nPromoted++; lastCand = cand; }
-    catch (e) { console.warn('addCandidateToList threw for chain:', chain, e); }
-  }
-  if (lastCand) {
-    try { candMod.setCandidate(page1State, lastCand); }
-    catch (e) { console.warn('setCandidate threw:', e); }
-  }
-  inv._local_pca_dosage_state = page1State;
-
-  const finalStatus = (granularity === 'macrostripe')
-    ? `auto-merge V macrostripe ran in ${ms}ms · ${sum.n_loci} loci · `
-      + `${sum.n_loci_with_chains} with chains · ${sum.n_pairs} pairs · `
-      + `${sum.n_merge} MERGE · promoted ${nPromoted} chain${nPromoted === 1 ? '' : 's'} `
-      + `(${multiChains.reduce((a, c) => a + c.length, 0)} seeds → ${nPromoted} candidates)`
-    : `auto-merge V ran in ${ms}ms · ${sum.n_pairs} pairs · `
-      + `${sum.n_merge} MERGE · ${sum.n_separate} SEPARATE · `
-      + `${sum.n_insufficient} INSUFFICIENT · promoted ${nPromoted} `
-      + `chain${nPromoted === 1 ? '' : 's'} (${multiChains.reduce((a, c) => a + c.length, 0)} seeds → ${nPromoted} candidates)`;
-  _setStatus(root, finalStatus);
-
-  // Refresh seeds strip + L3 pairs table so the new candidates surface.
-  try { _renderSeedsStrip(root, state); } catch (_) {}
-  try { _renderL3PairsTable(root, state); } catch (_) {}
-}
-
-// Back-compat wrappers — the action-bar wiring still calls these names.
-// Until the wiring is rewritten in Part C, these forwarders keep the
-// HTML buttons working.
-async function _runAutoMergeCramersV(root, state, atlasState) {
-  return _runAutoMerge(root, state, atlasState, 'local');
-}
-async function _runAutoMergeCramersVMacro(root, state, atlasState) {
-  return _runAutoMerge(root, state, atlasState, 'macrostripe');
-}
 
 /**
  * Auto-merge V — Mode 2 (post_long_range) driver (2026-05-20).
