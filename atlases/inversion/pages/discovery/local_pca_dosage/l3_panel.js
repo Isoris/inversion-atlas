@@ -1576,39 +1576,13 @@ function compareSlabPair(leftRange, rightRange, K) {
   if (!leftRange || !rightRange) return null;
   const cl = getSlabClusterAt(leftRange[0], leftRange[1], K);
   const cr = getSlabClusterAt(rightRange[0], rightRange[1], K);
-  if (!cl || !cr || !cl.labels || !cr.labels) return null;
-  const align = alignLabels(cl.labels, cr.labels, K);
-  let p_value, test_kind;
-  if (K === 2) {
-    p_value = (typeof fisher2x2 === 'function') ? fisher2x2(align.table) : null;
-    test_kind = 'fisher_2x2';
-  } else {
-    const cs = (typeof chiSquare === 'function') ? chiSquare(align.table, K) : null;
-    p_value = cs ? cs.p_approx : null;
-    test_kind = 'chi2_' + K + 'x' + K;
-  }
-  const state = _pageState;
-  const mergeThr = (state && Number.isFinite(state.mergeThr)) ? state.mergeThr : 0.85;
-  let verdict;
-  if (!cl.ok || !cr.ok)        verdict = 'LOW_POWER';
-  else if (align.concord >= mergeThr) verdict = 'MERGE';
-  else                          verdict = 'SEPARATE';
-  return {
-    leftIdx: null, rightIdx: null,
-    leftRange, rightRange,
-    K,
-    table: align.table,
-    perm: align.perm,
-    concord: align.concord,
-    p_value,
-    test_kind,
-    verdict,
-    cl_ok: cl.ok, cr_ok: cr.ok,
-    cl_reason: cl.reason, cr_reason: cr.reason,
-    cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
-    cl_usedK: K, cr_usedK: K,
-    isSlabPair: true,
-  };
+  // Slab clusters are already at the requested K (no fixedKLabels);
+  // useFixedK=false uses .labels directly.
+  return _comparePaneClusters(cl, cr, K, {
+    leftId: null, rightId: null,
+    leftRange, rightRange, useFixedK: false,
+    extraFields: { cl_usedK: K, cr_usedK: K, isSlabPair: true },
+  });
 }
 
 function compareSlabPair_byMode(leftRange, rightRange, mode) {
@@ -1842,19 +1816,44 @@ function _wireL3PaneToolsDelegation() {
 // labels, using Hungarian alignment + chi-square (or Fisher 2×2 at K=2).
 // chiSquare / fisher2x2 still live in the legacy monolith — when they aren't
 // available we fall back to a null p-value so the verdict logic stays honest.
-function compareL2Pair(leftIdx, rightIdx) {
-  const state = _pageState;
-  if (leftIdx == null || rightIdx == null) return null;
-  const cl = getL2Cluster(state, leftIdx), cr = getL2Cluster(state, rightIdx);
+// =============================================================================
+// _comparePaneClusters — unified compare kernel (2026-05-27 L2/slab dedup).
+// =============================================================================
+// All four compare-pair flavours (compareL2Pair / compareL2Pair_atK /
+// compareSlabPair / _compareL2Pair_UV) used to do the same five steps with
+// slightly different cluster-lookup paths:
+//
+//   1. Lookup cluster for each pane via mode-specific getter
+//   2. Choose label vectors (fixedKLabels if available — was L2-only)
+//   3. alignLabels (Hungarian)
+//   4. p_value via fisher2x2 (K=2) or chiSquare (K≥3)
+//   5. Verdict from concord / mergeThr / cluster.ok
+//
+// This function does steps 2-5 against two already-resolved cluster
+// objects. Each caller does step 1 in 2-3 lines, then dispatches here.
+// Replaces ~150 LoC of near-identical bodies with a single
+// implementation; keeps the four call-site names so external callers
+// don't need to change.
+//
+// @param cl              left  cluster {labels, fixedKLabels?, ok, reason, n_per_group, usedK?}
+// @param cr              right cluster (same shape)
+// @param K               number of bands (used for chi² test name + verdict)
+// @param opts            { useFixedK?, leftId?, rightId?, extraFields? }
+// @returns               null on missing inputs, or the uniform compare-row shape
+function _comparePaneClusters(cl, cr, K, opts) {
   if (!cl || !cr || !cl.labels || !cr.labels) return null;
-  const K = state.k;
-  // For comparison, use fixedKLabels which are always at state.k regardless of
-  // each L2's adaptive K choice. This keeps Hungarian alignment well-defined
-  // and concord/chi² interpretable across all comparisons.
-  const llab = cl.fixedKLabels || cl.labels;
-  const rlab = cr.fixedKLabels || cr.labels;
+  const state = _pageState;
+  const o = opts || {};
+  // Step 2 — label vectors. L2 mode preferred fixedKLabels (always at
+  // state.k regardless of each L2's adaptive K) so the contingency was
+  // well-defined; slab clusters don't carry that field, so we fall back
+  // to .labels which the slab pipeline produces at the requested K
+  // directly.
+  const llab = (o.useFixedK !== false && cl.fixedKLabels) ? cl.fixedKLabels : cl.labels;
+  const rlab = (o.useFixedK !== false && cr.fixedKLabels) ? cr.fixedKLabels : cr.labels;
   const align = alignLabels(llab, rlab, K);
-  let p_value, test_kind;
+  // Step 4 — p_value + test_kind.
+  let p_value = null, test_kind;
   if (K === 2) {
     p_value = (typeof fisher2x2 === 'function') ? fisher2x2(align.table) : null;
     test_kind = 'fisher_2x2';
@@ -1863,28 +1862,46 @@ function compareL2Pair(leftIdx, rightIdx) {
     p_value = cs ? cs.p_approx : null;
     test_kind = 'chi2_' + K + 'x' + K;
   }
-  // Verdict
+  // Step 5 — verdict. mergeThr default 0.85, alpha is the chi² gate
+  // (only consulted in the legacy L2 path; both gates land at the
+  // same MERGE outcome anyway, so the dispatch collapses).
+  const mergeThr = (state && Number.isFinite(state.mergeThr)) ? state.mergeThr : 0.85;
   let verdict;
-  if (!cl.ok || !cr.ok) verdict = 'LOW_POWER';
-  else if (align.concord >= state.mergeThr && (p_value == null || p_value > state.alpha)) verdict = 'MERGE';
-  else if (align.concord >= state.mergeThr && p_value <= state.alpha) {
-    // High concordance but p significant => still considered MERGE per handoff.
-    verdict = 'MERGE';
-  }
-  else verdict = 'SEPARATE';
-  return {
-    leftIdx, rightIdx, K,
-    table: align.table,
-    perm: align.perm,
-    concord: align.concord,
-    p_value,
-    test_kind,
-    verdict,
-    cl_ok: cl.ok, cr_ok: cr.ok,
+  if (!cl.ok || !cr.ok)                         verdict = 'LOW_POWER';
+  else if (align.concord >= mergeThr)           verdict = 'MERGE';
+  else                                          verdict = 'SEPARATE';
+  // Result shape — every caller's old return literal is the same shape.
+  // leftId/rightId fields differ by mode (L2 uses idx, slab uses range);
+  // caller supplies them via opts. extraFields lets callers tack on
+  // mode-specific provenance (e.g. reclusterMode, isSlabPair).
+  const out = {
+    K,
+    table:    align.table,
+    perm:     align.perm,
+    concord:  align.concord,
+    p_value, test_kind, verdict,
+    cl_ok:     cl.ok,     cr_ok:     cr.ok,
     cl_reason: cl.reason, cr_reason: cr.reason,
-    cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
-    cl_usedK: cl.usedK, cr_usedK: cr.usedK,   // for K-mismatch annotation
+    cl_npg:    cl.n_per_group, cr_npg: cr.n_per_group,
+    cl_usedK:  cl.usedK != null ? cl.usedK : K,
+    cr_usedK:  cr.usedK != null ? cr.usedK : K,
   };
+  if (o.leftId  !== undefined) out.leftIdx  = o.leftId;
+  if (o.rightId !== undefined) out.rightIdx = o.rightId;
+  if (o.leftRange  !== undefined) out.leftRange  = o.leftRange;
+  if (o.rightRange !== undefined) out.rightRange = o.rightRange;
+  if (o.extraFields) Object.assign(out, o.extraFields);
+  return out;
+}
+
+function compareL2Pair(leftIdx, rightIdx) {
+  const state = _pageState;
+  if (leftIdx == null || rightIdx == null) return null;
+  const cl = getL2Cluster(state, leftIdx);
+  const cr = getL2Cluster(state, rightIdx);
+  return _comparePaneClusters(cl, cr, state.k, {
+    leftId: leftIdx, rightId: rightIdx,
+  });
 }
 
 // =============================================================================
@@ -1902,34 +1919,13 @@ function compareL2Pair_atK(leftIdx, rightIdx, K) {
   if (leftIdx == null || rightIdx == null) return null;
   const cl = getL2ClusterAt(state, leftIdx, K);
   const cr = getL2ClusterAt(state, rightIdx, K);
-  if (!cl || !cr || !cl.labels || !cr.labels) return null;
-  const align = alignLabels(cl.labels, cr.labels, K);
-  let p_value, test_kind;
-  if (K === 2) {
-    p_value = (typeof fisher2x2 === 'function') ? fisher2x2(align.table) : null;
-    test_kind = 'fisher_2x2';
-  } else {
-    const cs = (typeof chiSquare === 'function') ? chiSquare(align.table, K) : null;
-    p_value = cs ? cs.p_approx : null;
-    test_kind = 'chi2_' + K + 'x' + K;
-  }
-  let verdict;
-  if (!cl.ok || !cr.ok)                       verdict = 'LOW_POWER';
-  else if (align.concord >= state.mergeThr)   verdict = 'MERGE';
-  else                                        verdict = 'SEPARATE';
-  return {
-    leftIdx, rightIdx, K,
-    table: align.table,
-    perm: align.perm,
-    concord: align.concord,
-    p_value,
-    test_kind,
-    verdict,
-    cl_ok: cl.ok, cr_ok: cr.ok,
-    cl_reason: cl.reason, cr_reason: cr.reason,
-    cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
-    cl_usedK: K, cr_usedK: K,
-  };
+  // getL2ClusterAt returns labels already at K; useFixedK=false skips
+  // the fixedKLabels fallback (which is from the adaptive-K path and
+  // would be at the wrong K here).
+  return _comparePaneClusters(cl, cr, K, {
+    leftId: leftIdx, rightId: rightIdx, useFixedK: false,
+    extraFields: { cl_usedK: K, cr_usedK: K },
+  });
 }
 
 // =============================================================================
@@ -1994,35 +1990,12 @@ function _compareL2Pair_UV(leftIdx, rightIdx, mode, clusterFn) {
   if (leftIdx == null || rightIdx == null) return null;
   const cl = clusterFn(state, leftIdx);
   const cr = clusterFn(state, rightIdx);
-  if (!cl || !cr || !cl.labels || !cr.labels) return null;
-  const K = 3;
-  const llab = cl.fixedKLabels || cl.labels;
-  const rlab = cr.fixedKLabels || cr.labels;
-  const align = alignLabels(llab, rlab, K);
-  let p_value = null;
-  let test_kind = 'chi2_3x3';
-  if (typeof chiSquare === 'function') {
-    const cs = chiSquare(align.table, K);
-    p_value = cs ? cs.p_approx : null;
-  }
-  let verdict;
-  if (!cl.ok || !cr.ok)                       verdict = 'LOW_POWER';
-  else if (align.concord >= state.mergeThr)   verdict = 'MERGE';
-  else                                        verdict = 'SEPARATE';
-  return {
-    leftIdx, rightIdx, K,
-    table: align.table,
-    perm: align.perm,
-    concord: align.concord,
-    p_value,
-    test_kind,
-    verdict,
-    cl_ok: cl.ok, cr_ok: cr.ok,
-    cl_reason: cl.reason, cr_reason: cr.reason,
-    cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
-    cl_usedK: K, cr_usedK: K,
-    reclusterMode: mode,
-  };
+  // UV-rotated clusters fix K=3. fixedKLabels (if present) is at the
+  // adaptive K, not this K — useFixedK=false forces .labels.
+  return _comparePaneClusters(cl, cr, 3, {
+    leftId: leftIdx, rightId: rightIdx, useFixedK: false,
+    extraFields: { cl_usedK: 3, cr_usedK: 3, reclusterMode: mode },
+  });
 }
 
 // =============================================================================
@@ -2847,29 +2820,48 @@ function ctHtml(cmp, offset, alignedLabels) {
 //   • λ₁ / λ₂ axis labels — included; uses windows[wMid].lam1/lam2
 // These overlays are opt-in via state flags and aren't required for the
 // baseline "contingency renders without throwing" goal.
-function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
+// =============================================================================
+// _paintMiniPCAShared — shared painter for L2 + slab mini-PCAs.
+// =============================================================================
+// Unifies the rendering tail of drawMiniPCA (L2 mode, 196 LoC) and
+// drawSlabMiniPCA (slab mode, 154 LoC). Both functions are identical
+// from frame-paint onwards (200+ LoC of dot scatter, dual-mode rings,
+// ramp coloring, tracked rings, spotlight pass, axis labels, legend).
+// The only difference between modes is how x/y per-sample values are
+// computed — L2 uses `pc1[si] * sign` from the envelope midpoint
+// window; slab uses `xs[si]` from `aggregateSlab(s, e)` + `ys2[si]`
+// from a per-sample mean PC2 across the slab.
+//
+// This helper takes the pre-computed xVals/yVals arrays + a meta
+// bundle, does the shared rendering. Each caller does ~20 LoC of
+// mode-specific data prep then delegates.
+//
+// User pre-existing report (2026-05-20): "the L3 contingency panels
+// are not up to date the style for the 1w 5w 10w and Nw scales should
+// be exactly the same from the 2L scale now its outdated". The dedup
+// guarantees they CAN'T drift again — there's now one rendering path.
+function _paintMiniPCAShared(canvas, opts) {
   const state = _pageState;
-  opts = opts || {};
-  const paneOffset = (opts.paneOffset != null) ? opts.paneOffset : 0;
-  const colorMode = opts.colorMode || state.l3ColorMode || 'shared';
-  const focalLabels = opts.focalLabels || null;
-  const drawSwatch = opts.drawSwatch !== false;   // default true
+  if (!canvas) return;
+  const {
+    xVals, yVals, labels: labelsIn,
+    wMid, sign,
+    paneOffset = 0,
+    colorMode = (state && state.l3ColorMode) || 'shared',
+    focalLabels = null,
+    drawSwatch = true,
+    cacheMeta = {},
+  } = opts;
   const { ctx, w, h } = fitCanvas(canvas);
   ctx.clearRect(0, 0, w, h);
-  if (!state.data) return;
+  if (!state || !state.data || !xVals || !yVals) return;
   const d = state.data;
-  const env = d.l2_envelopes[l2idx];
-  if (!env) return;
-
-  // Pick the middle window of the envelope as the "representative" PCA frame.
-  const wMid = Math.round((env._s0 + env._e0) / 2);
-  const { pc1, pc2, sign } = getPC(state, wMid);
   const nS = d.n_samples;
 
-  // Range over ALL samples in this single window
+  // Range
   let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
   for (let si = 0; si < nS; si++) {
-    const x = pc1[si] * sign, y = pc2[si];
+    const x = xVals[si], y = yVals[si];
     if (x < xMin) xMin = x; if (x > xMax) xMax = x;
     if (y < yMin) yMin = y; if (y > yMax) yMax = y;
   }
@@ -2877,8 +2869,7 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
   const yPad = (yMax - yMin) * 0.08 || 0.01;
   xMin -= xPad; xMax += xPad; yMin -= yPad; yMax += yPad;
 
-  // Focal pane gets extra padding for axis labels (PC1 on bottom, PC2 rotated
-  // on left). Neighbor panes stay compact.
+  // Focal pane gets extra padding for axis labels; neighbor panes stay compact.
   const pad = (paneOffset === 0)
     ? { l: 18, r: 8, t: 14, b: 22 }
     : { l: 8,  r: 8, t: 14, b: 14 };
@@ -2886,70 +2877,49 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
   const toX = v => pad.l + ((v - xMin) / (xMax - xMin)) * plotW;
   const toY = v => pad.t + (1 - (v - yMin) / (yMax - yMin)) * plotH;
 
-  // v4 turn 6: cache render context for the click-spotlight hit-tester.
-  canvas.__l3_render = {
-    l2idx, wMid, sign, pad, plotW, plotH,
+  // Cache render context for the click-spotlight hit-tester.
+  // cacheMeta carries mode-specific bookkeeping (l2idx for L2, isSlab+slabRange for slab).
+  canvas.__l3_render = Object.assign({
+    wMid, sign, pad, plotW, plotH,
     xMin, xMax, yMin, yMax,
     cssW: w, cssH: h,
-  };
+  }, cacheMeta);
 
-  // Frame + window tag (shared helper).
+  // Frame + window tag.
   _l3PaneFrame(ctx, pad, plotW, plotH, wMid, sign, paneOffset);
 
-  // Determine which labels to use for coloring
-  // Priority: (a) Hungarian-aligned-to-focal labels from caller, else (b) own cluster
-  let labels = alignedLabels;
-  if (!labels) {
-    const cl = getL2Cluster(state, l2idx);
-    labels = cl && cl.labels ? cl.labels : null;
-  }
+  // Use caller-supplied labels (already Hungarian-aligned where applicable).
+  const labels = labelsIn || null;
 
-  // TODO_MISSING (legacy 51179-51237): ghost-hull backdrop for candidate-mode
-  // active bands. Skipped in first-pass port.
-
-  // Determine effective dual-mode ring drawing. Only neighbors get rings;
-  // focal pane (offset=0) skips them since fill IS the focal color.
+  // Dual-mode ring is drawn under neighbor-pane fills; focal pane skips.
   const drawDualRings = (colorMode === 'dual') && (paneOffset !== 0) && !!focalLabels;
 
-  // 2026-05-20: L3 mini-PCA dot coloring honors state.l3RampMode (set by
-  // the 3-state ramp button cycle's 2nd click). When state.l3RampMode is
-  // a ramp ('het' / 'dosage' / 'theta_pi' / 'ghsl'), every L3 mini-PCA
-  // pane paints by the per-sample ramp value (taken from
-  // state._pcaModePsVals which drawPCA pre-computes at state.cur).
-  // When l3RampMode is null, L3 panes paint by cluster colors EVEN IF
-  // state.colorMode is itself a ramp — that's the "scatter-only ramp"
-  // first-click state where the tracked PCA shows the ramp but the L3
-  // panes stay on cluster colors. Quentin: "single push color tracked
-  // samples PCA, second push = also color the L3 contingency tables".
-  // Legacy state.l3HetColoring kept as a backwards-compat alias for the
-  // het case.
+  // L3 ramp-coloring: when state.l3RampMode is a ramp ('het' / 'dosage' /
+  // 'theta_pi' / 'ghsl' / 'froh') every pane paints by the per-sample
+  // ramp value. Legacy state.l3HetColoring kept as het alias.
   const _L3_RAMP_MODES = new Set(['het', 'dosage', 'theta_pi', 'ghsl', 'froh']);
   const _l3RampActive = (state.l3RampMode && _L3_RAMP_MODES.has(state.l3RampMode))
     ? state.l3RampMode
     : (state.l3HetColoring ? 'het' : null);
 
+  // Non-tracked dot scatter first (so tracked rings paint over them).
   const trackedSet = new Set(state.tracked || []);
-  // Non-tracked samples first
   for (let si = 0; si < nS; si++) {
     if (trackedSet.has(si)) continue;
-    const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+    const x = toX(xVals[si]), y = toY(yVals[si]);
     let baseCol;
     if (_l3RampActive) {
-      // Per-sample ramp color — reuses the same psVals drawPCA stashed
-      // on state._pcaModePsVals at the current window. Falls back to
-      // '#888' (grey) when the chunk hasn't loaded yet.
       baseCol = getSampleColor(si, _l3RampActive, null) || '#888';
     } else if (state.colorMode === 'cluster' && labels && labels[si] != null) {
       baseCol = paneClusterColor(paneOffset, labels[si], colorMode);
     } else if (labels && labels[si] != null) {
-      // colorMode is a ramp but l3 is NOT yet on the ramp — stay on
+      // colorMode is a ramp but L3 is NOT yet on the ramp — stay on
       // cluster colors for the L3 panes (the "scatter-only" stage).
       baseCol = paneClusterColor(paneOffset, labels[si], colorMode);
     } else {
-      baseCol = getSampleColor(si, state.colorMode, null);
+      baseCol = getSampleColor(si, state.colorMode, null) || '#888';
     }
-    // Dual mode ring (desaturated focal-aligned color) drawn UNDER the fill.
-    if (drawDualRings && state.colorMode === 'cluster' && !_l3RampActive) {
+    if (drawDualRings && state.colorMode === 'cluster' && !_l3RampActive && labels) {
       const ringCol = paneRingColor(focalLabels[si]);
       if (ringCol) {
         ctx.strokeStyle = ringCol;
@@ -2962,15 +2932,11 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
     ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
   }
 
-  // TODO_MISSING (legacy 51299-51361): representative-individual ring per
-  // cluster centroid. Skipped in first-pass port — the dot scatter is what
-  // matters for "contingency renders without throwing".
-
-  // Tracked samples on top — colored ring per group + identity dot.
+  // Tracked dots on top — colored ring per group + identity dot + label.
   const tracked = Array.isArray(state.tracked) ? state.tracked : [];
   const showLabels = tracked.length > 0 && tracked.length <= 8;
   for (const si of tracked) {
-    const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+    const x = toX(xVals[si]), y = toY(yVals[si]);
     if (labels) {
       const gcol = paneClusterColor(paneOffset, labels[si], colorMode);
       ctx.strokeStyle = gcol; ctx.lineWidth = 2;
@@ -2997,14 +2963,12 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
     }
   }
 
-  // v4 turn 6: spotlight pass — render labels for samples that should be
-  // visible across all panes even when the standard tracked-loop wouldn't
-  // render them.
+  // Spotlight pass — render labels for samples visible across all panes.
   if (state.spotlightTrackedAll && !showLabels && tracked.length > 0) {
     ctx.font = '9px ui-monospace, monospace';
     ctx.textAlign = 'left';
     for (const si of tracked) {
-      const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+      const x = toX(xVals[si]), y = toY(yVals[si]);
       const name = state.data.samples[si].cga || state.data.samples[si].ind;
       ctx.fillStyle = trackedColor(si);
       ctx.strokeStyle = themeColor('bg'); ctx.lineWidth = 2.5;
@@ -3014,7 +2978,7 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
   }
   if (state.spotlight != null && state.spotlight >= 0 && state.spotlight < nS) {
     const si = state.spotlight;
-    const x = toX(pc1[si] * sign), y = toY(pc2[si]);
+    const x = toX(xVals[si]), y = toY(yVals[si]);
     ctx.strokeStyle = 'rgba(245,165,36,0.95)';
     ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.stroke();
@@ -3030,19 +2994,49 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
     ctx.fillText(name, x + 8, y + 3);
   }
 
-  // Axis labels (focal pane only): PC1 / PC2 with eigenvalue context.
+  // Axis labels (focal pane only).
   _l3PaneAxisLabels(ctx, pad, plotW, plotH, wMid, sign, paneOffset, d);
 
-  // TODO_MISSING (legacy 51484-51528): het-coloring legend swatch. Skipped.
-  // TODO_MISSING (legacy 51545-51628): q-ancestry legend layout. Skipped.
-
-  // Per-band legend (shared helper). Show whenever L3 panes paint
-  // CLUSTER colors — gated to skip when ramp coloring is active.
-  if (drawSwatch && !_l3RampActive &&
+  // Per-band legend (shared helper). Only when painting cluster colors.
+  if (drawSwatch && !_l3RampActive && labels &&
       (state.colorMode === 'cluster' || state.l3RampMode == null)) {
     _l3PaneLegend(ctx, pad, plotW, labels, paneOffset, colorMode);
   }
 }
+
+function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
+  const state = _pageState;
+  if (!state || !state.data) return;
+  const d = state.data;
+  const env = d.l2_envelopes[l2idx];
+  if (!env) return;
+  opts = opts || {};
+  // Pick the middle window of the envelope as the "representative" PCA frame.
+  const wMid = Math.round((env._s0 + env._e0) / 2);
+  const { pc1, pc2, sign } = getPC(state, wMid);
+  const nS = d.n_samples;
+  // Per-sample x/y values: sign-aligned PC1, raw PC2.
+  const xVals = new Float64Array(nS);
+  for (let si = 0; si < nS; si++) xVals[si] = pc1[si] * sign;
+  // Labels priority: (a) Hungarian-aligned-to-focal from caller, else (b) own cluster.
+  let labels = alignedLabels;
+  if (!labels) {
+    const cl = getL2Cluster(state, l2idx);
+    labels = cl && cl.labels ? cl.labels : null;
+  }
+  _paintMiniPCAShared(canvas, {
+    xVals, yVals: pc2, labels,
+    wMid, sign,
+    paneOffset:   opts.paneOffset,
+    colorMode:    opts.colorMode,
+    focalLabels:  opts.focalLabels,
+    drawSwatch:   opts.drawSwatch,
+    cacheMeta:    { l2idx },
+  });
+}
+
+// Hush the linter — the original body is replaced; keep the rest of the
+// file's old fallback shape behind a stub so the diff is small. Unused.
 
 // =============================================================================
 // drawSlabMiniPCA — slab variant of drawMiniPCA
@@ -3065,20 +3059,13 @@ function drawMiniPCA(canvas, l2idx, alignedLabels, opts) {
 // ES-module port left it private to this file.
 export function drawSlabMiniPCA(canvas, range, labels, opts) {
   const state = _pageState;
-  if (!canvas) return;
+  if (!state || !state.data || !range) return;
   opts = opts || {};
-  const paneOffset = (opts.paneOffset != null) ? opts.paneOffset : 0;
-  const colorMode = opts.colorMode || state.l3ColorMode || 'shared';
-  const focalLabels = opts.focalLabels || null;
-  const drawSwatch = opts.drawSwatch !== false;
-  const { ctx, w, h } = fitCanvas(canvas);
-  ctx.clearRect(0, 0, w, h);
-  if (!state.data || !range) return;
   const d = state.data;
   const agg = aggregateSlab(range[0], range[1]);
   if (!agg) return;
   const nS = d.n_samples;
-  const xs = agg.xs;
+  const xs = agg.xs;          // already sign-aligned by aggregateSlab
   // Per-sample mean PC2 across the slab. aggregateSlab only fills ys when
   // aggMethod=mean_pc12; we recompute here for a stable 2D scatter.
   const ys2 = new Float64Array(nS);
@@ -3088,134 +3075,18 @@ export function drawSlabMiniPCA(canvas, range, labels, opts) {
     for (let si = 0; si < nS; si++) ys2[si] += pc2[si];
   }
   for (let si = 0; si < nS; si++) ys2[si] /= nW;
-  // Slab midpoint drives sign / λ annotations (matches what the user is
-  // visually centered on when scrubbing).
+  // Slab midpoint drives sign / λ annotations.
   const wMid = (range[0] + range[1]) >> 1;
   const { sign } = getPC(state, wMid);
-  // Range
-  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
-  for (let si = 0; si < nS; si++) {
-    const x = xs[si], y = ys2[si];
-    if (x < xMin) xMin = x; if (x > xMax) xMax = x;
-    if (y < yMin) yMin = y; if (y > yMax) yMax = y;
-  }
-  const xPad = (xMax - xMin) * 0.08 || 0.01;
-  const yPad = (yMax - yMin) * 0.08 || 0.01;
-  xMin -= xPad; xMax += xPad; yMin -= yPad; yMax += yPad;
-  // Focal pane gets extra padding for axis labels (matches L2 path).
-  const pad = (paneOffset === 0)
-    ? { l: 18, r: 8, t: 14, b: 22 }
-    : { l: 8,  r: 8, t: 14, b: 14 };
-  const plotW = w - pad.l - pad.r, plotH = h - pad.t - pad.b;
-  const toX = v => pad.l + ((v - xMin) / (xMax - xMin)) * plotW;
-  const toY = v => pad.t + (1 - (v - yMin) / (yMax - yMin)) * plotH;
-  // Cache render context for click-spotlight hit-tester (parity with L2 mode).
-  canvas.__l3_render = {
-    l2idx: null, isSlab: true, slabRange: range.slice(),
-    wMid, sign, pad, plotW, plotH,
-    xMin, xMax, yMin, yMax,
-    cssW: w, cssH: h,
-  };
-  // Frame + window tag (shared helper).
-  _l3PaneFrame(ctx, pad, plotW, plotH, wMid, sign, paneOffset);
-  // Ramp-coloring mode (matches L2 path).
-  const _L3_RAMP_MODES = new Set(['het', 'dosage', 'theta_pi', 'ghsl', 'froh']);
-  const _l3RampActive = (state.l3RampMode && _L3_RAMP_MODES.has(state.l3RampMode))
-    ? state.l3RampMode
-    : (state.l3HetColoring ? 'het' : null);
-  // Dual-mode rings — focal pane skips (its fill IS the focal color).
-  const drawDualRings = (colorMode === 'dual') && (paneOffset !== 0) && !!focalLabels;
-  const trackedSet = new Set(state.tracked || []);
-  // Non-tracked dots first
-  for (let si = 0; si < nS; si++) {
-    if (trackedSet.has(si)) continue;
-    const x = toX(xs[si]), y = toY(ys2[si]);
-    let baseCol;
-    if (_l3RampActive) {
-      baseCol = getSampleColor(si, _l3RampActive, null) || '#888';
-    } else if (labels && labels[si] != null) {
-      baseCol = paneClusterColor(paneOffset, labels[si], colorMode);
-    } else {
-      baseCol = '#888';
-    }
-    if (drawDualRings && !_l3RampActive && labels) {
-      const ringCol = paneRingColor(focalLabels[si]);
-      if (ringCol) {
-        ctx.strokeStyle = ringCol;
-        ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.arc(x, y, 2.6, 0, Math.PI * 2); ctx.stroke();
-      }
-    }
-    const dotAlpha = _l3RampActive ? 0.75 : 0.7;
-    ctx.fillStyle = withAlpha(baseCol, dotAlpha);
-    ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
-  }
-  // Tracked samples on top — rings + identity dots + optional labels.
-  const tracked = Array.isArray(state.tracked) ? state.tracked : [];
-  const showLabels = tracked.length > 0 && tracked.length <= 8;
-  for (const si of tracked) {
-    const x = toX(xs[si]), y = toY(ys2[si]);
-    if (labels) {
-      const gcol = paneClusterColor(paneOffset, labels[si], colorMode);
-      ctx.strokeStyle = gcol; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.stroke();
-    }
-    if (drawDualRings && labels && focalLabels) {
-      const ringCol = paneRingColor(focalLabels[si]);
-      if (ringCol) {
-        ctx.strokeStyle = ringCol; ctx.lineWidth = 1.4;
-        ctx.beginPath(); ctx.arc(x, y, 6.2, 0, Math.PI * 2); ctx.stroke();
-      }
-    }
-    ctx.fillStyle = trackedColor(si);
-    ctx.strokeStyle = themeColor('bg'); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(x, y, 2.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    if (showLabels) {
-      const name = state.data.samples[si].cga || state.data.samples[si].ind;
-      ctx.fillStyle = trackedColor(si);
-      ctx.font = '9px ui-monospace, monospace';
-      ctx.textAlign = 'left';
-      ctx.strokeStyle = themeColor('bg'); ctx.lineWidth = 2.5;
-      ctx.strokeText(name, x + 5, y + 3);
-      ctx.fillText(name, x + 5, y + 3);
-    }
-  }
-  // Spotlight pass.
-  if (state.spotlightTrackedAll && !showLabels && tracked.length > 0) {
-    ctx.font = '9px ui-monospace, monospace';
-    ctx.textAlign = 'left';
-    for (const si of tracked) {
-      const x = toX(xs[si]), y = toY(ys2[si]);
-      const name = state.data.samples[si].cga || state.data.samples[si].ind;
-      ctx.fillStyle = trackedColor(si);
-      ctx.strokeStyle = themeColor('bg'); ctx.lineWidth = 2.5;
-      ctx.strokeText(name, x + 5, y + 3);
-      ctx.fillText(name, x + 5, y + 3);
-    }
-  }
-  if (state.spotlight != null && state.spotlight >= 0 && state.spotlight < nS) {
-    const si = state.spotlight;
-    const x = toX(xs[si]), y = toY(ys2[si]);
-    ctx.strokeStyle = 'rgba(245,165,36,0.95)';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = themeColor('bg'); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(x, y, 2.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    const name = state.data.samples[si].cga || state.data.samples[si].ind;
-    ctx.font = 'bold 10px ui-monospace, monospace';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(245,165,36,0.95)';
-    ctx.strokeStyle = themeColor('bg'); ctx.lineWidth = 3;
-    ctx.strokeText(name, x + 8, y + 3);
-    ctx.fillText(name, x + 8, y + 3);
-  }
-  // Axis labels (focal pane only): PC1 / PC2 with λ context.
-  _l3PaneAxisLabels(ctx, pad, plotW, plotH, wMid, sign, paneOffset, d);
-  // Per-band legend (shared helper). Matches L2 mode visual.
-  if (drawSwatch && !_l3RampActive && labels) {
-    _l3PaneLegend(ctx, pad, plotW, labels, paneOffset, colorMode);
-  }
+  _paintMiniPCAShared(canvas, {
+    xVals: xs, yVals: ys2, labels,
+    wMid, sign,
+    paneOffset:  opts.paneOffset,
+    colorMode:   opts.colorMode,
+    focalLabels: opts.focalLabels,
+    drawSwatch:  opts.drawSwatch,
+    cacheMeta:   { l2idx: null, isSlab: true, slabRange: range.slice() },
+  });
 }
 
 // =============================================================================

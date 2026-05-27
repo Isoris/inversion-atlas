@@ -740,14 +740,22 @@ function getPCByAxis(state, winIdx, axis) {
 }
 
 // --- getPCRender(state, winIdx, axisX, axisY) — legacy lines 10000-10007 ---
-// Replaces the round-2 stub. PC1 has the sign-flip rule; other axes
-// use raw orientation. The call sites destructure { x, y, signX, signY }.
+// 2026-05-27: now applies the per-window sign-flip to BOTH PC1 and
+// PC2 (was PC1-only). See shared/pc_accessors.js:getPCRender for the
+// rationale — PC2 X-braids independently of PC1 without its own
+// sign-align pass.
 export function getPCRender(state, winIdx, axisX, axisY) {
-  const x = getPCByAxis(state, winIdx, axisX || 'pc1');
-  const y = getPCByAxis(state, winIdx, axisY || 'pc2');
-  const signX = (axisX === 'pc1' && state && state.flipPC1 && state.pc1Sign) ? state.pc1Sign[winIdx] : 1;
-  const signY = (axisY === 'pc1' && state && state.flipPC1 && state.pc1Sign) ? state.pc1Sign[winIdx] : 1;
-  return { x, y, signX, signY, axisX, axisY };
+  const aX = axisX || 'pc1';
+  const aY = axisY || 'pc2';
+  const x = getPCByAxis(state, winIdx, aX);
+  const y = getPCByAxis(state, winIdx, aY);
+  const signFor = (axis) => {
+    if (!state || !Number.isInteger(winIdx)) return 1;
+    if (axis === 'pc1') return (state.flipPC1 && state.pc1Sign) ? (state.pc1Sign[winIdx] || 1) : 1;
+    if (axis === 'pc2') return (state.flipPC2 && state.pc2Sign) ? (state.pc2Sign[winIdx] || 1) : 1;
+    return 1;
+  };
+  return { x, y, signX: signFor(aX), signY: signFor(aY), axisX: aX, axisY: aY };
 }
 
 // --- getPC(state, winIdx) — legacy lines 9951-9955 ---
@@ -862,24 +870,127 @@ export function buildIndexes(state) {
 }
 
 // --- computePC1Signs(state) — legacy lines 9932-9950 ---
+//
+// 2026-05-27 rewrite: the legacy walking algorithm correlated each
+// window's PC1 with its *immediate predecessor* and flipped sign on a
+// negative correlation. That fails — visibly — when a window pair is
+// nearly uncorrelated (|cor| → 0): the sign choice is essentially
+// random, the chosen sign persists for every downstream window, and
+// the per-sample line traces in the lines panel cross each other to
+// form X-shaped braids instead of staying parallel.
+//
+// New algorithm: two passes anchored to a per-sample reference vector
+// built from the data itself. Implementation lives in
+// `_computeAxisSigns(windows, axisKey)` and is reused by
+// `computePC2Signs` below.
 export function computePC1Signs(state) {
   if (!state || !state.data) return;
-  const wins = state.data.windows;
-  const n = wins.length;
+  state.pc1Sign = _computeAxisSigns(state.data.windows, 'pc1');
+}
+
+// 2026-05-27 follow-up: parallel sign-alignment for PC2. PCA's
+// eigenvectors are signed independently, so PC2 X-braids just like
+// PC1 did before — the legacy code never had a PC2-sign pass.
+// State contract: state.pc2Sign : Float32Array(n_windows);
+// state.flipPC2 : boolean (default true).
+export function computePC2Signs(state) {
+  if (!state || !state.data) return;
+  state.pc2Sign = _computeAxisSigns(state.data.windows, 'pc2');
+}
+
+/**
+ * Shared 2-pass reference-anchored sign aligner. Takes the windows
+ * array + the axis key ('pc1' / 'pc2') and returns a Float32Array of
+ * per-window signs (+1 / −1).
+ *
+ *   Pass 1 (seed) — walking correlation, same shape as the legacy
+ *   pc1-only code, to seed a rough sign sequence.
+ *   Pass 2 (reference) — for each sample, the mean of seed-aligned
+ *   per-window values across the chromosome. That gives a stable
+ *   per-sample "canonical PC[12]" averaged from N windows.
+ *   Pass 3 (re-align) — independently correlate each window's RAW
+ *   axis vector against the reference and flip when negative. No
+ *   error propagation. Hysteresis on low-|cor| windows so noise
+ *   doesn't trigger spurious flips.
+ *
+ * All loops skip non-finite values so partial-NaN windows don't
+ * poison the correlation, and an all-NaN window inherits its
+ * neighbour's sign through hysteresis.
+ *
+ * @param {Array<Object>} wins   state.data.windows
+ * @param {string} axisKey       'pc1' | 'pc2'
+ * @returns {Float32Array}       length = wins.length
+ */
+function _computeAxisSigns(wins, axisKey) {
+  const n = wins ? wins.length : 0;
+  if (n === 0) return new Float32Array(0);
   const signs = new Float32Array(n);
   signs[0] = 1;
-  let prev = wins[0].pc1;
+
+  // Pass 1: walking seed.
+  let prev = wins[0] && wins[0][axisKey];
   for (let i = 1; i < n; i++) {
-    const cur = wins[i].pc1;
+    const cur = wins[i] && wins[i][axisKey];
+    if (!cur || !prev || cur.length === 0 || prev.length === 0) {
+      signs[i] = signs[i - 1] || 1;
+      if (cur) prev = cur;
+      continue;
+    }
+    const L = Math.min(prev.length, cur.length);
     let dot = 0, mp = 0, mc = 0;
-    for (let j = 0; j < cur.length; j++) {
-      dot += prev[j] * cur[j]; mp += prev[j] * prev[j]; mc += cur[j] * cur[j];
+    for (let j = 0; j < L; j++) {
+      const a = prev[j], b = cur[j];
+      if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+      dot += a * b; mp += a * a; mc += b * b;
     }
     const cor = dot / Math.sqrt(mp * mc + 1e-9);
-    signs[i] = (cor >= 0 ? 1 : -1) * signs[i - 1];
+    signs[i] = (cor >= 0 ? 1 : -1) * (signs[i - 1] || 1);
     prev = cur;
   }
-  state.pc1Sign = signs;
+
+  // Pass 2: per-sample reference vector.
+  const nS = (wins[0] && wins[0][axisKey] && wins[0][axisKey].length) | 0;
+  if (nS === 0) return signs;
+  const ref = new Float32Array(nS);
+  const refN = new Int32Array(nS);
+  for (let i = 0; i < n; i++) {
+    const w = wins[i] && wins[i][axisKey];
+    if (!w) continue;
+    const s = signs[i];
+    const L = Math.min(nS, w.length);
+    for (let j = 0; j < L; j++) {
+      const v = w[j];
+      if (!Number.isFinite(v)) continue;
+      ref[j] += s * v;
+      refN[j]++;
+    }
+  }
+  for (let j = 0; j < nS; j++) {
+    if (refN[j] > 0) ref[j] /= refN[j];
+  }
+
+  // Pass 3: re-align each window against the reference.
+  let lastSign = 1;
+  for (let i = 0; i < n; i++) {
+    const cur = wins[i] && wins[i][axisKey];
+    if (!cur || cur.length === 0) { signs[i] = lastSign; continue; }
+    const L = Math.min(ref.length, cur.length);
+    let dot = 0, mp = 0, mc = 0;
+    for (let j = 0; j < L; j++) {
+      const a = ref[j], b = cur[j];
+      if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+      dot += a * b; mp += a * a; mc += b * b;
+    }
+    const denom = Math.sqrt(mp * mc + 1e-9);
+    const cor = denom > 0 ? dot / denom : 0;
+    if (Math.abs(cor) < 0.10) {
+      signs[i] = lastSign;             // hysteresis — too noisy to call
+    } else {
+      signs[i] = (cor >= 0 ? 1 : -1);
+      lastSign = signs[i];
+    }
+  }
+  return signs;
 }
 
 // --- populateSimScales(state) — legacy lines 52472-52530 ---
@@ -1127,7 +1238,12 @@ export function getLinesGrid(state, source) {
 
 // --- getLinesSignAt(state, winIdx, source) — legacy lines 33674-33677 ---
 export function getLinesSignAt(state, winIdx, source) {
-  if (source === 'pc1' && state && state.flipPC1 && state.pc1Sign) return state.pc1Sign[winIdx];
+  if (!state || !Number.isInteger(winIdx)) return 1;
+  if (source === 'pc1' && state.flipPC1 && state.pc1Sign) return state.pc1Sign[winIdx] || 1;
+  // 2026-05-27: parallel PC2 sign-flip path. Same gating shape as
+  // PC1; only fires when state.flipPC2 is on and the sign array has
+  // been computed by computePC2Signs.
+  if (source === 'pc2' && state.flipPC2 && state.pc2Sign) return state.pc2Sign[winIdx] || 1;
   return 1;
 }
 

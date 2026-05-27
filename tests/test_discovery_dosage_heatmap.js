@@ -14,6 +14,9 @@ import {
   deriveMarkerOrder,
   buildGroupColorMap,
   dosageValueToColor,
+  dosageMagmaColor,
+  dosageGenotypeColor,
+  pickDosageColorFn,
 } from '../atlases/inversion/pages/discovery/dosage_heatmap/renderer.js';
 import {
   adaptMglHeatmapJson,
@@ -52,13 +55,31 @@ state._setActiveState(null);
 check('_setActiveState(null) clears',            state._pageState === null);
 
 // =====================================================================
-group('renderer.dosageValueToColor');
+group('renderer.dosageMagmaColor (default ramp)');
 
-check('v=0 → cream',                             dosageValueToColor(0) === 'rgb(255,245,235)');
-check('v=2 → deep red',                          dosageValueToColor(2) === 'rgb(165,15,21)');
-check('v=1 → orange mid',                        dosageValueToColor(1) === 'rgb(252,141,89)');
-check('NaN → grey',                              dosageValueToColor(NaN) === 'rgb(200,200,200)');
-check('custom vmin/vmax respected',              dosageValueToColor(0.5, 0, 1) === 'rgb(252,141,89)');
+// Magma stops at the test points: t=0 → (0,0,4); t=0.5 → (183,55,121);
+// t=1 → (252,253,191). Default vmin/vmax = 0/2 so v=1 lands at t=0.5.
+check('v=0 → magma dark',                        dosageMagmaColor(0) === 'rgb(0,0,4)');
+check('v=2 → magma yellow',                      dosageMagmaColor(2) === 'rgb(252,253,191)');
+check('v=1 → magma magenta mid',                 dosageMagmaColor(1) === 'rgb(183,55,121)');
+check('NaN → pale-pink missing',                 dosageMagmaColor(NaN) === 'rgb(230,210,220)');
+check('custom vmin/vmax respected (t=0.5)',      dosageMagmaColor(0.5, 0, 1) === 'rgb(183,55,121)');
+
+// dosageValueToColor is now an alias for the magma ramp.
+check('dosageValueToColor alias → magma',        dosageValueToColor(0) === dosageMagmaColor(0));
+
+group('renderer.dosageGenotypeColor (discrete white / blue / red)');
+
+check('v=0 → near-white (HOM ref)',              dosageGenotypeColor(0) === 'rgb(248,248,250)');
+check('v=1 → blue (HET)',                        dosageGenotypeColor(1) === 'rgb( 56,107,196)');
+check('v=2 → red (HOM alt)',                     dosageGenotypeColor(2) === 'rgb(196, 40, 50)');
+check('NaN → mauve (missing)',                   dosageGenotypeColor(NaN) === 'rgb(238,214,222)');
+
+group('renderer.pickDosageColorFn');
+
+check('magma → magma fn',                        pickDosageColorFn('magma')(1, 0, 2) === 'rgb(183,55,121)');
+check('genotype → genotype fn',                  pickDosageColorFn('genotype')(1) === 'rgb( 56,107,196)');
+check('default → magma',                         pickDosageColorFn()(2, 0, 2) === 'rgb(252,253,191)');
 
 // =====================================================================
 group('renderer.buildGroupColorMap');
@@ -406,6 +427,79 @@ check('group sizes: HOMO_2 = 2',
 check('group sizes sorted desc',
       sizes[0][1] >= sizes[sizes.length - 1][1]);
 check('group sizes: null → []',                  groupSizesFromSampleGroup(null).length === 0);
+
+// =====================================================================
+group('sample_means — per-sample left-track derivations');
+
+const {
+  computeSampleHetDosageMean,
+  computeSampleThetaPiMean,
+  computeSampleGhslMean,
+} = await import('../atlases/inversion/pages/discovery/dosage_heatmap/sample_means.js');
+
+const canonForMeans = {
+  n_samples: 3, n_markers: 4,
+  // sample 0: 0,1,1,1 → 3/4 het; sample 1: 0,0,2,2 → 0/4 het;
+  // sample 2: 1,1,1,1 → 4/4 het
+  cellValue: (m, s) => {
+    const table = [
+      [0, 1, 1, 1],
+      [0, 0, 2, 2],
+      [1, 1, 1, 1],
+    ];
+    return table[s][m];
+  },
+  sample_labels: ['s0', 's1', 's2'],
+};
+
+const het = computeSampleHetDosageMean(canonForMeans);
+check('het-dosage mean: returns Float32Array',   het instanceof Float32Array);
+check('het-dosage mean: s0 = 0.75',              Math.abs(het[0] - 0.75) < 1e-6);
+check('het-dosage mean: s1 = 0',                 het[1] === 0);
+check('het-dosage mean: s2 = 1',                 het[2] === 1);
+check('het-dosage mean: null on missing data',   computeSampleHetDosageMean(null) === null);
+
+const tpData = {
+  theta_pi_per_window: {
+    samples: ['s0', 's1', 's2'],
+    windows: [0, 1, 2, 3],
+    // flat Float32Array, row-major by sample: s0 = [1,2,3,4] mean 2.5;
+    // s1 has one NaN → mean of finite; s2 = [10,10,10,10] mean 10
+    values: Float32Array.from([
+      1, 2, 3, 4,
+      0, NaN, 6, 6,
+      10, 10, 10, 10,
+    ]),
+  },
+};
+const tp = computeSampleThetaPiMean(tpData);
+check('θπ mean: returns Float32Array',           tp instanceof Float32Array);
+check('θπ mean: s0 = 2.5',                       Math.abs(tp[0] - 2.5) < 1e-6);
+check('θπ mean: s1 ignores NaN',                 Math.abs(tp[1] - 4) < 1e-6);
+check('θπ mean: s2 = 10',                        tp[2] === 10);
+check('θπ mean: null when panel missing',        computeSampleThetaPiMean({}) === null);
+
+const ghslData = {
+  ghsl_panel: {
+    samples: ['s0', 's1', 's2'],
+    scales: ['s25k'],
+    primary_scale: 's25k',
+    div_roll: {
+      // jagged Array<Float32Array>[sample][window]
+      's25k': [
+        Float32Array.from([0.2, 0.4, 0.6]),     // mean 0.4
+        Float32Array.from([NaN, 0.5, 0.5]),     // mean 0.5
+        Float32Array.from([1.0, 1.0, 1.0]),     // mean 1.0
+      ],
+    },
+  },
+};
+const gh = computeSampleGhslMean(ghslData, canonForMeans);
+check('GHSL mean: returns Float32Array',         gh instanceof Float32Array);
+check('GHSL mean: s0 = 0.4',                     Math.abs(gh[0] - 0.4) < 1e-6);
+check('GHSL mean: s1 ignores NaN',               Math.abs(gh[1] - 0.5) < 1e-6);
+check('GHSL mean: s2 = 1.0',                     Math.abs(gh[2] - 1.0) < 1e-6);
+check('GHSL mean: null when panel missing',      computeSampleGhslMean({}) === null);
 
 // =====================================================================
 console.log('\n=================');

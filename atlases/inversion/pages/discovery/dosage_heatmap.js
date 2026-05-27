@@ -54,13 +54,24 @@ import {
   groupSizesFromSampleGroup,
 } from './dosage_heatmap/selection.js';
 import { fitCanvasNoDpr } from '../../shared/page1_utils.js';
+import {
+  computeSampleHetDosageMean,
+  computeSampleThetaPiMean,
+  computeSampleGhslMean,
+} from './dosage_heatmap/sample_means.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   sample_order_mode:     'by_group',
   marker_order_mode:     'natural',
+  color_mode:            'magma',    // 'magma' | 'genotype'
   show_group_track:      true,
   show_k6_track:         false,
+  show_ghsl_track:       false,      // per-sample mean GHSL (continuous)
+  show_theta_pi_track:   false,      // per-sample mean θπ (continuous)
+  show_het_dosage_track: false,      // per-sample mean het dosage (continuous)
   show_polarity_track:   true,
+  show_y_ticks:          true,
+  show_group_labels:     true,
 });
 
 // =====================================================================
@@ -258,16 +269,42 @@ function _buildPageState(atlasState) {
   if (dh) {
     if (dh.mgl_heatmap_result) {
       canonical = adaptMglHeatmapJson(dh.mgl_heatmap_result, {
-        sample_group: dh.sample_group || null,
-        sample_k6:    dh.sample_k6    || null,
+        sample_group:           dh.sample_group           || null,
+        sample_k6:              dh.sample_k6              || null,
+        sample_ghsl_mean:       dh.sample_ghsl_mean       || null,
+        sample_theta_pi_mean:   dh.sample_theta_pi_mean   || null,
+        sample_het_dosage_mean: dh.sample_het_dosage_mean || null,
       });
     } else if (dh.legacy_chunk) {
       canonical = adaptLegacyChunk(dh.legacy_chunk, {
         selected_marker_indices: dh.selected_marker_indices || null,
-        sample_group:            dh.sample_group || null,
-        sample_k6:               dh.sample_k6    || null,
-        marker_polarity:         dh.marker_polarity || null,
+        sample_group:            dh.sample_group            || null,
+        sample_k6:               dh.sample_k6               || null,
+        sample_ghsl_mean:        dh.sample_ghsl_mean        || null,
+        sample_theta_pi_mean:    dh.sample_theta_pi_mean    || null,
+        sample_het_dosage_mean:  dh.sample_het_dosage_mean  || null,
+        marker_polarity:         dh.marker_polarity         || null,
       });
+    }
+  }
+
+  // Fill any missing per-sample mean from the chrom precomp / heatmap
+  // data itself. The local_pca_dosage page stashes the precomp at
+  // inv._local_pca_dosage_state.data. Het-dosage mean is always
+  // derivable from the canonical heatmap directly.
+  if (canonical) {
+    const chromData = (inv._local_pca_dosage_state && inv._local_pca_dosage_state.data) || null;
+    if (!canonical.sample_het_dosage_mean) {
+      try { canonical.sample_het_dosage_mean = computeSampleHetDosageMean(canonical); }
+      catch (e) { console.warn('dosage_heatmap: het-dosage mean compute threw —', e); }
+    }
+    if (!canonical.sample_theta_pi_mean && chromData) {
+      try { canonical.sample_theta_pi_mean = computeSampleThetaPiMean(chromData); }
+      catch (e) { console.warn('dosage_heatmap: θπ mean compute threw —', e); }
+    }
+    if (!canonical.sample_ghsl_mean && chromData) {
+      try { canonical.sample_ghsl_mean = computeSampleGhslMean(chromData, canonical); }
+      catch (e) { console.warn('dosage_heatmap: GHSL mean compute threw —', e); }
     }
   }
   return {
@@ -325,13 +362,20 @@ function _renderHeader(state) {
   if (so) so.value = state.view_state.sample_order_mode;
   const mo = document.getElementById('dosageHeatmapMarkerOrder');
   if (mo) mo.value = state.view_state.marker_order_mode;
+  const cm = document.getElementById('dosageHeatmapColorMode');
+  if (cm) cm.value = state.view_state.color_mode;
   const gt = document.getElementById('dosageHeatmapShowGroupTrack');
   if (gt) gt.checked = !!state.view_state.show_group_track;
   const pt = document.getElementById('dosageHeatmapShowPolarityTrack');
   if (pt) pt.checked = !!state.view_state.show_polarity_track;
-  // 2026-05-26: K6-track checkbox added to HTML; mirror existing pattern.
   const k6 = document.getElementById('dosageHeatmapShowK6Track');
   if (k6) k6.checked = !!state.view_state.show_k6_track;
+  const hg = document.getElementById('dosageHeatmapShowGhslTrack');
+  if (hg) hg.checked = !!state.view_state.show_ghsl_track;
+  const tp = document.getElementById('dosageHeatmapShowThetaPiTrack');
+  if (tp) tp.checked = !!state.view_state.show_theta_pi_track;
+  const hd = document.getElementById('dosageHeatmapShowHetDosageTrack');
+  if (hd) hd.checked = !!state.view_state.show_het_dosage_track;
 }
 
 // =====================================================================
@@ -366,16 +410,22 @@ function _paintHeatmap(state) {
                                      state.data.n_markers, state.data);
   const hov = state.selection.getHoveredCell();
   const paint = paintDosageHeatmap(canvas, state.data, {
-    sample_order:        order_s,
-    marker_order:        order_m,
-    show_group_track:    state.view_state.show_group_track,
-    show_k6_track:       state.view_state.show_k6_track,
-    show_polarity_track: state.view_state.show_polarity_track,
-    group_colors:        state.group_colors,
-    k6_colors:           state.k6_colors,
-    hovered_cell:        hov ? { row: hov.row, col: hov.col } : null,
-    selected_samples:    state.selection.getSelectedSamples(),
-    selected_markers:    state.selection.getSelectedMarkers(),
+    sample_order:          order_s,
+    marker_order:          order_m,
+    color_mode:            state.view_state.color_mode,
+    show_group_track:      state.view_state.show_group_track,
+    show_k6_track:         state.view_state.show_k6_track,
+    show_ghsl_track:       state.view_state.show_ghsl_track,
+    show_theta_pi_track:   state.view_state.show_theta_pi_track,
+    show_het_dosage_track: state.view_state.show_het_dosage_track,
+    show_polarity_track:   state.view_state.show_polarity_track,
+    show_y_ticks:          state.view_state.show_y_ticks,
+    show_group_labels:     state.view_state.show_group_labels,
+    group_colors:          state.group_colors,
+    k6_colors:             state.k6_colors,
+    hovered_cell:          hov ? { row: hov.row, col: hov.col } : null,
+    selected_samples:      state.selection.getSelectedSamples(),
+    selected_markers:      state.selection.getSelectedMarkers(),
   });
   state.layout = paint.layout;
 }
@@ -458,6 +508,10 @@ function _wireToolbar(state) {
     state.view_state.marker_order_mode = (e && e.target && e.target.value) || 'natural';
     repaint();
   };
+  const onColorMode = (e) => {
+    state.view_state.color_mode = (e && e.target && e.target.value) || 'magma';
+    repaint();
+  };
   const onShowGroupTrack = (e) => {
     state.view_state.show_group_track = !!(e && e.target && e.target.checked);
     repaint();
@@ -468,6 +522,18 @@ function _wireToolbar(state) {
   };
   const onShowK6Track = (e) => {
     state.view_state.show_k6_track = !!(e && e.target && e.target.checked);
+    repaint();
+  };
+  const onShowGhslTrack = (e) => {
+    state.view_state.show_ghsl_track = !!(e && e.target && e.target.checked);
+    repaint();
+  };
+  const onShowThetaPiTrack = (e) => {
+    state.view_state.show_theta_pi_track = !!(e && e.target && e.target.checked);
+    repaint();
+  };
+  const onShowHetDosageTrack = (e) => {
+    state.view_state.show_het_dosage_track = !!(e && e.target && e.target.checked);
     repaint();
   };
   const onCanvasMove = (ev) => {
@@ -507,33 +573,42 @@ function _wireToolbar(state) {
   });
 
   state._handlers = {
-    onSampleOrder, onMarkerOrder,
+    onSampleOrder, onMarkerOrder, onColorMode,
     onShowGroupTrack, onShowPolarityTrack, onShowK6Track,
+    onShowGhslTrack, onShowThetaPiTrack, onShowHetDosageTrack,
     onCanvasMove, onCanvasClick, onCanvasLeave,
     unsubSelection,
   };
 
-  _addListener('dosageHeatmapSampleOrder',        'change',     onSampleOrder);
-  _addListener('dosageHeatmapMarkerOrder',        'change',     onMarkerOrder);
-  _addListener('dosageHeatmapShowGroupTrack',     'change',     onShowGroupTrack);
-  _addListener('dosageHeatmapShowPolarityTrack',  'change',     onShowPolarityTrack);
-  _addListener('dosageHeatmapShowK6Track',        'change',     onShowK6Track);
-  _addListener('dosageHeatmapCanvas',             'mousemove',  onCanvasMove);
-  _addListener('dosageHeatmapCanvas',             'click',      onCanvasClick);
-  _addListener('dosageHeatmapCanvas',             'mouseleave', onCanvasLeave);
+  _addListener('dosageHeatmapSampleOrder',          'change',     onSampleOrder);
+  _addListener('dosageHeatmapMarkerOrder',          'change',     onMarkerOrder);
+  _addListener('dosageHeatmapColorMode',            'change',     onColorMode);
+  _addListener('dosageHeatmapShowGroupTrack',       'change',     onShowGroupTrack);
+  _addListener('dosageHeatmapShowPolarityTrack',    'change',     onShowPolarityTrack);
+  _addListener('dosageHeatmapShowK6Track',          'change',     onShowK6Track);
+  _addListener('dosageHeatmapShowGhslTrack',        'change',     onShowGhslTrack);
+  _addListener('dosageHeatmapShowThetaPiTrack',     'change',     onShowThetaPiTrack);
+  _addListener('dosageHeatmapShowHetDosageTrack',   'change',     onShowHetDosageTrack);
+  _addListener('dosageHeatmapCanvas',               'mousemove',  onCanvasMove);
+  _addListener('dosageHeatmapCanvas',               'click',      onCanvasClick);
+  _addListener('dosageHeatmapCanvas',               'mouseleave', onCanvasLeave);
 }
 
 function _teardownToolbar(state) {
   if (!state || !state._handlers) return;
   const h = state._handlers;
-  if (h.onSampleOrder)        _removeListener('dosageHeatmapSampleOrder',        'change',    h.onSampleOrder);
-  if (h.onMarkerOrder)        _removeListener('dosageHeatmapMarkerOrder',        'change',    h.onMarkerOrder);
-  if (h.onShowGroupTrack)     _removeListener('dosageHeatmapShowGroupTrack',     'change',    h.onShowGroupTrack);
-  if (h.onShowPolarityTrack)  _removeListener('dosageHeatmapShowPolarityTrack',  'change',    h.onShowPolarityTrack);
-  if (h.onShowK6Track)        _removeListener('dosageHeatmapShowK6Track',        'change',    h.onShowK6Track);
-  if (h.onCanvasMove)         _removeListener('dosageHeatmapCanvas',             'mousemove',  h.onCanvasMove);
-  if (h.onCanvasClick)        _removeListener('dosageHeatmapCanvas',             'click',      h.onCanvasClick);
-  if (h.onCanvasLeave)        _removeListener('dosageHeatmapCanvas',             'mouseleave', h.onCanvasLeave);
+  if (h.onSampleOrder)         _removeListener('dosageHeatmapSampleOrder',          'change',    h.onSampleOrder);
+  if (h.onMarkerOrder)         _removeListener('dosageHeatmapMarkerOrder',          'change',    h.onMarkerOrder);
+  if (h.onColorMode)           _removeListener('dosageHeatmapColorMode',            'change',    h.onColorMode);
+  if (h.onShowGroupTrack)      _removeListener('dosageHeatmapShowGroupTrack',       'change',    h.onShowGroupTrack);
+  if (h.onShowPolarityTrack)   _removeListener('dosageHeatmapShowPolarityTrack',    'change',    h.onShowPolarityTrack);
+  if (h.onShowK6Track)         _removeListener('dosageHeatmapShowK6Track',          'change',    h.onShowK6Track);
+  if (h.onShowGhslTrack)       _removeListener('dosageHeatmapShowGhslTrack',        'change',    h.onShowGhslTrack);
+  if (h.onShowThetaPiTrack)    _removeListener('dosageHeatmapShowThetaPiTrack',     'change',    h.onShowThetaPiTrack);
+  if (h.onShowHetDosageTrack)  _removeListener('dosageHeatmapShowHetDosageTrack',   'change',    h.onShowHetDosageTrack);
+  if (h.onCanvasMove)          _removeListener('dosageHeatmapCanvas',               'mousemove',  h.onCanvasMove);
+  if (h.onCanvasClick)         _removeListener('dosageHeatmapCanvas',               'click',      h.onCanvasClick);
+  if (h.onCanvasLeave)         _removeListener('dosageHeatmapCanvas',               'mouseleave', h.onCanvasLeave);
   if (typeof h.unsubSelection === 'function') { try { h.unsubSelection(); } catch (_) {} }
   state._handlers = {};
 }

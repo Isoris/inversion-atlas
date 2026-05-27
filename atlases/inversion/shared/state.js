@@ -212,10 +212,12 @@ export const SLOT_REGISTRY = Object.freeze({
   playing:                  { default: false, tag: 'transient', type: 'bool' },
   playTimer:                { default: null,  tag: 'transient', type: 'function' },
   pc1Sign:                  { default: null,  tag: 'derived',   type: 'Float32Array' },
+  pc2Sign:                  { default: null,  tag: 'derived',   type: 'Float32Array' },
   layersPresent:            { default: null,  tag: 'derived',   type: 'Set' },
   trailN:                   { default: 15,    tag: 'transient', type: 'int' },
   trailOn:                  { default: true,  tag: 'transient', type: 'bool' },
   flipPC1:                  { default: true,  tag: 'transient', type: 'bool' },
+  flipPC2:                  { default: true,  tag: 'transient', type: 'bool' },
 
   // Sim_mat display
   simScale:                 { default: null,  tag: 'transient', type: 'string' },
