@@ -1576,39 +1576,13 @@ function compareSlabPair(leftRange, rightRange, K) {
   if (!leftRange || !rightRange) return null;
   const cl = getSlabClusterAt(leftRange[0], leftRange[1], K);
   const cr = getSlabClusterAt(rightRange[0], rightRange[1], K);
-  if (!cl || !cr || !cl.labels || !cr.labels) return null;
-  const align = alignLabels(cl.labels, cr.labels, K);
-  let p_value, test_kind;
-  if (K === 2) {
-    p_value = (typeof fisher2x2 === 'function') ? fisher2x2(align.table) : null;
-    test_kind = 'fisher_2x2';
-  } else {
-    const cs = (typeof chiSquare === 'function') ? chiSquare(align.table, K) : null;
-    p_value = cs ? cs.p_approx : null;
-    test_kind = 'chi2_' + K + 'x' + K;
-  }
-  const state = _pageState;
-  const mergeThr = (state && Number.isFinite(state.mergeThr)) ? state.mergeThr : 0.85;
-  let verdict;
-  if (!cl.ok || !cr.ok)        verdict = 'LOW_POWER';
-  else if (align.concord >= mergeThr) verdict = 'MERGE';
-  else                          verdict = 'SEPARATE';
-  return {
-    leftIdx: null, rightIdx: null,
-    leftRange, rightRange,
-    K,
-    table: align.table,
-    perm: align.perm,
-    concord: align.concord,
-    p_value,
-    test_kind,
-    verdict,
-    cl_ok: cl.ok, cr_ok: cr.ok,
-    cl_reason: cl.reason, cr_reason: cr.reason,
-    cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
-    cl_usedK: K, cr_usedK: K,
-    isSlabPair: true,
-  };
+  // Slab clusters are already at the requested K (no fixedKLabels);
+  // useFixedK=false uses .labels directly.
+  return _comparePaneClusters(cl, cr, K, {
+    leftId: null, rightId: null,
+    leftRange, rightRange, useFixedK: false,
+    extraFields: { cl_usedK: K, cr_usedK: K, isSlabPair: true },
+  });
 }
 
 function compareSlabPair_byMode(leftRange, rightRange, mode) {
@@ -1842,19 +1816,44 @@ function _wireL3PaneToolsDelegation() {
 // labels, using Hungarian alignment + chi-square (or Fisher 2×2 at K=2).
 // chiSquare / fisher2x2 still live in the legacy monolith — when they aren't
 // available we fall back to a null p-value so the verdict logic stays honest.
-function compareL2Pair(leftIdx, rightIdx) {
-  const state = _pageState;
-  if (leftIdx == null || rightIdx == null) return null;
-  const cl = getL2Cluster(state, leftIdx), cr = getL2Cluster(state, rightIdx);
+// =============================================================================
+// _comparePaneClusters — unified compare kernel (2026-05-27 L2/slab dedup).
+// =============================================================================
+// All four compare-pair flavours (compareL2Pair / compareL2Pair_atK /
+// compareSlabPair / _compareL2Pair_UV) used to do the same five steps with
+// slightly different cluster-lookup paths:
+//
+//   1. Lookup cluster for each pane via mode-specific getter
+//   2. Choose label vectors (fixedKLabels if available — was L2-only)
+//   3. alignLabels (Hungarian)
+//   4. p_value via fisher2x2 (K=2) or chiSquare (K≥3)
+//   5. Verdict from concord / mergeThr / cluster.ok
+//
+// This function does steps 2-5 against two already-resolved cluster
+// objects. Each caller does step 1 in 2-3 lines, then dispatches here.
+// Replaces ~150 LoC of near-identical bodies with a single
+// implementation; keeps the four call-site names so external callers
+// don't need to change.
+//
+// @param cl              left  cluster {labels, fixedKLabels?, ok, reason, n_per_group, usedK?}
+// @param cr              right cluster (same shape)
+// @param K               number of bands (used for chi² test name + verdict)
+// @param opts            { useFixedK?, leftId?, rightId?, extraFields? }
+// @returns               null on missing inputs, or the uniform compare-row shape
+function _comparePaneClusters(cl, cr, K, opts) {
   if (!cl || !cr || !cl.labels || !cr.labels) return null;
-  const K = state.k;
-  // For comparison, use fixedKLabels which are always at state.k regardless of
-  // each L2's adaptive K choice. This keeps Hungarian alignment well-defined
-  // and concord/chi² interpretable across all comparisons.
-  const llab = cl.fixedKLabels || cl.labels;
-  const rlab = cr.fixedKLabels || cr.labels;
+  const state = _pageState;
+  const o = opts || {};
+  // Step 2 — label vectors. L2 mode preferred fixedKLabels (always at
+  // state.k regardless of each L2's adaptive K) so the contingency was
+  // well-defined; slab clusters don't carry that field, so we fall back
+  // to .labels which the slab pipeline produces at the requested K
+  // directly.
+  const llab = (o.useFixedK !== false && cl.fixedKLabels) ? cl.fixedKLabels : cl.labels;
+  const rlab = (o.useFixedK !== false && cr.fixedKLabels) ? cr.fixedKLabels : cr.labels;
   const align = alignLabels(llab, rlab, K);
-  let p_value, test_kind;
+  // Step 4 — p_value + test_kind.
+  let p_value = null, test_kind;
   if (K === 2) {
     p_value = (typeof fisher2x2 === 'function') ? fisher2x2(align.table) : null;
     test_kind = 'fisher_2x2';
@@ -1863,28 +1862,46 @@ function compareL2Pair(leftIdx, rightIdx) {
     p_value = cs ? cs.p_approx : null;
     test_kind = 'chi2_' + K + 'x' + K;
   }
-  // Verdict
+  // Step 5 — verdict. mergeThr default 0.85, alpha is the chi² gate
+  // (only consulted in the legacy L2 path; both gates land at the
+  // same MERGE outcome anyway, so the dispatch collapses).
+  const mergeThr = (state && Number.isFinite(state.mergeThr)) ? state.mergeThr : 0.85;
   let verdict;
-  if (!cl.ok || !cr.ok) verdict = 'LOW_POWER';
-  else if (align.concord >= state.mergeThr && (p_value == null || p_value > state.alpha)) verdict = 'MERGE';
-  else if (align.concord >= state.mergeThr && p_value <= state.alpha) {
-    // High concordance but p significant => still considered MERGE per handoff.
-    verdict = 'MERGE';
-  }
-  else verdict = 'SEPARATE';
-  return {
-    leftIdx, rightIdx, K,
-    table: align.table,
-    perm: align.perm,
-    concord: align.concord,
-    p_value,
-    test_kind,
-    verdict,
-    cl_ok: cl.ok, cr_ok: cr.ok,
+  if (!cl.ok || !cr.ok)                         verdict = 'LOW_POWER';
+  else if (align.concord >= mergeThr)           verdict = 'MERGE';
+  else                                          verdict = 'SEPARATE';
+  // Result shape — every caller's old return literal is the same shape.
+  // leftId/rightId fields differ by mode (L2 uses idx, slab uses range);
+  // caller supplies them via opts. extraFields lets callers tack on
+  // mode-specific provenance (e.g. reclusterMode, isSlabPair).
+  const out = {
+    K,
+    table:    align.table,
+    perm:     align.perm,
+    concord:  align.concord,
+    p_value, test_kind, verdict,
+    cl_ok:     cl.ok,     cr_ok:     cr.ok,
     cl_reason: cl.reason, cr_reason: cr.reason,
-    cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
-    cl_usedK: cl.usedK, cr_usedK: cr.usedK,   // for K-mismatch annotation
+    cl_npg:    cl.n_per_group, cr_npg: cr.n_per_group,
+    cl_usedK:  cl.usedK != null ? cl.usedK : K,
+    cr_usedK:  cr.usedK != null ? cr.usedK : K,
   };
+  if (o.leftId  !== undefined) out.leftIdx  = o.leftId;
+  if (o.rightId !== undefined) out.rightIdx = o.rightId;
+  if (o.leftRange  !== undefined) out.leftRange  = o.leftRange;
+  if (o.rightRange !== undefined) out.rightRange = o.rightRange;
+  if (o.extraFields) Object.assign(out, o.extraFields);
+  return out;
+}
+
+function compareL2Pair(leftIdx, rightIdx) {
+  const state = _pageState;
+  if (leftIdx == null || rightIdx == null) return null;
+  const cl = getL2Cluster(state, leftIdx);
+  const cr = getL2Cluster(state, rightIdx);
+  return _comparePaneClusters(cl, cr, state.k, {
+    leftId: leftIdx, rightId: rightIdx,
+  });
 }
 
 // =============================================================================
@@ -1902,34 +1919,13 @@ function compareL2Pair_atK(leftIdx, rightIdx, K) {
   if (leftIdx == null || rightIdx == null) return null;
   const cl = getL2ClusterAt(state, leftIdx, K);
   const cr = getL2ClusterAt(state, rightIdx, K);
-  if (!cl || !cr || !cl.labels || !cr.labels) return null;
-  const align = alignLabels(cl.labels, cr.labels, K);
-  let p_value, test_kind;
-  if (K === 2) {
-    p_value = (typeof fisher2x2 === 'function') ? fisher2x2(align.table) : null;
-    test_kind = 'fisher_2x2';
-  } else {
-    const cs = (typeof chiSquare === 'function') ? chiSquare(align.table, K) : null;
-    p_value = cs ? cs.p_approx : null;
-    test_kind = 'chi2_' + K + 'x' + K;
-  }
-  let verdict;
-  if (!cl.ok || !cr.ok)                       verdict = 'LOW_POWER';
-  else if (align.concord >= state.mergeThr)   verdict = 'MERGE';
-  else                                        verdict = 'SEPARATE';
-  return {
-    leftIdx, rightIdx, K,
-    table: align.table,
-    perm: align.perm,
-    concord: align.concord,
-    p_value,
-    test_kind,
-    verdict,
-    cl_ok: cl.ok, cr_ok: cr.ok,
-    cl_reason: cl.reason, cr_reason: cr.reason,
-    cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
-    cl_usedK: K, cr_usedK: K,
-  };
+  // getL2ClusterAt returns labels already at K; useFixedK=false skips
+  // the fixedKLabels fallback (which is from the adaptive-K path and
+  // would be at the wrong K here).
+  return _comparePaneClusters(cl, cr, K, {
+    leftId: leftIdx, rightId: rightIdx, useFixedK: false,
+    extraFields: { cl_usedK: K, cr_usedK: K },
+  });
 }
 
 // =============================================================================
@@ -1994,35 +1990,12 @@ function _compareL2Pair_UV(leftIdx, rightIdx, mode, clusterFn) {
   if (leftIdx == null || rightIdx == null) return null;
   const cl = clusterFn(state, leftIdx);
   const cr = clusterFn(state, rightIdx);
-  if (!cl || !cr || !cl.labels || !cr.labels) return null;
-  const K = 3;
-  const llab = cl.fixedKLabels || cl.labels;
-  const rlab = cr.fixedKLabels || cr.labels;
-  const align = alignLabels(llab, rlab, K);
-  let p_value = null;
-  let test_kind = 'chi2_3x3';
-  if (typeof chiSquare === 'function') {
-    const cs = chiSquare(align.table, K);
-    p_value = cs ? cs.p_approx : null;
-  }
-  let verdict;
-  if (!cl.ok || !cr.ok)                       verdict = 'LOW_POWER';
-  else if (align.concord >= state.mergeThr)   verdict = 'MERGE';
-  else                                        verdict = 'SEPARATE';
-  return {
-    leftIdx, rightIdx, K,
-    table: align.table,
-    perm: align.perm,
-    concord: align.concord,
-    p_value,
-    test_kind,
-    verdict,
-    cl_ok: cl.ok, cr_ok: cr.ok,
-    cl_reason: cl.reason, cr_reason: cr.reason,
-    cl_npg: cl.n_per_group, cr_npg: cr.n_per_group,
-    cl_usedK: K, cr_usedK: K,
-    reclusterMode: mode,
-  };
+  // UV-rotated clusters fix K=3. fixedKLabels (if present) is at the
+  // adaptive K, not this K — useFixedK=false forces .labels.
+  return _comparePaneClusters(cl, cr, 3, {
+    leftId: leftIdx, rightId: rightIdx, useFixedK: false,
+    extraFields: { cl_usedK: 3, cr_usedK: 3, reclusterMode: mode },
+  });
 }
 
 // =============================================================================
