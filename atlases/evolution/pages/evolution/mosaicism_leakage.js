@@ -14,6 +14,9 @@
 
 import { _pageState, _setActiveState } from './mosaicism_leakage/_state.js';
 import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
+import { autoSeedDosageInput } from '../../shared/auto_seed_inv_idx.js';
+import { attachAutoSeedBadge, detachAutoSeedBadge } from '../../shared/auto_seed_badge.js';
+import { paintCanvasAxes, paintMatrixLabels, paintColorRamp } from '../../shared/canvas_axes.js';
 import {
   perWindowLeakage,
   integrityVerdict,
@@ -58,6 +61,7 @@ export function initMosaicismToolbar() {
 
 export async function mount(root, atlasState, registry) {
   resetOnboarding('mosaicism_leakage');
+  _autoSeedIfMissing(atlasState);
   const pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
   try { refreshMosaicism(pageState); }
@@ -73,6 +77,15 @@ export async function unmount(root) {
   try { _teardownToolbar(_pageState); }
   catch (e) { console.warn('mosaicism_leakage.unmount: teardown threw —', e); }
   _setActiveState(null);
+}
+
+function _autoSeedIfMissing(atlasState) {
+  const inv = atlasState && atlasState.inversion;
+  if (!inv) return;
+  if (inv.mosaicism_state && inv.mosaicism_state.dosage) return;
+  const seeded = autoSeedDosageInput(atlasState);
+  if (!seeded) return;
+  inv.mosaicism_state = seeded;
 }
 
 function _buildPageState(atlasState) {
@@ -114,7 +127,11 @@ function _rebuildLeak(state) {
 function _renderHeader(state) {
   if (!state || typeof document === 'undefined' || !document.getElementById) return;
   const lbl = document.getElementById('mosCandidateLabel');
-  if (lbl) lbl.textContent = state.candidate_label || '—';
+  if (lbl) {
+    lbl.textContent = state.candidate_label || '—';
+    if (state.source && state.source._auto_seeded) attachAutoSeedBadge(lbl);
+    else                                           detachAutoSeedBadge(lbl);
+  }
   const b = document.getElementById('mosIntegrityBadge');
   if (b) {
     if (state.verdict) {
@@ -149,15 +166,19 @@ function _paintCanvas(state) {
   const W = canvas.width || 800;
   const H = canvas.height || 320;
   if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, W, H);
-  const padX = 8, padY = 8;
-  const cellW = Math.max(2, (W - 2 * padX) / L.n_windows);
-  const cellH = Math.max(4, (H - 2 * padY) / L.n_inv);
+  // Reserve gutters for row (sample) labels, column (window) axis,
+  // and a ramp legend strip at the bottom.
+  const left = 90, top = 16, right = 16, bottom = 56;
+  const cellW = Math.max(2, (W - left - right)  / L.n_windows);
+  const cellH = Math.max(4, (H - top  - bottom) / L.n_inv);
+  const plot = { x: left, y: top, w: cellW * L.n_windows, h: cellH * L.n_inv };
+
   for (let pi = 0; pi < L.n_inv; pi++) {
     for (let w = 0; w < L.n_windows; w++) {
       const v = L.per_sample_per_window[pi * L.n_windows + w];
       ctx.fillStyle = _heatColor(v);
       if (typeof ctx.fillRect === 'function') {
-        ctx.fillRect(padX + w * cellW, padY + pi * cellH, cellW + 0.5, cellH + 0.5);
+        ctx.fillRect(plot.x + w * cellW, plot.y + pi * cellH, cellW + 0.5, cellH + 0.5);
       }
     }
   }
@@ -165,9 +186,61 @@ function _paintCanvas(state) {
   ctx.strokeStyle = 'rgba(40,50,70,0.6)';
   ctx.lineWidth = 1;
   if (typeof ctx.strokeRect === 'function') {
-    ctx.strokeRect(padX, padY, cellW * L.n_windows, cellH * L.n_inv);
+    ctx.strokeRect(plot.x, plot.y, plot.w, plot.h);
   }
-  state.layout = { padX, padY, cellW, cellH, n_inv: L.n_inv, n_windows: L.n_windows };
+
+  // Row labels (sample names) — fall back to s<idx> when none given.
+  const rowLabels = [];
+  const invIdx = (state.source && state.source.inv_idx) || null;
+  for (let i = 0; i < L.n_inv; i++) {
+    const sampleIdx = invIdx ? invIdx[i] : i;
+    const lbl = (state.sample_labels && state.sample_labels[sampleIdx])
+      || ('s' + sampleIdx);
+    rowLabels.push(String(lbl));
+  }
+  paintMatrixLabels(ctx, { plot, rowLabels, colLabels: [], maxChars: 11 });
+
+  // X axis: window index 0..n_windows-1. Keep ticks sparse so they
+  // don't collide when n_windows is large.
+  paintCanvasAxes(ctx, {
+    plot,
+    xRange: [0, Math.max(1, L.n_windows - 1)],
+    yRange: [0, 1],     // unused — we drew the matrix ourselves
+    xLabel: 'window index',
+    nXTicks: 6, nYTicks: 0,
+    showGrid: false,
+  });
+
+  // Colour ramp at the bottom-left: STD-consensus (0%) → INV-consensus (100%).
+  paintColorRamp(ctx, {
+    origin: { x: plot.x, y: plot.y + plot.h + 30 },
+    w:      Math.min(220, plot.w),
+    h:      10,
+    colorFn: (t) => _heatColor(t),
+    vMin: 0, vMax: 1,
+    fmt: (v) => (v * 100).toFixed(0) + '%',
+    nMidTicks: 1,
+  });
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.fillStyle = 'rgba(80,90,110,0.95)';
+  if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'top';
+  if (typeof ctx.fillText === 'function') {
+    ctx.fillText('leakage (STD-like → INV-like)',
+                 plot.x + Math.min(220, plot.w) + 12, plot.y + plot.h + 30);
+  }
+  if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'alphabetic';
+
+  // Hover highlight (thin outline on the hovered cell + crosshair).
+  if (state.hover) {
+    const cx = plot.x + state.hover.window_idx * cellW;
+    const cy = plot.y + state.hover.sample_idx * cellH;
+    ctx.strokeStyle = 'rgba(40,50,70,0.95)';
+    ctx.lineWidth = 1.5;
+    if (typeof ctx.strokeRect === 'function') ctx.strokeRect(cx, cy, cellW, cellH);
+  }
+
+  state.layout = { padX: plot.x, padY: plot.y, cellW, cellH,
+                   n_inv: L.n_inv, n_windows: L.n_windows };
 }
 
 function _renderRightPanel(state) {
@@ -236,12 +309,21 @@ function _wireToolbar(state) {
     const col = Math.floor((x - L.padX) / L.cellW);
     const row = Math.floor((y - L.padY) / L.cellH);
     if (col < 0 || col >= L.n_windows || row < 0 || row >= L.n_inv) {
-      if (state.hover != null) { state.hover = null; _renderRightPanel(state); }
+      if (state.hover != null) {
+        state.hover = null;
+        _paintCanvas(state);
+        _renderRightPanel(state);
+      }
       return;
     }
     const v = state.leak.per_sample_per_window[row * L.n_windows + col];
-    state.hover = { sample_idx: row, window_idx: col, value: v };
-    _renderRightPanel(state);
+    // Repaint only when the hovered cell actually changed — avoids
+    // burning paint cycles on every pixel of pointer movement.
+    if (!state.hover || state.hover.sample_idx !== row || state.hover.window_idx !== col) {
+      state.hover = { sample_idx: row, window_idx: col, value: v };
+      _paintCanvas(state);
+      _renderRightPanel(state);
+    }
   };
   state._handlers = { onWindowChange, onMove };
   _addListener('mosWindowSize', 'change',    onWindowChange);

@@ -15,6 +15,7 @@
 import { _pageState, _setActiveState }
   from './polarize_synteny_vote/_state.js';
 import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
+import { paintLegend } from '../../shared/canvas_axes.js';
 import {
   normaliseSyntenyEntry,
   aggregateSyntenyVotes,
@@ -103,29 +104,70 @@ function _paintBar(state) {
   if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, W, H);
   const total = state.aggregate.n_a + state.aggregate.n_b + state.aggregate.n_unresolved;
   if (total === 0) return;
-  const padX = 16, padY = 24;
-  const barH = Math.max(20, H - 2 * padY);
+  // Wider gutters so the % axis labels + bottom legend fit.
+  const padX = 24, padY = 16;
+  const barH = 24;
+  const legendGap = 28;
   const barW = Math.max(50, W - 2 * padX);
-  let x = padX;
   const segs = [
     { label: 'A', n: state.aggregate.n_a, color: VOTE_COLOR.matches_A },
     { label: 'B', n: state.aggregate.n_b, color: VOTE_COLOR.matches_B },
     { label: '?', n: state.aggregate.n_unresolved, color: VOTE_COLOR.unresolved },
   ];
-  ctx.font = '11px sans-serif';
+  // Bar segments with in-bar labels (white when the segment is wide
+  // enough to fit them).
+  let x = padX;
   for (const seg of segs) {
     const w = (seg.n / total) * barW;
     ctx.fillStyle = seg.color;
     if (typeof ctx.fillRect === 'function' && w > 0) ctx.fillRect(x, padY, w, barH);
-    if (typeof ctx.fillText === 'function' && w > 14) {
+    if (typeof ctx.fillText === 'function' && w > 28) {
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(`${seg.label}: ${seg.n}`, x + 4, padY + barH / 2 + 4);
+      ctx.font = '11px var(--mono, ui-monospace, monospace)';
+      if (typeof ctx.textAlign !== 'undefined') ctx.textAlign = 'left';
+      if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'middle';
+      ctx.fillText(`${seg.label}: ${seg.n}`, x + 6, padY + barH / 2);
     }
     x += w;
   }
+  // Outer frame.
   ctx.strokeStyle = 'rgba(40,50,70,0.6)';
   ctx.lineWidth = 1;
   if (typeof ctx.strokeRect === 'function') ctx.strokeRect(padX, padY, barW, barH);
+
+  // Percent axis ticks at 0 / 25 / 50 / 75 / 100 below the bar.
+  ctx.fillStyle = 'rgba(80,90,110,0.85)';
+  ctx.font = '9.5px ui-monospace, monospace';
+  if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'top';
+  for (const pct of [0, 25, 50, 75, 100]) {
+    const tx = padX + (pct / 100) * barW;
+    // Short tick mark.
+    if (typeof ctx.beginPath === 'function' && typeof ctx.stroke === 'function') {
+      ctx.strokeStyle = 'rgba(80,90,110,0.55)';
+      ctx.beginPath();
+      ctx.moveTo(tx, padY + barH);
+      ctx.lineTo(tx, padY + barH + 3);
+      ctx.stroke();
+    }
+    if (typeof ctx.fillText === 'function') {
+      if (typeof ctx.textAlign !== 'undefined') {
+        ctx.textAlign = pct === 0 ? 'left' : (pct === 100 ? 'right' : 'center');
+      }
+      ctx.fillText(pct + '%', tx, padY + barH + 4);
+    }
+  }
+  if (typeof ctx.textAlign !== 'undefined') ctx.textAlign = 'left';
+  if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'alphabetic';
+
+  // Inline legend strip under the percent ticks.
+  paintLegend(ctx, {
+    origin: { x: padX, y: padY + barH + legendGap },
+    entries: [
+      { label: 'matches A',  color: VOTE_COLOR.matches_A },
+      { label: 'matches B',  color: VOTE_COLOR.matches_B },
+      { label: 'unresolved', color: VOTE_COLOR.unresolved },
+    ],
+  });
 }
 
 function _renderVotes(state) {

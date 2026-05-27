@@ -19,6 +19,7 @@
 
 import { _pageState, _setActiveState } from './layer_cleaning/_state.js';
 import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
+import { paintCanvasAxes, paintLegend } from '../../shared/canvas_axes.js';
 import {
   computeSampleWeights,
   weightsSummary,
@@ -132,27 +133,72 @@ function _paintCanvas(state) {
   const W = canvas.width || 800;
   const H = canvas.height || 300;
   if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, W, H);
-  const padX = 32, padY = 20;
-  const barW = Math.max(2, (W - 2 * padX) / w.length);
-  const barH = Math.max(50, H - 2 * padY);
+  // Wider gutters: room for the y-axis ticks/title on the left and
+  // an inline legend strip at the bottom.
+  const left = 64, top = 22, right = 16, bottom = 56;
+  const barW = Math.max(2, (W - left - right) / w.length);
+  const barH = Math.max(50, H - top - bottom);
+  const plot = { x: left, y: top, w: barW * w.length, h: barH };
+
+  // Axes — y is weight ∈ [0, 1], x is sample index. Grid on Y so the
+  // user can eyeball where each bar lands relative to the 0.9 clean
+  // threshold.
+  paintCanvasAxes(ctx, {
+    plot,
+    xRange: [0, Math.max(1, w.length - 1)],
+    yRange: [0, 1],
+    xLabel: 'sample index',
+    yLabel: 'weight',
+    nXTicks: 6,
+    nYTicks: 5,
+    showGrid: true,
+  });
+
+  // Bars.
   for (let i = 0; i < w.length; i++) {
     const v = w[i];
     const h = barH * (Number.isFinite(v) ? v : 0);
-    // green=clean, yellow=mid, red=excluded
     let c;
     if (v === 0)        c = '#D04545';
     else if (v >= 0.9)  c = '#2BAA50';
     else                c = '#D8A030';
     ctx.fillStyle = c;
     if (typeof ctx.fillRect === 'function') {
-      ctx.fillRect(padX + i * barW, padY + (barH - h), barW + 0.5, h);
+      ctx.fillRect(plot.x + i * barW, plot.y + (barH - h), barW + 0.5, h);
     }
   }
-  ctx.strokeStyle = 'rgba(40,50,70,0.6)';
-  ctx.lineWidth = 1;
-  if (typeof ctx.strokeRect === 'function') {
-    ctx.strokeRect(padX, padY, barW * w.length, barH);
+
+  // Clean threshold line at y=0.9 (the boundary we use to call a
+  // sample "clean"). Dashed and labelled to disambiguate from grid.
+  if (typeof ctx.beginPath === 'function' && typeof ctx.stroke === 'function') {
+    const yClean = plot.y + plot.h - 0.9 * plot.h;
+    ctx.strokeStyle = 'rgba(43, 170, 80, 0.85)';
+    ctx.lineWidth = 1;
+    if (typeof ctx.setLineDash === 'function') ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(plot.x, yClean);
+    ctx.lineTo(plot.x + plot.w, yClean);
+    ctx.stroke();
+    if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+    if (typeof ctx.fillText === 'function') {
+      ctx.font = '10px ui-monospace, monospace';
+      ctx.fillStyle = 'rgba(43, 170, 80, 0.85)';
+      if (typeof ctx.textAlign !== 'undefined') ctx.textAlign = 'left';
+      if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'bottom';
+      ctx.fillText('clean ≥ 0.9', plot.x + 4, yClean - 2);
+      if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'alphabetic';
+    }
   }
+
+  // Inline colour-legend strip under the chart.
+  paintLegend(ctx, {
+    origin: { x: plot.x, y: plot.y + plot.h + 28 },
+    entries: [
+      { label: 'clean (≥0.9)',       color: '#2BAA50' },
+      { label: 'downweighted',       color: '#D8A030' },
+      { label: 'excluded (w = 0)',   color: '#D04545' },
+    ],
+  });
 }
 
 function _renderCounts(state) {

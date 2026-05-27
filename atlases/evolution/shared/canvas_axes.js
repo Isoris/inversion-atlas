@@ -222,6 +222,78 @@ export function paintLegend(ctx, opts) {
   if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'alphabetic';
 }
 
+/**
+ * Paint a horizontal colour-ramp legend with min/max labels + an
+ * optional title underneath. The ramp is sampled by repeatedly
+ * calling `colorFn(t)` for t ∈ [0, 1] in 1-pixel steps.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Object} opts
+ * @param {{x:number, y:number}} opts.origin   top-left of the ramp
+ * @param {number}   opts.w            ramp pixel width
+ * @param {number}   [opts.h=10]       ramp pixel height
+ * @param {(t:number)=>string} opts.colorFn   t∈[0,1] → CSS color
+ * @param {number}   [opts.vMin=0]
+ * @param {number}   [opts.vMax=1]
+ * @param {(v:number)=>string} [opts.fmt]
+ * @param {string}   [opts.title]      optional caption under the ramp
+ * @param {number}   [opts.nMidTicks=0]   draw N intermediate tick labels
+ * @param {string}   [opts.ink]
+ * @param {string}   [opts.inkDim]
+ */
+export function paintColorRamp(ctx, opts) {
+  if (!ctx || !opts || !opts.origin || typeof opts.colorFn !== 'function') return;
+  const o = opts;
+  const x0 = o.origin.x, y0 = o.origin.y;
+  const w = Math.max(20, o.w | 0);
+  const h = Math.max(4, (o.h || 10) | 0);
+  const vMin = Number.isFinite(o.vMin) ? o.vMin : 0;
+  const vMax = Number.isFinite(o.vMax) ? o.vMax : 1;
+  const ink     = o.ink     || DEFAULT_INK;
+  const inkDim  = o.inkDim  || DEFAULT_INK_DIM;
+  const fmt = o.fmt || _defaultFmt;
+
+  // Sample the ramp.
+  if (typeof ctx.fillRect === 'function') {
+    for (let i = 0; i < w; i++) {
+      const t = i / Math.max(1, w - 1);
+      ctx.fillStyle = o.colorFn(t);
+      ctx.fillRect(x0 + i, y0, 1, h);
+    }
+  }
+  // Frame.
+  if (typeof ctx.strokeRect === 'function') {
+    ctx.strokeStyle = inkDim;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x0 + 0.5, y0 + 0.5, w, h);
+  }
+  // Min / max labels.
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.fillStyle = inkDim;
+  if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'top';
+  if (typeof ctx.textAlign !== 'undefined') ctx.textAlign = 'left';
+  if (typeof ctx.fillText === 'function') ctx.fillText(fmt(vMin), x0, y0 + h + 2);
+  if (typeof ctx.textAlign !== 'undefined') ctx.textAlign = 'right';
+  if (typeof ctx.fillText === 'function') ctx.fillText(fmt(vMax), x0 + w, y0 + h + 2);
+  // Intermediate ticks.
+  const n = (o.nMidTicks | 0);
+  if (n > 0 && typeof ctx.fillText === 'function') {
+    if (typeof ctx.textAlign !== 'undefined') ctx.textAlign = 'center';
+    for (let k = 1; k <= n; k++) {
+      const t = k / (n + 1);
+      ctx.fillText(fmt(vMin + (vMax - vMin) * t), x0 + t * w, y0 + h + 2);
+    }
+  }
+  // Optional caption under the ramp.
+  if (o.title) {
+    ctx.fillStyle = ink;
+    if (typeof ctx.textAlign !== 'undefined') ctx.textAlign = 'center';
+    if (typeof ctx.fillText === 'function') ctx.fillText(o.title, x0 + w / 2, y0 + h + 16);
+  }
+  if (typeof ctx.textAlign !== 'undefined') ctx.textAlign = 'left';
+  if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'alphabetic';
+}
+
 // =====================================================================
 // Helpers
 // =====================================================================

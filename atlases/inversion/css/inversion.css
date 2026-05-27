@@ -5823,7 +5823,7 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
 }
 .pmsa-canvas, .mos-canvas, .et-canvas { flex: 1; min-height: 280px; }
 .hnet-canvas { flex: 1; min-height: 360px; }
-.syn-canvas  { height: 100px; }
+.syn-canvas  { height: 130px; }
 .age-canvas  { flex: 1; min-height: 220px; }
 .ih-canvas   { flex: 1; min-height: 320px; }
 .lc-canvas   { flex: 1; min-height: 280px; }

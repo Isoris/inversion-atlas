@@ -101,6 +101,7 @@ const {
   paintCanvasAxes,
   paintMatrixLabels,
   paintLegend,
+  paintColorRamp,
 } = await import('../atlases/evolution/shared/canvas_axes.js');
 
 // =====================================================================
@@ -346,6 +347,23 @@ paintLegend(c3, {
 check('paintLegend draws swatches', c3._calls.filter(k => k === 'fillRect').length === 2);
 check('paintLegend writes labels',  c3._calls.filter(k => k === 'fillText').length === 2);
 
+// paintColorRamp.
+const c4 = makeCtx();
+paintColorRamp(c4, {
+  origin: { x: 80, y: 200 },
+  w: 200, h: 10,
+  colorFn: (t) => `rgb(${(255*t)|0}, 80, 80)`,
+  vMin: 0, vMax: 1,
+  fmt: (v) => (v * 100).toFixed(0) + '%',
+  nMidTicks: 1,
+  title: 'leakage',
+});
+// 200 ramp samples + 1 frame = 201 fillRects; 2 endpoint labels +
+// 1 mid + 1 title = 4 fillText. Frame stroke.
+check('paintColorRamp draws 200+ swatches',  c4._calls.filter(k => k === 'fillRect').length >= 200);
+check('paintColorRamp draws labels',         c4._calls.filter(k => k === 'fillText').length >= 4);
+check('paintColorRamp draws frame',          c4._calls.includes('strokeRect'));
+
 // Null safety.
 paintCanvasAxes(null, {});
 paintCanvasAxes(c, null);
@@ -353,6 +371,9 @@ paintMatrixLabels(null, {});
 paintMatrixLabels(c, null);
 paintLegend(null, {});
 paintLegend(c, null);
+paintColorRamp(null, {});
+paintColorRamp(c, null);
+paintColorRamp(c, { origin: { x: 0, y: 0 }, w: 100 });   // no colorFn → noop
 check('canvas_axes helpers null-safe',     true);
 
 // =====================================================================
