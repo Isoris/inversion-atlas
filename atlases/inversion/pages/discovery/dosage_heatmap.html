@@ -62,6 +62,19 @@ genotype: discrete white/blue/red for 0/0 · 0/1 · 1/1.">
           <input id="dosageHeatmapShowK6Track" type="checkbox">
           K=6 cluster track
         </label>
+        <!-- 2026-05-27: regime overlays (active candidate scope). The
+             regime-call ribbon paints each sample by its homA_like /
+             het_like / homB_like / uncertain call; the locus span
+             overlay draws a semi-transparent vertical band over the
+             matrix marking the active candidate's marker range. -->
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowRegimeCallTrack" type="checkbox">
+          Regime call
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowLocusSpanOverlay" type="checkbox">
+          Locus span
+        </label>
       </div>
     </header>
 

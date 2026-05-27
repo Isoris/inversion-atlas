@@ -168,6 +168,18 @@ function _autoMax(arr) {
  * @param {Object<*,string>} [overrides]
  * @returns {Map<*, string>}
  */
+/**
+ * Colour palette for the regime-call ribbon. Keys match the controlled
+ * vocabulary exported from shared/mgl_regime_consistency.js
+ * (SAMPLE_REGIME_CALLS).
+ */
+export const REGIME_CALL_COLORS = Object.freeze({
+  homA_like: '#3074C8',   // blue   = STD-like
+  het_like:  '#9344B5',   // purple = heterozygote-like
+  homB_like: '#D04545',   // red    = INV-like
+  uncertain: '#7a8290',   // grey   = uncertain
+});
+
 export function buildGroupColorMap(group_ids, overrides) {
   const out = new Map();
   const seen = new Set();
@@ -340,6 +352,16 @@ export function paintDosageHeatmap(canvas, data, opts) {
   // backing data is present AND the caller hasn't opted out.
   const showGroup       = (o.show_group_track !== false)        && !!data.sample_group;
   const showK6          = (o.show_k6_track === true)            && !!data.sample_k6;
+  // 2026-05-27: regime overlays read from data.regime_overlay (set by
+  // the page adapter from the active candidate). Each is independently
+  // toggleable; gracefully skip when the underlying data isn't there.
+  const regimeOverlay   = data.regime_overlay || null;
+  const showRegimeCall  = (o.show_regime_call_track === true)
+                          && regimeOverlay && regimeOverlay.sample_regime_call;
+  const showLocusSpan   = (o.show_locus_span_overlay === true)
+                          && regimeOverlay
+                          && Number.isFinite(regimeOverlay.locus_start_marker)
+                          && Number.isFinite(regimeOverlay.locus_end_marker);
   const showGhsl        = (o.show_ghsl_track === true)          && !!data.sample_ghsl_mean;
   const showThetaPi     = (o.show_theta_pi_track === true)      && !!data.sample_theta_pi_mean;
   const showHetDosage   = (o.show_het_dosage_track === true)    && !!data.sample_het_dosage_mean;
@@ -384,6 +406,9 @@ export function paintDosageHeatmap(canvas, data, opts) {
   if (showK6) {
     trackBlocks.push({ kind: 'categorical_k6', label: 'K6' });
   }
+  if (showRegimeCall) {
+    trackBlocks.push({ kind: 'regime_call', label: 'regime' });
+  }
   if (showGroup) {
     trackBlocks.push({ kind: 'group', label: 'group' });
   }
@@ -409,6 +434,27 @@ export function paintDosageHeatmap(canvas, data, opts) {
     : buildGroupColorMap(_distinctOf(data.sample_k6));
   const selectedSamples = (o.selected_samples instanceof Set) ? o.selected_samples : null;
   const selectedMarkers = (o.selected_markers instanceof Set) ? o.selected_markers : null;
+
+  // --- Locus span overlay (drawn AFTER matrix so it sits on top).
+  // Resolves marker indices to canvas-x positions through order_m so
+  // it stays correct under any marker-order mode.
+  let locusSpanPxRange = null;
+  if (showLocusSpan) {
+    const lo = regimeOverlay.locus_start_marker | 0;
+    const hi = regimeOverlay.locus_end_marker | 0;
+    let xLo = Infinity, xHi = -Infinity;
+    for (let c = 0; c < nM; c++) {
+      const mi = order_m[c];
+      if (mi >= lo && mi <= hi) {
+        const x = matX + c * cellW;
+        if (x < xLo) xLo = x;
+        if (x + cellW > xHi) xHi = x + cellW;
+      }
+    }
+    if (Number.isFinite(xLo) && xHi > xLo) {
+      locusSpanPxRange = { x0: xLo, x1: xHi };
+    }
+  }
 
   // --- Matrix cells.
   for (let r = 0; r < nS; r++) {
@@ -458,8 +504,40 @@ export function paintDosageHeatmap(canvas, data, opts) {
           ctx.fillRect(leftX, matY + r * cellH, trackPx, cellH + 0.5);
         }
       }
+    } else if (blk.kind === 'regime_call') {
+      // Color per regime_call vocabulary. Uncalled / out-of-locus
+      // samples render as transparent so the matrix shows through.
+      const calls = regimeOverlay.sample_regime_call;
+      for (let r = 0; r < nS; r++) {
+        const si = order_s[r];
+        const c  = calls[si];
+        const fill = REGIME_CALL_COLORS[c] || 'rgba(0,0,0,0)';
+        if (typeof ctx.fillRect === 'function') {
+          ctx.fillStyle = fill;
+          ctx.fillRect(leftX, matY + r * cellH, trackPx, cellH + 0.5);
+        }
+      }
     }
     leftX += trackPx + trackGap;
+  }
+
+  // --- Locus span overlay (semi-transparent fill + outline on top of
+  // the matrix, only the marker range belonging to the active candidate).
+  if (locusSpanPxRange) {
+    const { x0, x1 } = locusSpanPxRange;
+    const matBottom = matY + nS * cellH;
+    if (typeof ctx.save === 'function') ctx.save();
+    if (typeof ctx.fillRect === 'function') {
+      ctx.fillStyle = 'rgba(245,165,36,0.10)';
+      ctx.fillRect(x0, matY, x1 - x0, matBottom - matY);
+    }
+    if (typeof ctx.strokeRect === 'function') {
+      ctx.strokeStyle = 'rgba(245,165,36,0.85)';
+      ctx.lineWidth = 1.25;
+      ctx.strokeRect(x0 + 0.5, matY + 0.5,
+                     (x1 - x0) - 1, (matBottom - matY) - 1);
+    }
+    if (typeof ctx.restore === 'function') ctx.restore();
   }
 
   // --- Y-axis ticks: sample-index marks every ~10% of rows.

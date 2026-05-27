@@ -72,6 +72,9 @@ const DEFAULT_VIEW_STATE = Object.freeze({
   show_polarity_track:   true,
   show_y_ticks:          true,
   show_group_labels:     true,
+  // 2026-05-27: regime overlays (active candidate scope).
+  show_regime_call_track:  false,
+  show_locus_span_overlay: false,
 });
 
 // =====================================================================
@@ -306,6 +309,9 @@ function _buildPageState(atlasState) {
       try { canonical.sample_ghsl_mean = computeSampleGhslMean(chromData, canonical); }
       catch (e) { console.warn('dosage_heatmap: GHSL mean compute threw —', e); }
     }
+    // 2026-05-27: build regime overlay from the active candidate.
+    try { canonical.regime_overlay = _buildRegimeOverlay(canonical, atlasState); }
+    catch (e) { console.warn('dosage_heatmap: regime overlay build threw —', e); }
   }
   return {
     data:                  canonical,
@@ -347,6 +353,78 @@ function _distinctOf(arr) {
 }
 
 // =====================================================================
+// Regime overlay (active-candidate scope)
+// =====================================================================
+
+// Dosage tier thresholds — kept in sync with shared/mgl_regime_consistency.js
+// MGL_REGIME_CONSISTENCY_DEFAULTS. Duplicated as constants here so the
+// build doesn't pull the whole stats module into this page when the
+// user hasn't enabled the regime overlays.
+const _DOSAGE_TIER_HOM_A_MAX = 0.4;
+const _DOSAGE_TIER_HET_LO    = 0.6;
+const _DOSAGE_TIER_HET_HI    = 1.4;
+const _DOSAGE_TIER_HOM_B_MIN = 1.6;
+
+/**
+ * Build the regime overlay struct from atlasState.shared.activeCandidate.
+ * Returns null when there's no active candidate or when the candidate's
+ * chrom doesn't match the heatmap.
+ *
+ *   locus_start_marker / locus_end_marker — marker indices spanning the
+ *     candidate's bp range (used by the locus-span overlay).
+ *   sample_regime_call: Array<string|null> length n_samples — homA_like
+ *     / het_like / homB_like / uncertain / null (out-of-locus).
+ */
+function _buildRegimeOverlay(canonical, atlasState) {
+  if (!canonical || !atlasState) return null;
+  const cand = atlasState.shared && atlasState.shared.activeCandidate;
+  if (!cand) return null;
+  // 1. Map candidate bp range -> marker indices.
+  const mb = canonical.marker_pos_bp;
+  let lo = -1, hi = -1;
+  if (mb && Number.isFinite(cand.start_bp) && Number.isFinite(cand.end_bp)) {
+    for (let i = 0; i < mb.length; i++) {
+      const v = mb[i];
+      if (!Number.isFinite(v)) continue;
+      if (v >= cand.start_bp && v <= cand.end_bp) {
+        if (lo < 0) lo = i;
+        hi = i;
+      }
+    }
+  }
+  // 2. Per-sample mean dosage over the locus markers.
+  const nS = canonical.n_samples | 0;
+  const call = new Array(nS).fill(null);
+  if (lo >= 0 && hi >= lo) {
+    // Walk locked_labels (TypedArray-friendly) — samples without a band
+    // assignment leave a null call.
+    const locked = cand.locked_labels;
+    const lockedLen = (locked && typeof locked.length === 'number') ? locked.length : 0;
+    for (let s = 0; s < nS; s++) {
+      const k = (s < lockedLen) ? locked[s] : -1;
+      if (k == null || k < 0) continue;
+      let sum = 0, n = 0;
+      for (let m = lo; m <= hi; m++) {
+        const v = canonical.cellValue(m, s);
+        if (Number.isFinite(v)) { sum += v; n++; }
+      }
+      if (n === 0) { call[s] = 'uncertain'; continue; }
+      const mean = sum / n;
+      if      (mean <= _DOSAGE_TIER_HOM_A_MAX)                                  call[s] = 'homA_like';
+      else if (mean >= _DOSAGE_TIER_HET_LO && mean <= _DOSAGE_TIER_HET_HI)      call[s] = 'het_like';
+      else if (mean >= _DOSAGE_TIER_HOM_B_MIN)                                  call[s] = 'homB_like';
+      else                                                                      call[s] = 'uncertain';
+    }
+  }
+  return {
+    candidate_id:        cand.id || null,
+    locus_start_marker:  lo,
+    locus_end_marker:    hi,
+    sample_regime_call:  call,
+  };
+}
+
+// =====================================================================
 // Header
 // =====================================================================
 
@@ -370,6 +448,10 @@ function _renderHeader(state) {
   if (pt) pt.checked = !!state.view_state.show_polarity_track;
   const k6 = document.getElementById('dosageHeatmapShowK6Track');
   if (k6) k6.checked = !!state.view_state.show_k6_track;
+  const rc = document.getElementById('dosageHeatmapShowRegimeCallTrack');
+  if (rc) rc.checked = !!state.view_state.show_regime_call_track;
+  const ls = document.getElementById('dosageHeatmapShowLocusSpanOverlay');
+  if (ls) ls.checked = !!state.view_state.show_locus_span_overlay;
   const hg = document.getElementById('dosageHeatmapShowGhslTrack');
   if (hg) hg.checked = !!state.view_state.show_ghsl_track;
   const tp = document.getElementById('dosageHeatmapShowThetaPiTrack');
@@ -419,8 +501,10 @@ function _paintHeatmap(state) {
     show_theta_pi_track:   state.view_state.show_theta_pi_track,
     show_het_dosage_track: state.view_state.show_het_dosage_track,
     show_polarity_track:   state.view_state.show_polarity_track,
-    show_y_ticks:          state.view_state.show_y_ticks,
-    show_group_labels:     state.view_state.show_group_labels,
+    show_y_ticks:            state.view_state.show_y_ticks,
+    show_group_labels:       state.view_state.show_group_labels,
+    show_regime_call_track:  state.view_state.show_regime_call_track,
+    show_locus_span_overlay: state.view_state.show_locus_span_overlay,
     group_colors:          state.group_colors,
     k6_colors:             state.k6_colors,
     hovered_cell:          hov ? { row: hov.row, col: hov.col } : null,
@@ -536,6 +620,14 @@ function _wireToolbar(state) {
     state.view_state.show_het_dosage_track = !!(e && e.target && e.target.checked);
     repaint();
   };
+  const onShowRegimeCallTrack = (e) => {
+    state.view_state.show_regime_call_track = !!(e && e.target && e.target.checked);
+    repaint();
+  };
+  const onShowLocusSpanOverlay = (e) => {
+    state.view_state.show_locus_span_overlay = !!(e && e.target && e.target.checked);
+    repaint();
+  };
   const onCanvasMove = (ev) => {
     const c = document.getElementById('dosageHeatmapCanvas');
     if (!c) return;
@@ -576,6 +668,7 @@ function _wireToolbar(state) {
     onSampleOrder, onMarkerOrder, onColorMode,
     onShowGroupTrack, onShowPolarityTrack, onShowK6Track,
     onShowGhslTrack, onShowThetaPiTrack, onShowHetDosageTrack,
+    onShowRegimeCallTrack, onShowLocusSpanOverlay,
     onCanvasMove, onCanvasClick, onCanvasLeave,
     unsubSelection,
   };
@@ -589,6 +682,8 @@ function _wireToolbar(state) {
   _addListener('dosageHeatmapShowGhslTrack',        'change',     onShowGhslTrack);
   _addListener('dosageHeatmapShowThetaPiTrack',     'change',     onShowThetaPiTrack);
   _addListener('dosageHeatmapShowHetDosageTrack',   'change',     onShowHetDosageTrack);
+  _addListener('dosageHeatmapShowRegimeCallTrack',  'change',     onShowRegimeCallTrack);
+  _addListener('dosageHeatmapShowLocusSpanOverlay', 'change',     onShowLocusSpanOverlay);
   _addListener('dosageHeatmapCanvas',               'mousemove',  onCanvasMove);
   _addListener('dosageHeatmapCanvas',               'click',      onCanvasClick);
   _addListener('dosageHeatmapCanvas',               'mouseleave', onCanvasLeave);
@@ -606,6 +701,8 @@ function _teardownToolbar(state) {
   if (h.onShowGhslTrack)       _removeListener('dosageHeatmapShowGhslTrack',        'change',    h.onShowGhslTrack);
   if (h.onShowThetaPiTrack)    _removeListener('dosageHeatmapShowThetaPiTrack',     'change',    h.onShowThetaPiTrack);
   if (h.onShowHetDosageTrack)  _removeListener('dosageHeatmapShowHetDosageTrack',   'change',    h.onShowHetDosageTrack);
+  if (h.onShowRegimeCallTrack) _removeListener('dosageHeatmapShowRegimeCallTrack',  'change',    h.onShowRegimeCallTrack);
+  if (h.onShowLocusSpanOverlay) _removeListener('dosageHeatmapShowLocusSpanOverlay','change',    h.onShowLocusSpanOverlay);
   if (h.onCanvasMove)          _removeListener('dosageHeatmapCanvas',               'mousemove',  h.onCanvasMove);
   if (h.onCanvasClick)         _removeListener('dosageHeatmapCanvas',               'click',      h.onCanvasClick);
   if (h.onCanvasLeave)         _removeListener('dosageHeatmapCanvas',               'mouseleave', h.onCanvasLeave);
