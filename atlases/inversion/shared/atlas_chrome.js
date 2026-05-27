@@ -190,10 +190,12 @@ export function syncPillsToActivePage(rootEl) {
 // =====================================================================
 
 /**
- * Wire the global-settings gear button. Clicking it toggles a
- * `[data-sidebar]` attribute on the supplied `wrapEl` between
- * 'expanded' and 'collapsed' — atlases that have a sidebar use
- * this to hide / show it.
+ * Wire the global-settings gear button. Clicking it cycles a
+ * `[data-sidebar]` attribute on the supplied `wrapEl` through three
+ * states: 'expanded' → 'collapsed' → 'floating' → back. The first
+ * two are the historical docked modes (full / rail); 'floating'
+ * detaches the aside as a draggable + resizable panel via CSS in
+ * inversion.css + `_wireFloatingAside` below.
  *
  * Idempotent: calling twice replaces the handler.
  *
@@ -201,7 +203,7 @@ export function syncPillsToActivePage(rootEl) {
  * @param {HTMLElement} wrapEl   the layout wrap element to toggle
  * @param {Object} [opts]
  * @param {string}  [opts.storageKey='atlas_chrome.sidebar']
- * @param {Function}[opts.onToggle] callback(nextState: 'expanded'|'collapsed')
+ * @param {Function}[opts.onToggle] callback(nextState: 'expanded'|'collapsed'|'floating')
  * @returns {{teardown: Function, setSidebar: Function}}
  */
 export function wireGlobalSettingsBtn(btnEl, wrapEl, opts) {
@@ -216,30 +218,227 @@ export function wireGlobalSettingsBtn(btnEl, wrapEl, opts) {
   let state = 'expanded';
   try {
     const saved = localStorage.getItem(storageKey);
-    if (saved === 'collapsed' || saved === 'expanded') state = saved;
+    if (saved === 'collapsed' || saved === 'expanded' || saved === 'floating') {
+      state = saved;
+    }
   } catch (_) {}
-  wrapEl.setAttribute('data-sidebar', state);
+
+  // Mirror the state onto the button itself so CSS / a11y can read it.
+  // Glyph chosen to match the next action (what clicking will do):
+  //   expanded   → »  collapse to rail
+  //   collapsed  → ⤢  detach as floating panel
+  //   floating   → ⌘  dock again
+  const GLYPH = { expanded: '»', collapsed: '⤢', floating: '⌘' };
+  const TITLE = {
+    expanded:  'Collapse sidebar to a rail',
+    collapsed: 'Float the sidebar as a draggable panel',
+    floating:  'Dock the sidebar',
+  };
+  const reflectBtn = () => {
+    btnEl.setAttribute('data-state', state);
+    btnEl.textContent = GLYPH[state] || '⌘';
+    btnEl.title = TITLE[state] || '';
+    btnEl.setAttribute('aria-label', TITLE[state] || 'Sidebar mode');
+  };
+
+  // Drag wiring lifecycle — installed when entering floating, torn
+  // down when leaving. Owned by the closure so setSidebar can flip it.
+  let floatTeardown = null;
+  const enterFloating = () => {
+    if (floatTeardown) return;
+    floatTeardown = _wireFloatingAside(wrapEl, storageKey);
+  };
+  const leaveFloating = () => {
+    if (!floatTeardown) return;
+    try { floatTeardown(); } catch (_) {}
+    floatTeardown = null;
+  };
 
   const setSidebar = (next) => {
-    if (next !== 'expanded' && next !== 'collapsed') return;
+    if (next !== 'expanded' && next !== 'collapsed' && next !== 'floating') return;
+    const wasFloating = (state === 'floating');
+    const nowFloating = (next === 'floating');
     state = next;
     wrapEl.setAttribute('data-sidebar', next);
     try { localStorage.setItem(storageKey, next); } catch (_) {}
+    if (wasFloating && !nowFloating) leaveFloating();
+    if (!wasFloating && nowFloating) enterFloating();
+    reflectBtn();
     if (typeof o.onToggle === 'function') {
       try { o.onToggle(next); } catch (_) {}
     }
   };
 
-  const cb = () => setSidebar(state === 'expanded' ? 'collapsed' : 'expanded');
+  // Initial apply (covers the case where saved state is 'floating').
+  wrapEl.setAttribute('data-sidebar', state);
+  if (state === 'floating') enterFloating();
+  reflectBtn();
+
+  // Cycle order: expanded → collapsed → floating → expanded.
+  const CYCLE = { expanded: 'collapsed', collapsed: 'floating', floating: 'expanded' };
+  const cb = () => setSidebar(CYCLE[state] || 'expanded');
   btnEl.addEventListener('click', cb);
 
   const teardown = () => {
     try { btnEl.removeEventListener('click', cb); } catch (_) {}
+    leaveFloating();
     btnEl.__atlasChromeSettingsHandler__ = null;
   };
 
   btnEl.__atlasChromeSettingsHandler__ = { teardown };
   return { teardown, setSidebar };
+}
+
+// =====================================================================
+// 2b. Floating-aside drag handler
+// =====================================================================
+
+/**
+ * Inject a drag-handle bar into the first `<aside>` inside `wrapEl`
+ * and wire pointer events so the user can drag the aside anywhere on
+ * the page. Position is persisted under `<storageKey>.pos` per atlas.
+ * The handle carries a "dock" button that flips the sidebar back to
+ * 'expanded' without forcing the user to cycle through the gear.
+ *
+ * Returns a teardown that removes the handle + listeners + restores
+ * the aside's inline style.
+ *
+ * @param {HTMLElement} wrapEl
+ * @param {string}      storageKey   base key (positions saved at `${key}.pos`)
+ * @returns {Function} teardown
+ */
+function _wireFloatingAside(wrapEl, storageKey) {
+  if (!wrapEl || typeof document === 'undefined') return () => {};
+  const aside = wrapEl.querySelector(':scope > aside');
+  if (!aside) return () => {};
+
+  const posKey = storageKey + '.pos';
+
+  // Build the handle bar.
+  const handle = document.createElement('div');
+  handle.className = 'atlas-aside-handle';
+  handle.setAttribute('data-atlas-handle', '1');
+  const title = document.createElement('span');
+  title.className = 'atlas-aside-handle-title';
+  title.textContent = '⋮⋮  sidebar';
+  const dockBtn = document.createElement('button');
+  dockBtn.type = 'button';
+  dockBtn.className = 'atlas-aside-handle-dock';
+  dockBtn.textContent = 'dock';
+  dockBtn.title = 'Dock the sidebar back into the layout (Esc also works)';
+  handle.appendChild(title);
+  handle.appendChild(dockBtn);
+  aside.insertBefore(handle, aside.firstChild);
+
+  // Restore persisted position.
+  try {
+    const raw = localStorage.getItem(posKey);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p && typeof p === 'object') {
+        if (Number.isFinite(p.left))  aside.style.left  = (p.left  | 0) + 'px';
+        if (Number.isFinite(p.top))   aside.style.top   = (p.top   | 0) + 'px';
+        if (Number.isFinite(p.width)  && p.width  > 200) aside.style.width  = (p.width  | 0) + 'px';
+        if (Number.isFinite(p.height) && p.height > 140) aside.style.height = (p.height | 0) + 'px';
+      }
+    }
+  } catch (_) {}
+
+  // Drag state.
+  let dragging = false;
+  let originX = 0, originY = 0;
+  let startLeft = 0, startTop = 0;
+  let pointerId = null;
+
+  const onPointerDown = (e) => {
+    if (e.button != null && e.button !== 0) return;
+    // Don't start a drag from the dock button or any nested control.
+    if (e.target === dockBtn || (e.target.closest && e.target.closest('.atlas-aside-handle-dock'))) return;
+    dragging = true;
+    pointerId = (typeof e.pointerId === 'number') ? e.pointerId : null;
+    if (pointerId != null && typeof handle.setPointerCapture === 'function') {
+      try { handle.setPointerCapture(pointerId); } catch (_) {}
+    }
+    const rect = aside.getBoundingClientRect();
+    startLeft = rect.left;
+    startTop  = rect.top;
+    originX   = e.clientX;
+    originY   = e.clientY;
+    e.preventDefault();
+  };
+  const onPointerMove = (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - originX;
+    const dy = e.clientY - originY;
+    const vw = window.innerWidth  || document.documentElement.clientWidth  || 1024;
+    const vh = window.innerHeight || document.documentElement.clientHeight || 768;
+    const w  = aside.offsetWidth  || 320;
+    const h  = aside.offsetHeight || 240;
+    const left = Math.max(0, Math.min(vw - 24, startLeft + dx));
+    const top  = Math.max(0, Math.min(vh - 24, startTop  + dy));
+    aside.style.left = left + 'px';
+    aside.style.top  = top  + 'px';
+  };
+  const onPointerUp = () => {
+    if (!dragging) return;
+    dragging = false;
+    if (pointerId != null && typeof handle.releasePointerCapture === 'function') {
+      try { handle.releasePointerCapture(pointerId); } catch (_) {}
+    }
+    pointerId = null;
+    // Persist final position.
+    try {
+      const rect = aside.getBoundingClientRect();
+      const p = {
+        left:   rect.left  | 0,
+        top:    rect.top   | 0,
+        width:  aside.offsetWidth  | 0,
+        height: aside.offsetHeight | 0,
+      };
+      localStorage.setItem(posKey, JSON.stringify(p));
+    } catch (_) {}
+  };
+
+  const onDockClick = () => {
+    const btn = document.getElementById('globalSettingsBtn');
+    // If we can find the chrome gear, just cycle past floating → expanded.
+    // Otherwise fall back to setting the attribute directly.
+    if (btn && btn.__atlasChromeSettingsHandler__) {
+      // The gear's CYCLE map will route floating → expanded.
+      btn.click();
+    } else {
+      wrapEl.setAttribute('data-sidebar', 'expanded');
+      try { localStorage.setItem(storageKey, 'expanded'); } catch (_) {}
+    }
+  };
+
+  const onKey = (e) => {
+    if (e.key === 'Escape' && wrapEl.getAttribute('data-sidebar') === 'floating') {
+      onDockClick();
+    }
+  };
+
+  handle.addEventListener('pointerdown', onPointerDown);
+  document.addEventListener('pointermove', onPointerMove);
+  document.addEventListener('pointerup', onPointerUp);
+  document.addEventListener('pointercancel', onPointerUp);
+  dockBtn.addEventListener('click', onDockClick);
+  document.addEventListener('keydown', onKey);
+
+  return () => {
+    try { handle.removeEventListener('pointerdown', onPointerDown); } catch (_) {}
+    try { document.removeEventListener('pointermove', onPointerMove); } catch (_) {}
+    try { document.removeEventListener('pointerup', onPointerUp); } catch (_) {}
+    try { document.removeEventListener('pointercancel', onPointerUp); } catch (_) {}
+    try { dockBtn.removeEventListener('click', onDockClick); } catch (_) {}
+    try { document.removeEventListener('keydown', onKey); } catch (_) {}
+    if (handle.parentNode === aside) aside.removeChild(handle);
+    // Clear inline positioning so re-docking returns to the grid cell.
+    aside.style.left = '';
+    aside.style.top  = '';
+    aside.style.width  = '';
+    aside.style.height = '';
+  };
 }
 
 // =====================================================================
