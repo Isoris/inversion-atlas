@@ -13,6 +13,7 @@ import {
   filterKaryoRows,
   sortKaryoRows,
   isKaryoTwoTrack,
+  _isLabelsArray,
 } from './karyo_rows.js';
 
 function _escape(s) {
@@ -46,7 +47,7 @@ function _sigmaSpread(state) {
  */
 export function renderKaryotypeBodyHtml(state) {
   const c = state && state.candidate;
-  if (!c || !Array.isArray(c.locked_labels) || !Number.isFinite(c.K)) return '';
+  if (!c || !_isLabelsArray(c.locked_labels) || !Number.isFinite(c.K)) return '';
 
   const samples = _samples(state);
   const sigSpread = _sigmaSpread(state);
@@ -269,7 +270,7 @@ export function renderKaryotypeBody(state, opts) {
 
   // Update count display + sigma threshold note
   const c = state && state.candidate;
-  if (c && Array.isArray(c.locked_labels)) {
+  if (c && _isLabelsArray(c.locked_labels)) {
     const samples = _samples(state);
     const allRows = buildKaryotypeRows(c, samples, _sigmaSpread(state));
     const filtered = filterKaryoRows(allRows, state.karyoUi);

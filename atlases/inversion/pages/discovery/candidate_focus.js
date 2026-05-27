@@ -569,13 +569,19 @@ function _buildLegacyState(atlasState) {
   legacy.activeSampleSet        = sh.activeSampleSet || null;
   legacy.candidate_review_decisions = inv.candidate_review_decisions || {};
   legacy.locked_karyotype_groups    = inv.locked_karyotype_groups || {};
-  // Page2 reads state.data the same way local_pca_dosage does (chromosome precomp).
-  // It's stashed on inv.tracks[chrom] by local_pca_dosage's mount; if local_pca_dosage hasn't
-  // mounted yet (user navigates to candidate_focus first), state.data stays null
-  // and the helpers degrade gracefully (each guards with state.data tests).
+  // state.data is the chromosome precomp (n_windows, samples, l2_envelopes,
+  // per-window pc1 …). It's stashed on inv._local_pca_dosage_state by
+  // local_pca_dosage's mount. The legacy `inv.tracks[chrom]` slot was a stale
+  // contract — nothing writes it — and meant this page silently lost
+  // state.data even when local_pca_dosage HAD mounted. 2026-05-27 fix:
+  // pull from inv._local_pca_dosage_state.data, fall back to the legacy
+  // slot for back-compat.
   const chrom = sh.activeChrom;
-  if (chrom && inv.tracks && inv.tracks[chrom]) {
-    legacy.data = inv.tracks[chrom];
+  const stashedData = inv._local_pca_dosage_state && inv._local_pca_dosage_state.data;
+  if (chrom && stashedData && stashedData.chrom === chrom) {
+    legacy.data = stashedData;
+  } else if (chrom && inv.tracks && inv.tracks[chrom]) {
+    legacy.data = inv.tracks[chrom];               // legacy slot (back-compat)
   } else {
     legacy.data = null;
   }
