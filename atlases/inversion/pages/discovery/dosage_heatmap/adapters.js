@@ -88,6 +88,9 @@ export function adaptMglHeatmapJson(result, opts) {
     cellValue,
     sample_group:    o.sample_group || null,
     sample_k6:       o.sample_k6 || null,
+    sample_ghsl_mean:       o.sample_ghsl_mean || null,
+    sample_theta_pi_mean:   o.sample_theta_pi_mean || null,
+    sample_het_dosage_mean: o.sample_het_dosage_mean || null,
     marker_polarity: polarity,
     marker_role_pair: role_pair,    // 2026-05-16 — null per-marker on bi-only data
     sample_labels:   (result.samples && result.samples.slice()) || null,
@@ -178,6 +181,9 @@ export function adaptLegacyChunk(chunk, opts) {
     cellValue,
     sample_group:    o.sample_group || null,
     sample_k6:       o.sample_k6 || null,
+    sample_ghsl_mean:       o.sample_ghsl_mean || null,
+    sample_theta_pi_mean:   o.sample_theta_pi_mean || null,
+    sample_het_dosage_mean: o.sample_het_dosage_mean || null,
     marker_polarity: polarity,
     marker_role_pair: role_pair,    // 2026-05-16 — null per-marker on legacy bi-only chunks
     sample_labels:   chunk.samples.slice(),

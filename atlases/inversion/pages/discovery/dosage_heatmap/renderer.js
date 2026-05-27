@@ -25,33 +25,139 @@ const DEFAULT_GROUP_PALETTE = [
   '#C06080', '#60A030', '#705090', '#888888',
 ];
 
+// Matplotlib `magma` palette control points. Used for the default
+// continuous dosage ramp — matches the "Regional het (dosage)"
+// reference figure (yellow → orange → magenta → purple → near-black).
+const MAGMA_STOPS = Object.freeze([
+  [0.00, [  0,   0,   4]],
+  [0.13, [ 28,  16,  68]],
+  [0.25, [ 80,  18, 123]],
+  [0.38, [127,  39, 132]],
+  [0.50, [183,  55, 121]],
+  [0.63, [225,  83, 103]],
+  [0.75, [251, 135,  97]],
+  [0.88, [254, 198, 132]],
+  [1.00, [252, 253, 191]],
+]);
+
+function _interpStops(stops, t) {
+  if (t <= stops[0][0]) return stops[0][1];
+  if (t >= stops[stops.length - 1][0]) return stops[stops.length - 1][1];
+  for (let i = 1; i < stops.length; i++) {
+    const a = stops[i - 1], b = stops[i];
+    if (t <= b[0]) {
+      const u = (t - a[0]) / Math.max(1e-9, b[0] - a[0]);
+      return [
+        Math.round(a[1][0] + (b[1][0] - a[1][0]) * u),
+        Math.round(a[1][1] + (b[1][1] - a[1][1]) * u),
+        Math.round(a[1][2] + (b[1][2] - a[1][2]) * u),
+      ];
+    }
+  }
+  return stops[stops.length - 1][1];
+}
+
 /**
- * Sequential cream → orange → deep red ramp (matches the similarity
- * panel "Reds" ramp). Used for dosage cells.
+ * Continuous magma ramp for dosage / regional-het cells. Default
+ * colour mode.
  *
  * @param {number} v       dosage scalar (default range [0, 2])
  * @param {number} [vmin]  default 0
  * @param {number} [vmax]  default 2
  * @returns {string}       'rgb(r,g,b)'
  */
-export function dosageValueToColor(v, vmin, vmax) {
-  if (!Number.isFinite(v)) return 'rgb(200,200,200)';
+export function dosageMagmaColor(v, vmin, vmax) {
+  if (!Number.isFinite(v)) return 'rgb(230,210,220)';   // missing → pale pink
   const lo = Number.isFinite(vmin) ? vmin : 0;
   const hi = Number.isFinite(vmax) ? vmax : 2;
   const t = Math.max(0, Math.min(1, (v - lo) / Math.max(1e-9, hi - lo)));
-  let r, g, b;
-  if (t < 0.5) {
-    const s = t * 2;
-    r = Math.round(255 + (252 - 255) * s);
-    g = Math.round(245 + (141 - 245) * s);
-    b = Math.round(235 + ( 89 - 235) * s);
-  } else {
-    const s = (t - 0.5) * 2;
-    r = Math.round(252 + (165 - 252) * s);
-    g = Math.round(141 + ( 15 - 141) * s);
-    b = Math.round( 89 + ( 21 -  89) * s);
+  const c = _interpStops(MAGMA_STOPS, t);
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+/**
+ * Discrete-genotype palette: white (0/0) · blue (0/1) · red (1/1).
+ * Used when `color_mode === 'genotype'` — matches the reference
+ * paper's dosage-heatmap convention.
+ *
+ * @param {number} v       dosage scalar in [0, 2]
+ * @returns {string}       'rgb(r,g,b)'
+ */
+export function dosageGenotypeColor(v) {
+  if (!Number.isFinite(v)) return 'rgb(238,214,222)';   // missing → mauve
+  if (v < 0.5)  return 'rgb(248,248,250)';              // 0/0 — near-white
+  if (v < 1.5)  return 'rgb( 56,107,196)';              // 0/1 — blue
+  return 'rgb(196, 40, 50)';                            // 1/1 — red
+}
+
+/**
+ * Back-compat alias for the old name (returned a sequential ramp).
+ * Now resolves to the magma palette (the new default).
+ */
+export function dosageValueToColor(v, vmin, vmax) {
+  return dosageMagmaColor(v, vmin, vmax);
+}
+
+/**
+ * Pick a per-cell colourer for the given `color_mode`.
+ *
+ * @param {'magma'|'genotype'} mode
+ * @returns {(v:number, vmin:number, vmax:number)=>string}
+ */
+export function pickDosageColorFn(mode) {
+  if (mode === 'genotype') return (v) => dosageGenotypeColor(v);
+  return dosageMagmaColor;
+}
+
+// Viridis stops for the per-sample θπ track.
+const VIRIDIS_STOPS = Object.freeze([
+  [0.00, [ 68,   1,  84]],
+  [0.25, [ 59,  82, 139]],
+  [0.50, [ 33, 145, 140]],
+  [0.75, [ 94, 201,  97]],
+  [1.00, [253, 231,  37]],
+]);
+
+function _viridisColor(v, vmin, vmax) {
+  if (!Number.isFinite(v)) return 'rgb(60,60,60)';
+  const lo = Number.isFinite(vmin) ? vmin : 0;
+  const hi = Number.isFinite(vmax) ? vmax : 1;
+  const t = Math.max(0, Math.min(1, (v - lo) / Math.max(1e-9, hi - lo)));
+  const c = _interpStops(VIRIDIS_STOPS, t);
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+// Blue → white → red diverging palette for GHSL mean (deficit ↔ excess).
+const GHSL_STOPS = Object.freeze([
+  [0.00, [ 38,  72, 158]],
+  [0.50, [245, 245, 245]],
+  [1.00, [178,  34,  52]],
+]);
+
+function _ghslDivergingColor(v, vmin, vmax) {
+  if (!Number.isFinite(v)) return 'rgb(60,60,60)';
+  const lo = Number.isFinite(vmin) ? vmin : -1;
+  const hi = Number.isFinite(vmax) ? vmax :  1;
+  const t = Math.max(0, Math.min(1, (v - lo) / Math.max(1e-9, hi - lo)));
+  const c = _interpStops(GHSL_STOPS, t);
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+function _autoMin(arr) {
+  let m = Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const v = arr[i];
+    if (Number.isFinite(v) && v < m) m = v;
   }
-  return `rgb(${r},${g},${b})`;
+  return Number.isFinite(m) ? m : 0;
+}
+function _autoMax(arr) {
+  let m = -Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    const v = arr[i];
+    if (Number.isFinite(v) && v > m) m = v;
+  }
+  return Number.isFinite(m) ? m : 1;
 }
 
 /**
@@ -221,14 +327,25 @@ export function paintDosageHeatmap(canvas, data, opts) {
     ? o.marker_order
     : deriveMarkerOrder('natural', nM, data);
 
-  // Track widths / heights.
+  // Layout constants.
   const xPad = 8;
   const yPad = 8;
   const trackPx = 8;
   const trackGap = 1;
-  const showGroup     = (o.show_group_track !== false)    && !!data.sample_group;
-  const showK6        = (o.show_k6_track === true)        && !!data.sample_k6;
-  const showPolarity  = (o.show_polarity_track !== false) && !!data.marker_polarity;
+  const tickPad = 32;        // left gutter for y-axis tick labels (s=N)
+  const labelPad = 44;       // left gutter for group-run text labels
+
+  // Track toggles. The four per-sample left tracks (group / ghsl mean
+  // / theta-pi mean / het-dosage mean) each render only when the
+  // backing data is present AND the caller hasn't opted out.
+  const showGroup       = (o.show_group_track !== false)        && !!data.sample_group;
+  const showK6          = (o.show_k6_track === true)            && !!data.sample_k6;
+  const showGhsl        = (o.show_ghsl_track === true)          && !!data.sample_ghsl_mean;
+  const showThetaPi     = (o.show_theta_pi_track === true)      && !!data.sample_theta_pi_mean;
+  const showHetDosage   = (o.show_het_dosage_track === true)    && !!data.sample_het_dosage_mean;
+  const showPolarity    = (o.show_polarity_track !== false)     && !!data.marker_polarity;
+  const showTicks       = (o.show_y_ticks !== false);
+  const showGroupLabels = (o.show_group_labels !== false)       && !!data.sample_group;
   // 2026-05-16: per-marker role-pair sidecar track (SPEC_0 §1 —
   // MAJOR_MINOR1 / MAJOR_MINOR2 / MINOR1_MINOR2 / MAJOR_MINOR3 /
   // MINOR1_MINOR3 / MINOR2_MINOR3). Auto-hidden when no marker has
@@ -238,19 +355,54 @@ export function paintDosageHeatmap(canvas, data, opts) {
     && Array.isArray(data.marker_role_pair)
     && data.marker_role_pair.some(p => p);
   const showRolePair = (o.show_role_pair_track !== false) && hasAnyRolePair;
-  const leftBands = (showGroup ? trackPx + trackGap : 0)
-                 + (showK6    ? trackPx + trackGap : 0);
+
+  // Continuous per-sample tracks are drawn with a unique palette each
+  // so they're visually distinct from the group categorical track and
+  // from the main matrix.
+  const trackBlocks = [];
+  if (showHetDosage) {
+    trackBlocks.push({
+      kind: 'continuous', label: 'het',
+      values: data.sample_het_dosage_mean,
+      colorFn: dosageMagmaColor, vmin: 0, vmax: 1,
+    });
+  }
+  if (showThetaPi) {
+    trackBlocks.push({
+      kind: 'continuous', label: 'θπ',
+      values: data.sample_theta_pi_mean,
+      colorFn: _viridisColor, vmin: null, vmax: null,    // auto-range
+    });
+  }
+  if (showGhsl) {
+    trackBlocks.push({
+      kind: 'continuous', label: 'GHSL',
+      values: data.sample_ghsl_mean,
+      colorFn: _ghslDivergingColor, vmin: -1, vmax: 1,
+    });
+  }
+  if (showK6) {
+    trackBlocks.push({ kind: 'categorical_k6', label: 'K6' });
+  }
+  if (showGroup) {
+    trackBlocks.push({ kind: 'group', label: 'group' });
+  }
+
+  const leftBands = trackBlocks.length * (trackPx + trackGap);
   const topBand   = (showPolarity ? trackPx + trackGap : 0)
                   + (showRolePair ? trackPx + trackGap : 0);
-  const drawW = Math.max(50, W - 2 * xPad - leftBands);
+  const leftGutter = (showTicks ? tickPad : 0)
+                   + (showGroupLabels ? labelPad : 0);
+  const drawW = Math.max(50, W - xPad - leftGutter - leftBands - xPad);
   const drawH = Math.max(50, H - 2 * yPad - topBand);
   const cellW = drawW / nM;
   const cellH = drawH / nS;
-  const matX = xPad + leftBands;
+  const matX = xPad + leftGutter + leftBands;
   const matY = yPad + topBand;
 
   const vmin = Number.isFinite(o.vmin) ? o.vmin : 0;
   const vmax = Number.isFinite(o.vmax) ? o.vmax : 2;
+  const colorFn = pickDosageColorFn(o.color_mode || 'magma');
   const groupColors = (o.group_colors instanceof Map) ? o.group_colors
     : buildGroupColorMap(_distinctOf(data.sample_group));
   const k6Colors    = (o.k6_colors instanceof Map) ? o.k6_colors
@@ -265,36 +417,94 @@ export function paintDosageHeatmap(canvas, data, opts) {
     for (let c = 0; c < nM; c++) {
       const mi = order_m[c];
       const v  = data.cellValue(mi, si);
-      ctx.fillStyle = dosageValueToColor(v, vmin, vmax);
+      ctx.fillStyle = colorFn(v, vmin, vmax);
       if (typeof ctx.fillRect === 'function') {
         ctx.fillRect(matX + c * cellW, y, cellW + 0.5, cellH + 0.5);
       }
     }
   }
 
-  // --- Left tracks: group + optional k6.
-  let leftX = xPad;
-  if (showGroup) {
-    for (let r = 0; r < nS; r++) {
-      const si = order_s[r];
-      const g  = data.sample_group[si];
-      ctx.fillStyle = groupColors.get(g) || '#bbbbbb';
-      if (typeof ctx.fillRect === 'function') {
-        ctx.fillRect(leftX, matY + r * cellH, trackPx, cellH + 0.5);
+  // --- Left annotation tracks. Order: continuous (het / θπ / GHSL)
+  // outermost, then K6, then group adjacent to the matrix so the user
+  // sees the group bar right next to the corresponding rows.
+  let leftX = xPad + leftGutter;
+  for (const blk of trackBlocks) {
+    if (blk.kind === 'continuous') {
+      const lo = (blk.vmin == null) ? _autoMin(blk.values) : blk.vmin;
+      const hi = (blk.vmax == null) ? _autoMax(blk.values) : blk.vmax;
+      for (let r = 0; r < nS; r++) {
+        const si = order_s[r];
+        const v  = blk.values[si];
+        ctx.fillStyle = blk.colorFn(v, lo, hi);
+        if (typeof ctx.fillRect === 'function') {
+          ctx.fillRect(leftX, matY + r * cellH, trackPx, cellH + 0.5);
+        }
+      }
+    } else if (blk.kind === 'categorical_k6') {
+      for (let r = 0; r < nS; r++) {
+        const si = order_s[r];
+        const k  = data.sample_k6[si];
+        ctx.fillStyle = k6Colors.get(k) || '#bbbbbb';
+        if (typeof ctx.fillRect === 'function') {
+          ctx.fillRect(leftX, matY + r * cellH, trackPx, cellH + 0.5);
+        }
+      }
+    } else if (blk.kind === 'group') {
+      for (let r = 0; r < nS; r++) {
+        const si = order_s[r];
+        const g  = data.sample_group[si];
+        ctx.fillStyle = groupColors.get(g) || '#bbbbbb';
+        if (typeof ctx.fillRect === 'function') {
+          ctx.fillRect(leftX, matY + r * cellH, trackPx, cellH + 0.5);
+        }
       }
     }
     leftX += trackPx + trackGap;
   }
-  if (showK6) {
-    for (let r = 0; r < nS; r++) {
-      const si = order_s[r];
-      const k  = data.sample_k6[si];
-      ctx.fillStyle = k6Colors.get(k) || '#bbbbbb';
-      if (typeof ctx.fillRect === 'function') {
-        ctx.fillRect(leftX, matY + r * cellH, trackPx, cellH + 0.5);
+
+  // --- Y-axis ticks: sample-index marks every ~10% of rows.
+  if (showTicks && typeof ctx.fillText === 'function') {
+    if (typeof ctx.save === 'function') ctx.save();
+    ctx.font = '9.5px ui-monospace, monospace';
+    ctx.fillStyle = 'rgba(160,180,200,0.85)';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    const tickStride = Math.max(1, Math.round(nS / 10));
+    for (let r = 0; r < nS; r += tickStride) {
+      const y = matY + (r + 0.5) * cellH;
+      ctx.fillText('s=' + r, xPad + tickPad - 4, y);
+    }
+    if ((nS - 1) % tickStride !== 0) {
+      ctx.fillText('s=' + (nS - 1), xPad + tickPad - 4,
+                   matY + (nS - 0.5) * cellH);
+    }
+    if (typeof ctx.restore === 'function') ctx.restore();
+  }
+
+  // --- Group-run labels next to the group track (one centered label
+  // per contiguous run of the same group in the row order).
+  if (showGroupLabels && typeof ctx.fillText === 'function') {
+    const labelX = xPad + (showTicks ? tickPad : 0) + labelPad - 6;
+    if (typeof ctx.save === 'function') ctx.save();
+    ctx.font = '10px ui-sans-serif, system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(220,230,245,0.95)';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    let runStart = 0;
+    let runVal = data.sample_group[order_s[0]];
+    for (let r = 1; r <= nS; r++) {
+      const v = (r < nS) ? data.sample_group[order_s[r]] : Symbol('end');
+      if (v !== runVal) {
+        const yMid = matY + ((runStart + r) / 2) * cellH;
+        const runH = (r - runStart) * cellH;
+        if (runH >= 12) {
+          ctx.fillText(String(runVal == null ? '—' : runVal), labelX, yMid);
+        }
+        runStart = r;
+        runVal = v;
       }
     }
-    leftX += trackPx + trackGap;
+    if (typeof ctx.restore === 'function') ctx.restore();
   }
 
   // --- Top tracks (stacked above the matrix).
