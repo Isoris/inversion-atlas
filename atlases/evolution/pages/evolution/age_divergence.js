@@ -15,6 +15,7 @@ import { _pageState, _setActiveState } from './age_divergence/_state.js';
 import { computeDivergence } from '../../shared/mgl_inversion_divergence.js';
 import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
 import { autoSeedDosageInput } from '../../shared/auto_seed_inv_idx.js';
+import { attachAutoSeedBadge, detachAutoSeedBadge } from '../../shared/auto_seed_badge.js';
 
 const AGE_CLASS_LABEL = Object.freeze({
   young_clean:        'Young, clean',
@@ -80,7 +81,11 @@ function _buildPageState(atlasState) {
 function _renderHeader(state) {
   if (!state || typeof document === 'undefined' || !document.getElementById) return;
   const lbl = document.getElementById('ageCandidateLabel');
-  if (lbl) lbl.textContent = state.candidate_label || '—';
+  if (lbl) {
+    lbl.textContent = state.candidate_label || '—';
+    if (state.source && state.source._auto_seeded) attachAutoSeedBadge(lbl);
+    else                                           detachAutoSeedBadge(lbl);
+  }
   const b = document.getElementById('ageClassBadge');
   if (b) {
     if (state.metrics && state.metrics.age_class) {
@@ -118,28 +123,57 @@ function _paintBars(state) {
   const vals   = [m.pi_inv, m.pi_std, m.dxy, m.fst_hudson];
   const maxes  = [0.03, 0.03, 0.03, 1.0];
   const colors = ['#3074C8', '#2BAA50', '#D04545', '#705090'];
-  const padX = 60, padY = 20;
-  const barH = 24, gap = 8;
-  const barW = Math.max(50, W - 2 * padX);
-  ctx.font = '11px sans-serif';
+  const padX = 72;             // left padding wider for π_INV / dXY / FST labels
+  const padY = 22;
+  const barH = 26, gap = 10;
+  const valW = 64;             // reserved right gutter for value text
+  const barW = Math.max(60, W - padX - valW - 16);
   for (let i = 0; i < 4; i++) {
     const y = padY + i * (barH + gap);
-    ctx.fillStyle = 'rgba(40,50,70,0.7)';
-    if (typeof ctx.fillText === 'function') ctx.fillText(labels[i], 8, y + barH / 2 + 4);
-    ctx.fillStyle = 'rgba(220,220,220,0.6)';
+    // Row label.
+    ctx.font = '11.5px var(--mono, ui-monospace, monospace)';
+    ctx.fillStyle = 'rgba(40,50,70,0.85)';
+    if (typeof ctx.textAlign !== 'undefined') ctx.textAlign = 'right';
+    if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'middle';
+    if (typeof ctx.fillText === 'function') ctx.fillText(labels[i], padX - 8, y + barH / 2);
+    // Track.
+    ctx.fillStyle = 'rgba(220,220,220,0.55)';
     if (typeof ctx.fillRect === 'function') ctx.fillRect(padX, y, barW, barH);
+    // Midline tick at 50% of the bar's scale (helps eyeballing).
+    if (typeof ctx.beginPath === 'function' && typeof ctx.stroke === 'function') {
+      ctx.strokeStyle = 'rgba(40,50,70,0.30)';
+      ctx.beginPath();
+      ctx.moveTo(padX + barW * 0.5, y);
+      ctx.lineTo(padX + barW * 0.5, y + barH);
+      ctx.stroke();
+    }
+    // Bar fill.
     const v = vals[i];
     if (Number.isFinite(v)) {
       const t = Math.max(0, Math.min(1, v / maxes[i]));
       ctx.fillStyle = colors[i];
       if (typeof ctx.fillRect === 'function') ctx.fillRect(padX, y, barW * t, barH);
-      ctx.fillStyle = 'rgba(40,50,70,0.95)';
-      if (typeof ctx.fillText === 'function') {
-        ctx.fillText(v.toFixed(4), padX + barW + 6, y + barH / 2 + 4);
-      }
+    }
+    // Right-edge max marker.
+    ctx.font = '9.5px var(--mono, ui-monospace, monospace)';
+    ctx.fillStyle = 'rgba(40,50,70,0.55)';
+    if (typeof ctx.textAlign !== 'undefined') ctx.textAlign = 'right';
+    if (typeof ctx.fillText === 'function') {
+      ctx.fillText('max ' + maxes[i], padX + barW - 4, y - 4);
+    }
+    // Value text.
+    ctx.font = '12px var(--mono, ui-monospace, monospace)';
+    ctx.fillStyle = 'rgba(40,50,70,0.95)';
+    if (typeof ctx.textAlign !== 'undefined') ctx.textAlign = 'left';
+    if (typeof ctx.fillText === 'function') {
+      ctx.fillText(Number.isFinite(v) ? v.toFixed(4) : '—', padX + barW + 8, y + barH / 2);
     }
   }
-  ctx.strokeStyle = 'rgba(40,50,70,0.6)';
+  // Restore.
+  if (typeof ctx.textAlign !== 'undefined') ctx.textAlign = 'left';
+  if (typeof ctx.textBaseline !== 'undefined') ctx.textBaseline = 'alphabetic';
+  // Outer frame.
+  ctx.strokeStyle = 'rgba(40,50,70,0.55)';
   if (typeof ctx.strokeRect === 'function') {
     ctx.strokeRect(padX, padY, barW, 4 * barH + 3 * gap);
   }

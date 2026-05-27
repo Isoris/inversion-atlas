@@ -657,6 +657,32 @@ body[data-sim-in-minimap="1"] #simPanel {
   text-decoration: none;
 }
 .ev-empty-card .ev-empty-help:hover { color: var(--accent, #79a3ff); }
+
+/* ---------------------------------------------------------------------
+   Auto-seed chip — surfaces "this page's inv_idx was auto-derived"
+   right next to a page's candidate-label. Subtle amber so the user
+   notices but it doesn't compete with the page's primary metrics.
+   See atlases/evolution/shared/auto_seed_badge.js.
+   --------------------------------------------------------------------- */
+.ev-autoseed-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  background: rgba(216, 160, 48, 0.15);
+  color: #c08020;
+  border: 1px solid rgba(216, 160, 48, 0.45);
+  border-radius: 10px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  cursor: help;
+  user-select: none;
+}
+.ev-autoseed-chip:hover {
+  background: rgba(216, 160, 48, 0.22);
+  border-color: rgba(216, 160, 48, 0.65);
+}
 /* v3.53: trackedList holds the CGA tag chips. Was previously style="display:flex"
    inline, which was higher specificity than the collapse rule above and caused
    the chips to leak out when the sidebar was collapsed. Moved to CSS here so the

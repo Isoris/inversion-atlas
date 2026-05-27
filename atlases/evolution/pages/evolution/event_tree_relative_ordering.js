@@ -17,6 +17,7 @@
 import { _pageState, _setActiveState } from './event_tree_relative_ordering/_state.js';
 import { buildEventTree } from '../../shared/mgl_event_tree.js';
 import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
+import { paintMatrixLabels, paintLegend } from '../../shared/canvas_axes.js';
 
 const REL_COLOR = Object.freeze({
   nested:           '#3074C8',
@@ -104,9 +105,16 @@ function _paintCanvas(state) {
   const H = canvas.height || 400;
   if (typeof ctx.clearRect === 'function') ctx.clearRect(0, 0, W, H);
   const n = state.source.n_candidates;
-  const pad = 28;
-  const cellW = Math.max(8, (W - 2 * pad) / n);
-  const cellH = Math.max(8, (H - 2 * pad) / n);
+  // Leave room on the left for row labels, on top for rotated column
+  // labels, on the bottom for an inline legend.
+  const left   = 92;
+  const top    = 52;
+  const right  = 16;
+  const bottom = 36;        // legend strip
+  const cellW  = Math.max(8, (W - left - right) / n);
+  const cellH  = Math.max(8, (H - top - bottom) / n);
+  const plot   = { x: left, y: top, w: cellW * n, h: cellH * n };
+
   // Build a lookup of pairs by (a, b) ordered.
   const relMap = new Map();
   for (const p of state.tree.pairs) {
@@ -121,13 +129,38 @@ function _paintCanvas(state) {
       else if (rel) color = REL_COLOR[rel] || '#888';
       ctx.fillStyle = color;
       if (typeof ctx.fillRect === 'function') {
-        ctx.fillRect(pad + j * cellW, pad + i * cellH, cellW + 0.5, cellH + 0.5);
+        ctx.fillRect(plot.x + j * cellW, plot.y + i * cellH, cellW + 0.5, cellH + 0.5);
       }
     }
   }
   ctx.strokeStyle = 'rgba(40,50,70,0.6)';
   ctx.lineWidth = 1;
-  if (typeof ctx.strokeRect === 'function') ctx.strokeRect(pad, pad, cellW * n, cellH * n);
+  if (typeof ctx.strokeRect === 'function') ctx.strokeRect(plot.x, plot.y, plot.w, plot.h);
+
+  // Row + column labels.
+  const labelFor = (idx) => {
+    const c = state.source.per_candidate && state.source.per_candidate[idx];
+    return (c && (c.label || c.id)) || ('inv ' + idx);
+  };
+  const rowLabels = [];
+  for (let i = 0; i < n; i++) rowLabels.push(String(labelFor(i)));
+  paintMatrixLabels(ctx, {
+    plot,
+    rowLabels,
+    colLabels: rowLabels,
+    maxChars: 10,
+  });
+
+  // Inline legend strip below the matrix.
+  paintLegend(ctx, {
+    origin: { x: plot.x, y: plot.y + plot.h + 22 },
+    entries: [
+      { label: 'nested',     color: REL_COLOR.nested },
+      { label: 'sister',     color: REL_COLOR.sister },
+      { label: 'independent',color: REL_COLOR.independent },
+      { label: 'exclusive',  color: REL_COLOR.mutual_exclusive },
+    ],
+  });
 }
 
 function _renderPairs(state) {

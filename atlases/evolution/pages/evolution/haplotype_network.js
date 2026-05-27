@@ -30,6 +30,7 @@ import {
 } from './haplotype_network/selection.js';
 import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
 import { autoSeedInvIdx, chromDosageMatrix } from '../../shared/auto_seed_inv_idx.js';
+import { attachAutoSeedBadge, detachAutoSeedBadge } from '../../shared/auto_seed_badge.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   hamming_radius:  2,
@@ -114,7 +115,7 @@ function _autoSeedIfMissing(atlasState) {
     n_samples:       dosage.n_samples,
     inv_idx:         Array.from(seed.inv_idx),
     sample_labels:   seed.sample_labels,
-    candidate_label: seed.candidate_label + '  (auto-derived inv_idx)',
+    candidate_label: seed.candidate_label,
     view_state:      _loadPersistedViewState(),
     _auto_seeded:    true,
   };
@@ -192,7 +193,11 @@ function _rebuildNetwork(state) {
 function _renderHeader(state) {
   if (!state || typeof document === 'undefined' || !document.getElementById) return;
   const lbl = document.getElementById('hapNetCandidateLabel');
-  if (lbl) lbl.textContent = state.candidate_label || '—';
+  if (lbl) {
+    lbl.textContent = state.candidate_label || '—';
+    if (state.source && state.source._auto_seeded) attachAutoSeedBadge(lbl);
+    else                                           detachAutoSeedBadge(lbl);
+  }
   const sb = document.getElementById('hapNetSummaryBadge');
   if (sb) sb.textContent = summariseNetwork(state.network);
   const hr = document.getElementById('hapNetHammingRadius');

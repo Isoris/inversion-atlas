@@ -25,8 +25,8 @@ class FakeEl {
     this.textContent = '';
     this._listeners = {};
   }
-  appendChild(c) { this.children.push(c); c.parent = this; return c; }
-  insertBefore(c) { this.children.unshift(c); c.parent = this; return c; }
+  appendChild(c) { this.children.push(c); c.parent = this; c.parentNode = this; return c; }
+  insertBefore(c) { this.children.unshift(c); c.parent = this; c.parentNode = this; return c; }
   setAttribute(k, v) { this.attrs[k] = String(v); }
   getAttribute(k)    { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null; }
   removeAttribute(k) { delete this.attrs[k]; }
@@ -93,6 +93,15 @@ const {
   chromDosageMatrix,
   autoSeedDosageInput,
 } = await import('../atlases/evolution/shared/auto_seed_inv_idx.js');
+const {
+  attachAutoSeedBadge,
+  detachAutoSeedBadge,
+} = await import('../atlases/evolution/shared/auto_seed_badge.js');
+const {
+  paintCanvasAxes,
+  paintMatrixLabels,
+  paintLegend,
+} = await import('../atlases/evolution/shared/canvas_axes.js');
 
 // =====================================================================
 group('empty_state_panel.renderEmptyStatePanel');
@@ -233,6 +242,118 @@ check('input is flagged auto_seeded',            input._auto_seeded === true);
 // Returns null when no upstream data is available.
 check('autoSeedDosageInput null without atlas state',
       autoSeedDosageInput(null) === null);
+
+// =====================================================================
+group('auto_seed_badge');
+
+fakeDocument._clear();
+const headerWrap = new FakeEl('div');
+const lbl = new FakeEl('span');
+headerWrap.appendChild(lbl);
+// insertAdjacentElement polyfill for the test FakeEl.
+lbl.insertAdjacentElement = (pos, node) => {
+  if (pos === 'afterend' && lbl.parent) lbl.parent.children.push(node);
+};
+// Parent's querySelector needs to scan its own children for the chip class.
+headerWrap.querySelector = (sel) => {
+  if (sel === '.ev-autoseed-chip') {
+    for (const c of headerWrap.children) {
+      if (c.className === 'ev-autoseed-chip') return c;
+    }
+  }
+  return null;
+};
+attachAutoSeedBadge(lbl);
+check('badge attached as sibling',     headerWrap.children.length === 2);
+const chip = headerWrap.children[1];
+check('badge has chip class',          chip.className === 'ev-autoseed-chip');
+check('badge text starts with ⓘ',      /^ⓘ/.test(chip.textContent));
+check('badge has tooltip',             typeof chip.title === 'string' && chip.title.length > 20);
+attachAutoSeedBadge(lbl);   // idempotent
+check('attaching twice is idempotent', headerWrap.children.length === 2);
+
+attachAutoSeedBadge(lbl, { text: 'demo' });
+check('badge text overridable',        chip.textContent === 'ⓘ demo');
+
+// detach
+chip.remove = function () {
+  const i = headerWrap.children.indexOf(this);
+  if (i >= 0) headerWrap.children.splice(i, 1);
+};
+detachAutoSeedBadge(lbl);
+check('badge detached',                headerWrap.children.length === 1);
+
+// Null + missing-DOM safety.
+attachAutoSeedBadge(null);
+detachAutoSeedBadge(null);
+check('null label is a no-op',         true);
+
+// =====================================================================
+group('canvas_axes');
+
+// Mock canvas context that records what was called.
+function makeCtx() {
+  return {
+    _calls: [],
+    fillStyle: '', strokeStyle: '', lineWidth: 1,
+    font: '', textAlign: 'left', textBaseline: 'alphabetic',
+    fillRect:    function () { this._calls.push('fillRect');    },
+    strokeRect:  function () { this._calls.push('strokeRect');  },
+    fillText:    function () { this._calls.push('fillText');    },
+    beginPath:   function () {},
+    stroke:      function () { this._calls.push('stroke');      },
+    moveTo:      function () {},
+    lineTo:      function () {},
+    save:        function () {},
+    restore:     function () {},
+    translate:   function () {},
+    rotate:      function () {},
+    arc:         function () {},
+    fill:        function () { this._calls.push('fill');        },
+    clearRect:   function () {},
+  };
+}
+
+const c = makeCtx();
+paintCanvasAxes(c, {
+  plot: { x: 60, y: 20, w: 300, h: 200 },
+  xRange: [-2, 2],
+  yRange: [0, 0.05],
+  xLabel: 'PC1 (40%)',
+  yLabel: 'PC2 (12%)',
+  nXTicks: 4, nYTicks: 4,
+});
+check('paintCanvasAxes draws frame',       c._calls.includes('strokeRect'));
+check('paintCanvasAxes paints tick labels', c._calls.filter(k => k === 'fillText').length >= 4);
+
+const c2 = makeCtx();
+paintMatrixLabels(c2, {
+  plot: { x: 90, y: 50, w: 200, h: 200 },
+  rowLabels: ['inv 0', 'inv 1', 'inv_with_a_very_long_label'],
+  colLabels: ['inv 0', 'inv 1', 'inv 2'],
+  maxChars: 8,
+});
+check('paintMatrixLabels writes labels',   c2._calls.filter(k => k === 'fillText').length >= 6);
+
+const c3 = makeCtx();
+paintLegend(c3, {
+  origin: { x: 90, y: 280 },
+  entries: [
+    { label: 'nested',  color: '#3074C8' },
+    { label: 'sister',  color: '#A060B8' },
+  ],
+});
+check('paintLegend draws swatches', c3._calls.filter(k => k === 'fillRect').length === 2);
+check('paintLegend writes labels',  c3._calls.filter(k => k === 'fillText').length === 2);
+
+// Null safety.
+paintCanvasAxes(null, {});
+paintCanvasAxes(c, null);
+paintMatrixLabels(null, {});
+paintMatrixLabels(c, null);
+paintLegend(null, {});
+paintLegend(c, null);
+check('canvas_axes helpers null-safe',     true);
 
 // =====================================================================
 console.log('\n=================');

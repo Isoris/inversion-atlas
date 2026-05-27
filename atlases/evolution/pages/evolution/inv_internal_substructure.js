@@ -7,6 +7,8 @@
 import { _pageState, _setActiveState } from './inv_internal_substructure/_state.js';
 import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
 import { autoSeedDosageInput } from '../../shared/auto_seed_inv_idx.js';
+import { attachAutoSeedBadge, detachAutoSeedBadge } from '../../shared/auto_seed_badge.js';
+import { paintCanvasAxes } from '../../shared/canvas_axes.js';
 // 2026-05-23 Phase 1c: mgl_pca_compute moved to cross-species atlas.
 // inv_internal_substructure will migrate to evolution atlas in Phase 2
 // — at that point this becomes evolution → cross-species cross-atlas.
@@ -75,7 +77,11 @@ function _buildPageState(atlasState) {
 function _renderHeader(state) {
   if (!state || typeof document === 'undefined' || !document.getElementById) return;
   const lbl = document.getElementById('ihCandidateLabel');
-  if (lbl) lbl.textContent = state.candidate_label || '—';
+  if (lbl) {
+    lbl.textContent = state.candidate_label || '—';
+    if (state.source && state.source._auto_seeded) attachAutoSeedBadge(lbl);
+    else                                           detachAutoSeedBadge(lbl);
+  }
   const n = document.getElementById('ihNotePresent');
   if (n) {
     n.textContent = state.pca && state.pca.pc1
@@ -112,17 +118,36 @@ function _paintCanvas(state) {
   }
   if (lo1 === hi1) { lo1 -= 0.5; hi1 += 0.5; }
   if (lo2 === hi2) { lo2 -= 0.5; hi2 += 0.5; }
-  const pad = 24;
-  const plot = { x: pad, y: pad, w: Math.max(50, W - 2 * pad), h: Math.max(50, H - 2 * pad) };
-  ctx.strokeStyle = 'rgba(40,50,70,0.6)';
-  if (typeof ctx.strokeRect === 'function') ctx.strokeRect(plot.x, plot.y, plot.w, plot.h);
+  // Plot margins make room for axis tick labels + axis titles.
+  const plot = { x: 56, y: 16, w: Math.max(50, W - 80), h: Math.max(50, H - 60) };
+
+  // % variance subtitles when eigenvalues sum is known.
+  let xLabel = 'PC1', yLabel = 'PC2';
+  const lamSum = (state.pca.lam1 || 0) + (state.pca.lam2 || 0);
+  if (lamSum > 0) {
+    xLabel = `PC1  (${(100 * (state.pca.lam1 || 0) / lamSum).toFixed(1)}%)`;
+    yLabel = `PC2  (${(100 * (state.pca.lam2 || 0) / lamSum).toFixed(1)}%)`;
+  }
+  paintCanvasAxes(ctx, {
+    plot,
+    xRange: [lo1, hi1], yRange: [lo2, hi2],
+    xLabel, yLabel,
+    nXTicks: 5, nYTicks: 5,
+  });
+
   ctx.fillStyle = 'rgba(48, 116, 200, 0.85)';
   for (let i = 0; i < pc1.length; i++) {
     const tx = (pc1[i] - lo1) / (hi1 - lo1);
     const ty = (pc2[i] - lo2) / (hi2 - lo2);
     const px = plot.x + tx * plot.w;
     const py = plot.y + plot.h - ty * plot.h;
-    if (typeof ctx.fillRect === 'function') ctx.fillRect(px - 3, py - 3, 6, 6);
+    if (typeof ctx.beginPath === 'function' && typeof ctx.arc === 'function' && typeof ctx.fill === 'function') {
+      ctx.beginPath();
+      ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (typeof ctx.fillRect === 'function') {
+      ctx.fillRect(px - 3, py - 3, 6, 6);
+    }
   }
 }
 
