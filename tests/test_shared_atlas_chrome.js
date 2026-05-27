@@ -281,10 +281,13 @@ delete global.localStorage._store['atlas_chrome.sidebar'];
 const s = wireGlobalSettingsBtn(btn, wrap, { storageKey: 'atlas_chrome.sidebar' });
 check('default sidebar = expanded',  wrap.getAttribute('data-sidebar') === 'expanded');
 btn.click();
-check('click: sidebar = collapsed',  wrap.getAttribute('data-sidebar') === 'collapsed');
-check('persisted to localStorage',   global.localStorage._store['atlas_chrome.sidebar'] === 'collapsed');
+check('click 1: sidebar = collapsed',  wrap.getAttribute('data-sidebar') === 'collapsed');
+check('persisted to localStorage',     global.localStorage._store['atlas_chrome.sidebar'] === 'collapsed');
 btn.click();
-check('click again: sidebar = expanded', wrap.getAttribute('data-sidebar') === 'expanded');
+check('click 2: sidebar = floating',   wrap.getAttribute('data-sidebar') === 'floating');
+check('floating persisted',            global.localStorage._store['atlas_chrome.sidebar'] === 'floating');
+btn.click();
+check('click 3 (wrap): sidebar = expanded', wrap.getAttribute('data-sidebar') === 'expanded');
 
 // Restore from localStorage on next wire.
 global.localStorage._store['atlas_chrome.sidebar'] = 'collapsed';
@@ -320,8 +323,23 @@ const wrap5 = new FakeNode('div');
 const r5 = wireGlobalSettingsBtn(btn5, wrap5);
 r5.setSidebar('collapsed');
 check('programmatic setSidebar: collapsed', wrap5.getAttribute('data-sidebar') === 'collapsed');
+r5.setSidebar('floating');
+check('programmatic setSidebar: floating',  wrap5.getAttribute('data-sidebar') === 'floating');
+r5.setSidebar('expanded');
+check('programmatic setSidebar: expanded',  wrap5.getAttribute('data-sidebar') === 'expanded');
 r5.setSidebar('not_a_state');   // ignored
-check('invalid state: ignored',             wrap5.getAttribute('data-sidebar') === 'collapsed');
+check('invalid state: ignored',             wrap5.getAttribute('data-sidebar') === 'expanded');
+
+// Button reflects state via data-state + glyph.
+const btn6 = new FakeNode('button');
+const wrap6 = new FakeNode('div');
+delete global.localStorage._store['atlas_chrome.sidebar'];
+const r6 = wireGlobalSettingsBtn(btn6, wrap6);
+check('button data-state: expanded',         btn6.getAttribute('data-state') === 'expanded');
+btn6.click();
+check('after click: button data-state = collapsed',  btn6.getAttribute('data-state') === 'collapsed');
+btn6.click();
+check('after click: button data-state = floating',   btn6.getAttribute('data-state') === 'floating');
 
 // =====================================================================
 group('bootstrapAtlasChrome — one-call wiring');
