@@ -55,8 +55,20 @@ export function karyoBandToTrackMap(cand) {
  * @param {ArrayLike<number>?} sigmaSpread
  * @returns {Array<Object>}
  */
+/**
+ * True when `x` is something we can iterate as a labels vector —
+ * either a plain Array or any TypedArray (Int8Array / Uint8Array /
+ * …). The candidates pipeline stores `locked_labels` as Int8Array,
+ * but the JSON roundtrip path re-hydrates it from a plain Array, so
+ * we need to accept both. A bare `Array.isArray(x)` check returns
+ * false for the Int8Array case → blank karyotype table.
+ */
+export function _isLabelsArray(x) {
+  return Array.isArray(x) || (x != null && ArrayBuffer.isView(x) && typeof x.length === 'number');
+}
+
 export function buildKaryotypeRows(cand, samples, sigmaSpread) {
-  if (!cand || !Array.isArray(cand.locked_labels)) return [];
+  if (!cand || !_isLabelsArray(cand.locked_labels)) return [];
   const samp = Array.isArray(samples) ? samples : [];
   const sig  = sigmaSpread || null;
   const twoTrack = isKaryoTwoTrack(cand);
