@@ -11,9 +11,12 @@
 //
 // Per docs/MIGRATION_4_ATLASES.md §1.3 + atlases/cross-species/README.md.
 
+import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
+
 let _pageState = null;
 
 export async function mount(root, atlasState, registry) {
+  resetOnboarding('bp_catalogue');
   _pageState = {
     atlasState,
     registry,
@@ -52,19 +55,25 @@ async function _loadCatalogue(root, atlasState, registry) {
       console.warn('bp_catalogue: failed to load breakpoints_consolidated_v1 —', e);
     }
   }
-  if (!tsv) {
-    _renderEmptyState(root,
-      'No breakpoints_consolidated_v1 layer loaded. Run the ' +
-      'gene_order_consolidation workflow ' +
-      '(engines/producers/gene_order/cluster_breakpoints.py) and ensure ' +
-      'data/breakpoints/breakpoint_clusters.tsv exists.');
-    return;
-  }
+  if (!tsv) { _renderEmpty(root); return; }
   const rows = (typeof tsv === 'string') ? _parseTsv(tsv)
              : (Array.isArray(tsv) ? tsv : []);
   if (_pageState) _pageState.rows = rows;
+  if (rows.length === 0) { _renderEmpty(root); return; }
+  const wrap = root.querySelector('#bpCatTableWrap');
+  if (wrap) wrap.style.display = '';
   if (statusEl) statusEl.textContent = `loaded ${rows.length} cluster${rows.length === 1 ? '' : 's'}`;
   _renderRows(root);
+}
+
+function _renderEmpty(root) {
+  const wrap = root.querySelector('#bpCatTableWrap');
+  if (wrap) wrap.style.display = 'none';
+  applyOnboarding('bp_catalogue');
+  const statusEl = root.querySelector('#bpCatStatus');
+  if (statusEl) statusEl.textContent = 'no data';
+  const count = root.querySelector('#bpCatCount');
+  if (count) count.textContent = '';
 }
 
 // Minimal TSV → array-of-objects parser. Header row required.
@@ -83,14 +92,6 @@ function _parseTsv(txt) {
 // ---------------------------------------------------------------------------
 // Render
 // ---------------------------------------------------------------------------
-
-function _renderEmptyState(root, msg) {
-  const body = root.querySelector('#bpCatBody');
-  const count = root.querySelector('#bpCatCount');
-  if (body) body.innerHTML =
-    `<tr><td colspan="11" style="padding: 14px 10px; color: var(--ink-dimmer, #5a6472); font-style: italic;">${_esc(msg)}</td></tr>`;
-  if (count) count.textContent = '';
-}
 
 function _renderRows(root) {
   if (!_pageState) return;

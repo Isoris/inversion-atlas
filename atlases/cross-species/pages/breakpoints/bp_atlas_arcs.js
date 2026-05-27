@@ -6,9 +6,12 @@
 // this canvas is the in-browser preview for the breakpoint-arc
 // arrangement.
 
+import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
+
 let _pageState = null;
 
 export async function mount(root, atlasState, registry) {
+  resetOnboarding('bp_atlas_arcs');
   _pageState = { atlasState, registry, arcs: null, meta: null };
   await _load(root, registry);
 }
@@ -34,11 +37,7 @@ async function _load(root, registry) {
   }
   if (_pageState) { _pageState.arcs = arcs; _pageState.meta = meta; }
   if (!arcs) {
-    _showEmpty(root,
-      'No bp_atlas_arcs_v1 layer loaded. Run the bp_atlas_pipeline ' +
-      'workflow through stage BP5 to produce atlas_paf_arcs.json. ' +
-      'The R scripts in engines/figures/bp_atlas/ render the same data ' +
-      'as static figures (ribbons + dotplots + montage).');
+    applyOnboarding('bp_atlas_arcs');
     if (statusEl) statusEl.textContent = 'no data';
     return;
   }
@@ -50,13 +49,6 @@ async function _load(root, registry) {
   _paint(root);
 }
 
-function _showEmpty(root, msg) {
-  const empty = root.querySelector('#bpArcsEmpty');
-  if (empty) {
-    empty.textContent = msg;
-    empty.style.display = 'flex';
-  }
-}
 function _hideEmpty(root) {
   const empty = root.querySelector('#bpArcsEmpty');
   if (empty) empty.style.display = 'none';

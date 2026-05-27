@@ -4,9 +4,12 @@
 // validated zones with confidence tier + backbone_support flag.
 // Phase 1a: page stub. Renders empty-state when data missing.
 
+import { applyOnboarding, resetOnboarding } from '../../shared/onboarding.js';
+
 let _pageState = null;
 
 export async function mount(root, atlasState, registry) {
+  resetOnboarding('bp_atlas_reciprocity');
   _pageState = { atlasState, registry, rows: [] };
   await _loadReciprocity(root, registry);
 }
@@ -29,16 +32,33 @@ async function _loadReciprocity(root, registry) {
     catch (e) { console.warn('bp_atlas_reciprocity: load failed —', e); }
   }
   if (!tsv) {
-    _renderEmptyState(root,
-      'No bp_atlas_reciprocity_v1 layer loaded. Run the bp_atlas_pipeline ' +
-      'workflow through stage BP3c (engines/producers/bp_atlas/runners/run_bp_atlas_LAPTOP.sh).');
+    _renderEmpty(root);
     return;
   }
   const rows = (typeof tsv === 'string') ? _parseTsv(tsv)
              : (Array.isArray(tsv) ? tsv : []);
   if (_pageState) _pageState.rows = rows;
+  if (rows.length === 0) {
+    _renderEmpty(root);
+    return;
+  }
+  // Make sure the table wrap is visible when data arrives (covers
+  // the case where a previous mount left it hidden).
+  const wrap = root.querySelector('#bpRecTableWrap');
+  if (wrap) wrap.style.display = '';
   if (statusEl) statusEl.textContent = `${rows.length} zone${rows.length === 1 ? '' : 's'}`;
   _renderRows(root);
+}
+
+function _renderEmpty(root) {
+  // Hide the table-wrap and let the onboarding panel take its slot.
+  const wrap = root.querySelector('#bpRecTableWrap');
+  if (wrap) wrap.style.display = 'none';
+  applyOnboarding('bp_atlas_reciprocity');
+  const statusEl = root.querySelector('#bpRecStatus');
+  if (statusEl) statusEl.textContent = 'no data';
+  const count = root.querySelector('#bpRecCount');
+  if (count) count.textContent = '';
 }
 
 function _parseTsv(txt) {
@@ -51,14 +71,6 @@ function _parseTsv(txt) {
     headers.forEach((h, i) => { obj[h] = cells[i] != null ? cells[i] : ''; });
     return obj;
   });
-}
-
-function _renderEmptyState(root, msg) {
-  const body = root.querySelector('#bpRecBody');
-  const count = root.querySelector('#bpRecCount');
-  if (body) body.innerHTML =
-    `<tr><td colspan="7" style="padding: 14px 10px; color: var(--ink-dimmer, #5a6472); font-style: italic;">${_esc(msg)}</td></tr>`;
-  if (count) count.textContent = '';
 }
 
 function _renderRows(root) {

@@ -103,6 +103,7 @@ const {
   paintLegend,
   paintColorRamp,
 } = await import('../atlases/evolution/shared/canvas_axes.js');
+const csOnboarding = await import('../atlases/cross-species/shared/onboarding.js');
 
 // =====================================================================
 group('empty_state_panel.renderEmptyStatePanel');
@@ -375,6 +376,34 @@ paintColorRamp(null, {});
 paintColorRamp(c, null);
 paintColorRamp(c, { origin: { x: 0, y: 0 }, w: 100 });   // no colorFn → noop
 check('canvas_axes helpers null-safe',     true);
+
+// =====================================================================
+group('cross-species onboarding registry');
+
+check('cs registry has 3 entries',
+      Object.keys(csOnboarding._REGISTRY).length === 3);
+for (const p of ['bp_atlas_reciprocity', 'bp_atlas_arcs', 'bp_catalogue']) {
+  check(`cs registry has ${p}`,                !!csOnboarding._REGISTRY[p]);
+  check(`cs ${p} sentinelId is non-empty`,
+        typeof csOnboarding._REGISTRY[p].sentinelId === 'string'
+        && csOnboarding._REGISTRY[p].sentinelId.length > 0);
+  const cfg = csOnboarding._REGISTRY[p].cfg();
+  check(`cs ${p} cfg title`,                   typeof cfg.title === 'string' && cfg.title.length > 0);
+  check(`cs ${p} cfg description`,             typeof cfg.description === 'string' && cfg.description.length > 0);
+  check(`cs ${p} cfg ≥1 source`,               Array.isArray(cfg.sources) && cfg.sources.length >= 1);
+}
+
+// apply / reset cycle against a fake sentinel for bp_atlas_reciprocity.
+fakeDocument._clear();
+const csTarget = new FakeEl('div');
+fakeDocument._register('bpRecEmpty', csTarget);
+csOnboarding.resetOnboarding('bp_atlas_reciprocity');
+csOnboarding.applyOnboarding('bp_atlas_reciprocity');
+check('cs apply renders panel once',           csTarget.children.length === 1);
+csOnboarding.applyOnboarding('bp_atlas_reciprocity');
+check('cs apply idempotent same lifecycle',    csTarget.children.length === 1);
+csOnboarding.applyOnboarding('not_a_cs_page'); // no-op for unknown id
+check('cs apply unknown id is no-op',          csTarget.children.length === 1);
 
 // =====================================================================
 console.log('\n=================');
