@@ -348,16 +348,14 @@
             font: inherit;
             cursor: pointer;
           ">build regimes</button>
-        <button id="rgPromoteSeedBtn" class="rg-tb-btn" disabled
-          title="Re-promote the focal candidate (sets it active in the candidate carousel). Disabled until 'build regimes' has run."
-          style="
-            background: var(--panel-3, #232a36);
-            color: var(--ink, #e6edf6);
-            border: 1px solid var(--rule, #2a3242);
-            padding: 4px 10px;
-            font: inherit;
-            cursor: pointer;
-          ">&#9733; focal&hellip;</button>
+        <!-- 2026-05-27: no #rgPromoteSeedBtn on this page. The user
+             is already operating on the local_pca_dosage candidate
+             list — re-promoting via the shared promoteFocalSeed
+             handler would duplicate the source candidate (new id,
+             source='seed_promote'). If we want a "focal → set active"
+             action later, it should be a different handler that
+             only calls sh.setActiveCandidate on the existing object;
+             skipped here until the use case is clearer. -->
         <button id="rgAutoMergeBtn" class="rg-tb-btn" disabled
           title="Walk adjacent candidates, run the Cramér's V contingency test, and auto-promote each consecutive-MERGE chain as a new candidate. Disabled until 'build regimes' produces ≥ 2 candidates."
           style="
