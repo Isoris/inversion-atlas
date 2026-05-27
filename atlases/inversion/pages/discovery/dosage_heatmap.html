@@ -26,8 +26,29 @@
           </select>
         </label>
         <label class="dh2-toggle">
+          Colour
+          <select id="dosageHeatmapColorMode" class="dh2-select"
+                  title="magma: continuous dosage ramp (default).
+genotype: discrete white/blue/red for 0/0 · 0/1 · 1/1.">
+            <option value="magma">magma (continuous)</option>
+            <option value="genotype">genotype (0/0 · 0/1 · 1/1)</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
           <input id="dosageHeatmapShowGroupTrack" type="checkbox" checked>
-          Group track
+          Group
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowHetDosageTrack" type="checkbox">
+          Het (dosage) mean
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowThetaPiTrack" type="checkbox">
+          θπ mean
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowGhslTrack" type="checkbox">
+          GHSL mean
         </label>
         <label class="dh2-toggle">
           <input id="dosageHeatmapShowPolarityTrack" type="checkbox" checked>
@@ -67,8 +88,12 @@
     </div>
 
     <footer id="dosageHeatmapFooter" class="dh2-footer">
-      ⓘ Sample × marker dosage matrix. Sequential cream→deep-red ramp;
-      side tracks show K=3 group / K=6 cluster annotation; top stripe
+      ⓘ Sample × marker dosage matrix. Two colour modes: <b>magma</b>
+      (continuous, default — purple → magenta → orange → yellow) and
+      <b>genotype</b> (discrete white / blue / red for 0/0 · 0/1 · 1/1).
+      Left side tracks (outermost first): mean het-dosage, mean θπ,
+      mean GHSL, K=6 cluster, sample group. Y-axis ticks every ~10 %
+      of rows; group-run labels next to the group track. Top stripe
       marks polarity-flipped markers (HANDOFF_2 / SPEC_0 §11).
     </footer>
 

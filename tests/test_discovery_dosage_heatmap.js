@@ -14,6 +14,9 @@ import {
   deriveMarkerOrder,
   buildGroupColorMap,
   dosageValueToColor,
+  dosageMagmaColor,
+  dosageGenotypeColor,
+  pickDosageColorFn,
 } from '../atlases/inversion/pages/discovery/dosage_heatmap/renderer.js';
 import {
   adaptMglHeatmapJson,
@@ -52,13 +55,31 @@ state._setActiveState(null);
 check('_setActiveState(null) clears',            state._pageState === null);
 
 // =====================================================================
-group('renderer.dosageValueToColor');
+group('renderer.dosageMagmaColor (default ramp)');
 
-check('v=0 → cream',                             dosageValueToColor(0) === 'rgb(255,245,235)');
-check('v=2 → deep red',                          dosageValueToColor(2) === 'rgb(165,15,21)');
-check('v=1 → orange mid',                        dosageValueToColor(1) === 'rgb(252,141,89)');
-check('NaN → grey',                              dosageValueToColor(NaN) === 'rgb(200,200,200)');
-check('custom vmin/vmax respected',              dosageValueToColor(0.5, 0, 1) === 'rgb(252,141,89)');
+// Magma stops at the test points: t=0 → (0,0,4); t=0.5 → (183,55,121);
+// t=1 → (252,253,191). Default vmin/vmax = 0/2 so v=1 lands at t=0.5.
+check('v=0 → magma dark',                        dosageMagmaColor(0) === 'rgb(0,0,4)');
+check('v=2 → magma yellow',                      dosageMagmaColor(2) === 'rgb(252,253,191)');
+check('v=1 → magma magenta mid',                 dosageMagmaColor(1) === 'rgb(183,55,121)');
+check('NaN → pale-pink missing',                 dosageMagmaColor(NaN) === 'rgb(230,210,220)');
+check('custom vmin/vmax respected (t=0.5)',      dosageMagmaColor(0.5, 0, 1) === 'rgb(183,55,121)');
+
+// dosageValueToColor is now an alias for the magma ramp.
+check('dosageValueToColor alias → magma',        dosageValueToColor(0) === dosageMagmaColor(0));
+
+group('renderer.dosageGenotypeColor (discrete white / blue / red)');
+
+check('v=0 → near-white (HOM ref)',              dosageGenotypeColor(0) === 'rgb(248,248,250)');
+check('v=1 → blue (HET)',                        dosageGenotypeColor(1) === 'rgb( 56,107,196)');
+check('v=2 → red (HOM alt)',                     dosageGenotypeColor(2) === 'rgb(196, 40, 50)');
+check('NaN → mauve (missing)',                   dosageGenotypeColor(NaN) === 'rgb(238,214,222)');
+
+group('renderer.pickDosageColorFn');
+
+check('magma → magma fn',                        pickDosageColorFn('magma')(1, 0, 2) === 'rgb(183,55,121)');
+check('genotype → genotype fn',                  pickDosageColorFn('genotype')(1) === 'rgb( 56,107,196)');
+check('default → magma',                         pickDosageColorFn()(2, 0, 2) === 'rgb(252,253,191)');
 
 // =====================================================================
 group('renderer.buildGroupColorMap');
