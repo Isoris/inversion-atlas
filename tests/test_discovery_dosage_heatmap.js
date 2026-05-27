@@ -429,6 +429,79 @@ check('group sizes sorted desc',
 check('group sizes: null → []',                  groupSizesFromSampleGroup(null).length === 0);
 
 // =====================================================================
+group('sample_means — per-sample left-track derivations');
+
+const {
+  computeSampleHetDosageMean,
+  computeSampleThetaPiMean,
+  computeSampleGhslMean,
+} = await import('../atlases/inversion/pages/discovery/dosage_heatmap/sample_means.js');
+
+const canonForMeans = {
+  n_samples: 3, n_markers: 4,
+  // sample 0: 0,1,1,1 → 3/4 het; sample 1: 0,0,2,2 → 0/4 het;
+  // sample 2: 1,1,1,1 → 4/4 het
+  cellValue: (m, s) => {
+    const table = [
+      [0, 1, 1, 1],
+      [0, 0, 2, 2],
+      [1, 1, 1, 1],
+    ];
+    return table[s][m];
+  },
+  sample_labels: ['s0', 's1', 's2'],
+};
+
+const het = computeSampleHetDosageMean(canonForMeans);
+check('het-dosage mean: returns Float32Array',   het instanceof Float32Array);
+check('het-dosage mean: s0 = 0.75',              Math.abs(het[0] - 0.75) < 1e-6);
+check('het-dosage mean: s1 = 0',                 het[1] === 0);
+check('het-dosage mean: s2 = 1',                 het[2] === 1);
+check('het-dosage mean: null on missing data',   computeSampleHetDosageMean(null) === null);
+
+const tpData = {
+  theta_pi_per_window: {
+    samples: ['s0', 's1', 's2'],
+    windows: [0, 1, 2, 3],
+    // flat Float32Array, row-major by sample: s0 = [1,2,3,4] mean 2.5;
+    // s1 has one NaN → mean of finite; s2 = [10,10,10,10] mean 10
+    values: Float32Array.from([
+      1, 2, 3, 4,
+      0, NaN, 6, 6,
+      10, 10, 10, 10,
+    ]),
+  },
+};
+const tp = computeSampleThetaPiMean(tpData);
+check('θπ mean: returns Float32Array',           tp instanceof Float32Array);
+check('θπ mean: s0 = 2.5',                       Math.abs(tp[0] - 2.5) < 1e-6);
+check('θπ mean: s1 ignores NaN',                 Math.abs(tp[1] - 4) < 1e-6);
+check('θπ mean: s2 = 10',                        tp[2] === 10);
+check('θπ mean: null when panel missing',        computeSampleThetaPiMean({}) === null);
+
+const ghslData = {
+  ghsl_panel: {
+    samples: ['s0', 's1', 's2'],
+    scales: ['s25k'],
+    primary_scale: 's25k',
+    div_roll: {
+      // jagged Array<Float32Array>[sample][window]
+      's25k': [
+        Float32Array.from([0.2, 0.4, 0.6]),     // mean 0.4
+        Float32Array.from([NaN, 0.5, 0.5]),     // mean 0.5
+        Float32Array.from([1.0, 1.0, 1.0]),     // mean 1.0
+      ],
+    },
+  },
+};
+const gh = computeSampleGhslMean(ghslData, canonForMeans);
+check('GHSL mean: returns Float32Array',         gh instanceof Float32Array);
+check('GHSL mean: s0 = 0.4',                     Math.abs(gh[0] - 0.4) < 1e-6);
+check('GHSL mean: s1 ignores NaN',               Math.abs(gh[1] - 0.5) < 1e-6);
+check('GHSL mean: s2 = 1.0',                     Math.abs(gh[2] - 1.0) < 1e-6);
+check('GHSL mean: null when panel missing',      computeSampleGhslMean({}) === null);
+
+// =====================================================================
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

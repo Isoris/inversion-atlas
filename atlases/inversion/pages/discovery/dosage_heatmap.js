@@ -53,6 +53,11 @@ import {
   summariseHoverCell,
   groupSizesFromSampleGroup,
 } from './dosage_heatmap/selection.js';
+import {
+  computeSampleHetDosageMean,
+  computeSampleThetaPiMean,
+  computeSampleGhslMean,
+} from './dosage_heatmap/sample_means.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   sample_order_mode:     'by_group',
@@ -263,6 +268,26 @@ function _buildPageState(atlasState) {
         sample_het_dosage_mean:  dh.sample_het_dosage_mean  || null,
         marker_polarity:         dh.marker_polarity         || null,
       });
+    }
+  }
+
+  // Fill any missing per-sample mean from the chrom precomp / heatmap
+  // data itself. The local_pca_dosage page stashes the precomp at
+  // inv._local_pca_dosage_state.data. Het-dosage mean is always
+  // derivable from the canonical heatmap directly.
+  if (canonical) {
+    const chromData = (inv._local_pca_dosage_state && inv._local_pca_dosage_state.data) || null;
+    if (!canonical.sample_het_dosage_mean) {
+      try { canonical.sample_het_dosage_mean = computeSampleHetDosageMean(canonical); }
+      catch (e) { console.warn('dosage_heatmap: het-dosage mean compute threw —', e); }
+    }
+    if (!canonical.sample_theta_pi_mean && chromData) {
+      try { canonical.sample_theta_pi_mean = computeSampleThetaPiMean(chromData); }
+      catch (e) { console.warn('dosage_heatmap: θπ mean compute threw —', e); }
+    }
+    if (!canonical.sample_ghsl_mean && chromData) {
+      try { canonical.sample_ghsl_mean = computeSampleGhslMean(chromData, canonical); }
+      catch (e) { console.warn('dosage_heatmap: GHSL mean compute threw —', e); }
     }
   }
   return {
