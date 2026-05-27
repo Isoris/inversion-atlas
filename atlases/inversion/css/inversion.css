@@ -5948,8 +5948,35 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
   border-left: 4px solid var(--accent);
   font-family: var(--serif); font-size: 14px;
   color: var(--ink); line-height: 1.5;
+  transition: border-left-color 0.14s;
 }
 .ac-interpretation-box { font-style: italic; color: var(--ink-dim); }
+
+/* Archaeology confidence bar (replaces the lone "%" text) */
+.ac-conf-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 2px;
+}
+.ac-conf-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(120, 130, 150, 0.18);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ac-conf-fill {
+  height: 100%;
+  transition: width 0.18s, background 0.18s;
+  border-radius: 4px;
+}
+.ac-conf-text {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--ink);
+  min-width: 36px; text-align: right;
+}
+.ac-conf-text.ac-conf-empty { color: var(--ink-dim); }
 
 /* Reason box (age cartridge) */
 .age-reason-body { font-size: 11px; color: var(--ink); line-height: 1.5; }

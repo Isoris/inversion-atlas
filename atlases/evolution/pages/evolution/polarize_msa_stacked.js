@@ -53,6 +53,13 @@ const VERDICT_LABEL = Object.freeze({
   insufficient_data:  'Insufficient data',
 });
 
+const VERDICT_COLOR = Object.freeze({
+  derived_inv:       '#3074C8',
+  derived_std:       '#D04545',
+  unpolarized:       '#888888',
+  insufficient_data: '#888888',
+});
+
 // =====================================================================
 // Public entry
 // =====================================================================
@@ -154,6 +161,13 @@ function _renderHeader(state) {
   if (badge) {
     const v = state.verdict && state.verdict.verdict;
     badge.textContent = v ? (VERDICT_LABEL[v] || v) : '—';
+    if (v && VERDICT_COLOR[v]) {
+      badge.style.background = VERDICT_COLOR[v];
+      badge.style.color      = '#ffffff';
+      badge.style.borderColor = VERDICT_COLOR[v];
+    } else {
+      badge.style.background = ''; badge.style.color = ''; badge.style.borderColor = '';
+    }
   }
   const cm = document.getElementById('polarizeMsaConsensusMode');
   if (cm) cm.value = state.view_state.consensus_mode;

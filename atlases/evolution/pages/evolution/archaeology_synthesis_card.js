@@ -99,13 +99,22 @@ function _renderBoxes(state) {
   const interp = document.getElementById('acInterpretationBox');
   const empty  = document.getElementById('acEmpty');
   if (!state.card) {
-    if (reason) reason.textContent = '—';
+    if (reason) {
+      reason.textContent = '—';
+      reason.style.borderLeftColor = '';
+    }
     if (interp) interp.textContent = '—';
     if (empty) { empty.style.display = ''; applyOnboarding('archaeology_synthesis_card'); }
     return;
   }
   if (empty) empty.style.display = 'none';
-  if (reason) reason.textContent = state.card.reason || '—';
+  if (reason) {
+    reason.textContent = state.card.reason || '—';
+    // Verdict-coloured left band so the user's eye reads reason →
+    // verdict in one glance.
+    const v = state.card.verdict;
+    reason.style.borderLeftColor = (v && VERDICT_COLOR[v]) || 'transparent';
+  }
   if (interp) interp.textContent = state.card.interpretation || '—';
 }
 
@@ -143,8 +152,20 @@ function _renderConfidence(state) {
   if (!state || typeof document === 'undefined' || !document.getElementById) return;
   const body = document.getElementById('acConfBody');
   if (!body) return;
-  if (!state.card) { body.textContent = '—'; return; }
-  body.textContent = Number.isFinite(state.card.confidence)
-    ? (state.card.confidence * 100).toFixed(0) + '%'
-    : '—';
+  if (!state.card || !Number.isFinite(state.card.confidence)) {
+    body.innerHTML = '<span class="ac-conf-text ac-conf-empty">—</span>';
+    return;
+  }
+  const c = Math.max(0, Math.min(1, state.card.confidence));
+  const pct = (c * 100).toFixed(0);
+  // Tint the fill by confidence — red <0.4, amber <0.7, green ≥0.7.
+  const fillColor = c < 0.4 ? '#D04545'
+                  : c < 0.7 ? '#D8A030'
+                  : '#2BAA50';
+  body.innerHTML =
+      `<div class="ac-conf-row">`
+    +   `<div class="ac-conf-bar"><div class="ac-conf-fill" `
+    +     `style="width:${pct}%; background:${fillColor};"></div></div>`
+    +   `<span class="ac-conf-text">${pct}%</span>`
+    + `</div>`;
 }
