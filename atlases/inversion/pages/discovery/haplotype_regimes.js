@@ -37,6 +37,7 @@
 // =============================================================================
 
 import { contextFromState, ClusterCache } from '../../shared/per_l2_cluster.js';
+import { computePC1Signs, computePC2Signs } from '../../shared/page1_data_helpers.js';
 import { alignLabels } from '../../shared/hungarian.js';
 import { buildContingency, cramersV } from '../../shared/contingency.js';
 import { runCramersVMergeLocal, runCramersVMergeMacrostripe, computeAdjacentSeedMerges } from '../../shared/cramers_v_merge.js';
@@ -159,18 +160,24 @@ export async function mount(root, atlasState, registry) {
   state.data = data;
   state.activeChrom = chrom;
 
-  // 2026-05-26: contribute a chrom summary so a user who lands directly
-  // here (skipping local_pca_dosage) still populates the cross-chrom
-  // summary cache (SPEC_multichrom_load_orchestrator Slice 1). Idempotent
-  // — overwrites the previous entry for this chrom; the in-flight Promise
-  // dedup means the underlying `data` is the same object local_pca_dosage
-  // would have written anyway.
+  // Contribute a chrom summary so a user who lands directly here
+  // (skipping local_pca_dosage) still populates the cross-chrom summary
+  // cache (SPEC_multichrom_load_orchestrator Slice 1). Idempotent.
   try {
     const cs = await import('../../../../core/chrom_summary.js');
     if (typeof atlasState.setChromSummary === 'function') {
       atlasState.setChromSummary(chrom, cs.buildChromSummary(data, { chrom }));
     }
   } catch (_) { /* don't block the mount on a non-essential cache write */ }
+
+  // Ensure PC1 + PC2 sign-align arrays exist on this page's state regardless
+  // of whether local_pca_dosage was visited first.
+  if (!state.pc1Sign || state.pc1Sign.length !== data.windows.length) {
+    computePC1Signs(state);
+  }
+  if (!state.pc2Sign || state.pc2Sign.length !== data.windows.length) {
+    computePC2Signs(state);
+  }
 
   // Build the per-window-labels bridge (clusterL2 backed by a cache).
   _wireCtxCallbacks(state, atlasState);
@@ -239,8 +246,19 @@ function _buildLegacyState(atlasState) {
   legacy.regimesPanel = null;        // populated when pipeline runs
   legacy.tracked = inv.tracked || new Set();
   legacy.linesColorMode = inv.linesColorMode || 'kmeans';
-  legacy.flipPC1 = inv.flipPC1 || false;
-  legacy.pc1Sign = inv.pc1Sign || null;
+
+  // 2026-05-27: PC1/PC2 sign-align defaults aligned with state.js
+  // (flipPC1, flipPC2 both true). Reuse the precomputed sign arrays
+  // from local_pca_dosage if its mount has populated them — that
+  // saves the O(N) pass when the user tabs between pages on the
+  // same chromosome. computePCxSigns runs after mount loads data
+  // and writes legacy.pc1Sign / legacy.pc2Sign anyway, so this is
+  // just a warm-start.
+  const stash = inv._local_pca_dosage_state || null;
+  legacy.flipPC1 = (inv.flipPC1 !== undefined) ? !!inv.flipPC1 : true;
+  legacy.flipPC2 = (inv.flipPC2 !== undefined) ? !!inv.flipPC2 : true;
+  legacy.pc1Sign = (stash && stash.pc1Sign) || inv.pc1Sign || null;
+  legacy.pc2Sign = (stash && stash.pc2Sign) || inv.pc2Sign || null;
   return legacy;
 }
 
