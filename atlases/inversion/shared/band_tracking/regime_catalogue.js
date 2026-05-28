@@ -424,17 +424,77 @@ export function buildCatalogue(bandingResult, args) {
     }
   }
 
+  // 2026-05-27: optional regime_summary_bundle (output of
+  // shared/mgl_regime_consistency.buildRegimeTables) embedded into
+  // each record so downstream consumers (manuscript_bundle, exporters)
+  // don't have to re-run the stats compute. Bundle rows are matched
+  // to records by stage3 emission index (pre-sort).
+  const regimeBundle = args.regime_summary_bundle || null;
+  const candById = (regimeBundle && Array.isArray(regimeBundle.candidate_regime_summary))
+    ? regimeBundle.candidate_regime_summary : [];
+  const samplesByCand = new Map();
+  if (regimeBundle && Array.isArray(regimeBundle.sample_regime_calls)) {
+    for (const r of regimeBundle.sample_regime_calls) {
+      const key = r.candidate_id;
+      if (!samplesByCand.has(key)) samplesByCand.set(key, []);
+      samplesByCand.get(key).push(r);
+    }
+  }
+  const windowsByCand = new Map();
+  if (regimeBundle && Array.isArray(regimeBundle.window_regime_support)) {
+    for (const r of regimeBundle.window_regime_support) {
+      const key = r.candidate_id;
+      if (!windowsByCand.has(key)) windowsByCand.set(key, []);
+      windowsByCand.get(key).push(r);
+    }
+  }
+  const qcByCand = new Map();
+  if (regimeBundle && Array.isArray(regimeBundle.regime_qc_summary)) {
+    for (const r of regimeBundle.regime_qc_summary) qcByCand.set(r.candidate_id, r);
+  }
+
   const records = [];
   for (let i = 0; i < bandingResult.stage3.loci.length; i++) {
     const locus = bandingResult.stage3.loci[i];
-    records.push(buildLocusRecord({
+    const rec = buildLocusRecord({
       locus, locus_index: i,
       sample_ids: args.sample_ids,
       chromName: args.chromName,
       windowToBp: args.windowToBp,
       stage4_per_target,
       include_full_votes: !!args.include_full_votes,
-    }));
+    });
+    // Attach the matching regime-summary row (by stage3 index = locus.seed_id
+    // when available, else by index position into candidate_regime_summary).
+    if (candById.length > 0) {
+      const cand = candById[i] || candById.find(r => r && r.candidate_id === locus.seed_id);
+      if (cand) {
+        rec.regime_summary = cand;
+        const key = cand.candidate_id;
+        if (samplesByCand.has(key)) rec.regime_sample_calls      = samplesByCand.get(key);
+        if (windowsByCand.has(key)) rec.regime_window_support    = windowsByCand.get(key);
+        if (qcByCand.has(key))      rec.regime_qc                = qcByCand.get(key);
+
+        // Pre-aggregate sample IDs by regime call into the popstats group
+        // shape ({'H1/H1': [...], 'H1/H2': [...], 'H2/H2': [...], 'uncertain': [...]}).
+        // Downstream consumers (popstats, gene annotation, age inference)
+        // read rec.regime_groups directly instead of re-grouping
+        // rec.regime_sample_calls on every load.
+        if (rec.regime_sample_calls) {
+          const groups = _groupCallsByServerLabel(rec.regime_sample_calls);
+          rec.regime_groups = groups.groups;
+          rec.n_per_regime  = groups.n_per_group;
+          // Band-level grouping (one group per K-means band) — faithful for
+          // any K. tier labels keep it interpretable. Mirrors the in-memory
+          // registry written by run_pipeline._bandGroupsFromCalls.
+          const bands = _groupCallsByBand(rec.regime_sample_calls);
+          rec.band_groups      = bands.groups;
+          rec.n_per_band       = bands.n_per_group;
+          rec.band_tier_labels = bands.tier_labels;
+        }
+      }
+    }
+    records.push(rec);
   }
 
   // Sort records by (chrom_idx, s_bp) for deterministic output. Avoids
@@ -463,6 +523,7 @@ export function buildCatalogue(bandingResult, args) {
     n_samples:        args.sample_ids.length,
     n_intervals:      records.length,
     has_stage4:       !!bandingResult.stage4,
+    has_regime_summary: !!regimeBundle,
     include_full_votes: !!args.include_full_votes,
     generated_at_utc: new Date().toISOString(),
     summary:          bandingResult.summary,
@@ -473,6 +534,57 @@ export function buildCatalogue(bandingResult, args) {
     knobs: args.resolved_opts,
     catalogue: records,
   };
+}
+
+// 2026-05-27: Local copy of the regime_call → popstats-server label map
+// (kept in shared/candidate_groups.js as _REGIME_CALL_TO_SERVER). Duped
+// here so this module stays self-contained — no cross-import.
+const _REGIME_CALL_TO_SERVER_LABEL = Object.freeze({
+  homA_like: 'H1/H1',
+  het_like:  'H1/H2',
+  homB_like: 'H2/H2',
+  uncertain: 'uncertain',
+});
+
+function _groupCallsByServerLabel(sample_calls) {
+  const groups = Object.create(null);
+  const n_per_group = Object.create(null);
+  for (const row of sample_calls) {
+    if (!row || !row.sample_id || !row.regime_call) continue;
+    const key = _REGIME_CALL_TO_SERVER_LABEL[row.regime_call] || row.regime_call;
+    if (!groups[key]) { groups[key] = []; n_per_group[key] = 0; }
+    groups[key].push(row.sample_id);
+    n_per_group[key]++;
+  }
+  return { groups, n_per_group };
+}
+
+// Band-level grouping (one group per K-means band: band_0..band_{K-1}),
+// with each band's modal non-uncertain dosage tier as a label. Mirrors
+// run_pipeline._bandGroupsFromCalls so the on-disk catalogue + in-memory
+// registry carry the identical band-group shape.
+function _groupCallsByBand(sample_calls) {
+  const groups = Object.create(null);
+  const n_per_group = Object.create(null);
+  const tierVotes = Object.create(null);
+  for (const row of sample_calls) {
+    if (!row || !row.sample_id || row.band_id == null || row.band_id < 0) continue;
+    const key = `band_${row.band_id}`;
+    if (!groups[key]) { groups[key] = []; n_per_group[key] = 0; tierVotes[key] = Object.create(null); }
+    groups[key].push(row.sample_id);
+    n_per_group[key]++;
+    const tier = row.regime_call || 'uncertain';
+    if (tier !== 'uncertain') tierVotes[key][tier] = (tierVotes[key][tier] || 0) + 1;
+  }
+  const tier_labels = Object.create(null);
+  for (const key of Object.keys(groups)) {
+    let best = 'uncertain', bestN = 0;
+    for (const [tier, n] of Object.entries(tierVotes[key])) {
+      if (n > bestN) { best = tier; bestN = n; }
+    }
+    tier_labels[key] = best;
+  }
+  return { groups, n_per_group, tier_labels };
 }
 
 // ---------------------------------------------------------------------

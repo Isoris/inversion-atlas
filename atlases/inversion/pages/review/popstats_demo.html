@@ -1,0 +1,71 @@
+<!-- atlases/inversion/pages/review/popstats_demo.html -->
+<!--
+  popstats_demo — integration proof for the regime → popstats loop.
+
+  Reads atlasState.shared.registeredCandidates (written by the
+  haplotype_regimes / candidate_regimes pipeline on run-complete) and,
+  per candidate, POSTs its regime_groups to /api/popstats/groupwise.
+  Renders θπ per regime group + pairwise FST. Honest failure states
+  when the popstats server is down / the endpoint is unwired / a group
+  is below the server's min_group_n floor.
+
+  DOM contract:
+    #popstats_demo            page wrapper
+    #psdHeader                header (title + compute-all + metric chips)
+    #psdComputeAllBtn         button — fire every candidate's compute
+    #psdMetricChips           metric toggles (θπ / FST / dXY)
+    #psdServerBadge           server-reachability badge
+    #psdEmpty                 empty-state (no registered candidates)
+    #psdTableWrap             scroll container for the candidate table
+    #psdTable                 the results table
+-->
+<div id="popstats_demo" class="page" style="display: flex; flex-direction: column; height: 100%; min-height: 0;">
+
+  <header id="psdHeader"
+          style="flex: 0 0 auto; display: flex; align-items: center; gap: 14px;
+                 padding: 8px 14px; border-bottom: 1px solid var(--rule, #2a3242);
+                 font-family: var(--mono, ui-monospace, monospace); font-size: 11px;">
+    <span style="font-size: 13px; font-weight: 600;">popstats per regime group</span>
+    <span style="color: var(--ink-dim, #8895a8);">integration proof — registry &rarr; /api/popstats/groupwise</span>
+
+    <span id="psdServerBadge"
+          title="popstats server reachability (probed on first compute)"
+          style="margin-left: 4px; padding: 1px 7px; border-radius: 3px;
+                 border: 1px solid var(--rule, #2a3242); color: var(--ink-dim, #8895a8);">
+      server: unprobed
+    </span>
+
+    <div style="flex: 1 1 auto;"></div>
+
+    <div id="psdMetricChips" style="display: inline-flex; gap: 4px;"></div>
+
+    <button type="button" id="psdComputeAllBtn"
+            style="background: var(--panel-2, #131a25); border: 1px solid var(--rule, #2a3242);
+                   color: var(--ink, #d6deea); cursor: pointer; padding: 2px 10px;
+                   border-radius: 3px; font: 11px var(--mono, ui-monospace, monospace);">
+      compute all
+    </button>
+  </header>
+
+  <div id="psdEmpty"
+       style="flex: 1 1 auto; display: none; align-items: center; justify-content: center;
+              color: var(--ink-dim, #8895a8); font-family: var(--mono, ui-monospace, monospace);
+              font-size: 12px; text-align: center; padding: 30px;">
+    <div>
+      <div style="font-size: 14px; margin-bottom: 6px;">no registered candidates yet</div>
+      <div>Run the haplotype-regimes pipeline on a chromosome first.<br>
+        Confirmed candidates auto-register into
+        <code>atlasState.shared.registeredCandidates</code>
+        and appear here for per-group popstats.</div>
+    </div>
+  </div>
+
+  <div id="psdTableWrap"
+       style="flex: 1 1 0; min-height: 0; overflow: auto; padding: 0 14px 14px 14px;">
+    <table id="psdTable"
+           style="width: 100%; border-collapse: collapse;
+                  font-family: var(--mono, ui-monospace, monospace); font-size: 11px;">
+    </table>
+  </div>
+
+</div>

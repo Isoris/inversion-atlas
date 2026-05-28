@@ -41,6 +41,7 @@ import { setStatus } from './haplotype_regimes/util.js';
 import { wireCtxCallbacks } from './haplotype_regimes/pipeline_ctx.js';
 import { wireActionBar } from './haplotype_regimes/action_bar.js';
 import { afterPipelineRun } from './haplotype_regimes/run_pipeline.js';
+import { wireRegimeFigureExportButtons } from './haplotype_regimes/figure_export_buttons.js';
 import {
   applyViewToggle,
   renderRegimesSummary,
@@ -100,6 +101,11 @@ export async function mount(root, atlasState, registry) {
   // Wire the action bar buttons (mode toggle, view toggle, run /
   // export / promote / auto-merge).
   wireActionBar(root, state, atlasState);
+
+  // 2026-05-27: figure export — ⇩ PNG + ⇩ SVG buttons on each of the
+  // 4 regime panels. Idempotent re-wire is safe.
+  try { wireRegimeFigureExportButtons(root, state); }
+  catch (e) { console.warn('[mount] wireRegimeFigureExportButtons threw —', e); }
 
   // 2026-05-20: restore pipeline result from the cross-mount stash so
   // tabbing away and back doesn't wipe the user's discovered seeds /

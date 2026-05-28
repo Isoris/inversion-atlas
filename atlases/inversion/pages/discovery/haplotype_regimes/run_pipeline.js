@@ -48,6 +48,8 @@ import {
 import { renderL3PairsTable } from './l3_pairs_table.js';
 import { renderRegimesSummary, applyViewToggle } from './regimes_summary.js';
 import { setStatus } from './util.js';
+import { buildRegimeTables, lengthBinAggregate }
+  from '../../../shared/mgl_regime_consistency.js';
 
 /**
  * Run the pipeline against the active chromosome's pre-wired ctx
@@ -275,6 +277,254 @@ export function afterPipelineRun(root, state, result, opts) {
       };
     }
   } catch (e) { console.warn('[stash] write failed:', e); }
+
+  // Build + render the 4-table regime summary bundle. Pure compute on
+  // top of the banding result + ctx — dosage_per_sample omitted in v1
+  // (homA/het/homB will read 0); a follow-up wires per-locus dosage in.
+  // The render is candidate_regimes-only for now: the panel HTML only
+  // exists on that page; haplotype_regimes will get its own panel in
+  // a follow-up.
+  // Build the regime-summary bundle + write the cross-atlas registry on
+  // BOTH producer pages (haplotype_regimes + candidate_regimes). The
+  // panel RENDER inside is gated to candidate_regimes (only that page has
+  // the panel HTML), but the bundle build + registeredCandidates write
+  // must run regardless so downstream atlases (popstats_demo, …) see the
+  // candidates no matter which page launched the pipeline.
+  try {
+    _renderRegimeSummaryBundle(root, state, result, opts);
+  } catch (e) {
+    console.warn('[regime-summary] build/render threw —', e);
+  }
+}
+
+// Lazy-loaded so haplotype_regimes (which doesn't have the panel HTML)
+// doesn't pull the renderer + palette modules at all.
+async function _renderRegimeSummaryBundle(root, state, result, opts) {
+  const ctx = state._regimesCtx;
+  if (!ctx || !result || !result.stage3) return;
+  // Map stage3 loci back to candidates from the local_pca_dosage stash
+  // (short-mode 1:1 — each candidate is one locus).
+  const atlas = state._atlasState;
+  const lpd = atlas && atlas.inversion && atlas.inversion._local_pca_dosage_state;
+  const candList = (lpd && Array.isArray(lpd.candidateList)) ? lpd.candidateList : [];
+  const chrom = state.activeChrom;
+  const onChrom = candList.filter(c => c && (!c.chrom || c.chrom === chrom));
+  // Resolve canonical sample-id STRINGS (not the sample objects). The
+  // bundle stores sample_ids[idx] verbatim into sample_regime_calls[].sample_id
+  // → regime_groups → the popstats request body, where the schema demands
+  // strings. data.samples[i] is an object ({cga, ind, id, …}); map it to
+  // the canonical id the VCF / popstats server uses (cga first, matching
+  // shared/candidate_groups.js + candidate_focus/_popstats_panels.js).
+  const sample_ids = (state.data && Array.isArray(state.data.samples))
+    ? state.data.samples.map(_canonicalSampleId) : null;
+  // Pull per-sample mean dosage from the candidate (when present) — used
+  // for homA/het/homB tier counts. Each candidate's mean_dosage_per_sample
+  // covers its own marker range, so we average over the candidates the
+  // sample is assigned to. v1 keeps it simple: pick the first candidate's
+  // array as the global reference. Follow-up: per-locus dosage.
+  let dosage_per_sample = null;
+  for (const c of onChrom) {
+    if (c && c.mean_dosage_per_sample && c.mean_dosage_per_sample.length > 0) {
+      dosage_per_sample = c.mean_dosage_per_sample;
+      break;
+    }
+  }
+  const bundle = buildRegimeTables({
+    result,
+    ctx,
+    dosage_per_sample,
+    candidates: onChrom,
+    sample_ids,
+    chromName: () => chrom,
+    opts: opts || {},
+  });
+  bundle.length_binned_aggregate = lengthBinAggregate(bundle.candidate_regime_summary);
+  state._regimeSummaryBundle = bundle;
+
+  // 2026-05-27: auto-register confirmed candidates into the cross-atlas
+  // shared registry. Other atlases (popstats, gene annotation, age
+  // inference) read from atlasState.shared.registeredCandidates without
+  // having to re-run any compute or watch for export events.
+  try { _registerCandidatesIntoSharedState(state, bundle, onChrom); }
+  catch (e) { console.warn('[regime-summary] shared registry write threw —', e); }
+
+  // Render via the page's panel module — candidate_regimes only (the
+  // panel HTML lives on that page; haplotype_regimes will get its own
+  // panel in a follow-up). The bundle build + registry write above ran
+  // regardless of page, so popstats_demo is fed either way.
+  if (state._pageId !== 'candidate_regimes') return;
+  try {
+    const mod = await import('../../classification/candidate_regimes/regime_summary_panel.js');
+    mod.renderRegimeSummaryPanel(root, bundle, {
+      downloadPrefix: `${chrom || 'chr'}_regime_`,
+    });
+  } catch (e) {
+    console.warn('[regime-summary] panel render threw —', e);
+  }
+}
+
+// Canonical sample-id resolver. data.samples[i] may be an object
+// ({cga, ind, sample_id, id}) or already a bare string; either way
+// return the string the VCF / popstats server keys on. Mirrors
+// shared/candidate_groups.js _sampleId + candidate_focus _sampleId.
+function _canonicalSampleId(s) {
+  if (s == null) return null;
+  if (typeof s === 'string') return s;
+  return s.cga || s.ind || s.sample_id || s.id || null;
+}
+
+// Group sample_regime_calls by band_id → { groups, n_per_group, tier_labels }.
+// groups keys are 'band_0'..'band_{K-1}' (the convention candidate_focus
+// uses). tier_labels[band] = the band's modal non-uncertain dosage tier
+// (homA_like/het_like/homB_like) so a band-grouped popstats run is still
+// interpretable; falls back to 'uncertain' when a band has no clean tier.
+function _bandGroupsFromCalls(sCalls) {
+  const groups = Object.create(null);
+  const n_per_group = Object.create(null);
+  const tierVotes = Object.create(null);    // band → { tier: count }
+  for (const r of sCalls) {
+    if (!r || !r.sample_id || r.band_id == null || r.band_id < 0) continue;
+    const key = `band_${r.band_id}`;
+    if (!groups[key]) { groups[key] = []; n_per_group[key] = 0; tierVotes[key] = Object.create(null); }
+    groups[key].push(r.sample_id);
+    n_per_group[key]++;
+    const tier = r.regime_call || 'uncertain';
+    if (tier !== 'uncertain') tierVotes[key][tier] = (tierVotes[key][tier] || 0) + 1;
+  }
+  const tier_labels = Object.create(null);
+  for (const key of Object.keys(groups)) {
+    const votes = tierVotes[key];
+    let best = 'uncertain', bestN = 0;
+    for (const [tier, n] of Object.entries(votes)) {
+      if (n > bestN) { best = tier; bestN = n; }
+    }
+    tier_labels[key] = best;
+  }
+  return { groups, n_per_group, tier_labels };
+}
+
+// Per-call → popstats-server label dict. Local copy (also lives in
+// regime_catalogue.js + candidate_groups.js) so this file has no new
+// cross-imports.
+const _REGIME_CALL_TO_SERVER = Object.freeze({
+  homA_like: 'H1/H1',
+  het_like:  'H1/H2',
+  homB_like: 'H2/H2',
+  uncertain: 'uncertain',
+});
+
+/**
+ * Write atlasState.shared.registeredCandidates with one record per
+ * confirmed candidate on this chromosome. Records carry everything
+ * downstream atlases need to run their analyses without re-running
+ * the regime pipeline:
+ *
+ *   { candidate_id, chrom, start_bp, end_bp, span_bp,
+ *     regime_class, confidence, support_score,
+ *     regime_groups: {H1/H1:[sids], H1/H2:[sids], H2/H2:[sids], uncertain:[sids]},
+ *     n_per_regime: {…},
+ *     supported_windows: [w_idx, …],
+ *     qc: { possible_ancestry_confounding, possible_family_confounding, missingness },
+ *     registered_at: ISO8601,
+ *     source_page: 'haplotype_regimes' | 'candidate_regimes' }
+ *
+ * Per-chromosome write: records from other chromosomes survive
+ * (registry is global; pipeline run is per-chrom).
+ */
+function _registerCandidatesIntoSharedState(state, bundle, candList) {
+  const atlas = state && state._atlasState;
+  if (!atlas) return;
+  if (!atlas.shared) atlas.shared = {};
+  const chrom = state.activeChrom;
+  const nowISO = new Date().toISOString();
+  const sourcePage = state._pageId || 'haplotype_regimes';
+
+  // Group sub-arrays by candidate_id for O(n) lookup.
+  const samplesByCand = new Map();
+  const windowsByCand = new Map();
+  const qcByCand      = new Map();
+  for (const r of bundle.sample_regime_calls || []) {
+    if (!r) continue;
+    const k = r.candidate_id;
+    if (!samplesByCand.has(k)) samplesByCand.set(k, []);
+    samplesByCand.get(k).push(r);
+  }
+  for (const r of bundle.window_regime_support || []) {
+    if (!r) continue;
+    const k = r.candidate_id;
+    if (!windowsByCand.has(k)) windowsByCand.set(k, []);
+    windowsByCand.get(k).push(r);
+  }
+  for (const r of bundle.regime_qc_summary || []) {
+    if (r) qcByCand.set(r.candidate_id, r);
+  }
+
+  // Build records for THIS chromosome.
+  const records = [];
+  for (const cand of bundle.candidate_regime_summary || []) {
+    if (!cand || !cand.candidate_id) continue;
+    const sCalls = samplesByCand.get(cand.candidate_id) || [];
+    const wRows  = windowsByCand.get(cand.candidate_id) || [];
+    const qcRow  = qcByCand.get(cand.candidate_id) || null;
+    // (a) dosage-tier collapse: homA/het/homB → server karyotype labels.
+    //     Lossy for K>3 (multiple bands fold into 3 tiers) but the
+    //     conventional biallelic-inversion view.
+    const groups = Object.create(null);
+    const nPer   = Object.create(null);
+    for (const r of sCalls) {
+      if (!r.sample_id || !r.regime_call) continue;
+      const key = _REGIME_CALL_TO_SERVER[r.regime_call] || r.regime_call;
+      if (!groups[key]) { groups[key] = []; nPer[key] = 0; }
+      groups[key].push(r.sample_id);
+      nPer[key]++;
+    }
+    // (b) band-level grouping: one group per K-means band (band_0..band_{K-1}).
+    //     Faithful for any K; preserves multi-haplotype / nested structure.
+    //     band_tier_labels records each band's modal dosage tier so the
+    //     popstats output stays interpretable (which band is hom-ref etc.).
+    const bandGroups = _bandGroupsFromCalls(sCalls);
+    records.push({
+      candidate_id:     cand.candidate_id,
+      chrom:            cand.chrom || chrom,
+      start_bp:         cand.start,
+      end_bp:           cand.end,
+      span_bp:          (cand.end != null && cand.start != null) ? (cand.end - cand.start + 1) : null,
+      n_bands:          cand.n_bands != null ? cand.n_bands : null,
+      regime_class:     cand.regime_class,
+      confidence:       cand.confidence,
+      support_score:    cand.support_score,
+      heterozygote_band_present: !!cand.heterozygote_band_present,
+      regime_groups:    groups,
+      n_per_regime:     nPer,
+      band_groups:      bandGroups.groups,
+      n_per_band:       bandGroups.n_per_group,
+      band_tier_labels: bandGroups.tier_labels,
+      supported_windows: wRows.filter(w => w.is_supported).map(w => w.window_id),
+      qc: qcRow ? {
+        possible_ancestry_confounding: !!qcRow.possible_ancestry_confounding,
+        possible_family_confounding:   !!qcRow.possible_family_confounding,
+        missingness:                   qcRow.missingness,
+      } : null,
+      registered_at:    nowISO,
+      source_page:      sourcePage,
+    });
+  }
+
+  // Merge into the cross-chromosome registry: drop prior records for
+  // this chrom (a re-run replaces them), keep records from others.
+  const prior = Array.isArray(atlas.shared.registeredCandidates)
+    ? atlas.shared.registeredCandidates : [];
+  const kept = prior.filter(r => r && r.chrom !== chrom);
+  atlas.shared.registeredCandidates = kept.concat(records);
+  // Idempotent: dispatch a custom event so any listening atlas can
+  // react without polling.
+  try {
+    if (typeof document !== 'undefined' && typeof CustomEvent === 'function') {
+      document.dispatchEvent(new CustomEvent('atlas:registeredCandidatesUpdated', {
+        detail: { chrom, n_added: records.length, total: atlas.shared.registeredCandidates.length },
+      }));
+    }
+  } catch (_) {}
 }
 
 /**

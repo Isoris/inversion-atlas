@@ -67,6 +67,7 @@ export function adaptMglHeatmapJson(result, opts) {
   // can show all of them but the colour stripe lets the user spot
   // which pair each column is at a glance.
   const role_pair = new Array(n_markers);
+  const marker_pos_bp = new Float64Array(n_markers);
   for (let i = 0; i < n_markers; i++) {
     const m = result.markers[i] || {};
     rows[i] = useCentered ? (m.dosage_centered || m.dosage || null)
@@ -75,6 +76,8 @@ export function adaptMglHeatmapJson(result, opts) {
     mlabels[i] = String(m.marker || ('M' + i));
     // role_a / role_b absent on bi-allelic legacy precomp → null.
     role_pair[i] = (m.role_a && m.role_b) ? (m.role_a + '_' + m.role_b) : null;
+    marker_pos_bp[i] = Number.isFinite(m.pos_bp) ? m.pos_bp
+                       : (Number.isFinite(m.bp) ? m.bp : NaN);
   }
   const cellValue = (m, s) => {
     const row = rows[m];
@@ -95,6 +98,7 @@ export function adaptMglHeatmapJson(result, opts) {
     marker_role_pair: role_pair,    // 2026-05-16 — null per-marker on bi-only data
     sample_labels:   (result.samples && result.samples.slice()) || null,
     marker_labels:   mlabels,
+    marker_pos_bp,                   // 2026-05-27 — for locus-span overlay
     _source:         'mgl_heatmap_json',
   };
 }
@@ -143,12 +147,14 @@ export function adaptLegacyChunk(chunk, opts) {
     for (let i = 0; i < n_markers; i++) polarity[i] = !!o.marker_polarity(i);
   }
 
-  // Marker labels.
+  // Marker labels + bp positions (bp needed for locus-span overlay).
   const marker_labels = new Array(n_markers);
+  const marker_pos_bp = new Float64Array(n_markers);
   for (let i = 0; i < n_markers; i++) {
     const mi = sel ? sel[i] : i;
     const m = chunk.markers[mi] || {};
     marker_labels[i] = String(m.marker_id || ('pos' + (m.pos_bp != null ? m.pos_bp : mi)));
+    marker_pos_bp[i] = Number.isFinite(m.pos_bp) ? m.pos_bp : NaN;
   }
 
   // Display canonical-marker → chunk-marker index map.
@@ -188,6 +194,7 @@ export function adaptLegacyChunk(chunk, opts) {
     marker_role_pair: role_pair,    // 2026-05-16 — null per-marker on legacy bi-only chunks
     sample_labels:   chunk.samples.slice(),
     marker_labels,
+    marker_pos_bp,                  // 2026-05-27 — for locus-span overlay
     _source:         'legacy_chunk',
   };
 }
