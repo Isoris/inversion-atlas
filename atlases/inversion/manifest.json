@@ -222,6 +222,15 @@
       "_was_id": "page18"
     },
     {
+      "id": "popstats_demo",
+      "slug": "popstats_demo",
+      "label": "popstats (per regime group)",
+      "stage": "classification",
+      "fragment": "atlases/inversion/pages/review/popstats_demo.html",
+      "module": "atlases/inversion/pages/review/popstats_demo.js",
+      "tooltip": "Integration proof for the regime → popstats loop. Reads atlasState.shared.registeredCandidates (written by the haplotype-regimes pipeline on run-complete) and POSTs each candidate's regime_groups to /api/popstats/groupwise, rendering θπ per regime group + pairwise FST/dXY. Honest server-down / endpoint-unwired / group-too-small states."
+    },
+    {
       "id": "stats_profile",
       "slug": "stats_profile",
       "label": "stats profile",
