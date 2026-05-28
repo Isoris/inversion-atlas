@@ -19,6 +19,61 @@
 
 ---
 
+## Abstract
+
+We describe a population-genomic pipeline that detects polymorphic chromosomal
+inversions from per-sample allele **dosage** and assigns each individual a
+karyotype, without prior knowledge of breakpoints. The method runs a local
+principal-component analysis in sliding windows along a chromosome, uses the
+leading eigenvalue `λ₁` as a structure-detection track, clusters per-window PC1
+scores into karyotype bands, and links windows that band the cohort the same
+way through a reusable contingency currency — Cramér's V, the adjusted Rand
+index, normalised mutual information, Jaccard overlap, and an off-diagonal
+entropy `H_off`. Seeds discovered this way are extended by a `V`/`H_off` walker,
+projected and voted across the genome to a partition consensus, overlaid with
+polarised dosage to call karyotypes, and assembled into long-range
+haplotype-segregation **regimes** carrying per-regime stability, support and
+confidence statistics. Applied to **226 pure *Clarias gariepinus*** (African
+catfish) on linkage group **LG28** (4302 windows), the scan localises a single
+dominant structure peak at ≈ 2.05–2.10 Mb (`λ₁ = 50.3`, `λ₁/λ₂ = 4.5`) that
+resolves at `K = 3` into a clean **1 : 2 : 1** banding (61 : 103 : 62 of 226;
+alt-arrangement frequency `q ≈ 0.5`) with a voter consensus of 0.87 — the
+Hardy–Weinberg signature of a balanced biallelic inversion polymorphism. We
+report only stages that were actually executed on this cohort and produced
+verifiable artifacts (Appendix B); the downstream population-genetic, selection,
+and Mendelian-transmission statistics are documented as methods but were not run
+on these data.
+
+## Introduction
+
+Chromosomal inversions suppress recombination between arrangements across the
+inverted segment and can hold co-adapted allele combinations together as
+balanced polymorphisms, leaving a characteristic three-genotype structure
+(two homokaryotypes and a recombination-suppressed heterokaryotype) in the
+cohort. Detecting them from imputed short-read genotypes is awkward when
+breakpoints are unknown: the signal is a *local* axis of population structure
+that appears and disappears along the chromosome rather than a single typed
+variant.
+
+This document specifies the **mathematics and statistics** of an
+inversion-detection and karyotyping pipeline implemented in this repository, and
+reports a worked example on one linkage group. The emphasis is on the
+estimators and decision rules — each step cites its implementing module as
+`path:line` so the formulas can be checked against source — rather than on the
+atlas user interface, which is omitted. The chain proceeds from raw dosage
+(§0) through the local-PCA structure scan (§1), a set of atomic
+partition-comparison primitives (§2), seed discovery and interval construction
+(§3), long-range segregation voting (§4), dosage-based karyotype calling (§5),
+regime construction with consistency statistics (§6–7), and per-regime
+population-genetic and relatedness statistics (§8–9), ending in a
+content-addressed catalogue (§10). Section 11 is a worked example on the
+226-sample *C. gariepinus* LG28 cohort. Throughout, an honesty pass
+(summarised in Appendix B) separates **verified results** — stages with a
+result artifact on this cohort — from merely-implemented method, so that no
+un-run or stub stage is presented as a result.
+
+---
+
 ## 0. Cohort, input encoding, and windowing
 
 ### 0.1 Cohort
@@ -773,12 +828,21 @@ selscan); outliers are `|z(XP-EHH)| ≥ 2.0` or the top 1 %
 
 ## 9. Relatedness and Mendelian transmission per regime (relatedness atlas)
 
-These consume the regime catalogue + cohort kinship; they are run on a separate
-page but are part of the scientific chain.
+These consume the regime catalogue + cohort kinship; they are part of the
+scientific chain but live in the separate **popstats** atlas
+(`atlases/popstats/shared/band_tracking/`), reached from the inversion atlas
+through `atlases/inversion/shared/band_tracking/genome_scale.js`. In the
+current repository snapshot these four modules are present as **test-covered
+specifications** (the `tests/test_shared_band_tracking_regime_*` suites and the
+`genome_scale.js` importer reference them) but the source was extracted to the
+popstats atlas and is not committed here; none were run on the LG28 cohort
+(Appendix B). The estimators below are therefore documented from the test
+contracts and should be confirmed against the popstats source before
+publication.
 
 ### 9.1 Trio Mendelian support
 
-`band_tracking/regime_mendelian.js` runs two methods. **Method A** counts
+`atlases/popstats/shared/band_tracking/regime_mendelian.js` runs two methods. **Method A** counts
 per-trio Mendelian contradictions of the karyotype calls (an offspring
 karyotype impossible from the parents' karyotypes). **Method B** is a per-family
 χ² goodness-of-fit of observed offspring karyotype counts to the Mendelian
@@ -787,14 +851,14 @@ expectation given parental karyotypes (e.g. HET × HET → 1:2:1; HET × HOM →
 
 ### 9.2 Dyad transmission and meiotic drive
 
-`band_tracking/regime_dyad_mendelian.js` pools single-parent (dyad)
+`atlases/popstats/shared/band_tracking/regime_dyad_mendelian.js` pools single-parent (dyad)
 transmissions and tests the transmitted-allele count against the binomial null
 `Binom(n, ½)`; deviation classes are `MENDELIAN / MILD_DRIVE / STRONG_DRIVE /
 INVIABILITY / INSUFFICIENT_DATA`.
 
 ### 9.3 Cohort linkage and recombination
 
-`band_tracking/regime_linkage.js` builds the `3×3` karyotype contingency between
+`atlases/popstats/shared/band_tracking/regime_linkage.js` builds the `3×3` karyotype contingency between
 two regimes across the cohort and reports Cramér's V; a family-level testcross
 estimates the recombination fraction `r̂ = #recombinant / #total` from
 doubly-heterozygous parents, with verdict `LINKED / WEAKLY_LINKED /
@@ -802,7 +866,7 @@ INDEPENDENT / INSUFFICIENT_DATA`.
 
 ### 9.4 Inverse pedigree from regime co-membership
 
-`band_tracking/regime_pedigree.js` classifies a sample pair's relatedness from
+`atlases/popstats/shared/band_tracking/regime_pedigree.js` classifies a sample pair's relatedness from
 the fraction of regimes in which they share a karyotype class →
 `DUPLICATE / FIRST_DEGREE / SECOND_DEGREE / UNRELATED / INSUFFICIENT_DATA`,
 cross-checked against ngsRelate/KING kinship `φ` (parent–offspring `φ ≈ 0.25`).
@@ -858,24 +922,33 @@ cross-window voter projection is `pattern_class = SUBSET` with
 partition, yielding a `CLEAN_PARTITION` consensus and a
 `stable_three_band_regime` classification (§6.4).
 
-### 11.2a The locus across its full window span
+### 11.2a The locus across its window span
 
-The same `K = 3` call was made on a sliding triple of envelopes spanning
-`d17L2_0010` envelopes 01–08 (`arrangement_calls/lg28_2026-05-06_run/`, ten
-consensus files). Per-envelope band sizes (each summing to 226):
+The run directory `data/arrangement_calls/lg28_2026-05-06_run/` holds **four**
+consensus files for this locus: three overlapping `K = 3` envelope triples
+(`02-03-04`, `03-04-05`, `04-05-06`) and one two-envelope call (`01-02`). Each
+envelope's banding is identical across every file it appears in, so the six
+envelopes 01–06 have a single per-envelope karyotype split (each summing to
+226 samples; the last column is the number of windows backing that envelope):
 
-| consensus (envelopes) | band sizes per envelope |
-|---|---|
-| 01-02-03 | 61:103:62 · 62:102:62 · 62:104:60 |
-| 02-03-04 | 61:103:62 · 62:104:60 · 71:95:60 |
-| 03-04-05 | 62:104:60 · 71:95:60 · **91:67:68** |
-| 04-05-06 | 71:95:60 · **91:67:68** · 76:96:54 |
-| 05-06-07 | 71:95:60 · 76:96:54 · 88:78:60 |
-| 06-07-08 | 83:84:59 · 76:96:54 · 88:78:60 |
+| envelope | band 0 | band 1 (centre) | band 2 | windows |
+|---|---|---|---|---|
+| 01 | 62 | 102 | 62 | 29 |
+| 02 | 61 | 103 | 62 | 201 |
+| 03 | 62 | 104 | 60 | 118 |
+| 04 | 71 | 95 | 60 | 237 |
+| 05 | **91** | **67** | **68** | 143 |
+| 06 | 76 | 96 | 54 | 19 |
 
-The core envelopes (01–04) hold a clean ≈ 1:2:1 split; the middle band erodes
-from envelope 05 onward (the heterokaryotype band shrinks, `91:67:68`), tracing
-the regime decaying along the chromosome rather than ending abruptly.
+The three CLEAN triples each return `consensus_class = CLEAN_PARTITION` with
+`voter_consensus = 0.867` and `resolving_power_class = COMPLEX_BUT_RESOLVABLE`
+(`K_locus = 9` sub-bands feeding each consensus); the two-envelope `01-02` call
+is filed `LABEL_AMBIGUOUS` (`consensus_class = MULTI_LAYER_STRUCTURE`; §11.3).
+The core envelopes 01–04 hold a clean ≈ 1 : 2 : 1 split; at envelope 05 the
+central (heterokaryotype) band collapses (95 → 67) while the low homokaryotype
+swells (71 → 91), i.e. `91 : 67 : 68` — the regime eroding along the chromosome
+rather than ending abruptly. Envelope 06 partly recovers (`76 : 96 : 54`) but
+rests on only 19 windows, too few to weight heavily.
 
 ### 11.3 A boundary anomaly
 
@@ -973,7 +1046,7 @@ merely-implemented method.
 | θπ / F_ST / d_XY | — | `region_popstats` (HTTP) | ✗ not run |
 | Cochran–Armitage permutation p | format only | upstream | ✗ not run |
 | XP-EHH | flagging only | selscan | ✗ no data |
-| Mendelian / kinship (trio, dyad, linkage, pedigree) | regime-level ✓ | base: ngsRelate/KING | ✗ not run |
+| Mendelian / kinship (trio, dyad, linkage, pedigree) | popstats atlas (test-covered; source not in snapshot) | base: ngsRelate/KING | ✗ not run |
 | SV-genotype Fisher evidence | stub (placeholder p) | — | ✗ empty scaffold |
 | Cross-species breakpoint tiers | not implemented | — | ✗ empty scaffold |
 
