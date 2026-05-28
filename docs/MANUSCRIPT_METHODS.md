@@ -92,12 +92,13 @@ Z(w) = λ₁(w)          (leading local-PCA eigenvalue; "local |Z|")
 ```
 
 A window with a strong single axis of population structure — the signature of a
-segregating inversion — has large `λ₁` and a large eigenvalue ratio
-`λ₁/λ₂`. The display clips at `z_clip = 5` and the candidate-calling floor is
-`z_max_min = 2.5`. (On LG28 window 0, `λ₁ = 25.26`, `λ₂ = 8.85`,
-`λ₁/λ₂ ≈ 2.85`.) The eigenvalue ratio recurs later as a band-quality term
-(§3.1). A complementary robust per-sample residual diagnostic uses the
-median / MAD of within-band PC1 rather than the mean/SD
+segregating inversion — has large `λ₁` and a large eigenvalue ratio `λ₁/λ₂`.
+`z_clip = 5` and `z_max_min = 2.5` are **display/scaling** parameters, not an
+absolute detection cut: on LG28 `λ₁` never falls below ≈ 7.9 (§11.1), so
+candidate regions are identified as *relative* `λ₁` maxima with elevated
+`λ₁/λ₂`, not by thresholding `λ₁` against 2.5. The eigenvalue ratio recurs as a
+band-quality term (§3.1). A complementary robust per-sample residual diagnostic
+uses the median / MAD of within-band PC1 rather than the mean/SD
 (`pages/discovery/local_pca_dosage/diag_residuals.js:19`).
 
 ### 1.3 Window × window similarity matrix
@@ -822,11 +823,17 @@ summary, per-sample calls, per-window support, QC, and both groupings (§8.1).
 
 ### 11.1 Genome-wide scan
 
-The LG28 precompute holds **4302 windows** with per-window local-PCA summaries.
-The leading-eigenvalue track `Z(w)=λ₁(w)` rises sharply over the candidate
-region (window 0: `λ₁ = 25.26`, `λ₂ = 8.85`, ratio ≈ 2.85), well above the
-`z_max_min = 2.5` calling floor, marking a single dominant axis of structure
-characteristic of a segregating inversion.
+The LG28 precompute holds **4302 windows** with per-window local-PCA summaries
+for all 226 samples. The leading-eigenvalue track `Z(w) = λ₁(w)` ranges
+`7.94 – 50.28` (mean ≈ 22.7) across the chromosome. Because `λ₁` is an
+eigenvalue magnitude, every window exceeds the nominal display floor
+(`z_max_min = 2.5`); detection therefore keys on **relative peaks** in `λ₁` and
+on the eigenvalue ratio `λ₁/λ₂`, not on an absolute cutoff. The strongest peak
+is a contiguous run at windows 238–244 (≈ 2.00–2.11 Mb) where `λ₁` reaches
+**50.28** (window 243, 2 051 341–2 100 716 bp) with `λ₁/λ₂ = 4.52` — a single
+dominant axis of structure against a background ratio of ≈ 2.85 (window 0). A
+secondary peak sits near 19.88 Mb (window 4280, `λ₁ = 47.06`, ratio 5.88).
+These relative maxima are the candidate regions carried into banding.
 
 ### 11.2 A clean three-band inversion karyotype
 
@@ -843,12 +850,32 @@ per-envelope band sizes:
 
 The central (heterokaryotype) band consistently contains ≈ 2× each flanking
 homokaryotype: **61 : 103 : 62 ≈ 1 : 2 : 1**, the Hardy–Weinberg expectation for
-a balanced biallelic inversion polymorphism at intermediate frequency. The
-band PC1 centres are well separated and ordered
-(`−0.089, +0.005, +0.079`), and every cross-window voter projection is
-`pattern_class = SUBSET` with `voter_consensus = 0.867` — i.e. the three
-windows agree on the same three-band partition, yielding a `CLEAN_PARTITION`
-consensus and a `stable_three_band_regime` classification (§6.4).
+a balanced biallelic inversion polymorphism at intermediate frequency
+(here alt-arrangement frequency `q ≈ (½·103 + 62)/226 ≈ 0.50`). The band PC1
+centres are well separated and ordered (`−0.089, +0.005, +0.079`), and every
+cross-window voter projection is `pattern_class = SUBSET` with
+`voter_consensus = 0.867` — i.e. the three windows agree on the same three-band
+partition, yielding a `CLEAN_PARTITION` consensus and a
+`stable_three_band_regime` classification (§6.4).
+
+### 11.2a The locus across its full window span
+
+The same `K = 3` call was made on a sliding triple of envelopes spanning
+`d17L2_0010` envelopes 01–08 (`arrangement_calls/lg28_2026-05-06_run/`, ten
+consensus files). Per-envelope band sizes (each summing to 226):
+
+| consensus (envelopes) | band sizes per envelope |
+|---|---|
+| 01-02-03 | 61:103:62 · 62:102:62 · 62:104:60 |
+| 02-03-04 | 61:103:62 · 62:104:60 · 71:95:60 |
+| 03-04-05 | 62:104:60 · 71:95:60 · **91:67:68** |
+| 04-05-06 | 71:95:60 · **91:67:68** · 76:96:54 |
+| 05-06-07 | 71:95:60 · 76:96:54 · 88:78:60 |
+| 06-07-08 | 83:84:59 · 76:96:54 · 88:78:60 |
+
+The core envelopes (01–04) hold a clean ≈ 1:2:1 split; the middle band erodes
+from envelope 05 onward (the heterokaryotype band shrinks, `91:67:68`), tracing
+the regime decaying along the chromosome rather than ending abruptly.
 
 ### 11.3 A boundary anomaly
 
@@ -861,16 +888,34 @@ designed to flag. A two-envelope call (`01+02`) returns to clean 1:2:1
 (`62:102:62`, `61:103:62`) but is `LABEL_AMBIGUOUS`, illustrating the
 `low_confidence_regime` gate (too few windows/pairs) of §6.4.
 
-### 11.4 Downstream
+### 11.4 Cohort diversity context
 
-Feeding the three bands (or their homA/het/homB collapse) to the
-`region_popstats` engine (§8) yields per-group `θ_π`, pairwise `F_ST` and `d_XY`
-across the inversion interval; the expectation for a true inversion is reduced
-`θ_π` within homokaryotypes and elevated `F_ST`/`d_XY` between the two
-homokaryotype groups (suppressed recombination between arrangements). The
-Mendelian and linkage tests of §9 then check that the three karyotypes transmit
-1:2:1 through the hatchery pedigree. *(These require the live engine / pedigree
-inputs and are not included in the static precompute snapshot.)*
+An independent diversity layer (`cohort_diversity_v1.json`, MODULE_3,
+226-sample pure *C. gariepinus* hatchery) provides per-sample genome-wide
+baselines that frame the inversion calls. For a representative individual
+(`CGA009`): heterozygosity `H = 0.0047`, `F_ROH = 0.254` over 3 190 ROH
+segments, and in-ROH vs out-of-ROH diversity `θ_in = 0.00120` vs
+`θ_out = 0.00501` (ratio `θ_in/θ_out = 0.239`). The ≈ 4-fold diversity
+reduction inside runs of homozygosity is the cohort-wide backdrop against which
+a balanced, diversity-retaining inversion polymorphism (§11.2) stands out.
+
+### 11.5 Repeat-density track
+
+A per-window repeat-density layer aligned to the same 4302-window scubber grid
+(`LG28.repeat_density.scrubber_windows.json`) is available for breakpoint-repeat
+context at the candidate edges. It is a real precomputed track on this
+chromosome; per-candidate breakpoint-enrichment statistics on top of it were not
+computed in this run.
+
+### 11.6 What was not produced
+
+Consistent with §9, the static snapshot analysed here contains **no** per-group
+`θ_π`/`F_ST`/`d_XY`, no permutation-test p-values, no XP-EHH, and no
+regime-level Mendelian/linkage results for this cohort: those stages were not
+executed. The SV-evidence and cross-species breakpoint layers exist only as
+empty scaffolds. The verified results are the genome-wide `λ₁` scan (§11.1), the
+`K = 3` arrangement calls with their ≈ 1:2:1 banding and voter consensus
+(§11.2–11.3), and the cohort-diversity baseline (§11.4).
 
 ---
 
@@ -904,22 +949,32 @@ inputs and are not included in the static precompute snapshot.)*
 | popstats | win_bp / step_bp | 50 000 / 10 000 | `popstats.py:33` |
 | XP-EHH | outlier z / top pct | 2.0 / 1 % | `xpehh_per_window.js:51` |
 
-## Appendix B — Statistic provenance
+## Appendix B — Statistic provenance and run status
 
-| Statistic | In-repo | External |
-|---|---|---|
-| Local PCA, λ₁/λ₂, PC scores | — | upstream R precompute |
-| Cramér's V, χ², ARI, NMI, Jaccard, H_off | ✓ | — |
-| K-means (1-D, adaptive), silhouette | ✓ | — |
-| Band quality, window classification, walker | ✓ | — |
-| Projection, voting, partition consensus | ✓ | — |
-| Dosage tiers, karyotype call, regime stats, confidence | ✓ | — |
-| Arrangement identity, topology, annotation | ✓ | — |
-| Wilcoxon / Mann–Whitney | ✓ | — |
-| NJ tree (Saitou–Nei) | ✓ | — |
-| θπ / F_ST / d_XY | — | `region_popstats` engine (HTTP) |
-| Cochran–Armitage permutation p | format only | upstream |
-| XP-EHH | outlier flagging only | selscan |
-| Mendelian / kinship (trio, dyad, linkage, pedigree) | regime-level ✓ | base kinship: ngsRelate/KING |
+Three columns: implemented **in-repo**, computed by an **external** engine, and
+whether it was actually **run on this 226-sample cohort** (i.e. a result artifact
+exists). The last column is what separates the verified results (§11) from the
+merely-implemented method.
+
+| Statistic | In-repo | External | Run on cohort |
+|---|---|---|---|
+| Local PCA, λ₁/λ₂, PC scores | — | upstream R precompute | ✓ (LG28, 4302 win) |
+| Cramér's V, χ², ARI, NMI, Jaccard, H_off | ✓ | — | ✓ |
+| K-means (1-D, adaptive), silhouette | ✓ | — | ✓ |
+| Band quality, window classification, walker | ✓ | — | ✓ |
+| Projection, voting, partition consensus | ✓ | — | ✓ (arrangement run) |
+| Dosage tiers, karyotype call, regime stats, confidence | ✓ | — | ✓ |
+| Arrangement identity, topology, annotation | ✓ | — | partial |
+| Cohort diversity (H, F_ROH, θ_in/θ_out) | — | upstream (MODULE_3) | ✓ |
+| Repeat density track | — | upstream | ✓ (track only) |
+| Wilcoxon / Mann–Whitney | ✓ | — | ✗ not run |
+| NJ tree (Saitou–Nei) | ✓ | — | ✗ not run |
+| Functional burden | ✓ | — | ✗ no input data |
+| θπ / F_ST / d_XY | — | `region_popstats` (HTTP) | ✗ not run |
+| Cochran–Armitage permutation p | format only | upstream | ✗ not run |
+| XP-EHH | flagging only | selscan | ✗ no data |
+| Mendelian / kinship (trio, dyad, linkage, pedigree) | regime-level ✓ | base: ngsRelate/KING | ✗ not run |
+| SV-genotype Fisher evidence | stub (placeholder p) | — | ✗ empty scaffold |
+| Cross-species breakpoint tiers | not implemented | — | ✗ empty scaffold |
 
 *End of methods draft.*
