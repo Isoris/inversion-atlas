@@ -284,10 +284,14 @@ export function afterPipelineRun(root, state, result, opts) {
   // The render is candidate_regimes-only for now: the panel HTML only
   // exists on that page; haplotype_regimes will get its own panel in
   // a follow-up.
+  // Build the regime-summary bundle + write the cross-atlas registry on
+  // BOTH producer pages (haplotype_regimes + candidate_regimes). The
+  // panel RENDER inside is gated to candidate_regimes (only that page has
+  // the panel HTML), but the bundle build + registeredCandidates write
+  // must run regardless so downstream atlases (popstats_demo, …) see the
+  // candidates no matter which page launched the pipeline.
   try {
-    if (state._pageId === 'candidate_regimes') {
-      _renderRegimeSummaryBundle(root, state, result, opts);
-    }
+    _renderRegimeSummaryBundle(root, state, result, opts);
   } catch (e) {
     console.warn('[regime-summary] build/render threw —', e);
   }
@@ -305,8 +309,14 @@ async function _renderRegimeSummaryBundle(root, state, result, opts) {
   const candList = (lpd && Array.isArray(lpd.candidateList)) ? lpd.candidateList : [];
   const chrom = state.activeChrom;
   const onChrom = candList.filter(c => c && (!c.chrom || c.chrom === chrom));
+  // Resolve canonical sample-id STRINGS (not the sample objects). The
+  // bundle stores sample_ids[idx] verbatim into sample_regime_calls[].sample_id
+  // → regime_groups → the popstats request body, where the schema demands
+  // strings. data.samples[i] is an object ({cga, ind, id, …}); map it to
+  // the canonical id the VCF / popstats server uses (cga first, matching
+  // shared/candidate_groups.js + candidate_focus/_popstats_panels.js).
   const sample_ids = (state.data && Array.isArray(state.data.samples))
-    ? state.data.samples : null;
+    ? state.data.samples.map(_canonicalSampleId) : null;
   // Pull per-sample mean dosage from the candidate (when present) — used
   // for homA/het/homB tier counts. Each candidate's mean_dosage_per_sample
   // covers its own marker range, so we average over the candidates the
@@ -338,8 +348,11 @@ async function _renderRegimeSummaryBundle(root, state, result, opts) {
   try { _registerCandidatesIntoSharedState(state, bundle, onChrom); }
   catch (e) { console.warn('[regime-summary] shared registry write threw —', e); }
 
-  // Render via the page's panel module. Lazy import keeps the bundle
-  // small for the haplotype_regimes page which doesn't need this yet.
+  // Render via the page's panel module — candidate_regimes only (the
+  // panel HTML lives on that page; haplotype_regimes will get its own
+  // panel in a follow-up). The bundle build + registry write above ran
+  // regardless of page, so popstats_demo is fed either way.
+  if (state._pageId !== 'candidate_regimes') return;
   try {
     const mod = await import('../../classification/candidate_regimes/regime_summary_panel.js');
     mod.renderRegimeSummaryPanel(root, bundle, {
@@ -348,6 +361,16 @@ async function _renderRegimeSummaryBundle(root, state, result, opts) {
   } catch (e) {
     console.warn('[regime-summary] panel render threw —', e);
   }
+}
+
+// Canonical sample-id resolver. data.samples[i] may be an object
+// ({cga, ind, sample_id, id}) or already a bare string; either way
+// return the string the VCF / popstats server keys on. Mirrors
+// shared/candidate_groups.js _sampleId + candidate_focus _sampleId.
+function _canonicalSampleId(s) {
+  if (s == null) return null;
+  if (typeof s === 'string') return s;
+  return s.cga || s.ind || s.sample_id || s.id || null;
 }
 
 // Per-call → popstats-server label dict. Local copy (also lives in

@@ -131,6 +131,16 @@ function _wireComputeAll(root, state) {
     const oldLabel = btn.textContent;
     btn.textContent = 'computing…';
     try {
+      // Re-read the registry + repaint first, so a cached page (mounted
+      // before the pipeline ran) picks up newly-registered candidates
+      // instead of computing over a stale empty/partial snapshot.
+      state.candidates = _readRegistry(state.atlasState);
+      if (!state.candidates || state.candidates.length === 0) {
+        _showEmpty(root, true);
+        return;
+      }
+      _showEmpty(root, false);
+      _renderTable(root, state);
       // Sequential — keeps server load sane + the badge probe stable.
       for (const cand of state.candidates) {
         await _computeOne(root, state, cand);
@@ -245,8 +255,20 @@ async function _computeOne(root, state, cand) {
   const groups = _requestGroups(cand);
   const nGroups = Object.keys(groups).length;
   if (nGroups < 2) {
-    slot.innerHTML = _diag('⚠',
-      `need ≥2 non-empty karyotype groups; have ${nGroups} (uncertain dropped)`);
+    // Distinguish "all uncertain" (the usual cause — no per-sample dosage
+    // was available, so every call defaulted to uncertain) from a genuine
+    // single-karyotype locus.
+    const uncN = (cand.regime_groups && cand.regime_groups['uncertain']
+      ? cand.regime_groups['uncertain'].length : 0);
+    const total = Object.values(cand.n_per_regime || {}).reduce((a, b) => a + (b | 0), 0);
+    if (nGroups === 0 && uncN > 0 && uncN === total) {
+      slot.innerHTML = _diag('⚠',
+        'all samples called "uncertain" — per-sample dosage was missing. '
+        + 'Run local_pca_dosage discovery on this chrom first, then re-run the regime pipeline.');
+    } else {
+      slot.innerHTML = _diag('⚠',
+        `need ≥2 non-empty karyotype groups; have ${nGroups} (uncertain dropped)`);
+    }
     return;
   }
   const chrom = cand.chrom;
@@ -257,12 +279,16 @@ async function _computeOne(root, state, cand) {
 
   slot.innerHTML = '<span style="color: var(--ink-dim, #8895a8);">computing…</span>';
 
-  const body = {
-    chrom,
-    region: { start_bp: cand.start_bp | 0, end_bp: cand.end_bp | 0 },
-    groups,
-    metrics,
-  };
+  const body = { chrom, groups, metrics };
+  // Only attach region when both coords are valid (finite, end > start).
+  // summarizeLocus leaves start/end null when windowToBp is unavailable;
+  // sending {start_bp:0, end_bp:0} would violate the schema (end_bp ≥ 1)
+  // and/or make the server compute an empty window. Omitting region ⇒
+  // chromosome-wide, which is the correct fallback.
+  const sb = cand.start_bp, eb = cand.end_bp;
+  if (Number.isFinite(sb) && Number.isFinite(eb) && eb > sb) {
+    body.region = { start_bp: sb | 0, end_bp: eb | 0 };
+  }
   const r = await _postJson(GROUPWISE_URL, body);
   _markServer(root, state, r);
 
