@@ -82,11 +82,11 @@ console.log('buildCatalogue — embeds regime_groups per record');
         n_samples: 25, n_bands: 3 },
     ],
     sample_regime_calls: [
-      { candidate_id: 'cand_A', sample_id: 's01', regime_call: 'homA_like' },
-      { candidate_id: 'cand_A', sample_id: 's02', regime_call: 'homA_like' },
-      { candidate_id: 'cand_A', sample_id: 's03', regime_call: 'het_like'  },
-      { candidate_id: 'cand_A', sample_id: 's04', regime_call: 'het_like'  },
-      { candidate_id: 'cand_A', sample_id: 's05', regime_call: 'homB_like' },
+      { candidate_id: 'cand_A', sample_id: 's01', regime_call: 'homA_like', band_id: 0 },
+      { candidate_id: 'cand_A', sample_id: 's02', regime_call: 'homA_like', band_id: 0 },
+      { candidate_id: 'cand_A', sample_id: 's03', regime_call: 'het_like',  band_id: 1 },
+      { candidate_id: 'cand_A', sample_id: 's04', regime_call: 'het_like',  band_id: 1 },
+      { candidate_id: 'cand_A', sample_id: 's05', regime_call: 'homB_like', band_id: 2 },
     ],
     window_regime_support: [
       { candidate_id: 'cand_A', window_id: 10, start: 1_000_000, is_supported: true,
@@ -127,7 +127,7 @@ console.log('buildCatalogue — embeds regime_groups per record');
   assert('regime_qc attached',              !!rec.regime_qc);
   assertEq('regime_summary.regime_class',   rec.regime_summary.regime_class, 'stable_three_band_regime');
 
-  // The new bits.
+  // The new bits — tier collapse.
   assert('regime_groups attached',          !!rec.regime_groups);
   assertEq('regime_groups H1/H1',           rec.regime_groups['H1/H1'], ['s01','s02']);
   assertEq('regime_groups H1/H2',           rec.regime_groups['H1/H2'], ['s03','s04']);
@@ -135,6 +135,16 @@ console.log('buildCatalogue — embeds regime_groups per record');
   assertEq('n_per_regime H1/H1',            rec.n_per_regime['H1/H1'], 2);
   assertEq('n_per_regime H1/H2',            rec.n_per_regime['H1/H2'], 2);
   assertEq('n_per_regime H2/H2',            rec.n_per_regime['H2/H2'], 1);
+
+  // Band-level grouping (faithful for any K).
+  assert('band_groups attached',            !!rec.band_groups);
+  assertEq('band_groups band_0',            rec.band_groups['band_0'], ['s01','s02']);
+  assertEq('band_groups band_1',            rec.band_groups['band_1'], ['s03','s04']);
+  assertEq('band_groups band_2',            rec.band_groups['band_2'], ['s05']);
+  assertEq('n_per_band band_0',             rec.n_per_band['band_0'], 2);
+  assertEq('band_tier_labels band_0',       rec.band_tier_labels['band_0'], 'homA_like');
+  assertEq('band_tier_labels band_1',       rec.band_tier_labels['band_1'], 'het_like');
+  assertEq('band_tier_labels band_2',       rec.band_tier_labels['band_2'], 'homB_like');
 }
 
 // -------- 3. buildCatalogue without bundle: regime_groups omitted ---------

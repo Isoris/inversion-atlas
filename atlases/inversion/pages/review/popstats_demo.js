@@ -44,6 +44,9 @@ export async function mount(root, atlasState, _registry) {
   const state = {
     atlasState,
     enabledMetrics: new Set(['theta_pi', 'fst']),
+    // 'band' = one popstats group per K-means band (faithful for any K);
+    // 'tier' = dosage-tier karyotype collapse (homA/het/homB, lossy for K>3).
+    groupingMode: 'band',
     serverProbed: false,
   };
   _pageState = state;
@@ -51,6 +54,7 @@ export async function mount(root, atlasState, _registry) {
   const candidates = _readRegistry(atlasState);
   state.candidates = candidates;
 
+  _renderGroupingToggle(root, state);
   _renderMetricChips(root, state);
   _wireComputeAll(root, state);
 
@@ -94,6 +98,44 @@ function _readRegistry(atlasState) {
 // =====================================================================
 // chrome wiring
 // =====================================================================
+
+// Grouping toggle: band (per K-means band, faithful for any K) vs
+// tier (homA/het/homB dosage collapse). Inserted at the front of the
+// metric-chip row, separated by a thin divider.
+function _renderGroupingToggle(root, state) {
+  const wrap = root.querySelector('#psdMetricChips');
+  if (!wrap) return;
+  // Build a leading container so the toggle sits before the metric chips.
+  let host = root.querySelector('#psdGroupingToggle');
+  if (!host) {
+    host = document.createElement('span');
+    host.id = 'psdGroupingToggle';
+    host.style.cssText = 'display: inline-flex; gap: 4px; margin-right: 8px; '
+      + 'padding-right: 8px; border-right: 1px solid var(--rule, #2a3242);';
+    wrap.parentNode.insertBefore(host, wrap);
+  }
+  host.innerHTML = '';
+  const label = document.createElement('span');
+  label.textContent = 'group:';
+  label.style.cssText = 'color: var(--ink-dimmer, #5a6678); align-self: center; font: 10px var(--mono, ui-monospace, monospace);';
+  host.appendChild(label);
+  for (const m of [{ id: 'band', label: 'band' }, { id: 'tier', label: 'karyotype tier' }]) {
+    const on = state.groupingMode === m.id;
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.textContent = m.label;
+    chip.title = m.id === 'band'
+      ? 'one popstats group per K-means band — faithful for any K'
+      : 'collapse bands into homA/het/homB by dosage — lossy for K>3';
+    chip.style.cssText = _chipCss(on);
+    chip.onclick = () => {
+      state.groupingMode = m.id;
+      _renderGroupingToggle(root, state);   // restyle both chips
+      _renderTable(root, state);            // recompute composition badges
+    };
+    host.appendChild(chip);
+  }
+}
 
 function _renderMetricChips(root, state) {
   const wrap = root.querySelector('#psdMetricChips');
@@ -197,7 +239,7 @@ function _candidateRow(root, state, cand) {
     </td>
     <td style="padding: 6px 8px; color: var(--ink, #d6deea);">${_esc(cand.regime_class || '—')}</td>
     <td style="padding: 6px 8px; color: var(--ink-dim, #8895a8);">${_fmtNum(cand.confidence)}</td>
-    <td style="padding: 6px 8px;">${_groupBadges(cand)}</td>
+    <td style="padding: 6px 8px;">${_groupBadges(cand, state.groupingMode)}</td>
     <td style="padding: 6px 8px;" id="psd-result-${rowId}">
       <span style="color: var(--ink-dimmer, #5a6678);">— not computed —</span>
     </td>
@@ -224,24 +266,58 @@ function _candidateRow(root, state, cand) {
   return tr;
 }
 
-function _groupBadges(cand) {
+const _TIER_COLORS = {
+  'H1/H1': '#3b82f6', 'H1/H2': '#a855f7', 'H2/H2': '#ef4444', 'uncertain': '#6b7280',
+  homA_like: '#3b82f6', het_like: '#a855f7', homB_like: '#ef4444',
+};
+const _BAND_PALETTE = ['#3b82f6', '#a855f7', '#ef4444', '#10b981', '#f59e0b', '#ec4899', '#14b8a6', '#8b5cf6'];
+
+function _groupBadges(cand, mode) {
+  if ((mode || 'band') === 'band') {
+    const groups = cand.band_groups || {};
+    const nPer = cand.n_per_band || {};
+    const tierLabels = cand.band_tier_labels || {};
+    const keys = Object.keys(groups).sort(_bandKeyCmp);
+    const out = [];
+    keys.forEach((k, i) => {
+      const n = nPer[k] != null ? nPer[k] : (groups[k] ? groups[k].length : 0);
+      if (!n) return;
+      const col = _BAND_PALETTE[i % _BAND_PALETTE.length];
+      const tier = tierLabels[k] ? ` (${_esc(_shortTier(tierLabels[k]))})` : '';
+      out.push(
+        `<span style="display: inline-block; margin: 0 4px 2px 0; padding: 0 6px;
+                      border-radius: 3px; background: ${col}22; border: 1px solid ${col}66;
+                      color: var(--ink, #d6deea);">${_esc(k)}${tier}: ${n}</span>`);
+    });
+    return out.join('') || '<span style="color: var(--ink-dimmer, #5a6678);">no bands</span>';
+  }
+  // tier mode
   const groups = cand.regime_groups || {};
   const nPer = cand.n_per_regime || {};
   const order = ['H1/H1', 'H1/H2', 'H2/H2', 'uncertain'];
-  const colors = {
-    'H1/H1': '#3b82f6', 'H1/H2': '#a855f7', 'H2/H2': '#ef4444', 'uncertain': '#6b7280',
-  };
   const out = [];
   for (const k of order) {
     const n = nPer[k] != null ? nPer[k] : (groups[k] ? groups[k].length : 0);
     if (!n) continue;
+    const col = _TIER_COLORS[k] || '#6b7280';
     out.push(
       `<span style="display: inline-block; margin: 0 4px 2px 0; padding: 0 6px;
-                    border-radius: 3px; background: ${colors[k] || '#6b7280'}22;
-                    border: 1px solid ${colors[k] || '#6b7280'}66; color: var(--ink, #d6deea);">
-         ${_esc(k)}: ${n}</span>`);
+                    border-radius: 3px; background: ${col}22; border: 1px solid ${col}66;
+                    color: var(--ink, #d6deea);">${_esc(k)}: ${n}</span>`);
   }
   return out.join('') || '<span style="color: var(--ink-dimmer, #5a6678);">no groups</span>';
+}
+
+function _shortTier(t) {
+  return { homA_like: 'homA', het_like: 'het', homB_like: 'homB' }[t] || t;
+}
+
+// band_0 < band_2 < band_10 (numeric suffix order, not lexicographic).
+function _bandKeyCmp(a, b) {
+  const na = parseInt(String(a).replace(/^band_/, ''), 10);
+  const nb = parseInt(String(b).replace(/^band_/, ''), 10);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+  return String(a).localeCompare(String(b));
 }
 
 // =====================================================================
@@ -252,22 +328,28 @@ async function _computeOne(root, state, cand) {
   const slot = root.querySelector(`#psd-result-${_safeId(cand.candidate_id)}`);
   if (!slot) return;
 
-  const groups = _requestGroups(cand);
+  const mode = state.groupingMode || 'band';
+  const groups = _requestGroups(cand, mode);
   const nGroups = Object.keys(groups).length;
   if (nGroups < 2) {
-    // Distinguish "all uncertain" (the usual cause — no per-sample dosage
-    // was available, so every call defaulted to uncertain) from a genuine
-    // single-karyotype locus.
-    const uncN = (cand.regime_groups && cand.regime_groups['uncertain']
-      ? cand.regime_groups['uncertain'].length : 0);
-    const total = Object.values(cand.n_per_regime || {}).reduce((a, b) => a + (b | 0), 0);
-    if (nGroups === 0 && uncN > 0 && uncN === total) {
-      slot.innerHTML = _diag('⚠',
-        'all samples called "uncertain" — per-sample dosage was missing. '
-        + 'Run local_pca_dosage discovery on this chrom first, then re-run the regime pipeline.');
+    if (mode === 'tier') {
+      // The usual <2 cause in tier mode is "all uncertain" — no per-sample
+      // dosage was available, so every call defaulted to uncertain.
+      const uncN = (cand.regime_groups && cand.regime_groups['uncertain']
+        ? cand.regime_groups['uncertain'].length : 0);
+      const total = Object.values(cand.n_per_regime || {}).reduce((a, b) => a + (b | 0), 0);
+      if (nGroups === 0 && uncN > 0 && uncN === total) {
+        slot.innerHTML = _diag('⚠',
+          'all samples called "uncertain" — per-sample dosage was missing. '
+          + 'Run local_pca_dosage discovery first, switch to "band" grouping, '
+          + 'or re-run the regime pipeline with dosage.');
+      } else {
+        slot.innerHTML = _diag('⚠',
+          `need ≥2 non-empty karyotype tiers; have ${nGroups} (uncertain dropped)`);
+      }
     } else {
       slot.innerHTML = _diag('⚠',
-        `need ≥2 non-empty karyotype groups; have ${nGroups} (uncertain dropped)`);
+        `need ≥2 non-empty bands; have ${nGroups} (this locus is single-band — K=${cand.n_bands != null ? cand.n_bands : '?'})`);
     }
     return;
   }
@@ -296,12 +378,15 @@ async function _computeOne(root, state, cand) {
   slot.innerHTML = _renderResults(r.data, groups, metrics);
 }
 
-// Build the request groups dict: drop 'uncertain' + empty groups.
-function _requestGroups(cand) {
-  const src = cand.regime_groups || {};
+// Build the request groups dict for the active grouping mode.
+//   'band' → cand.band_groups (one group per K-means band), drop empty.
+//   'tier' → cand.regime_groups (homA/het/homB), drop 'uncertain' + empty.
+function _requestGroups(cand, mode) {
+  const m = mode || 'band';
+  const src = (m === 'band') ? (cand.band_groups || {}) : (cand.regime_groups || {});
   const out = {};
   for (const [name, ids] of Object.entries(src)) {
-    if (name === 'uncertain') continue;
+    if (m === 'tier' && name === 'uncertain') continue;
     if (Array.isArray(ids) && ids.length > 0) out[name] = ids;
   }
   return out;

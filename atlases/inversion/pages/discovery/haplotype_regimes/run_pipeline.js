@@ -373,6 +373,36 @@ function _canonicalSampleId(s) {
   return s.cga || s.ind || s.sample_id || s.id || null;
 }
 
+// Group sample_regime_calls by band_id → { groups, n_per_group, tier_labels }.
+// groups keys are 'band_0'..'band_{K-1}' (the convention candidate_focus
+// uses). tier_labels[band] = the band's modal non-uncertain dosage tier
+// (homA_like/het_like/homB_like) so a band-grouped popstats run is still
+// interpretable; falls back to 'uncertain' when a band has no clean tier.
+function _bandGroupsFromCalls(sCalls) {
+  const groups = Object.create(null);
+  const n_per_group = Object.create(null);
+  const tierVotes = Object.create(null);    // band → { tier: count }
+  for (const r of sCalls) {
+    if (!r || !r.sample_id || r.band_id == null || r.band_id < 0) continue;
+    const key = `band_${r.band_id}`;
+    if (!groups[key]) { groups[key] = []; n_per_group[key] = 0; tierVotes[key] = Object.create(null); }
+    groups[key].push(r.sample_id);
+    n_per_group[key]++;
+    const tier = r.regime_call || 'uncertain';
+    if (tier !== 'uncertain') tierVotes[key][tier] = (tierVotes[key][tier] || 0) + 1;
+  }
+  const tier_labels = Object.create(null);
+  for (const key of Object.keys(groups)) {
+    const votes = tierVotes[key];
+    let best = 'uncertain', bestN = 0;
+    for (const [tier, n] of Object.entries(votes)) {
+      if (n > bestN) { best = tier; bestN = n; }
+    }
+    tier_labels[key] = best;
+  }
+  return { groups, n_per_group, tier_labels };
+}
+
 // Per-call → popstats-server label dict. Local copy (also lives in
 // regime_catalogue.js + candidate_groups.js) so this file has no new
 // cross-imports.
@@ -436,6 +466,9 @@ function _registerCandidatesIntoSharedState(state, bundle, candList) {
     const sCalls = samplesByCand.get(cand.candidate_id) || [];
     const wRows  = windowsByCand.get(cand.candidate_id) || [];
     const qcRow  = qcByCand.get(cand.candidate_id) || null;
+    // (a) dosage-tier collapse: homA/het/homB → server karyotype labels.
+    //     Lossy for K>3 (multiple bands fold into 3 tiers) but the
+    //     conventional biallelic-inversion view.
     const groups = Object.create(null);
     const nPer   = Object.create(null);
     for (const r of sCalls) {
@@ -445,18 +478,27 @@ function _registerCandidatesIntoSharedState(state, bundle, candList) {
       groups[key].push(r.sample_id);
       nPer[key]++;
     }
+    // (b) band-level grouping: one group per K-means band (band_0..band_{K-1}).
+    //     Faithful for any K; preserves multi-haplotype / nested structure.
+    //     band_tier_labels records each band's modal dosage tier so the
+    //     popstats output stays interpretable (which band is hom-ref etc.).
+    const bandGroups = _bandGroupsFromCalls(sCalls);
     records.push({
       candidate_id:     cand.candidate_id,
       chrom:            cand.chrom || chrom,
       start_bp:         cand.start,
       end_bp:           cand.end,
       span_bp:          (cand.end != null && cand.start != null) ? (cand.end - cand.start + 1) : null,
+      n_bands:          cand.n_bands != null ? cand.n_bands : null,
       regime_class:     cand.regime_class,
       confidence:       cand.confidence,
       support_score:    cand.support_score,
       heterozygote_band_present: !!cand.heterozygote_band_present,
       regime_groups:    groups,
       n_per_regime:     nPer,
+      band_groups:      bandGroups.groups,
+      n_per_band:       bandGroups.n_per_group,
+      band_tier_labels: bandGroups.tier_labels,
       supported_windows: wRows.filter(w => w.is_supported).map(w => w.window_id),
       qc: qcRow ? {
         possible_ancestry_confounding: !!qcRow.possible_ancestry_confounding,

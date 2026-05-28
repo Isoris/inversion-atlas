@@ -484,6 +484,13 @@ export function buildCatalogue(bandingResult, args) {
           const groups = _groupCallsByServerLabel(rec.regime_sample_calls);
           rec.regime_groups = groups.groups;
           rec.n_per_regime  = groups.n_per_group;
+          // Band-level grouping (one group per K-means band) — faithful for
+          // any K. tier labels keep it interpretable. Mirrors the in-memory
+          // registry written by run_pipeline._bandGroupsFromCalls.
+          const bands = _groupCallsByBand(rec.regime_sample_calls);
+          rec.band_groups      = bands.groups;
+          rec.n_per_band       = bands.n_per_group;
+          rec.band_tier_labels = bands.tier_labels;
         }
       }
     }
@@ -550,6 +557,34 @@ function _groupCallsByServerLabel(sample_calls) {
     n_per_group[key]++;
   }
   return { groups, n_per_group };
+}
+
+// Band-level grouping (one group per K-means band: band_0..band_{K-1}),
+// with each band's modal non-uncertain dosage tier as a label. Mirrors
+// run_pipeline._bandGroupsFromCalls so the on-disk catalogue + in-memory
+// registry carry the identical band-group shape.
+function _groupCallsByBand(sample_calls) {
+  const groups = Object.create(null);
+  const n_per_group = Object.create(null);
+  const tierVotes = Object.create(null);
+  for (const row of sample_calls) {
+    if (!row || !row.sample_id || row.band_id == null || row.band_id < 0) continue;
+    const key = `band_${row.band_id}`;
+    if (!groups[key]) { groups[key] = []; n_per_group[key] = 0; tierVotes[key] = Object.create(null); }
+    groups[key].push(row.sample_id);
+    n_per_group[key]++;
+    const tier = row.regime_call || 'uncertain';
+    if (tier !== 'uncertain') tierVotes[key][tier] = (tierVotes[key][tier] || 0) + 1;
+  }
+  const tier_labels = Object.create(null);
+  for (const key of Object.keys(groups)) {
+    let best = 'uncertain', bestN = 0;
+    for (const [tier, n] of Object.entries(tierVotes[key])) {
+      if (n > bestN) { best = tier; bestN = n; }
+    }
+    tier_labels[key] = best;
+  }
+  return { groups, n_per_group, tier_labels };
 }
 
 // ---------------------------------------------------------------------

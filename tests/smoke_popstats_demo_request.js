@@ -25,7 +25,7 @@ function assert(label, cond) {
 
 // -------- 1. requestGroups: drops uncertain + empty -------------------
 
-console.log('requestGroups — drops uncertain + empty, keeps karyotype groups');
+console.log('requestGroups tier — drops uncertain + empty, keeps karyotype groups');
 {
   const cand = {
     candidate_id: 'cand_A',
@@ -36,7 +36,7 @@ console.log('requestGroups — drops uncertain + empty, keeps karyotype groups')
       'uncertain': ['s7', 's8'],
     },
   };
-  const groups = __test.requestGroups(cand);
+  const groups = __test.requestGroups(cand, 'tier');
   assertEq('keeps H1/H1', groups['H1/H1'], ['s1', 's2', 's3']);
   assertEq('keeps H1/H2', groups['H1/H2'], ['s4', 's5']);
   assertEq('keeps H2/H2', groups['H2/H2'], ['s6']);
@@ -51,20 +51,48 @@ console.log('requestGroups — drops uncertain + empty, keeps karyotype groups')
     Object.values(groups).every(a => a.every(s => typeof s === 'string')));
 }
 
-console.log('requestGroups — drops empty arrays');
+console.log('requestGroups tier — drops empty arrays');
 {
   const cand = { regime_groups: { 'H1/H1': ['s1'], 'H1/H2': [], 'H2/H2': ['s2'] } };
-  const groups = __test.requestGroups(cand);
+  const groups = __test.requestGroups(cand, 'tier');
   assert('drops empty H1/H2', !('H1/H2' in groups));
   assertEq('count = 2', Object.keys(groups).length, 2);
 }
 
-console.log('requestGroups — single karyotype group → caller must reject (<2)');
+console.log('requestGroups tier — single karyotype group → caller must reject (<2)');
 {
   const cand = { regime_groups: { 'H1/H1': ['s1', 's2'], 'uncertain': ['s3'] } };
-  const groups = __test.requestGroups(cand);
+  const groups = __test.requestGroups(cand, 'tier');
   assertEq('only 1 usable group', Object.keys(groups).length, 1);
-  // Page guards on nGroups < 2 before POSTing — verified here at the data level.
+}
+
+console.log('requestGroups band — keeps every non-empty band, no uncertain concept');
+{
+  const cand = {
+    band_groups: {
+      band_0: ['s1', 's2'],
+      band_1: ['s3'],
+      band_2: ['s4', 's5'],
+      band_3: [],            // empty → dropped
+    },
+  };
+  const groups = __test.requestGroups(cand, 'band');
+  assertEq('band_0', groups['band_0'], ['s1', 's2']);
+  assertEq('band_1', groups['band_1'], ['s3']);
+  assertEq('band_2', groups['band_2'], ['s4', 's5']);
+  assert('drops empty band_3', !('band_3' in groups));
+  assertEq('count = 3', Object.keys(groups).length, 3);
+  // band mode preserves K>3 structure that the 3-tier collapse would lose.
+}
+
+console.log('requestGroups band — default mode is band');
+{
+  const cand = {
+    band_groups: { band_0: ['s1'], band_1: ['s2'] },
+    regime_groups: { 'H1/H1': ['s1', 's2'] },   // tier would give 1 group
+  };
+  const groups = __test.requestGroups(cand);   // no mode → band default
+  assertEq('default uses band_groups', Object.keys(groups).sort(), ['band_0', 'band_1']);
 }
 
 // -------- 2. extractPerGroup: θπ across response shapes ----------------
