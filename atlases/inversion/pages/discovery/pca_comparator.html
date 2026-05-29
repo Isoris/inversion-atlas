@@ -64,6 +64,20 @@
                      color: var(--ink-dim); display: none;"></span>
         <span id="pcaCompHoveredSample" style="color: var(--ink-dim); min-width: 80px;
                font-family: var(--mono); font-size: 10.5px;">hover: —</span>
+        <!-- 2026-05-26 Phase 3 (SPEC §Phase 3): Procrustes-aligned
+             single-panel overlay. Off by default — the 3 honest
+             side-by-side panels stay the primary view. When on, the
+             θπ + GHSL scatters are rigidly rotated/scaled/translated
+             onto the dosage scatter so each sample becomes 3 connected
+             markers (⬤ dosage, △ θπ, □ GHSL); long connectors = the
+             evidence axes disagree for that sample. The alignment is
+             DOSAGE-ANCHORED — clearly labelled because Procrustes can
+             make spurious agreement look real. -->
+        <label style="display: flex; align-items: center; gap: 4px; color: var(--ink-dim);"
+               title="Procrustes overlay: rigidly align θπ + GHSL onto dosage so each sample is 3 connected markers in one panel. DOSAGE-ANCHORED — the rotation is fitted, not natural; read drift (connector length), not absolute position.">
+          <input type="checkbox" id="pcaCompOverlayToggle">
+          overlay
+        </label>
       </div>
     </header>
 
@@ -118,6 +132,33 @@
         </div>
         <div style="position: relative; flex: 1 1 auto; min-height: 220px;">
           <canvas id="pcaCompCanvasGhsl" style="width: 100%; height: 100%;
+                  background: var(--bg); cursor: crosshair;"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2026-05-26 Phase 3: Procrustes overlay panel. Hidden by default;
+         shown (and #pcaCompBody hidden) when #pcaCompOverlayToggle is on.
+         Single full-width canvas — θπ/GHSL aligned onto dosage. -->
+    <div id="pcaCompOverlayWrap"
+         style="display: none; padding: 8px 14px;">
+      <div class="pca-comp-cell"
+           style="display: flex; flex-direction: column;
+                  border: 1px solid var(--rule); border-radius: 4px;
+                  background: var(--panel); overflow: hidden;">
+        <div class="pca-comp-cell-head"
+             style="padding: 4px 8px; border-bottom: 1px solid var(--rule);
+                    font-family: var(--mono); font-size: 10px; color: var(--ink-dim);
+                    display: flex; justify-content: space-between; align-items: center;"
+             title="Dosage-anchored Procrustes overlay. θπ and GHSL PCs are rigidly rotated + scaled + translated onto the dosage scatter (least-squares, per current window). Each sample is 3 markers connected by a thin line: short connector = the 3 evidence axes agree on where the sample sits; long connector = they disagree (recombinant / mosaic / axis-specific signal). The rotation is FITTED — read relative drift, not absolute coordinates.">
+          <span><b>cross-evidence overlay</b>
+            <span style="color: var(--ink-dim); font-weight: 400;">
+              · ⬤ dosage  △ θπ  □ GHSL · dosage-anchored Procrustes</span>
+          </span>
+          <span id="pcaCompOverlayStatus" style="font-size: 9.5px;">—</span>
+        </div>
+        <div style="position: relative; flex: 1 1 auto; min-height: 420px;">
+          <canvas id="pcaCompOverlayCanvas" style="width: 100%; height: 100%;
                   background: var(--bg); cursor: crosshair;"></canvas>
         </div>
       </div>
@@ -221,7 +262,8 @@
                    font-family: var(--mono); font-size: 10px; color: var(--ink-dim);">
       ←/→ scrub window across all 3 panels · hover a dot to track it across panels ·
       heatmap below: regime cores, boundaries, microstripes · click a heatmap column to jump ·
-      Phase 1 (side-by-side). Read-only inspector — see
-      <code>specs_todo/SPEC_local_pca_comparator.md</code>.
+      <b>overlay</b> (header) = dosage-anchored Procrustes of all 3 axes in one panel —
+      read drift (connector length), not absolute position. Read-only inspector — see
+      <code>specs_done/SPEC_local_pca_comparator.md</code>.
     </footer>
   </div>

@@ -31,6 +31,55 @@ check('state exports _setActiveState',    typeof state._setActiveState === 'func
 const renderer = await import('../atlases/inversion/pages/discovery/pca_comparator/renderer.js');
 check('renderer exports paintPanel',       typeof renderer.paintPanel       === 'function');
 check('renderer exports findSampleAtPixel', typeof renderer.findSampleAtPixel === 'function');
+// Phase 3 (2026-05-26): Procrustes overlay.
+check('renderer exports paintProcrustesOverlay', typeof renderer.paintProcrustesOverlay === 'function');
+check('renderer exports _alignLayerToDosage',    typeof renderer._alignLayerToDosage === 'function');
+
+// =====================================================================
+group('Phase 3 — Procrustes alignment math');
+{
+  const align = renderer._alignLayerToDosage;
+  // Reference (dosage) scatter — 4 samples.
+  const ref = {
+    xs: [0, 1, 1, 0],
+    ys: [0, 0, 1, 1],
+  };
+  // Build a layer that is `ref` rotated +90° and scaled ×2 (+ shifted).
+  // Procrustes must recover the inverse so the aligned points land back
+  // on `ref`. Rotation +90°: (x,y) → (-y, x). Scale ×2, translate (+5,-3).
+  const layer = { xs: [], ys: [] };
+  for (let i = 0; i < 4; i++) {
+    const x = ref.xs[i], y = ref.ys[i];
+    layer.xs.push(2 * (-y) + 5);
+    layer.ys.push(2 * ( x) - 3);
+  }
+  const aligned = align(ref, layer);
+  check('alignment returns a result for a clean similarity transform', !!aligned);
+  if (aligned) {
+    check('recovered scale ≈ 0.5 (inverse of ×2)',
+          Math.abs(aligned.scale - 0.5) < 1e-6,
+          `got ${aligned.scale}`);
+    let maxErr = 0;
+    for (let i = 0; i < 4; i++) {
+      maxErr = Math.max(maxErr,
+        Math.abs(aligned.xs[i] - ref.xs[i]),
+        Math.abs(aligned.ys[i] - ref.ys[i]));
+    }
+    check('aligned points land back on the reference (err < 1e-6)',
+          maxErr < 1e-6, `maxErr=${maxErr}`);
+  }
+  // Degenerate: fewer than 2 paired finite points → null (no rotation defined).
+  const sparse = align({ xs: [0, NaN, NaN], ys: [0, NaN, NaN] },
+                       { xs: [1, NaN, NaN], ys: [1, NaN, NaN] });
+  check('alignment returns null when < 2 paired points', sparse === null);
+  // NaN samples in the layer stay NaN in the aligned output (not coerced to 0).
+  const withGap = align(ref, {
+    xs: [layer.xs[0], NaN, layer.xs[2], layer.xs[3]],
+    ys: [layer.ys[0], NaN, layer.ys[2], layer.ys[3]],
+  });
+  check('missing layer sample → NaN in aligned output',
+        withGap && Number.isNaN(withGap.xs[1]));
+}
 
 const heatmap = await import('../atlases/inversion/pages/discovery/pca_comparator/heatmap.js');
 check('heatmap exports paintHeatmap',     typeof heatmap.paintHeatmap   === 'function');

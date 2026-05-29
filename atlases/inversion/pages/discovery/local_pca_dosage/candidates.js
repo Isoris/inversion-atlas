@@ -930,6 +930,30 @@ export function loadCandidateList(state) {
   }
 }
 
+// --- loadPersistedCandidatesForChrom — 2026-05-29 ---
+// Read the persisted candidate list for a chrom STRAIGHT from localStorage,
+// without needing the local_pca_dosage page to have mounted this session.
+// Sibling pages (candidate_regimes, haplotype_regimes short-range) normally
+// read the in-memory bridge inv._local_pca_dosage_state.candidateList, which
+// is only populated once local_pca_dosage has mounted + run loadCandidateList
+// (or the user promoted a candidate this session). After a cold reload —
+// navigating straight to candidate_regimes — that bridge is empty even though
+// the candidates are still saved. This lets those pages see them anyway.
+// Returns [] on miss / parse error. `chrom` must be the scrubber_main payload
+// chrom (data.chrom) — the same value the save path keys on.
+export function loadPersistedCandidatesForChrom(chrom) {
+  try {
+    const raw = localStorage.getItem(_candStorageKey(chrom));
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr.map(candidateFromJSON).filter(Boolean);
+  } catch (e) {
+    console.warn('[candidate] loadPersistedCandidatesForChrom failed:', e.message);
+    return [];
+  }
+}
+
 // --- candidateToJSON / candidateFromJSON ---
 // Minimal JSON roundtrip — locked_labels needs to survive as Int8Array,
 // everything else is plain serializable.

@@ -349,6 +349,23 @@ function _wireL3Controls(state) {
     if (saved === '0') state.stepModeSync = false;
     else if (saved === '1') state.stepModeSync = true;
   } catch (_) {}
+  // 2026-05-29: reconcile a stale step/compare mismatch on mount. stepMode
+  // and compareUnit are restored independently above; when sync is on they
+  // MUST agree, but a state saved before the sync feature existed (or saved
+  // while sync was off, then re-enabled) loads mismatched — the user sees
+  // "the L3 panels aren't synchronized with the Z-panel scale". Treat the
+  // Z-panel stepMode as the source of truth and pull compareUnit (+ N) to
+  // match, once, before the DOM mirror below paints the active classes.
+  if (state.stepModeSync) {
+    const mapToCompare = { l2: 'L2', win1: 'win1', win5: 'win5', win10: 'win10', winN: 'winN' };
+    const want = mapToCompare[state.stepMode];
+    if (want) state.compareUnit = want;
+    if (state.stepMode === 'winN') {
+      const n = Math.max(1, (state.compareUnitN | 0) || (state.stepModeN | 0) || 1);
+      state.compareUnitN = n;
+      state.stepModeN = n;
+    }
+  }
   // Visual mirror — the #stepModeBar HTML defaults to L2 active and
   // #l3CompareUnit defaults to L2 active. After restoring the slots
   // above, sync the active class so the toolbar reflects the actual
@@ -952,8 +969,24 @@ function _installPageResizeObserver(state) {
   const page = document.getElementById('local_pca_dosage');
   if (!page || page.dataset.resizeObserverWired === '1') return;
   let rafId = null;
+  // 2026-05-29 (the "L3 panel refreshes every second / glitches" loop):
+  // every repaint re-fits all canvases, and a fit can nudge the page root
+  // height a pixel or two; that re-fires THIS observer → repaint → nudge …
+  // a self-sustaining ResizeObserver feedback loop. The earlier fingerprint
+  // short-circuit only stopped the L3 *rebuild*, not the loop (drawZ/drawPCA/
+  // drawLinesPanel still run every tick and can each reflow by a sub-pixel).
+  // Gate: remember the size we last *painted* at and ignore observer ticks
+  // whose size matches it — only a real (external) resize gets through.
+  let baseW = -1, baseH = -1;
+  const recordBaseline = () => { baseW = page.clientWidth; baseH = page.clientHeight; };
   const repaint = () => {
     rafId = null;
+    // A genuine resize must re-fit the L3 mini-PCAs (the reason this observer
+    // exists — otherwise they stay blurred). renderL3Panel short-circuits on
+    // an unchanged content-fingerprint that does NOT encode canvas size, so
+    // force one rebuild here. Safe from looping: the baseline below absorbs
+    // the rebuild's own reflow so it isn't read back as a fresh resize.
+    state._l3CacheRendered = false;
     try { drawSim(state); }        catch (_) {}
     try { drawSimMini(state); }    catch (_) {}
     try { drawZ(state); }          catch (_) {}
@@ -961,8 +994,15 @@ function _installPageResizeObserver(state) {
     try { drawAnchorStrip(state); }catch (_) {}
     try { drawLinesPanel(state); } catch (_) {}
     try { renderL3Panel(state); }  catch (_) {}
+    recordBaseline();
+    // renderL3Panel defers its DOM rebuild to its own rAF, so the height it
+    // changes lands a frame later — re-record on the trailing frame so that
+    // reflow doesn't read as a new resize on the next observer tick.
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(recordBaseline);
   };
   const ro = new ResizeObserver(() => {
+    const w = page.clientWidth, h = page.clientHeight;
+    if (baseW >= 0 && Math.abs(w - baseW) < 2 && Math.abs(h - baseH) < 2) return;
     if (rafId != null) return;
     rafId = requestAnimationFrame(repaint);
   });

@@ -14,6 +14,16 @@
       </div>
     </header>
 
+    <!-- 2026-05-29: saturation / reliability warning. Shown when the
+         auto-detect carpets the whole chromosome (label-drift artifact). -->
+    <div id="nestedDetectorWarning" class="nested-warning"
+         style="display:none; margin: 0 14px 6px; padding: 7px 12px;
+                border: 1px solid rgba(245,165,36,0.5);
+                border-left: 4px solid var(--accent);
+                background: rgba(245,165,36,0.10); border-radius: 4px;
+                font-family: var(--mono); font-size: 10.5px; color: var(--ink);
+                line-height: 1.5;"></div>
+
     <div class="nested-body">
       <div class="nested-tracks-wrap">
         <canvas id="nestedDetectorTracksCanvas" class="nested-tracks-canvas"></canvas>

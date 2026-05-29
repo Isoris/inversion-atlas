@@ -240,8 +240,14 @@ async function _postJson(url, body) {
     try {
       const text = await resp.text();
       if (text) {
-        try { serverMsg = (JSON.parse(text).detail) || text; }
-        catch (_) { serverMsg = text; }
+        try {
+          const d = JSON.parse(text).detail;
+          // FastAPI HTTPException → detail is a string; Pydantic validation
+          // errors → detail is an array of error objects. Stringify the
+          // latter so the badge never renders "[object Object]".
+          serverMsg = (typeof d === 'string') ? d
+                    : (d != null ? JSON.stringify(d) : text);
+        } catch (_) { serverMsg = text; }
       }
     } catch (_) {}
     return { ok: false, status: resp.status, error: 'http', message: serverMsg };
@@ -264,12 +270,13 @@ async function _postJson(url, body) {
 function _renderNotReady(slotId, opts, result) {
   const slot = document.getElementById(slotId);
   if (!slot) return;
-  // Build a reason string that distinguishes the three real failure modes:
+  // Build a reason string that distinguishes the real failure modes:
   //   404 → endpoint not wired                  (badge says "not ready")
-  //   400 (with server message, e.g. min_group_n violated) → "rejected"
-  //                                              (the request was malformed
-  //                                              for THIS candidate, but the
-  //                                              endpoint itself is live)
+  //   422 → inputs unavailable in this deploy    (badge says "unavailable")
+  //         e.g. Hobs needs per-sample BAMs that aren't deployed — the
+  //         request was valid, the data just isn't here. Not an error.
+  //   400 → request rejected (malformed for THIS candidate, e.g.
+  //         min_group_n violated); the endpoint itself is live → "rejected"
   //   5xx → server error                        (atlas_server.py threw)
   //   other → "popstats: <bare error>"
   let glyph = '○';
@@ -282,8 +289,13 @@ function _renderNotReady(slotId, opts, result) {
     reasonText = `popstats server returned ${status} but body wasn't JSON`;
   } else if (result.error === 'http' && status === 404) {
     reasonText = 'endpoint not implemented in atlas_server.py';
+  } else if (result.error === 'http' && status === 422) {
+    // Data-availability gap, not a crash. Keep the ○ glyph (same as "data
+    // pending") and surface the server's explanation verbatim.
+    badgeText = 'unavailable';
+    reasonText = result.message || 'metric unavailable in this deployment';
   } else if (result.error === 'http' && status >= 400 && status < 500) {
-    // 400 / 422 — request was rejected. Server's `detail` message is the
+    // 400 / 4xx — request was rejected. Server's `detail` message is the
     // useful payload (e.g. "group 'band_2' has only 7 known samples after
     // filtering against canonical sample_list (min_group_n=10)").
     glyph = '⚠';

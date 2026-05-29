@@ -16,6 +16,7 @@ import {
   buildGroupColorMap,
   dosageValueToColor,
   dosageMagmaColor,
+  dosageDivergentColor,
   dosageGenotypeColor,
   pickDosageColorFn,
   confidenceColor,
@@ -57,18 +58,25 @@ state._setActiveState(null);
 check('_setActiveState(null) clears',            state._pageState === null);
 
 // =====================================================================
-group('renderer.dosageMagmaColor (default ramp)');
+group('renderer.dosageDivergentColor (default ramp — blue/white/red, 2026-05-29)');
 
-// Magma stops at the test points: t=0 → (0,0,4); t=0.5 → (183,55,121);
-// t=1 → (252,253,191). Default vmin/vmax = 0/2 so v=1 lands at t=0.5.
+// RdBu stops: t=0 → (33,102,172) blue; t=0.5 → (247,247,247) white;
+// t=1 → (178,24,43) red. Default vmin/vmax = 0/2 so v=1 lands at t=0.5.
+check('v=0 → divergent blue (hom-ref)',          dosageDivergentColor(0) === 'rgb(33,102,172)');
+check('v=1 → divergent white (het)',             dosageDivergentColor(1) === 'rgb(247,247,247)');
+check('v=2 → divergent red (hom-alt)',           dosageDivergentColor(2) === 'rgb(178,24,43)');
+check('NaN → mauve missing',                     dosageDivergentColor(NaN) === 'rgb(238,214,222)');
+check('custom vmin/vmax respected (t=0.5→white)', dosageDivergentColor(0.5, 0, 1) === 'rgb(247,247,247)');
+
+// dosageValueToColor now aliases the divergent ramp (magma retired).
+check('dosageValueToColor alias → divergent',    dosageValueToColor(0) === dosageDivergentColor(0));
+
+group('renderer.dosageMagmaColor (legacy palette — retired as default)');
+
+// The magma fn is still exported (back-compat) but no longer the heatmap
+// default. Endpoints unchanged.
 check('v=0 → magma dark',                        dosageMagmaColor(0) === 'rgb(0,0,4)');
 check('v=2 → magma yellow',                      dosageMagmaColor(2) === 'rgb(252,253,191)');
-check('v=1 → magma magenta mid',                 dosageMagmaColor(1) === 'rgb(183,55,121)');
-check('NaN → pale-pink missing',                 dosageMagmaColor(NaN) === 'rgb(230,210,220)');
-check('custom vmin/vmax respected (t=0.5)',      dosageMagmaColor(0.5, 0, 1) === 'rgb(183,55,121)');
-
-// dosageValueToColor is now an alias for the magma ramp.
-check('dosageValueToColor alias → magma',        dosageValueToColor(0) === dosageMagmaColor(0));
 
 group('renderer.dosageGenotypeColor (discrete white / blue / red)');
 
@@ -79,9 +87,9 @@ check('NaN → mauve (missing)',                   dosageGenotypeColor(NaN) === 
 
 group('renderer.pickDosageColorFn');
 
-check('magma → magma fn',                        pickDosageColorFn('magma')(1, 0, 2) === 'rgb(183,55,121)');
+check('dosage → divergent fn',                   pickDosageColorFn('dosage')(1, 0, 2) === 'rgb(247,247,247)');
 check('genotype → genotype fn',                  pickDosageColorFn('genotype')(1) === 'rgb( 56,107,196)');
-check('default → magma',                         pickDosageColorFn()(2, 0, 2) === 'rgb(252,253,191)');
+check('default → divergent',                     pickDosageColorFn()(2, 0, 2) === 'rgb(178,24,43)');
 
 // =====================================================================
 group('renderer.buildGroupColorMap');

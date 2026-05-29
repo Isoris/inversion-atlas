@@ -43,25 +43,6 @@
       "tooltip": "Cross-evidence PCA comparator (dosage · θπ · GHSL). 3 synchronized mini-PCA panels at the active window; hover a dot to track it across all 3 axes + per-sample 3-axis trajectory + concordance badge. K-band coloring inherits from the anchor's clustering (default: dosage). Read-only inspector."
     },
     {
-      "id": "boundary_refinement",
-      "slug": "boundary_refinement",
-      "label": "boundaries",
-      "stage": "discovery",
-      "fragment": "atlases/inversion/pages/review/boundary_refinement.html",
-      "module": "atlases/inversion/pages/review/boundary_refinement.js",
-      "_was_id": "page11"
-    },
-    {
-      "id": "sv_evidence",
-      "slug": "sv_evidence",
-      "label": "SV evidence",
-      "stage": "tooling",
-      "_stage_moved_2026_05_21": "Was 'discovery'; relocated to 'tooling' per Quentin — SV-call inspection is conceptually a per-candidate validation cartridge, not a discovery surface. Sits alongside tree_panel / fingerprint_track / similarity_matrix / pca_scatter_per_window / dosage_heatmap / nested_inversion_detector / dosage_cluster_adaptive_k as an inspector that helps characterise a candidate. The 'discovery' stage's _doc previously billed it as a 'last-step validation' page, but the validation framing fits 'tooling' better since SV evidence is opened ON DEMAND per candidate rather than walked through linearly with the other discovery pages.",
-      "fragment": "atlases/inversion/pages/review/sv_evidence.html",
-      "module": "atlases/inversion/pages/review/sv_evidence.js",
-      "_was_id": "page_sv_evidence"
-    },
-    {
       "id": "sim_mat",
       "slug": "sim_mat",
       "label": "sim_mat",
@@ -150,15 +131,6 @@
       "_was_id": "page8"
     },
     {
-      "id": "negative_regions",
-      "slug": "negative_regions",
-      "label": "negative regions catalogue",
-      "stage": "catalogue",
-      "fragment": "atlases/inversion/pages/discovery/negative_regions.html",
-      "module": "atlases/inversion/pages/discovery/negative_regions.js",
-      "_was_id": "page19"
-    },
-    {
       "id": "catalogue",
       "slug": "catalogue",
       "label": "catalogue",
@@ -166,33 +138,6 @@
       "fragment": "atlases/inversion/pages/catalogue/catalogue.html",
       "module": "atlases/inversion/pages/catalogue/catalogue.js",
       "_was_id": "page3"
-    },
-    {
-      "id": "confirmed_carousel",
-      "slug": "confirmed_carousel",
-      "label": "confirmed carousel",
-      "stage": "catalogue",
-      "fragment": "atlases/inversion/pages/catalogue/confirmed_carousel.html",
-      "module": "atlases/inversion/pages/catalogue/confirmed_carousel.js",
-      "_was_id": "page9"
-    },
-    {
-      "id": "marker_panels",
-      "slug": "marker_panels",
-      "label": "marker panels",
-      "stage": "catalogue",
-      "fragment": "atlases/inversion/pages/catalogue/marker_panels.html",
-      "module": "atlases/inversion/pages/catalogue/marker_panels.js",
-      "_was_id": "page10"
-    },
-    {
-      "id": "annotation_cockpit",
-      "slug": "annotation_cockpit",
-      "label": "annotation cockpit",
-      "stage": "catalogue",
-      "fragment": "atlases/inversion/pages/catalogue/annotation_cockpit.html",
-      "module": "atlases/inversion/pages/catalogue/annotation_cockpit.js",
-      "_was_id": "page21"
     },
     {
       "id": "candidate_regimes",
@@ -213,15 +158,6 @@
       "_was_id": "page4"
     },
     {
-      "id": "marker_readiness",
-      "slug": "marker_readiness",
-      "label": "marker panel",
-      "stage": "classification",
-      "fragment": "atlases/inversion/pages/catalogue/marker_readiness.html",
-      "module": "atlases/inversion/pages/catalogue/marker_readiness.js",
-      "_was_id": "page18"
-    },
-    {
       "id": "popstats_demo",
       "slug": "popstats_demo",
       "label": "popstats (per regime group)",
@@ -229,28 +165,6 @@
       "fragment": "atlases/inversion/pages/review/popstats_demo.html",
       "module": "atlases/inversion/pages/review/popstats_demo.js",
       "tooltip": "Integration proof for the regime → popstats loop. Reads atlasState.shared.registeredCandidates (written by the haplotype-regimes pipeline on run-complete) and POSTs each candidate's regime_groups to /api/popstats/groupwise, rendering θπ per regime group + pairwise FST/dXY. Honest server-down / endpoint-unwired / group-too-small states."
-    },
-    {
-      "id": "stats_profile",
-      "slug": "stats_profile",
-      "label": "stats profile",
-      "stage": "synthesis",
-      "fragment": "atlases/inversion/pages/catalogue/stats_profile.html",
-      "module": "atlases/inversion/pages/catalogue/stats_profile.js",
-      "_was_id": "page17",
-      "tooltip": "Manuscript-bound statistical profile per candidate. Reads cross-species.synteny + runs the focal-vs-background permutation test on top of base pi/FST/dXY/HWE. Complement to popstats.popstats (which is the lightweight live group-wise tile); stats_profile is the deep, manuscript-ready surface.",
-      "_overlap_resolved_2026_05_23": "Earlier audit flagged stats_profile as potentially duplicating popstats.popstats. Resolved 2026-05-23: keep both. popstats.popstats = live cohort tile, computes groupwise_stats_v1 on demand. stats_profile = manuscript page, layers cross-species synteny + permutation test on top + writes the manuscript-ready table. Complementary, not redundant. Do NOT consolidate."
-    },
-    {
-      "id": "overview",
-      "slug": "overview",
-      "label": "overview",
-      "stage": "synthesis",
-      "fragment": "atlases/inversion/pages/catalogue/overview.html",
-      "module": "atlases/inversion/pages/catalogue/overview.js",
-      "_was_id": "page_overview",
-      "tooltip": "Synthesis landing surface. Two tiles: (1) layer inventory — workspace action-pipeline envelopes queried from GET /api/layers, grouped by layer_type; (2) candidate spreadsheet — sortable + filterable table of all promoted inversion candidates with TSV export. Manuscript-bound deliverable.",
-      "_status_2026_05_23": "Implemented in two tiles 2026-05-23. (a) Layer inventory had landed round-1 2026-05-14. (b) Candidate spreadsheet added 2026-05-23 — completes the second feature the legacy monolith comments hinted at ('candidate overview spreadsheet, manuscript-bound deliverables', monolith line 5134). Earlier annotation calling this an 'empty stub' was based on the page's outdated header comment and is no longer accurate."
     },
     {
       "id": "help",
@@ -326,12 +240,6 @@
       "label": "classification",
       "order": 4,
       "_doc": "Per-candidate karyotype assignment + marker readiness. Shrunk to 2 pages on 2026-05-18 (see STAGE_AUDIT_2026-05-18.md): ancestry / boundary-refinement / SV-evidence / popstats / stats_profile / overview moved out to evolution / discovery_2 / synthesis. Only karyotype_tier + marker_readiness remain — the actual per-candidate \"what kind of inversion\" surfaces."
-    },
-    {
-      "id": "synthesis",
-      "label": "synthesis",
-      "order": 5,
-      "_doc": "Cohort-level synthesis surfaces. Project overview, manuscript-ready statistical profile, per-window popstats track stack. Restored 2026-05-18 — these pages were originally synthesis-stage in legacy but got swept into classification by the slug-migration scripts. See STAGE_AUDIT_2026-05-18.md for the audit trail."
     },
     {
       "id": "help",
@@ -477,24 +385,40 @@
     "exports": [
       {
         "layer": "inversion.candidates_v1",
-        "used_by": ["evolution", "popstats", "cross-species", "relatedness", "meiosis"],
+        "used_by": [
+          "evolution",
+          "popstats",
+          "cross-species",
+          "relatedness",
+          "meiosis"
+        ],
         "purpose": "The canonical inversion candidate list. Every per-candidate operation in every atlas is keyed by candidate_id."
       },
       {
         "layer": "inversion.scrubber_main",
-        "used_by": ["popstats", "evolution"],
+        "used_by": [
+          "popstats",
+          "evolution"
+        ],
         "purpose": "Per-chrom local-PCA atlas JSON. Read by review/popstats.js and age_divergence for chrom-level context."
       },
       {
         "layer": "inversion.regime_catalogue_v1",
-        "used_by": ["popstats", "relatedness"],
+        "used_by": [
+          "popstats",
+          "relatedness"
+        ],
         "purpose": "Haplotype regime catalogue (Cluster 4 of the haplotype-regimes pipeline). Relatedness reads it for regime-inheritance; popstats reads it for per-regime stats."
       },
       {
         "layer": "inversion.candidate_lineage",
-        "used_by": ["evolution", "popstats"],
+        "used_by": [
+          "evolution",
+          "popstats"
+        ],
         "purpose": "Per-candidate version-index. Required arg for all per-candidate cross-atlas reads."
       }
     ]
-  }
+  },
+  "_stages_removed_2026_05_29": "Removed 'synthesis' stage — its only pages (stats_profile, overview) moved to the 'other' atlas."
 }

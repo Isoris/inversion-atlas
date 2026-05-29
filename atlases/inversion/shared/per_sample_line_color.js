@@ -27,7 +27,6 @@
 
 import { computeHetRateForRange, computeDosageMeanForRange } from './dosage_chunks.js';
 import { hetRateColor } from './het_rate.js';
-import { simColor } from './color_helpers.js';
 
 const CONFOUNDER_FROH_THRESHOLD = 0.05;
 
@@ -436,17 +435,14 @@ export function perSampleColorFor(mode, value, valuesArr) {
   if (!Number.isFinite(value)) return null;
 
   if (mode === 'het') {
-    // 2026-05-26 (revised): legacy `simColor` viridis-ish ramp (deep
-    // blue → light blue → yellow). Sequential, perceptually uniform,
-    // no olive midpoint collapse. Quentin: "use the same color ramp as
-    // in legacy was some sort of viridis but not magma".
-    // Range scaled to the cohort [vMin, vMax] so the visible spread is
-    // always full-range regardless of how tight the distribution is.
-    const r = _cohortRange(valuesArr);
-    if (!r || r.vMin === r.vMax) return hetRateColor(value);
-    const t = (value - r.vMin) / (r.vMax - r.vMin);
-    const [cr, cg, cb] = simColor(t);
-    return `rgb(${cr},${cg},${cb})`;
+    // 2026-05-29 (revised again): red/white/blue RdBu divergent, anchored
+    // at the diallelic expected-het rate 0.5 (white = expected, blue =
+    // homozygous-low, red = pure-het anomaly). This is the legacy page-1
+    // het ramp. Quentin: "for page 1 in het dosage mode it should be
+    // between red white and blue ... like GHSL where the ramp is
+    // divergent" — NOT the viridis blue→yellow we briefly tried.
+    // hetRateColor already does the 0.5-anchored RdBu mapping over [0,1].
+    return hetRateColor(value);
   }
 
   if (mode === 'froh') {
@@ -472,22 +468,33 @@ export function perSampleColorFor(mode, value, valuesArr) {
   }
 
   if (mode === 'dosage') {
-    // 2026-05-26 (revised): legacy `simColor` viridis-ish ramp, same as
-    // het. Cohort-rescaled to [vMin, vMax] so a tightly-clustered
-    // cohort still shows the full color spread; falls back to a fixed
-    // [0, 2] mapping when no valuesArr is supplied.
-    const r = _cohortRange(valuesArr);
-    let t;
-    if (r && r.vMin !== r.vMax) {
-      t = (value - r.vMin) / (r.vMax - r.vMin);
-    } else {
-      t = Math.max(0, Math.min(1, value / 2));
-    }
-    const [cr, cg, cb] = simColor(t);
-    return `rgb(${cr},${cg},${cb})`;
+    // 2026-05-29 (revised): red/white/blue RdBu divergent anchored at
+    // dosage = 1.0 (mean het). Per-sample mean dosage runs [0, 2]:
+    // 0 = hom-ref (blue), 1 = balanced/het (white), 2 = hom-alt (red).
+    // Same divergent family as het / z-panel / GHSL — Quentin wants the
+    // dosage-derived modes consistent, not the viridis we briefly used.
+    const t = Math.max(0, Math.min(1, value / 2));
+    return _divergentBlueWhiteRed(t);
   }
 
   return null;
+}
+
+// Red/white/blue (RdBu) divergent ramp. t in [0,1]: 0 → blue, 0.5 →
+// white, 1 → red. Stops match het_rate.js HET_RAMP so het / dosage /
+// the |Z| panel all read in the same blue-white-red language.
+function _divergentBlueWhiteRed(t) {
+  const tt = Math.max(0, Math.min(1, t));
+  const COLD = [0x21, 0x66, 0xAC];   // #2166AC
+  const MID  = [0xF7, 0xF7, 0xF7];   // #F7F7F7
+  const WARM = [0xB2, 0x18, 0x2B];   // #B2182B
+  let a, b, u;
+  if (tt <= 0.5) { a = COLD; b = MID;  u = tt * 2; }
+  else           { a = MID;  b = WARM; u = (tt - 0.5) * 2; }
+  const r = Math.round(a[0] + (b[0] - a[0]) * u);
+  const g = Math.round(a[1] + (b[1] - a[1]) * u);
+  const bl = Math.round(a[2] + (b[2] - a[2]) * u);
+  return `rgb(${r},${g},${bl})`;
 }
 
 // Sequential ramps. Kept inline (no dependency on a chroma library);

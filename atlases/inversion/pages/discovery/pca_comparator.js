@@ -29,6 +29,7 @@ import {
   paintTrajectory,
   computeConcordance,
   windowAtLinesX,
+  paintProcrustesOverlay,
 } from './pca_comparator/renderer.js';
 import {
   paintHeatmap,
@@ -183,6 +184,10 @@ function _buildPageState(atlasState) {
     // windows by 10 windows … click focal and it would show the dosage
     // but for 10 windows like the same interval as focal."
     heatmapScope: 'genome',
+    // 2026-05-26 Phase 3: Procrustes overlay mode. false → the 3
+    // side-by-side panels (default); true → single dosage-anchored
+    // overlay panel. Toggled via #pcaCompOverlayToggle.
+    overlayMode: false,
     hoveredSample: -1,
     _teardownFns: [],
     _canvasIds: {
@@ -299,9 +304,21 @@ function _refreshTrajectoryAndConcord(state) {
 // ---------------------------------------------------------------------------
 function _paintAll(state) {
   if (typeof document === 'undefined') return;
-  paintPanel(state, 'dosage');
-  paintPanel(state, 'theta_pi');
-  paintPanel(state, 'ghsl');
+  // 2026-05-26 Phase 3: toggle the 3-panel grid vs the single overlay
+  // panel. Only the visible one is painted.
+  const body    = document.getElementById('pcaCompBody');
+  const overlay = document.getElementById('pcaCompOverlayWrap');
+  if (state.overlayMode) {
+    if (body)    body.style.display    = 'none';
+    if (overlay) overlay.style.display = 'block';
+    paintProcrustesOverlay(state);
+  } else {
+    if (body)    body.style.display    = 'grid';
+    if (overlay) overlay.style.display = 'none';
+    paintPanel(state, 'dosage');
+    paintPanel(state, 'theta_pi');
+    paintPanel(state, 'ghsl');
+  }
   // 2026-05-26: heatmap moved off the sync path. paintHeatmap builds an
   // Int8Array(nWin×nSam) + per-pixel ImageData fill (~2M writes on LG01)
   // and was blocking first paint right next to paintLines. Both now go
@@ -404,6 +421,24 @@ function _wireToolbar(state) {
     };
     anchorSel.addEventListener('change', onChange);
     state._teardownFns.push(() => anchorSel.removeEventListener('change', onChange));
+  }
+  // 2026-05-26 Phase 3: Procrustes overlay toggle. Persisted so a reload
+  // keeps the choice. When on, _paintAll swaps the 3-panel grid for the
+  // single overlay panel.
+  const overlayToggle = document.getElementById('pcaCompOverlayToggle');
+  if (overlayToggle) {
+    try {
+      const saved = localStorage.getItem('pca_comparator.overlayMode');
+      if (saved === '1') state.overlayMode = true;
+    } catch (_) {}
+    overlayToggle.checked = !!state.overlayMode;
+    const onToggle = () => {
+      state.overlayMode = !!overlayToggle.checked;
+      try { localStorage.setItem('pca_comparator.overlayMode', state.overlayMode ? '1' : '0'); } catch (_) {}
+      _paintAll(state);
+    };
+    overlayToggle.addEventListener('change', onToggle);
+    state._teardownFns.push(() => overlayToggle.removeEventListener('change', onToggle));
   }
   // PC1 / PC2 buttons for the per-sample lines strip.
   const b1 = document.getElementById('pcaCompLinesAxisPC1');
@@ -664,13 +699,28 @@ function _wireCanvasHover(state) {
     _hoverRafId = requestAnimationFrame(() => {
       _hoverRafId = 0;
       _renderHeader(state);
-      paintPanel(state, 'dosage');
-      paintPanel(state, 'theta_pi');
-      paintPanel(state, 'ghsl');
+      // 2026-05-26 Phase 3: in overlay mode only the overlay canvas is
+      // visible — repaint it instead of the 3 hidden scatters.
+      if (state.overlayMode) {
+        paintProcrustesOverlay(state);
+      } else {
+        paintPanel(state, 'dosage');
+        paintPanel(state, 'theta_pi');
+        paintPanel(state, 'ghsl');
+      }
     });
   };
-  for (const layer of ['dosage', 'theta_pi', 'ghsl']) {
-    const canvas = document.getElementById(state._canvasIds[layer]);
+  // The overlay canvas hit-tests against the dosage marker positions
+  // (stashed under _lastScreenXY.overlay), so its hover layer key is
+  // 'overlay'.
+  const hoverTargets = [
+    { layer: 'dosage',   id: state._canvasIds.dosage },
+    { layer: 'theta_pi', id: state._canvasIds.theta_pi },
+    { layer: 'ghsl',     id: state._canvasIds.ghsl },
+    { layer: 'overlay',  id: 'pcaCompOverlayCanvas' },
+  ];
+  for (const { layer, id } of hoverTargets) {
+    const canvas = document.getElementById(id);
     if (!canvas) continue;
     const onMove = (e) => {
       const rect = canvas.getBoundingClientRect();

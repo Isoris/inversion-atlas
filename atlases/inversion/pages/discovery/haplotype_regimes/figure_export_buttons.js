@@ -23,7 +23,13 @@
 // draw function and is deferred to a v2.
 // =====================================================================
 
-import { drawRegimesPanel, drawRegimesPC1Panel } from './regimes_page.js';
+// 2026-05-29: drawRegimesPanel + drawRegimesPC1Panel live in their own
+// panel modules, NOT regimes_page.js (which only exports initRegimesPage
+// + computeGenomeView). The wrong path here was a broken named import,
+// which threw at module-eval and stopped the entire haplotype_regimes
+// chain from loading — the tab switched but the page never mounted.
+import { drawRegimesPanel } from './regimes_panel.js';
+import { drawRegimesPC1Panel } from './regimes_pc1_panel.js';
 import { downloadString, downloadCanvasAsPNG } from '../../../shared/figure_export.js';
 
 const DPR_HIGHQ = 4;     // 4× — ≈ 288 DPI at typical CSS sizes (print-ready)

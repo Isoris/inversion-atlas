@@ -69,7 +69,7 @@ import { buildRegistryOverlay } from './dosage_heatmap/regime_registry_overlay.j
 const DEFAULT_VIEW_STATE = Object.freeze({
   sample_order_mode:     'by_group',
   marker_order_mode:     'natural',
-  color_mode:            'magma',    // 'magma' | 'genotype'
+  color_mode:            'dosage',   // 'dosage' (blue-white-red divergent) | 'genotype'
   show_group_track:      true,
   show_k6_track:         false,
   show_ghsl_track:       false,      // per-sample mean GHSL (continuous)
@@ -173,11 +173,12 @@ export async function mount(root, atlasState, registry) {
       _setActiveState(pageState);
       try { refreshDosageHeatmap(pageState); }
       catch (e) { console.warn('dosage_heatmap.mount: post-autoload refresh threw —', e); }
-      // 2026-05-26: re-wire the toolbar so its selection subscribe + key
-      // handlers bind to the NEW pageState. Without this the original
-      // wire references the abandoned pre-load pageState and dropdowns
-      // appear to do nothing because the selection.subscribe was on the
-      // dead state. _wireToolbar is idempotent (calls _teardownToolbar).
+      // 2026-05-26: re-wire the toolbar so its handlers + selection
+      // subscribe bind to the NEW pageState. Without this the original
+      // wire (run before the auto-load) closes over the abandoned
+      // pre-load pageState — reorder dropdowns / track toggles appear to
+      // do nothing because they mutate the dead state. _wireToolbar is
+      // idempotent (tears down first).
       try { initDosageHeatmapToolbar(); }
       catch (e) { console.warn('dosage_heatmap.mount: post-autoload toolbar re-wire threw —', e); }
       if (atlasState.inversion) {
@@ -335,12 +336,38 @@ function _buildPageState(atlasState) {
       });
     }
   }
-  return {
-    data:                  canonical,
-    // 2026-05-26: stash the raw legacy chunk so the free-scroll handler
-    // can read (chrom, start_bp, end_bp) without depending on
-    // local_pca_dosage's stash being populated.
+
+  // Fill any missing per-sample mean from the chrom precomp / heatmap
+  // data itself. The local_pca_dosage page stashes the precomp at
+  // inv._local_pca_dosage_state.data. Het-dosage mean is always
+  // derivable from the canonical heatmap directly.
+  if (canonical) {
+    const chromData = (inv._local_pca_dosage_state && inv._local_pca_dosage_state.data) || null;
+    if (!canonical.sample_het_dosage_mean) {
+      try { canonical.sample_het_dosage_mean = computeSampleHetDosageMean(canonical); }
+      catch (e) { console.warn('dosage_heatmap: het-dosage mean compute threw —', e); }
+    }
+    if (!canonical.sample_theta_pi_mean && chromData) {
+      try { canonical.sample_theta_pi_mean = computeSampleThetaPiMean(chromData); }
+      catch (e) { console.warn('dosage_heatmap: θπ mean compute threw —', e); }
+    }
+    if (!canonical.sample_ghsl_mean && chromData) {
+      try { canonical.sample_ghsl_mean = computeSampleGhslMean(chromData, canonical); }
+      catch (e) { console.warn('dosage_heatmap: GHSL mean compute threw —', e); }
+    }
+    // 2026-05-27: build regime overlay from the active candidate.
+    try { canonical.regime_overlay = _buildRegimeOverlay(canonical, atlasState); }
+    catch (e) { console.warn('dosage_heatmap: regime overlay build threw —', e); }
+  }
+  const state = {
+    // 2026-05-26: atlasState handle + raw chunk for free-scroll mode.
+    // The free-scroll arrow handler resolves the active chrom + dosage
+    // chunk bridge template from here, and reads (chrom, start_bp,
+    // end_bp) off the raw legacy chunk to compute the next bp window.
+    atlasState:            atlasState || null,
     _raw_legacy_chunk:     (dh && dh.legacy_chunk) || null,
+    free_scroll:           false,
+    data:                  canonical,
     candidate_label:       dh ? (dh.candidate_label || null) : null,
     view_label:            dh ? (dh.view_label || _defaultViewLabel(dh)) : null,
     group_colors:          canonical
@@ -360,7 +387,6 @@ function _buildPageState(atlasState) {
     _focus_regime_id:      null,    // catalogue regime focused via click-to-focus
     view_state:            Object.assign({}, DEFAULT_VIEW_STATE,
                                           (dh && dh.view_state) || {}),
-    free_scroll:           false,
     selection:             createDosageHeatmapSelection(),
     _handlers:             {},
   };
@@ -592,6 +618,42 @@ function _renderHeader(state) {
   if (pt) pt.checked = !!state.view_state.show_polarity_track;
   const k6 = document.getElementById('dosageHeatmapShowK6Track');
   if (k6) k6.checked = !!state.view_state.show_k6_track;
+  const rc = document.getElementById('dosageHeatmapShowRegimeCallTrack');
+  if (rc) rc.checked = !!state.view_state.show_regime_call_track;
+  const ls = document.getElementById('dosageHeatmapShowLocusSpanOverlay');
+  if (ls) ls.checked = !!state.view_state.show_locus_span_overlay;
+  const gr = document.getElementById('dosageHeatmapShowGroupRects');
+  if (gr) gr.checked = !!state.view_state.show_group_rects;
+  const csim = document.getElementById('dosageHeatmapCollapseSimilar');
+  if (csim) csim.checked = !!state.view_state.collapse_similar;
+  const cham = document.getElementById('dosageHeatmapCollapseHamming');
+  if (cham) cham.value = String(state.view_state.collapse_hamming);
+  const crep = document.getElementById('dosageHeatmapCollapseReps');
+  if (crep) crep.value = String(state.view_state.collapse_reps);
+  const hg = document.getElementById('dosageHeatmapShowGhslTrack');
+  if (hg) hg.checked = !!state.view_state.show_ghsl_track;
+  const tp = document.getElementById('dosageHeatmapShowThetaPiTrack');
+  if (tp) tp.checked = !!state.view_state.show_theta_pi_track;
+  const hd = document.getElementById('dosageHeatmapShowHetDosageTrack');
+  if (hd) hd.checked = !!state.view_state.show_het_dosage_track;
+  const gs = document.getElementById('dosageHeatmapGroupingSource');
+  if (gs) gs.value = state.view_state.grouping_source;
+  const dk = document.getElementById('dosageHeatmapDetectK');
+  if (dk) dk.value = String(state.view_state.detect_k);
+  const cs = document.getElementById('dosageHeatmapConfidenceScheme');
+  if (cs) cs.value = state.view_state.confidence_scheme;
+  const ct = document.getElementById('dosageHeatmapShowConfidenceTrack');
+  if (ct) ct.checked = !!state.view_state.show_confidence_track;
+  const mv = document.getElementById('dosageHeatmapMarkerView');
+  if (mv) mv.value = state.view_state.marker_view;
+  const sn = document.getElementById('dosageHeatmapSubsampleN');
+  if (sn) sn.value = String(state.view_state.marker_subsample_n);
+  const zm = document.getElementById('dosageHeatmapZoom');
+  if (zm) zm.value = String(state.view_state.zoom);
+  // 2026-05-26: free-scroll toggle + bp-range chip.
+  const fs = document.getElementById('dosageHeatmapFreeScroll');
+  if (fs) fs.checked = !!state.free_scroll;
+  _updateFreeRangeLabel();
 }
 
 // =====================================================================
@@ -857,55 +919,158 @@ function _wireToolbar(state) {
   if (typeof document === 'undefined' || !document.getElementById) return;
   _teardownToolbar(state);
 
-  // 2026-05-26: handlers read the LIVE _pageState via the module-level
-  // reference (refreshed by _setActiveState on every mount / auto-load
-  // remount). The old pattern closed over the initial `state` param,
-  // which became stale after the auto-load created a new pageState —
-  // reorder dropdowns mutated the abandoned object → repaint painted
-  // the still-empty initial state → "nothing happens".
-  const live = () => _pageState || state;
-  const repaint = () => { _paintHeatmap(live()); };
+  const repaint = () => { _paintHeatmap(state); };
   const repaintAll = () => {
-    const s = live();
-    _renderHeader(s);
-    _paintHeatmap(s);
-    _renderRightPanel(s);
-    _renderLegend(s);
+    _renderHeader(state);
+    _paintHeatmap(state);
+    _renderRightPanel(state);
+    _renderLegend(state);
   };
 
   const onSampleOrder = (e) => {
-    const s = live();
-    if (!s) return;
-    s.view_state.sample_order_mode = (e && e.target && e.target.value) || 'natural';
+    state.view_state.sample_order_mode = (e && e.target && e.target.value) || 'natural';
     repaint();
   };
   const onMarkerOrder = (e) => {
-    const s = live();
-    if (!s) return;
-    s.view_state.marker_order_mode = (e && e.target && e.target.value) || 'natural';
+    state.view_state.marker_order_mode = (e && e.target && e.target.value) || 'natural';
     repaint();
   };
   const onColorMode = (e) => {
-    state.view_state.color_mode = (e && e.target && e.target.value) || 'magma';
+    state.view_state.color_mode = (e && e.target && e.target.value) || 'dosage';
     repaint();
   };
   const onShowGroupTrack = (e) => {
-    const s = live();
-    if (!s) return;
-    s.view_state.show_group_track = !!(e && e.target && e.target.checked);
+    state.view_state.show_group_track = !!(e && e.target && e.target.checked);
     repaint();
   };
   const onShowPolarityTrack = (e) => {
-    const s = live();
-    if (!s) return;
-    s.view_state.show_polarity_track = !!(e && e.target && e.target.checked);
+    state.view_state.show_polarity_track = !!(e && e.target && e.target.checked);
     repaint();
   };
   const onShowK6Track = (e) => {
-    const s = live();
-    if (!s) return;
-    s.view_state.show_k6_track = !!(e && e.target && e.target.checked);
+    state.view_state.show_k6_track = !!(e && e.target && e.target.checked);
     repaint();
+  };
+  const onShowGhslTrack = (e) => {
+    state.view_state.show_ghsl_track = !!(e && e.target && e.target.checked);
+    repaint();
+  };
+  const onShowThetaPiTrack = (e) => {
+    state.view_state.show_theta_pi_track = !!(e && e.target && e.target.checked);
+    repaint();
+  };
+  const onShowHetDosageTrack = (e) => {
+    state.view_state.show_het_dosage_track = !!(e && e.target && e.target.checked);
+    repaint();
+  };
+  const onGroupingSource = (e) => {
+    state.view_state.grouping_source = (e && e.target && e.target.value) || 'external';
+    state._focus_regime_id = null;   // focus is catalogue-specific; reset on source change
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onDetectK = (e) => {
+    const v = (e && e.target && e.target.value) || 'auto';
+    state.view_state.detect_k = (v === 'auto') ? 'auto' : (parseInt(v, 10) || 'auto');
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onConfidenceScheme = (e) => {
+    state.view_state.confidence_scheme = (e && e.target && e.target.value) || 'margin';
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onShowConfidenceTrack = (e) => {
+    state.view_state.show_confidence_track = !!(e && e.target && e.target.checked);
+    repaint();
+  };
+  const onMarkerView = (e) => {
+    state.view_state.marker_view = (e && e.target && e.target.value) || 'all';
+    _recomputeMarkers(state);
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onSubsampleN = (e) => {
+    const v = parseInt((e && e.target && e.target.value), 10);
+    state.view_state.marker_subsample_n = Number.isFinite(v) ? v : 0;
+    _recomputeMarkers(state);
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onZoom = (e) => {
+    const v = parseInt((e && e.target && e.target.value), 10);
+    state.view_state.zoom = Number.isFinite(v) && v >= 1 ? v : 1;
+    repaint();
+    _renderRightPanel(state);
+  };
+  // Keyboard cursor: ←/→ move the marker cursor (Shift ×10, Home/End to
+  // ends), ↑/↓ move the sample cursor, +/− zoom. Ignored while typing in
+  // a form control or when the page isn't mounted.
+  const onKeyDown = (ev) => {
+    if (!ev) return;
+    const t = ev.target;
+    if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName || '')) return;
+    if (!document.getElementById('dosageHeatmapCanvas')) return;
+    if (!state.data) return;
+    // 2026-05-26: free-scroll mode hijacks ←/→/Home/End to scrub the
+    // GENOME (refetch the dosage chunk for a shifted bp window) instead
+    // of moving the in-chunk marker cursor. ↑/↓ + zoom keep their normal
+    // meaning. Off by default → arrows move the cursor as before.
+    if (state.free_scroll &&
+        (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight' ||
+         ev.key === 'Home'      || ev.key === 'End')) {
+      if (typeof ev.preventDefault === 'function') ev.preventDefault();
+      _scrubFree(state, ev.key, !!ev.shiftKey);
+      return;
+    }
+    const vs = state.view_state;
+    const len = (state._working_markers && state._working_markers.length)
+      || (state.data.n_markers | 0);
+    const nS = state.data.n_samples | 0;
+    const step = ev.shiftKey ? 10 : 1;
+    let handled = true;
+    switch (ev.key) {
+      case 'ArrowLeft':  vs.cursor_col = Math.max(0, (vs.cursor_col | 0) - step); break;
+      case 'ArrowRight': vs.cursor_col = Math.min(len - 1, (vs.cursor_col | 0) + step); break;
+      case 'Home':       vs.cursor_col = 0; break;
+      case 'End':        vs.cursor_col = len - 1; break;
+      case 'ArrowUp':
+        vs.cursor_row = (vs.cursor_row < 0 ? nS - 1 : Math.max(0, vs.cursor_row - step)); break;
+      case 'ArrowDown':
+        vs.cursor_row = (vs.cursor_row < 0 ? 0 : Math.min(nS - 1, vs.cursor_row + step)); break;
+      case '+': case '=': vs.zoom = Math.min(16, (vs.zoom || 1) * 2); break;
+      case '-': case '_': vs.zoom = Math.max(1, (vs.zoom || 1) / 2); break;
+      default: handled = false;
+    }
+    if (!handled) return;
+    if (typeof ev.preventDefault === 'function') ev.preventDefault();
+    _renderHeader(state);
+    _paintHeatmap(state);
+    _renderRightPanel(state);
+  };
+  const onShowRegimeCallTrack = (e) => {
+    state.view_state.show_regime_call_track = !!(e && e.target && e.target.checked);
+    repaint();
+  };
+  const onShowLocusSpanOverlay = (e) => {
+    state.view_state.show_locus_span_overlay = !!(e && e.target && e.target.checked);
+    repaint();
+  };
+  const onShowGroupRects = (e) => {
+    state.view_state.show_group_rects = !!(e && e.target && e.target.checked);
+    repaint();
+  };
+  const onCollapseSimilar = (e) => {
+    state.view_state.collapse_similar = !!(e && e.target && e.target.checked);
+    repaintAll();
+  };
+  const onCollapseHamming = (e) => {
+    state.view_state.collapse_hamming = parseInt((e && e.target && e.target.value) || '0', 10) || 0;
+    repaintAll();
+  };
+  const onCollapseReps = (e) => {
+    state.view_state.collapse_reps = parseInt((e && e.target && e.target.value) || '4', 10) || 4;
+    repaintAll();
   };
   const onCanvasMove = (ev) => {
     const c = document.getElementById('dosageHeatmapCanvas');
@@ -954,6 +1119,13 @@ function _wireToolbar(state) {
     else                   state.selection.toggleSelectedSample(cell.sample_idx);
   };
 
+  // 2026-05-26: free-scroll toggle. Untracks the page from the active
+  // candidate; while on, ←/→ scrolls the genome (see onKeyDown branch).
+  const onFreeScroll = (e) => {
+    state.free_scroll = !!(e && e.target && e.target.checked);
+    _updateFreeRangeLabel();
+  };
+
   const unsubSelection = state.selection.subscribe(() => {
     repaintAll();
     _updateTooltip(state);
@@ -962,59 +1134,109 @@ function _wireToolbar(state) {
   state._handlers = {
     onSampleOrder, onMarkerOrder, onColorMode,
     onShowGroupTrack, onShowPolarityTrack, onShowK6Track,
+    onShowGhslTrack, onShowThetaPiTrack, onShowHetDosageTrack,
+    onShowRegimeCallTrack, onShowLocusSpanOverlay, onShowGroupRects,
+    onCollapseSimilar, onCollapseHamming, onCollapseReps,
+    onGroupingSource, onDetectK, onConfidenceScheme, onShowConfidenceTrack,
+    onMarkerView, onSubsampleN, onZoom, onKeyDown, onFreeScroll,
     onCanvasMove, onCanvasClick, onCanvasLeave,
     unsubSelection,
   };
 
-  _addListener('dosageHeatmapSampleOrder',        'change',     onSampleOrder);
-  _addListener('dosageHeatmapMarkerOrder',        'change',     onMarkerOrder);
-  _addListener('dosageHeatmapShowGroupTrack',     'change',     onShowGroupTrack);
-  _addListener('dosageHeatmapShowPolarityTrack',  'change',     onShowPolarityTrack);
-  _addListener('dosageHeatmapShowK6Track',        'change',     onShowK6Track);
-  _addListener('dosageHeatmapCanvas',             'mousemove',  onCanvasMove);
-  _addListener('dosageHeatmapCanvas',             'click',      onCanvasClick);
-  _addListener('dosageHeatmapCanvas',             'mouseleave', onCanvasLeave);
+  _addListener('dosageHeatmapSampleOrder',          'change',     onSampleOrder);
+  _addListener('dosageHeatmapMarkerOrder',          'change',     onMarkerOrder);
+  _addListener('dosageHeatmapColorMode',            'change',     onColorMode);
+  _addListener('dosageHeatmapShowGroupTrack',       'change',     onShowGroupTrack);
+  _addListener('dosageHeatmapShowPolarityTrack',    'change',     onShowPolarityTrack);
+  _addListener('dosageHeatmapShowK6Track',          'change',     onShowK6Track);
+  _addListener('dosageHeatmapShowGhslTrack',        'change',     onShowGhslTrack);
+  _addListener('dosageHeatmapShowThetaPiTrack',     'change',     onShowThetaPiTrack);
+  _addListener('dosageHeatmapShowHetDosageTrack',   'change',     onShowHetDosageTrack);
+  _addListener('dosageHeatmapGroupingSource',       'change',     onGroupingSource);
+  _addListener('dosageHeatmapDetectK',              'change',     onDetectK);
+  _addListener('dosageHeatmapConfidenceScheme',     'change',     onConfidenceScheme);
+  _addListener('dosageHeatmapShowConfidenceTrack',  'change',     onShowConfidenceTrack);
+  _addListener('dosageHeatmapMarkerView',           'change',     onMarkerView);
+  _addListener('dosageHeatmapSubsampleN',           'change',     onSubsampleN);
+  _addListener('dosageHeatmapZoom',                 'change',     onZoom);
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('keydown', onKeyDown);
+  }
+  _addListener('dosageHeatmapShowRegimeCallTrack',  'change',     onShowRegimeCallTrack);
+  _addListener('dosageHeatmapShowLocusSpanOverlay', 'change',     onShowLocusSpanOverlay);
+  _addListener('dosageHeatmapShowGroupRects',       'change',     onShowGroupRects);
+  _addListener('dosageHeatmapCollapseSimilar',      'change',     onCollapseSimilar);
+  _addListener('dosageHeatmapCollapseHamming',      'change',     onCollapseHamming);
+  _addListener('dosageHeatmapCollapseReps',         'change',     onCollapseReps);
+  _addListener('dosageHeatmapFreeScroll',           'change',     onFreeScroll);
+  _addListener('dosageHeatmapCanvas',               'mousemove',  onCanvasMove);
+  _addListener('dosageHeatmapCanvas',               'click',      onCanvasClick);
+  _addListener('dosageHeatmapCanvas',               'mouseleave', onCanvasLeave);
 }
 
 function _teardownToolbar(state) {
   if (!state || !state._handlers) return;
   const h = state._handlers;
-  if (h.onSampleOrder)        _removeListener('dosageHeatmapSampleOrder',        'change',    h.onSampleOrder);
-  if (h.onMarkerOrder)        _removeListener('dosageHeatmapMarkerOrder',        'change',    h.onMarkerOrder);
-  if (h.onShowGroupTrack)     _removeListener('dosageHeatmapShowGroupTrack',     'change',    h.onShowGroupTrack);
-  if (h.onShowPolarityTrack)  _removeListener('dosageHeatmapShowPolarityTrack',  'change',    h.onShowPolarityTrack);
-  if (h.onShowK6Track)        _removeListener('dosageHeatmapShowK6Track',        'change',    h.onShowK6Track);
-  if (h.onCanvasMove)         _removeListener('dosageHeatmapCanvas',             'mousemove',  h.onCanvasMove);
-  if (h.onCanvasClick)        _removeListener('dosageHeatmapCanvas',             'click',      h.onCanvasClick);
-  if (h.onCanvasLeave)        _removeListener('dosageHeatmapCanvas',             'mouseleave', h.onCanvasLeave);
+  if (h.onSampleOrder)         _removeListener('dosageHeatmapSampleOrder',          'change',    h.onSampleOrder);
+  if (h.onMarkerOrder)         _removeListener('dosageHeatmapMarkerOrder',          'change',    h.onMarkerOrder);
+  if (h.onColorMode)           _removeListener('dosageHeatmapColorMode',            'change',    h.onColorMode);
+  if (h.onShowGroupTrack)      _removeListener('dosageHeatmapShowGroupTrack',       'change',    h.onShowGroupTrack);
+  if (h.onShowPolarityTrack)   _removeListener('dosageHeatmapShowPolarityTrack',    'change',    h.onShowPolarityTrack);
+  if (h.onShowK6Track)         _removeListener('dosageHeatmapShowK6Track',          'change',    h.onShowK6Track);
+  if (h.onShowGhslTrack)       _removeListener('dosageHeatmapShowGhslTrack',        'change',    h.onShowGhslTrack);
+  if (h.onShowThetaPiTrack)    _removeListener('dosageHeatmapShowThetaPiTrack',     'change',    h.onShowThetaPiTrack);
+  if (h.onShowHetDosageTrack)  _removeListener('dosageHeatmapShowHetDosageTrack',   'change',    h.onShowHetDosageTrack);
+  if (h.onGroupingSource)      _removeListener('dosageHeatmapGroupingSource',       'change',    h.onGroupingSource);
+  if (h.onDetectK)             _removeListener('dosageHeatmapDetectK',              'change',    h.onDetectK);
+  if (h.onConfidenceScheme)    _removeListener('dosageHeatmapConfidenceScheme',     'change',    h.onConfidenceScheme);
+  if (h.onShowConfidenceTrack) _removeListener('dosageHeatmapShowConfidenceTrack',  'change',    h.onShowConfidenceTrack);
+  if (h.onMarkerView)          _removeListener('dosageHeatmapMarkerView',           'change',    h.onMarkerView);
+  if (h.onSubsampleN)          _removeListener('dosageHeatmapSubsampleN',           'change',    h.onSubsampleN);
+  if (h.onZoom)                _removeListener('dosageHeatmapZoom',                 'change',    h.onZoom);
+  if (h.onKeyDown && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+    document.removeEventListener('keydown', h.onKeyDown);
+  }
+  if (h.onShowRegimeCallTrack) _removeListener('dosageHeatmapShowRegimeCallTrack',  'change',    h.onShowRegimeCallTrack);
+  if (h.onShowLocusSpanOverlay) _removeListener('dosageHeatmapShowLocusSpanOverlay','change',    h.onShowLocusSpanOverlay);
+  if (h.onShowGroupRects)      _removeListener('dosageHeatmapShowGroupRects',        'change',     h.onShowGroupRects);
+  if (h.onCollapseSimilar)     _removeListener('dosageHeatmapCollapseSimilar',       'change',     h.onCollapseSimilar);
+  if (h.onCollapseHamming)     _removeListener('dosageHeatmapCollapseHamming',       'change',     h.onCollapseHamming);
+  if (h.onCollapseReps)        _removeListener('dosageHeatmapCollapseReps',          'change',     h.onCollapseReps);
+  if (h.onFreeScroll)          _removeListener('dosageHeatmapFreeScroll',            'change',     h.onFreeScroll);
+  if (h.onCanvasMove)          _removeListener('dosageHeatmapCanvas',               'mousemove',  h.onCanvasMove);
+  if (h.onCanvasClick)         _removeListener('dosageHeatmapCanvas',               'click',      h.onCanvasClick);
+  if (h.onCanvasLeave)         _removeListener('dosageHeatmapCanvas',               'mouseleave', h.onCanvasLeave);
   if (typeof h.unsubSelection === 'function') { try { h.unsubSelection(); } catch (_) {} }
   state._handlers = {};
 }
 
-// 2026-05-26: free-scroll bp-range scrubber. Reads the current chunk's
-// (chrom, start_bp, end_bp), shifts by ½ or full window, clamps to the
-// chromosome size when known, then refetches via the same /api/dosage/chunk
-// pipe _autoLoadDefaultChunk uses. Tracks an in-flight token so rapid
-// key-mashing doesn't race; only the latest request wins.
+// =====================================================================
+// Free-scroll mode (2026-05-26)
+// =====================================================================
+// When state.free_scroll is on, ←/→ shifts the visible bp window by ½
+// (Shift = full) and Home/End jumps to chrom start/end. Each step
+// refetches /api/dosage/chunk for the new range, rebuilds the page
+// state, and repaints. An in-flight token guards against key-mashing
+// races (only the latest request wins).
+
 let _scrubReqId = 0;
+
 async function _scrubFree(state, key, shiftKey) {
   const chunk = state && state._raw_legacy_chunk;
   const chrom = (chunk && chunk.chrom)
              || (state && state.atlasState && state.atlasState.shared
                   && state.atlasState.shared.activeChrom);
   if (!chrom) return;
-  let startBp = chunk && Number.isFinite(chunk.start_bp) ? chunk.start_bp | 0 : null;
-  let endBp   = chunk && Number.isFinite(chunk.end_bp)   ? chunk.end_bp   | 0 : null;
+  const startBp = chunk && Number.isFinite(chunk.start_bp) ? chunk.start_bp | 0 : null;
+  const endBp   = chunk && Number.isFinite(chunk.end_bp)   ? chunk.end_bp   | 0 : null;
   if (startBp == null || endBp == null || endBp <= startBp) return;
   const width = endBp - startBp;
   const step = shiftKey ? width : Math.max(1, width >> 1);
-  // Chrom size lookup — only used to clamp End/End-key. Falls back to
-  // letting the server's region check trim if size is unknown.
   const inv = state.atlasState && state.atlasState.inversion;
   const stash = inv && inv._local_pca_dosage_state;
-  const dataWindows = stash && stash.data && stash.data.windows;
-  const chromSize = dataWindows && dataWindows.length
-    ? (dataWindows[dataWindows.length - 1].end_bp | 0)
+  const windows = stash && stash.data && stash.data.windows;
+  const chromSize = windows && windows.length
+    ? (windows[windows.length - 1].end_bp | 0)
     : null;
   let newStart, newEnd;
   if (key === 'Home') {
@@ -1040,7 +1262,8 @@ async function _scrubFree(state, key, shiftKey) {
 
 async function _fetchFreeRange(state, chrom, startBp, endBp, reqId) {
   const inv = state.atlasState && state.atlasState.inversion;
-  const stash = inv && inv._local_pca_dosage_state;
+  if (!inv) return;
+  const stash = inv._local_pca_dosage_state;
   const data = stash && stash.data;
   const dc = data && data.dosage_chunks;
   const template =
@@ -1058,38 +1281,37 @@ async function _fetchFreeRange(state, chrom, startBp, endBp, reqId) {
     if (!r.ok) return;
     chunk = await r.json();
   } catch (_) { return; }
-  if (reqId !== _scrubReqId) return;   // a newer request superseded us
+  if (reqId !== _scrubReqId) return;   // superseded by a newer keypress
   if (!chunk || typeof chunk !== 'object') return;
+  const label = `free · ${chrom} ${(startBp / 1e6).toFixed(2)}-${(endBp / 1e6).toFixed(2)} Mb`;
   inv.dosage_heatmap_state = Object.assign({}, inv.dosage_heatmap_state || {}, {
     legacy_chunk:    chunk,
-    candidate_label: `free · ${chrom} ${(startBp / 1e6).toFixed(2)}-${(endBp / 1e6).toFixed(2)} Mb`,
+    candidate_label: label,
     view_label:      `free scroll · ${chrom} ${(startBp / 1e6).toFixed(2)}-${(endBp / 1e6).toFixed(2)} Mb`,
   });
-  // Rebuild + repaint via the exported refresh path so all panels sync.
   try {
-    const newPageState = _buildPageState(state.atlasState);
-    newPageState.free_scroll = true;   // preserve mode across remount
-    _setActiveState(newPageState);
-    refreshDosageHeatmap(newPageState);
-    if (inv) inv._page_dosage_heatmap_state = newPageState;
+    const next = _buildPageState(state.atlasState);
+    next.free_scroll = true;            // preserve mode across the remount
+    _setActiveState(next);
+    refreshDosageHeatmap(next);
+    inv._page_dosage_heatmap_state = next;
   } catch (e) {
     console.warn('dosage_heatmap free-scroll: refresh threw —', e);
   }
-  _updateFreeRangeLabel();
 }
 
 function _updateFreeRangeLabel() {
-  if (typeof document === 'undefined') return;
+  if (typeof document === 'undefined' || !document.getElementById) return;
   const el = document.getElementById('dosageHeatmapFreeRangeLabel');
   if (!el) return;
   const s = _pageState;
   if (!s || !s.free_scroll) { el.style.display = 'none'; return; }
   const chunk = s._raw_legacy_chunk;
+  el.style.display = 'inline';
   if (!chunk || !Number.isFinite(chunk.start_bp) || !Number.isFinite(chunk.end_bp)) {
-    el.style.display = 'inline'; el.textContent = '· free scroll on';
+    el.textContent = '· free scroll on';
     return;
   }
-  el.style.display = 'inline';
   el.textContent = `· ${chunk.chrom || ''} ${(chunk.start_bp / 1e6).toFixed(2)}-${(chunk.end_bp / 1e6).toFixed(2)} Mb (←/→)`;
 }
 

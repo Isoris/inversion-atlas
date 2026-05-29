@@ -1248,13 +1248,11 @@ function _refreshRampLegend(state) {
   // Mode-specific gradient + label format.
   let gradientCss = null, minLbl = '', maxLbl = '';
   if (ramp === 'het' || ramp === 'dosage') {
-    // 2026-05-26 (revised): legacy `simColor` viridis-ish ramp
-    // (color_helpers.js#simColor). Three-stop CSS gradient picked to
-    // match the renderer at t=0 / 0.5 / 1:
-    //   t=0   → rgb( 30,  50, 120)
-    //   t=0.5 → rgb( 70, 120, 220)
-    //   t=1   → rgb(255, 220,  40)
-    gradientCss = 'linear-gradient(to right, rgb(30,50,120), rgb(70,120,220), rgb(255,220,40))';
+    // 2026-05-29 (revised): red/white/blue RdBu divergent — matches the
+    // renderer (per_sample_line_color.js: hetRateColor for het anchored
+    // at 0.5; _divergentBlueWhiteRed for dosage anchored at 1.0). Stops
+    // #2166AC blue → #F7F7F7 white → #B2182B red.
+    gradientCss = 'linear-gradient(to right, #2166AC, #F7F7F7, #B2182B)';
     minLbl = Number.isFinite(vMin) ? vMin.toFixed(3) : '—';
     maxLbl = Number.isFinite(vMax) ? vMax.toFixed(3) : '—';
   } else if (ramp === 'theta_pi' || ramp === 'ghsl') {

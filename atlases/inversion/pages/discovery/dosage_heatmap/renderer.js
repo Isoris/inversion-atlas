@@ -91,22 +91,50 @@ export function dosageGenotypeColor(v) {
 }
 
 /**
- * Back-compat alias for the old name (returned a sequential ramp).
- * Now resolves to the magma palette (the new default).
+ * 2026-05-29: continuous blue→white→red RdBu divergent dosage ramp,
+ * anchored so dosage = 1.0 (mean het) maps to white. 0 = hom-ref (blue),
+ * 2 = hom-alt (red). This is the default heatmap colouring — Quentin:
+ * "in dosage heatmap it shouldnt use magma at all but only by dosage".
+ * Same blue-white-red language as page-1 het/dosage modes + the |Z|
+ * panel, so the whole atlas reads dosage structure consistently.
+ *
+ * @param {number} v       dosage scalar (default range [0, 2])
+ * @param {number} [vmin]  default 0
+ * @param {number} [vmax]  default 2
+ * @returns {string}       'rgb(r,g,b)'
+ */
+export function dosageDivergentColor(v, vmin, vmax) {
+  if (!Number.isFinite(v)) return 'rgb(238,214,222)';   // missing → mauve
+  const lo = Number.isFinite(vmin) ? vmin : 0;
+  const hi = Number.isFinite(vmax) ? vmax : 2;
+  const t = Math.max(0, Math.min(1, (v - lo) / Math.max(1e-9, hi - lo)));
+  const COLD = [0x21, 0x66, 0xAC], MID = [0xF7, 0xF7, 0xF7], WARM = [0xB2, 0x18, 0x2B];
+  let a, b, u;
+  if (t <= 0.5) { a = COLD; b = MID;  u = t * 2; }
+  else          { a = MID;  b = WARM; u = (t - 0.5) * 2; }
+  const r = Math.round(a[0] + (b[0] - a[0]) * u);
+  const g = Math.round(a[1] + (b[1] - a[1]) * u);
+  const bl = Math.round(a[2] + (b[2] - a[2]) * u);
+  return `rgb(${r},${g},${bl})`;
+}
+
+/**
+ * Back-compat alias for the old name. Resolves to the divergent dosage
+ * ramp (the new default — magma retired 2026-05-29).
  */
 export function dosageValueToColor(v, vmin, vmax) {
-  return dosageMagmaColor(v, vmin, vmax);
+  return dosageDivergentColor(v, vmin, vmax);
 }
 
 /**
  * Pick a per-cell colourer for the given `color_mode`.
  *
- * @param {'magma'|'genotype'} mode
+ * @param {'dosage'|'genotype'} mode
  * @returns {(v:number, vmin:number, vmax:number)=>string}
  */
 export function pickDosageColorFn(mode) {
   if (mode === 'genotype') return (v) => dosageGenotypeColor(v);
-  return dosageMagmaColor;
+  return dosageDivergentColor;
 }
 
 // Viridis stops for the per-sample θπ track.
@@ -442,8 +470,10 @@ export function paintDosageHeatmap(canvas, data, opts) {
   if (showHetDosage) {
     trackBlocks.push({
       kind: 'continuous', label: 'het',
+      // 2026-05-29: blue→white→red divergent (white at the 0.5 het rate),
+      // consistent with page-1 het mode. No magma in the dosage heatmap.
       values: data.sample_het_dosage_mean,
-      colorFn: dosageMagmaColor, vmin: 0, vmax: 1,
+      colorFn: dosageDivergentColor, vmin: 0, vmax: 1,
     });
   }
   if (showThetaPi) {
@@ -485,7 +515,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
 
   const vmin = Number.isFinite(o.vmin) ? o.vmin : 0;
   const vmax = Number.isFinite(o.vmax) ? o.vmax : 2;
-  const colorFn = pickDosageColorFn(o.color_mode || 'magma');
+  const colorFn = pickDosageColorFn(o.color_mode || 'dosage');
   const groupColors = (o.group_colors instanceof Map) ? o.group_colors
     : buildGroupColorMap(_distinctOf(data.sample_group));
   const k6Colors    = (o.k6_colors instanceof Map) ? o.k6_colors

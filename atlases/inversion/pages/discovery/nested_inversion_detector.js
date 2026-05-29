@@ -37,7 +37,13 @@ import {
   candidateCountsByStratum,
 } from './nested_inversion_detector/selection.js';
 import { detectNestedInversion } from '../../shared/mgl_nested_detector.js';
+import { kmeans2D } from '../../shared/kmeans.js';
 import { fitCanvasNoDpr } from '../../shared/page1_utils.js';
+
+// 2026-05-29: cap the per-window scan so a genome-wide fallback (no
+// focal L2) stays responsive. Focal-L2 scope is almost always far
+// smaller than this.
+const NESTED_MAX_SCAN_WINDOWS = 1500;
 
 // =====================================================================
 // Public entry — refresh
@@ -60,6 +66,19 @@ export function initNestedDetectorToolbar() {
 // =====================================================================
 
 export async function mount(root, atlasState, registry) {
+  // 2026-05-29: invalidate a cached detector_result computed for a
+  // DIFFERENT chromosome. Without this, the auto-detect bails on
+  // `existing.detector_result` and the page keeps showing the prior
+  // chrom's result (Quentin saw LG01 data while LG27 was selected).
+  const activeChrom = atlasState && atlasState.shared && atlasState.shared.activeChrom;
+  const inv = (atlasState && atlasState.inversion) || {};
+  if (inv.nested_detector_state &&
+      activeChrom &&
+      inv.nested_detector_state._chrom &&
+      inv.nested_detector_state._chrom !== activeChrom) {
+    inv.nested_detector_state = null;
+  }
+
   let pageState = _buildPageState(atlasState);
   _setActiveState(pageState);
 
@@ -134,64 +153,101 @@ async function _autoDetectNested(root, atlasState, registry) {
   const nW = wins.length;
   const nS = data.n_samples | 0;
   if (nW <= 0 || nS <= 0) return;
-  // Pull labels via priority: lockedLabels > stash focal-L2 K-means >
-  // auto-cluster the active window's PC1×PC2 via K-means K=3 (so the
-  // page works even when local_pca_dosage hasn't run yet).
-  let labels = stash && stash.lockedLabels;
-  if (!labels) {
-    const cur = (stash && Number.isFinite(stash.cur)) ? (stash.cur | 0)
-              : Math.floor(nW / 2);
-    const w = wins[Math.max(0, Math.min(nW - 1, cur))];
-    if (w && w.pc1 && w.pc2) {
-      try {
-        const km = await import('../../shared/kmeans.js').catch(() => null);
-        if (km && typeof km.kmeans2D === 'function') {
-          const result = km.kmeans2D(w.pc1, w.pc2, 3);
-          if (result && result.labels) labels = result.labels;
-        }
-      } catch (e) {
-        console.warn('nested_inversion_detector: K-means fallback threw —', e);
+
+  // -------------------------------------------------------------------
+  // 2026-05-29 (a)+(b): focal-L2-scoped, per-window karyotype detection.
+  //
+  // (a) SCOPE: restrict the scan to the focal L2 envelope (from the
+  //     local_pca_dosage stash) where the parent karyotype is stable.
+  //     Without a focal L2, fall back to a centred genome window capped
+  //     at NESTED_MAX_SCAN_WINDOWS so the per-window K-means stays fast.
+  //
+  // (b) PER-WINDOW KARYOTYPE: re-cluster EACH window's cohort (PC1, PC2)
+  //     into 3 parent strata via 2D K-means (kmeans2D already orders
+  //     clusters by PC1, so label 0/1/2 = HOM1/HET/HOM2 consistently
+  //     across windows). Then test each window-local stratum's PC2 (the
+  //     secondary axis, orthogonal to the parent split) for inner 3-band
+  //     structure. This is the correct method: it never broadcasts a
+  //     single window's labels genome-wide, so it can't carpet the
+  //     chromosome with the old label-drift false positives.
+  // -------------------------------------------------------------------
+  const cur = (stash && Number.isFinite(stash.cur)) ? (stash.cur | 0)
+            : Math.floor(nW / 2);
+  let wStart = 0, wEnd = nW - 1, scopeLabel = 'genome', scopeWarn = null;
+  // Focal L2 envelope from the stash, when available.
+  const w2l = stash && stash.windowToL2;
+  const envs = data.l2_envelopes;
+  if (w2l && Array.isArray(envs) && envs.length && Number.isFinite(cur)) {
+    const li = w2l[Math.max(0, Math.min(nW - 1, cur))] | 0;
+    const env = (li >= 0) ? envs[li] : null;
+    if (env) {
+      const s0 = Number.isFinite(env._s0) ? env._s0 : (env.start_w - 1);
+      const e0 = Number.isFinite(env._e0) ? env._e0 : (env.end_w - 1);
+      if (Number.isFinite(s0) && Number.isFinite(e0) && e0 >= s0) {
+        wStart = Math.max(0, s0 | 0);
+        wEnd   = Math.min(nW - 1, e0 | 0);
+        scopeLabel = `focal L2 (w ${wStart}-${wEnd}, window ${cur})`;
       }
     }
   }
-  if (!labels) {
-    _setLoadingHint(root, 'no K-means labels available — lock colors on a focal L2 in local_pca_dosage first (🔒 button).');
+  // Cap the genome fallback so per-window K-means stays responsive.
+  if (scopeLabel === 'genome' && (wEnd - wStart + 1) > NESTED_MAX_SCAN_WINDOWS) {
+    const half = NESTED_MAX_SCAN_WINDOWS >> 1;
+    wStart = Math.max(0, cur - half);
+    wEnd   = Math.min(nW - 1, wStart + NESTED_MAX_SCAN_WINDOWS - 1);
+    scopeLabel = `genome (capped to w ${wStart}-${wEnd} around window ${cur})`;
+    scopeWarn = `no focal L2 envelope available — scanned a ${NESTED_MAX_SCAN_WINDOWS}-window `
+              + `slab around window ${cur}. Lock colors on a focal L2 in local PCA |z| `
+              + `to scope the scan to a real envelope.`;
+  }
+
+  const strataNames = ['HOM1', 'HET', 'HOM2'];
+  const per_stratum_per_window_pcs = {
+    HOM1: [], HET: [], HOM2: [],
+  };
+  // Representative parent karyotype (focal window) for the detector's
+  // stratum-size gate.
+  let parent_karyotype = null;
+
+  for (let w = wStart; w <= wEnd; w++) {
+    const win = wins[w];
+    if (!win || !win.pc1 || !win.pc2) {
+      for (const nm of strataNames) per_stratum_per_window_pcs[nm].push({ idx: w, pcs: [] });
+      continue;
+    }
+    let km = null;
+    try { km = kmeans2D(win.pc1, win.pc2, 3); } catch (_) { km = null; }
+    if (!km || !km.labels) {
+      for (const nm of strataNames) per_stratum_per_window_pcs[nm].push({ idx: w, pcs: [] });
+      continue;
+    }
+    const lab = km.labels;
+    // Stash the focal window's labels as the representative parent karyotype.
+    if (w === Math.max(wStart, Math.min(wEnd, cur)) && !parent_karyotype) {
+      parent_karyotype = new Array(nS);
+      for (let s = 0; s < nS; s++) {
+        const k = lab[s];
+        parent_karyotype[s] = (k === 0) ? 'HOM1' : (k === 1) ? 'HET' : (k === 2) ? 'HOM2' : null;
+      }
+    }
+    // Per window-local stratum, collect members' PC2 (secondary axis).
+    const pc2By = [[], [], []];
+    for (let s = 0; s < nS; s++) {
+      const k = lab[s];
+      if (k >= 0 && k < 3) pc2By[k].push(+win.pc2[s] || 0);
+    }
+    for (let st = 0; st < 3; st++) {
+      per_stratum_per_window_pcs[strataNames[st]].push({
+        idx: w,
+        pcs: [Float64Array.from(pc2By[st])],
+      });
+    }
+  }
+  if (!parent_karyotype) {
+    _setLoadingHint(root, 'no per-window PCA available on this chromosome.');
     return;
   }
-  // Group sample indices by label.
-  const idxByLabel = [[], [], []];
-  for (let s = 0; s < nS; s++) {
-    const k = labels[s];
-    if (k >= 0 && k < 3) idxByLabel[k].push(s);
-  }
-  const strataNames = ['HOM1', 'HET', 'HOM2'];
-  const per_stratum_per_window_pcs = Object.create(null);
-  for (let st = 0; st < 3; st++) {
-    const idx = idxByLabel[st];
-    const per_window = new Array(nW);
-    for (let i = 0; i < nW; i++) {
-      const w = wins[i];
-      if (!w || !w.pc1 || !w.pc2) { per_window[i] = { idx: i, pcs: [] }; continue; }
-      const pc1Sub = new Float64Array(idx.length);
-      const pc2Sub = new Float64Array(idx.length);
-      for (let j = 0; j < idx.length; j++) {
-        pc1Sub[j] = +w.pc1[idx[j]] || 0;
-        pc2Sub[j] = +w.pc2[idx[j]] || 0;
-      }
-      per_window[i] = { idx: i, pcs: [pc1Sub, pc2Sub] };
-    }
-    per_stratum_per_window_pcs[strataNames[st]] = per_window;
-  }
-  // Build parent_karyotype mapping 0/1/2 → HOM1/HET/HOM2 for the
-  // detector's verdict + stratum-size gating.
-  const parent_karyotype = new Array(nS);
-  for (let s = 0; s < nS; s++) {
-    const k = labels[s];
-    parent_karyotype[s] = (k === 0) ? 'HOM1'
-                       : (k === 1) ? 'HET'
-                       : (k === 2) ? 'HOM2'
-                       : null;
-  }
+
   let result = null;
   try {
     result = detectNestedInversion({
@@ -202,9 +258,40 @@ async function _autoDetectNested(root, atlasState, registry) {
     _setLoadingHint(root, `detectNestedInversion threw: ${e && e.message ? e.message : 'error'}`);
     return;
   }
+  // 2026-05-29: light saturation guard. With per-window karyotype the
+  // old genome-wide label-drift carpet can't happen, but keep a soft
+  // check against the SCANNED scope: if essentially every window in the
+  // scope is flagged the silhouette threshold is too loose for this
+  // cohort — flag it rather than present a wall of intervals as signal.
+  const scopeW = Math.max(1, wEnd - wStart + 1);
+  let warning = scopeWarn;
+  try {
+    const ivs = Array.isArray(result.inner_intervals) ? result.inner_intervals : [];
+    let covered = 0;
+    for (const iv of ivs) {
+      const a = Number.isFinite(iv.window_start) ? iv.window_start : null;
+      const b = Number.isFinite(iv.window_end)   ? iv.window_end   : a;
+      if (a != null) covered += Math.max(0, b - a + 1);
+    }
+    const frac = covered / scopeW;
+    if (frac > 0.9) {
+      result.verdict = 'no_nested_structure';
+      const note = `inner-band signal saturates the scanned scope `
+                 + `(${(frac * 100).toFixed(0)}% of windows) — silhouette threshold likely too `
+                 + `loose for this cohort; treat as no clear nested structure.`;
+      warning = warning ? (warning + ' · ' + note) : note;
+    }
+  } catch (_) { /* non-fatal */ }
   inv.nested_detector_state = Object.assign({}, existing, {
     detector_result: result,
-    candidate_label: existing.candidate_label || (data.chrom || null),
+    warning,
+    candidate_label: (data.chrom || existing.candidate_label || '') + ' · ' + scopeLabel,
+    // 2026-05-29: stamp the chrom this result was computed for so mount()
+    // can invalidate the cache on a chrom change.
+    _chrom:          (atlasState.shared && atlasState.shared.activeChrom)
+                       || data.chrom || null,
+    // Render against the full chromosome so focal intervals sit at their
+    // true genomic position on the track x-axis.
     n_windows:       nW,
   });
 }
@@ -235,6 +322,7 @@ function _buildPageState(atlasState) {
   return {
     detector_result:      dr,
     candidate_label:      ns ? (ns.candidate_label || null) : null,
+    warning:              ns ? (ns.warning || null) : null,
     n_windows:            ns && Number.isFinite(ns.n_windows)
                             ? ns.n_windows : totalWindowCount(dr),
     band_hit_regions:     [],
@@ -273,6 +361,17 @@ function _renderHeader(state) {
     strata.textContent = scanned.length
       ? 'strata scanned: ' + scanned.join(', ')
       : 'strata scanned: —';
+  }
+  // 2026-05-29: reliability warning banner (saturation guard).
+  const warn = document.getElementById('nestedDetectorWarning');
+  if (warn) {
+    if (state.warning) {
+      warn.style.display = '';
+      warn.textContent = '⚠ ' + state.warning;
+    } else {
+      warn.style.display = 'none';
+      warn.textContent = '';
+    }
   }
 }
 

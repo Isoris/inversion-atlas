@@ -21,6 +21,8 @@
 // Filters to the active chrom so loci from other chromosomes don't
 // appear when scrubbing a single chrom.
 
+import { loadPersistedCandidatesForChrom } from '../local_pca_dosage/candidates.js';
+
 /**
  * @param {Object} state   haplotype_regimes legacy state — reads
  *                         state.data, state.activeChrom, state.candidateList,
@@ -40,9 +42,27 @@ export function buildShortRangeResult(state) {
   const inv = (typeof window !== 'undefined' && window.atlasState && window.atlasState.inversion)
             || {};
   const stash = inv._local_pca_dosage_state || {};
-  const cands = Array.isArray(stash.candidateList) ? stash.candidateList
-              : (Array.isArray(state.candidateList) ? state.candidateList : []);
-  const onChrom = cands.filter(c => c && (!activeChrom || c.chrom === activeChrom));
+  let cands = Array.isArray(stash.candidateList) ? stash.candidateList
+            : (Array.isArray(state.candidateList) ? state.candidateList : []);
+  // 2026-05-29: cold-reload fallback. The bridge above is only populated once
+  // local_pca_dosage has mounted this session (or the user promoted a
+  // candidate). After a hard reload + jump straight to candidate_regimes it's
+  // empty even though candidates are still persisted per-chrom in localStorage
+  // — read them directly and hydrate the bridge so the summary-bundle and
+  // status readouts agree. Keyed by data.chrom (matches the save path).
+  if (cands.length === 0 && data && data.chrom) {
+    const persisted = loadPersistedCandidatesForChrom(data.chrom);
+    if (persisted.length) {
+      cands = persisted;
+      if (!inv._local_pca_dosage_state) inv._local_pca_dosage_state = {};
+      inv._local_pca_dosage_state.candidateList = persisted;
+    }
+  }
+  // c.chrom is stamped as the scrubber_main payload chrom (candidates.js:1009),
+  // so accept either activeChrom or data.chrom to tolerate a toolbar-label vs
+  // payload-name difference.
+  const onChrom = cands.filter(c => c &&
+    (!c.chrom || c.chrom === activeChrom || (data && c.chrom === data.chrom)));
   if (onChrom.length === 0) {
     return {
       stage1: { seeds: [], per_chrom_summary: [] },

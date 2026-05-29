@@ -320,6 +320,28 @@ function _l3PaneHead(opts) {
 }
 
 // =============================================================================
+// _appendMiniPCA — height-bounded mini-PCA canvas factory (2026-05-29)
+// =============================================================================
+// The mini-PCA canvas must live inside a wrapper with a fixed 110px height.
+// fitCanvas() (shared/page1_utils.js) sizes a canvas from parentNode's
+// clientHeight; a bare <canvas> appended straight into .l3-col made it
+// measure the WHOLE column (tall, scrollable), so the canvas ballooned to
+// fill the column and shoved the contingency table out of view — the "PCA
+// panel and contingency table compete for each other" bug, worst in slab
+// (1w/5w/10w/Nw) mode. Mirrors the #pcaCanvasWrap pattern the main PCA panel
+// uses (local_pca_dosage.html:1044): wrapper owns the box, canvas fills it,
+// so fitCanvas reads the intended 110px plot height.
+function _appendMiniPCA(parent) {
+  const wrap = document.createElement('div');
+  wrap.className = 'mini-pca-wrap';
+  const canvas = document.createElement('canvas');
+  canvas.className = 'mini-pca';
+  wrap.appendChild(canvas);
+  parent.appendChild(wrap);
+  return canvas;
+}
+
+// =============================================================================
 // refreshPinUI(state) — legacy lines 70130-70161
 // =============================================================================
 // Updates the 📌 pin-2nd-L2 button label + accent + enables/disables the
@@ -590,6 +612,33 @@ export function renderL3Panel(state) {
   // contingency tables its not working for per window navigation … it
   // should work for every scale". Same bug for renderL3PanelScaleStability().
   if (state.compareUnit && state.compareUnit !== 'L2') {
+    // 2026-05-29 (the "L3 panels go up and down / auto-expand in 1w/5w/
+    // 10w/Nw modes" glitch): give the slab path the SAME content-fingerprint
+    // short-circuit the L2 path has at line 607. Without it, the slab branch
+    // returned here BEFORE the cache check, so every renderL3Panel() call
+    // tore down the panel (body.innerHTML='') and re-fit every mini-PCA
+    // canvas — INCLUDING the no-op ticks fired by the page ResizeObserver
+    // (sidebar.js _installPageResizeObserver → repaint → renderL3Panel).
+    // fitCanvas() sizing a freshly-rebuilt canvas nudges layout, which
+    // re-fires the observer → runaway rebuild loop. The L2 path never had
+    // this because its fingerprint cache made those same ticks no-ops.
+    // The slab fingerprint extends the base one with the inputs that are
+    // slab-specific: state.cur + halfW (slab panes ARE cursor-centred,
+    // unlike L2 panes) plus the ramp/spotlight inputs the slab painter reads.
+    const slabCurL2 = state.windowToL2 ? state.windowToL2[state.cur] : -1;
+    const slabHalfW = compareUnitHalfW();
+    const slabFp = _renderL3Fingerprint(slabCurL2)
+      + '::SLAB::' + state.cur
+      + '::' + (slabHalfW == null ? 'x' : slabHalfW)
+      + '::' + (state.l3RampMode || '')
+      + '::' + (state.l3HetColoring ? 'H' : '')
+      + '::' + (state.spotlight != null ? state.spotlight : '')
+      + '::' + (state.spotlightTrackedAll ? 'A' : '');
+    if (state._l3CacheFp === slabFp && state._l3CacheRendered === true) {
+      return;   // same render — DOM unchanged, skip rebuild + canvas re-fit
+    }
+    state._l3CacheFp = slabFp;
+    state._l3CacheRendered = true;
     return _renderL3PanelSlabImpl(state);
   }
 
@@ -712,9 +761,7 @@ export function renderL3Panel(state) {
     h3A.classList.add('focal');
     h3A.innerHTML = `🅰️ <b>${shortId(aEnv.candidate_id)}</b> <span class="dim" style="font-weight:400;">${aEnv.n_windows}W · sim ${fmt(aEnv.mean_sim)}</span>`;
     colA.appendChild(h3A);
-    const miniA = document.createElement('canvas');
-    miniA.className = 'mini-pca';
-    colA.appendChild(miniA);
+    const miniA = _appendMiniPCA(colA);
     const contentA = document.createElement('div');
     contentA.className = 'ct-content';
     contentA.innerHTML = focalContentHtml(aCl, aEnv, aIdx);
@@ -741,9 +788,7 @@ export function renderL3Panel(state) {
     h3B.classList.add('focal');
     h3B.innerHTML = `🅱️ <b>${shortId(bEnv.candidate_id)}</b> <span class="dim" style="font-weight:400;">${bEnv.n_windows}W · sim ${fmt(bEnv.mean_sim)}</span>`;
     colB.appendChild(h3B);
-    const miniB = document.createElement('canvas');
-    miniB.className = 'mini-pca';
-    colB.appendChild(miniB);
+    const miniB = _appendMiniPCA(colB);
     const contentB = document.createElement('div');
     contentB.className = 'ct-content';
     contentB.innerHTML = focalContentHtml(bCl, bEnv, bIdx);
@@ -865,9 +910,7 @@ export function renderL3Panel(state) {
 
     if (l2idx == null) {
       // Empty placeholder column — single mini + message, no per-K split.
-      const miniCanvas = document.createElement('canvas');
-      miniCanvas.className = 'mini-pca';
-      col.appendChild(miniCanvas);
+      const miniCanvas = _appendMiniPCA(col);
       const content = document.createElement('div');
       content.className = 'ct-content';
       content.innerHTML = `<div class="dim" style="padding: 4px 0;">no neighbor at offset ${offset}<br>(boundary of L1 parent)</div>`;
@@ -963,9 +1006,7 @@ export function renderL3Panel(state) {
         }
       }
 
-      const miniCanvas = document.createElement('canvas');
-      miniCanvas.className = 'mini-pca';
-      col.appendChild(miniCanvas);
+      const miniCanvas = _appendMiniPCA(col);
       // v4 turn 6: spotlight click — fires after drawMiniPCA so __l3_render
       // is populated before the user can interact.
       if (typeof _setupL3MiniClick === 'function') _setupL3MiniClick(miniCanvas);
@@ -1305,9 +1346,7 @@ function _renderL3PanelSlabImpl(state) {
       // the page-wide L3 mini-PCA styling (background, height, cursor,
       // padding). Drops the slab-specific inline overrides so the two
       // modes share the same visual base.
-      const mini = document.createElement('canvas');
-      mini.className = 'mini-pca';
-      col.appendChild(mini);
+      const mini = _appendMiniPCA(col);
       // turn 148: spotlight click — fires after drawSlabMiniPCA has populated
       // canvas.__l3_render. Same handler as L2 mode (parity with line 44707).
       if (typeof _setupL3MiniClick === 'function') _setupL3MiniClick(mini);
@@ -2843,6 +2882,12 @@ function ctHtml(cmp, offset, alignedLabels) {
 function _paintMiniPCAShared(canvas, opts) {
   const state = _pageState;
   if (!canvas) return;
+  // 2026-05-29: bail if this canvas was detached by a newer render before
+  // its scheduled rAF draw fired. Painting a detached canvas hits fitCanvas
+  // with parentNode === null → the canvas collapses to 1×1 and the draw is
+  // wasted (the visible canvas belongs to the latest render and gets its
+  // own draw). Cheap guard; also avoids the 1×1-squish artifact.
+  if (typeof canvas.isConnected === 'boolean' && !canvas.isConnected) return;
   const {
     xVals, yVals, labels: labelsIn,
     wMid, sign,
@@ -3078,6 +3123,17 @@ export function drawSlabMiniPCA(canvas, range, labels, opts) {
   // Slab midpoint drives sign / λ annotations.
   const wMid = (range[0] + range[1]) >> 1;
   const { sign } = getPC(state, wMid);
+  // 2026-05-29: label fallback — parity with drawMiniPCA (line 3022-3026).
+  // When the caller passes no labels (or a clustering-failure object whose
+  // `.labels` was undefined), fall back to the slab's own K-means cluster
+  // so the dots paint by band instead of dropping to the gray "#888"
+  // no-label branch in _paintMiniPCAShared. This was the "points have no
+  // colors" report in slab mode: drawMiniPCA had this safety net, the slab
+  // twin didn't.
+  if (!labels) {
+    const cl = getSlabClusterAt(range[0], range[1], state.k);
+    labels = (cl && cl.labels) ? cl.labels : null;
+  }
   _paintMiniPCAShared(canvas, {
     xVals: xs, yVals: ys2, labels,
     wMid, sign,

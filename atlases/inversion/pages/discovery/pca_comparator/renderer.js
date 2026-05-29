@@ -692,6 +692,231 @@ export function computeConcordance(state, si) {
   return { agree, total, frac: agree / total };
 }
 
+// ---------------------------------------------------------------------------
+// Phase 3 (SPEC §Phase 3): dosage-anchored Procrustes overlay.
+//
+// Rigidly aligns the θπ + GHSL scatters onto the dosage scatter at the
+// current window (least-squares rotation + uniform scale + translation,
+// computed only over samples finite in BOTH layers), then draws all
+// three in one panel: ⬤ dosage, △ θπ, □ GHSL, with a thin connector
+// per sample. A long connector means the evidence axes disagree about
+// where that sample sits.
+//
+// CAVEAT (the reason this is gated by the SPEC): the alignment is a
+// FITTED transform — it rotates θπ/GHSL onto dosage's coordinate frame.
+// Read DRIFT (connector length), not absolute position. Two scatters
+// with no real relationship can still be Procrustes-aligned to overlap.
+// The panel header labels this "dosage-anchored Procrustes" so the user
+// never mistakes the alignment for a natural shared space.
+//
+// Hit-test reuses the dosage marker positions (stashed into
+// _lastScreenXY.overlay) so hover continues to track samples.
+// ---------------------------------------------------------------------------
+export function paintProcrustesOverlay(state) {
+  if (typeof document === 'undefined') return;
+  const canvas = document.getElementById('pcaCompOverlayCanvas');
+  if (!canvas) return;
+  const status = document.getElementById('pcaCompOverlayStatus');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const { cssW: w, cssH: h } = _fitCanvas(canvas, ctx);
+  ctx.clearRect(0, 0, w, h);
+
+  const ss = state.sharedState;
+  if (!ss || !ss.data) {
+    _drawEmpty(ctx, w, h, 'no chromosome loaded');
+    _lastScreenXY.overlay = null;
+    if (status) status.textContent = 'no data';
+    return;
+  }
+
+  const dose = _getLayerPoints(ss, 'dosage');
+  if (!dose || !dose.xs || !dose.ys) {
+    _drawEmpty(ctx, w, h, 'dosage PCA absent at this window — overlay anchors on dosage');
+    _lastScreenXY.overlay = null;
+    if (status) status.textContent = 'no dosage anchor';
+    return;
+  }
+  const nS = dose.xs.length;
+  const tpi  = _getLayerPoints(ss, 'theta_pi');
+  const ghsl = _getLayerPoints(ss, 'ghsl');
+
+  // Align each non-dosage layer onto dosage. _alignLayerToDosage returns
+  // { xs, ys } in dosage's coordinate space, or null when the layer is
+  // absent / too few paired points / degenerate.
+  const tpiAligned  = (tpi  && tpi.xs)  ? _alignLayerToDosage(dose, tpi)  : null;
+  const ghslAligned = (ghsl && ghsl.xs) ? _alignLayerToDosage(dose, ghsl) : null;
+
+  // Combined bounds over dosage + aligned layers.
+  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+  const acc = (xs, ys) => {
+    if (!xs) return;
+    for (let i = 0; i < xs.length; i++) {
+      const x = xs[i], y = ys[i];
+      if (!isFinite(x) || !isFinite(y)) continue;
+      if (x < xMin) xMin = x; if (x > xMax) xMax = x;
+      if (y < yMin) yMin = y; if (y > yMax) yMax = y;
+    }
+  };
+  acc(dose.xs, dose.ys);
+  if (tpiAligned)  acc(tpiAligned.xs,  tpiAligned.ys);
+  if (ghslAligned) acc(ghslAligned.xs, ghslAligned.ys);
+  if (!isFinite(xMin) || xMin === xMax) { xMin -= 0.5; xMax += 0.5; }
+  if (!isFinite(yMin) || yMin === yMax) { yMin -= 0.5; yMax += 0.5; }
+  const padX = (xMax - xMin) * 0.06, padY = (yMax - yMin) * 0.06;
+  xMin -= padX; xMax += padX; yMin -= padY; yMax += padY;
+
+  const plotW = w - PANEL_PAD.l - PANEL_PAD.r;
+  const plotH = h - PANEL_PAD.t - PANEL_PAD.b;
+  const toX = (v) => PANEL_PAD.l + ((v - xMin) / (xMax - xMin)) * plotW;
+  const toY = (v) => PANEL_PAD.t + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+
+  // Axis frame.
+  ctx.strokeStyle = 'rgba(120,140,170,0.35)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(PANEL_PAD.l + 0.5, PANEL_PAD.t + 0.5, plotW - 1, plotH - 1);
+
+  const groupLabels = _resolveAnchorLabels(state);
+  let trackedSet;
+  const _tsCache = state._trackedSetCache;
+  if (_tsCache && _tsCache.arr === ss.tracked) {
+    trackedSet = _tsCache.set;
+  } else {
+    trackedSet = new Set(ss.tracked || []);
+    state._trackedSetCache = { arr: ss.tracked, set: trackedSet };
+  }
+
+  // Dosage screen positions for hit-test.
+  const screenXY = new Float32Array(nS * 2);
+
+  // Connector lines first (under the markers).
+  for (let si = 0; si < nS; si++) {
+    const pts = [];
+    if (isFinite(dose.xs[si]) && isFinite(dose.ys[si])) {
+      pts.push([toX(dose.xs[si]), toY(dose.ys[si])]);
+    }
+    if (tpiAligned && isFinite(tpiAligned.xs[si]) && isFinite(tpiAligned.ys[si])) {
+      pts.push([toX(tpiAligned.xs[si]), toY(tpiAligned.ys[si])]);
+    }
+    if (ghslAligned && isFinite(ghslAligned.xs[si]) && isFinite(ghslAligned.ys[si])) {
+      pts.push([toX(ghslAligned.xs[si]), toY(ghslAligned.ys[si])]);
+    }
+    if (pts.length < 2) continue;
+    const isHov = (si === state.hoveredSample);
+    const isTrk = trackedSet.has(si);
+    const k = groupLabels ? groupLabels[si] : -1;
+    const col = (k != null && k >= 0) ? (groupColor(k) || '#cdd5e1') : '#7a8696';
+    ctx.strokeStyle = (isHov || isTrk) ? _withAlpha(col, 0.9) : _withAlpha(col, 0.22);
+    ctx.lineWidth = isHov ? 1.6 : 1;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let p = 1; p < pts.length; p++) ctx.lineTo(pts[p][0], pts[p][1]);
+    ctx.stroke();
+  }
+
+  // Markers: ⬤ dosage, △ θπ, □ GHSL.
+  for (let si = 0; si < nS; si++) {
+    const isHov = (si === state.hoveredSample);
+    const isTrk = trackedSet.has(si);
+    const k = groupLabels ? groupLabels[si] : -1;
+    const col = (k != null && k >= 0) ? (groupColor(k) || '#cdd5e1') : '#7a8696';
+    const baseA = isHov ? 1 : (isTrk ? 0.85 : 0.6);
+    const rDose = isHov ? POINT_R_HV : (isTrk ? POINT_R_TR : POINT_R);
+
+    if (isFinite(dose.xs[si]) && isFinite(dose.ys[si])) {
+      const px = toX(dose.xs[si]), py = toY(dose.ys[si]);
+      screenXY[si * 2] = px; screenXY[si * 2 + 1] = py;
+      ctx.fillStyle = _withAlpha(col, baseA);
+      ctx.beginPath(); ctx.arc(px, py, rDose, 0, Math.PI * 2); ctx.fill();
+      if (isHov || isTrk) { ctx.lineWidth = isHov ? 2 : 1; ctx.strokeStyle = '#fff'; ctx.stroke(); }
+    } else {
+      screenXY[si * 2] = -1; screenXY[si * 2 + 1] = -1;
+    }
+    if (tpiAligned && isFinite(tpiAligned.xs[si]) && isFinite(tpiAligned.ys[si])) {
+      _drawTriangle(ctx, toX(tpiAligned.xs[si]), toY(tpiAligned.ys[si]),
+                    isHov ? 6 : 4, _withAlpha(col, baseA), isHov || isTrk);
+    }
+    if (ghslAligned && isFinite(ghslAligned.xs[si]) && isFinite(ghslAligned.ys[si])) {
+      _drawSquare(ctx, toX(ghslAligned.xs[si]), toY(ghslAligned.ys[si]),
+                  isHov ? 5 : 3.4, _withAlpha(col, baseA), isHov || isTrk);
+    }
+  }
+
+  _lastScreenXY.overlay = screenXY;
+  _lastPlotRect.overlay = { x: PANEL_PAD.l, y: PANEL_PAD.t, w: plotW, h: plotH };
+
+  if (status) {
+    const parts = [`dosage n=${_countValid(dose.xs, dose.ys)}`];
+    parts.push(tpiAligned  ? `θπ aligned (s=${tpiAligned.scale.toFixed(2)}, ${(tpiAligned.theta * 180 / Math.PI).toFixed(0)}°)`  : 'θπ —');
+    parts.push(ghslAligned ? `GHSL aligned (s=${ghslAligned.scale.toFixed(2)}, ${(ghslAligned.theta * 180 / Math.PI).toFixed(0)}°)` : 'GHSL —');
+    status.textContent = parts.join(' · ');
+  }
+}
+
+// 2D similarity Procrustes: find rotation θ + uniform scale s +
+// translation that best maps `layer` points onto `ref` (dosage) points,
+// using only samples finite in BOTH. Returns aligned { xs, ys } (length
+// = ref.xs.length; samples absent in `layer` stay NaN) plus { scale,
+// theta } for the status line. Returns null when fewer than 2 paired
+// points or the layer's spread is degenerate (can't define a rotation).
+// Exported for the unit test (test_discovery_pca_comparator.js).
+export function _alignLayerToDosage(ref, layer) {
+  const n = Math.min(ref.xs.length, layer.xs.length);
+  // Centroids over paired-finite samples.
+  let sumXx = 0, sumXy = 0, sumYx = 0, sumYy = 0, m = 0;
+  for (let i = 0; i < n; i++) {
+    const rx = ref.xs[i], ry = ref.ys[i], lx = layer.xs[i], ly = layer.ys[i];
+    if (!isFinite(rx) || !isFinite(ry) || !isFinite(lx) || !isFinite(ly)) continue;
+    sumXx += rx; sumXy += ry; sumYx += lx; sumYy += ly; m++;
+  }
+  if (m < 2) return null;
+  const cX = sumXx / m, cXy = sumXy / m, cY = sumYx / m, cYy = sumYy / m;
+  // a = Σ Yc·Xc, b = Σ Yc×Xc, sumYY = Σ|Yc|².
+  let a = 0, b = 0, sumYY = 0;
+  for (let i = 0; i < n; i++) {
+    const rx = ref.xs[i], ry = ref.ys[i], lx = layer.xs[i], ly = layer.ys[i];
+    if (!isFinite(rx) || !isFinite(ry) || !isFinite(lx) || !isFinite(ly)) continue;
+    const xcx = rx - cX,  xcy = ry - cXy;
+    const ycx = lx - cY,  ycy = ly - cYy;
+    a += ycx * xcx + ycy * xcy;
+    b += ycx * xcy - ycy * xcx;
+    sumYY += ycx * ycx + ycy * ycy;
+  }
+  if (sumYY < 1e-12) return null;
+  const theta = Math.atan2(b, a);
+  const scale = Math.sqrt(a * a + b * b) / sumYY;
+  if (!isFinite(scale) || scale <= 0) return null;
+  const cos = Math.cos(theta), sin = Math.sin(theta);
+  // Apply s·R·(Y - cY) + cX to every sample with finite layer coords.
+  const xs = new Float64Array(ref.xs.length).fill(NaN);
+  const ys = new Float64Array(ref.ys.length).fill(NaN);
+  for (let i = 0; i < layer.xs.length; i++) {
+    const lx = layer.xs[i], ly = layer.ys[i];
+    if (!isFinite(lx) || !isFinite(ly)) continue;
+    const ycx = lx - cY, ycy = ly - cYy;
+    const rx = scale * (ycx * cos - ycy * sin) + cX;
+    const ry = scale * (ycx * sin + ycy * cos) + cXy;
+    if (i < xs.length) { xs[i] = rx; ys[i] = ry; }
+  }
+  return { xs, ys, scale, theta };
+}
+
+function _drawTriangle(ctx, cx, cy, r, fill, outline) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r);
+  ctx.lineTo(cx - r * 0.87, cy + r * 0.5);
+  ctx.lineTo(cx + r * 0.87, cy + r * 0.5);
+  ctx.closePath();
+  ctx.fillStyle = fill; ctx.fill();
+  if (outline) { ctx.lineWidth = 1; ctx.strokeStyle = '#fff'; ctx.stroke(); }
+}
+
+function _drawSquare(ctx, cx, cy, r, fill, outline) {
+  ctx.fillStyle = fill;
+  ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  if (outline) { ctx.lineWidth = 1; ctx.strokeStyle = '#fff'; ctx.strokeRect(cx - r, cy - r, r * 2, r * 2); }
+}
+
 // Click-to-scrub: translate an x pixel coordinate inside the lines canvas
 // into the corresponding window index. Returns -1 if outside the plot box.
 export function windowAtLinesX(px) {

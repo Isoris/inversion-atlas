@@ -67,6 +67,7 @@ import {
   drawCandLocalPCA, drawCandLinesPanel, drawCandGHSLPerBand,
   drawCandidateSigmaChart, drawCandidateLocationStrip,
 } from './candidate_focus/_draw_panels.js';
+import { computePC1Signs, computePC2Signs } from '../../shared/page1_data_helpers.js';
 
 // Re-export public entry points so the manifest's `module:` contract
 // (atlas_router imports renderCandidateMetadata, wireCandidateNav, mount
@@ -608,6 +609,28 @@ function _buildLegacyState(atlasState) {
     legacy.data = inv.tracks[chrom];               // legacy slot (back-compat)
   } else {
     legacy.data = null;
+  }
+
+  // 2026-05-29: PC1/PC2 sign-alignment for the per-sample lines panel.
+  // drawCandLinesPanel (candidate_focus/_draw_panels.js) plots pc1[si] * sign,
+  // where `sign` = state.pc1Sign[w] via getPC(). The pc1Sign / pc2Sign arrays
+  // are produced by computePC1Signs() on the LOCAL_PCA_DOSAGE page state — NOT
+  // on the `inv` bucket — so the Object.assign({}, inv) above never carried
+  // them. getPC() then fell back to sign=1 and each window kept its arbitrary
+  // raw PCA polarity, so the per-sample PC1 traces braid / flip across windows
+  // even though the panel is labelled "sign-aligned PC1". Reuse the discovery
+  // page's already-computed signs when they belong to THIS data object
+  // (identical windows → identical alignment); otherwise compute fresh.
+  if (legacy.data && Array.isArray(legacy.data.windows)) {
+    if (legacy.flipPC1 == null) legacy.flipPC1 = true;
+    const lp = inv._local_pca_dosage_state;
+    if (lp && lp.data === legacy.data && lp.pc1Sign) {
+      legacy.pc1Sign = lp.pc1Sign;
+      legacy.pc2Sign = lp.pc2Sign || null;
+    } else {
+      computePC1Signs(legacy);
+      computePC2Signs(legacy);
+    }
   }
   // candidatePageMode controls "confirmed-only" navigation. The slot is
   // candidate_focus-private and gets set on the inversion bucket by tab transitions.

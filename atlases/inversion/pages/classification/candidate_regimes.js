@@ -47,6 +47,8 @@ import {
   applyViewToggle,
   renderRegimesSummary,
 } from '../discovery/haplotype_regimes/regimes_summary.js';
+import { loadPersistedCandidatesForChrom }
+  from '../discovery/local_pca_dosage/candidates.js';
 
 // ---------------------------------------------------------------------------
 // Page-local state. Set on mount, cleared on unmount.
@@ -120,9 +122,18 @@ export async function mount(root, atlasState, registry) {
   }
 
   // Initial status: hint at the next action.
-  const candList = (inv && inv._local_pca_dosage_state && inv._local_pca_dosage_state.candidateList)
+  let candList = (inv && inv._local_pca_dosage_state && inv._local_pca_dosage_state.candidateList)
     || [];
-  const onChrom = candList.filter(c => c && (!c.chrom || c.chrom === chrom));
+  // Cold-reload fallback: the in-memory bridge is only populated once
+  // local_pca_dosage has mounted this session. Read persisted candidates
+  // straight from localStorage (keyed by data.chrom) so the count is right
+  // even when the user jumped straight here after a reload. See
+  // candidates.js#loadPersistedCandidatesForChrom.
+  if (candList.length === 0 && data && data.chrom) {
+    candList = loadPersistedCandidatesForChrom(data.chrom);
+  }
+  const onChrom = candList.filter(c => c &&
+    (!c.chrom || c.chrom === chrom || (data && c.chrom === data.chrom)));
   if (onChrom.length === 0) {
     setStatus(root,
       `loaded ${chrom} · ${data.n_windows} windows · 0 candidates yet. `

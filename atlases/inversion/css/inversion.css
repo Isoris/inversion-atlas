@@ -363,6 +363,19 @@ body.light-theme .caution-banner { background: rgba(245, 165, 36, 0.10); }
 
 .page { display: none; height: 100%; min-height: 0; overflow: hidden; }
 .page.active { display: block; }
+/* 2026-05-20: the atlas-core router swaps #app-root.innerHTML per page and
+   mounts exactly ONE fragment at a time — it never adds the legacy `.active`
+   class to the page root (that was the old single-file tabBar's job; see the
+   "will be flipped by tab init" comment below, which no longer happens under
+   the router). Result: every `class="page"` fragment (haplotype_regimes,
+   candidate_focus, …) stayed display:none and rendered blank. Fix: show the
+   page when it is the direct child of #app-root (i.e. the mounted fragment).
+   Specificity (1,1,0) beats the base `.page` (0,1,0); nested `.page` elements
+   inside a fragment are unaffected (only the direct child shows). Placed
+   BEFORE the per-page `.page#id` rules below so their equal-specificity
+   later-in-source declarations (e.g. local_pca_dosage's display:none) still
+   win for those specific ids. */
+#app-root > .page { display: block; }
 /* v4 turn 73 / 73b: long-form scaffold pages (θπ landing, GHSL landing,
    diversity atlas, genome atlas) need vertical scroll because their
    content (intro + required-layers table + panel-layout description)
@@ -652,11 +665,24 @@ body[data-layout-mode="free"] main#local_pca_dosage #ctrlBar { min-height: 40px;
    later one wins, which was the 360px rule). Leaves a ~360px empty gap
    between the toolbar and the |z| panel. The `:not()` makes the free-mode
    rule only apply when sim is still in its main-panel position. */
-body[data-layout-mode="free"]:not([data-sim-in-minimap="1"]) main#local_pca_dosage #simPanel { min-height: 360px; }
-body[data-layout-mode="free"] main#local_pca_dosage #zPanel { min-height: 200px; }
-body[data-layout-mode="free"] main#local_pca_dosage #linesPanel { min-height: 200px; }
-body[data-layout-mode="free"] main#local_pca_dosage #anchorStripPanel { min-height: 24px; }
-body[data-layout-mode="free"] main#local_pca_dosage #pcaPanel { min-height: 360px; }
+/* 2026-05-26: canvas-bearing panels use a DEFINITE `height` in free mode,
+   not `min-height`. The panel children are `.panel canvas { height: 100% }`
+   — a percentage height needs a definite parent height to resolve against.
+   With only `min-height` the panel's height is auto (content-driven), so
+   fitCanvas's `parent.clientHeight` read INCLUDES the canvas itself; each
+   redraw set the canvas to the parent height, which grew the parent, which
+   grew the canvas → the sim_mat "extended infinitely" (Quentin's report).
+   A fixed `height` makes clientHeight stable. The page still scrolls
+   because `main` is `overflow-y: auto` and the panels stack taller than
+   the viewport. l3Panel keeps `min-height` — it holds HTML contingency
+   tables (not a single full-bleed canvas) and should grow with content;
+   its mini-PCA canvases resolve against their bounded `.l3-col` parents,
+   not the panel. */
+body[data-layout-mode="free"]:not([data-sim-in-minimap="1"]) main#local_pca_dosage #simPanel { height: 360px; }
+body[data-layout-mode="free"] main#local_pca_dosage #zPanel { height: 200px; }
+body[data-layout-mode="free"] main#local_pca_dosage #linesPanel { height: 200px; }
+body[data-layout-mode="free"] main#local_pca_dosage #anchorStripPanel { height: 24px; }
+body[data-layout-mode="free"] main#local_pca_dosage #pcaPanel { height: 360px; }
 body[data-layout-mode="free"] main#local_pca_dosage #l3Panel { min-height: 360px; }
 /* In free mode the resize handles still work; we don't need to disable them */
 
@@ -4935,9 +4961,17 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
   border-color: var(--accent);
 }
 .l3-act-btn:not(:disabled):hover { filter: brightness(1.1); }
-.l3-col .mini-pca { width: 100%; height: 110px; flex: 0 0 110px;
+/* 2026-05-29: the plot box is owned by .mini-pca-wrap (fixed 110px) so
+   fitCanvas measures the right height; the canvas just fills the wrapper.
+   Before, the bare canvas was a direct .l3-col flex child and fitCanvas
+   measured the whole tall column → it ballooned over the contingency table
+   (the "PCA panel and contingency compete" bug). See _appendMiniPCA in
+   l3_panel.js. */
+.l3-col .mini-pca-wrap { width: 100%; height: 110px; flex: 0 0 110px;
+                          margin: 2px 0 6px; position: relative; min-height: 0; }
+.l3-col .mini-pca { display: block; width: 100%; height: 100%;
                      background: #0b0e13; border: 1px solid var(--rule);
-                     border-radius: 2px; margin: 2px 0 6px; }
+                     border-radius: 2px; box-sizing: border-box; }
 /* v4 turn 3 ask 4: was flex: 1 1 auto, which caused overlap when the
    column had multiple K sections (K=3 + K=6 in K=both mode). Each
    section's .ct-content tried to claim "available space" and they
@@ -5121,6 +5155,28 @@ html[data-theme="academic"] #cross_species_breakpoints .cs-synteny-sankey {
   height: 100%;
   min-height: 0;
   overflow: hidden;
+}
+
+/* 2026-05-26: the atlas-core router mounts the fragment as
+   `#app-root > .page` and NEVER adds `.active` (see the #app-root > .page
+   override ~line 378). So the `.active` flex-column rule above never
+   matched under the shell — these pages fell back to `display: block`
+   and their `flex: 1` body + canvas had no flex parent to bound against,
+   so the canvas grew unbounded (similarity matrix "extended off the
+   bottom of the page", Quentin 2026-05-26). Mirror the flex-column
+   layout for the router-mounted form. `height: 100%` + `overflow: hidden`
+   already come from the base `.page` rule; only `display`/`flex-direction`
+   need restating. Higher specificity (id + parent) than `#app-root > .page`
+   so `display: flex` wins. */
+#app-root > .page#similarity_matrix,
+#app-root > .page#sim_mat,
+#app-root > .page#pca_scatter_per_window,
+#app-root > .page#dosage_heatmap,
+#app-root > .page#nested_inversion_detector,
+#app-root > .page#dosage_cluster_adaptive_k,
+#app-root > .page#pca_comparator {
+  display: flex;
+  flex-direction: column;
 }
 
 /* 2026-05-20: pca_comparator carries 3 PCA panels + heatmap + lines

@@ -90,20 +90,6 @@
       ],
       "_was_id": "page15"
     },
-    "negative_regions": {
-      "_label": "negative regions catalogue",
-      "_doc": "Region-level catalogue of 'no detectable inversion' calls — complement of the catalogue positive catalogue. Each region carries a region_status field (e.g. no_detectable_inversion_high_confidence) — NOT a binary positive/negative; the static caution banner explicitly warns against that misreading. Loaded from negative_regions.json or .tsv via #nrLoadBtn / #nrLoadInput; summary cards (#nrSummaryCards) show per-region_status counts; full per-region detail in #nrTableSlot. Export-CSV via #nrExportCsvBtn; reset via #nrResetBtn. The complement framing is deliberate: 'no detectable inversion' means no signal above the study's resolution / sample size / callability limits — tiny inversions, very rare inversions (1-2 fish), inversions in repetitive or low-callability regions, and inversions whose breakpoints fall outside short-read mappability can all be missed. Round-5-step-14 status: stub-preserving migration — HTML scaffold + lifecycle scaffolding only; no JS handlers exist in legacy/Inversion_atlas.html (confirmed by grep returning HTML/CSS/comments only — note the HTML contains an inline comment referencing _nrRender as the planned future renderer name, but no JS implements it). TODO_MISSING(_nrRender + _nrLoadFile + _nrExportCsv + _nrReset) — renderers will be authored fresh against the established _setActiveState pattern. Source: legacy/Inversion_atlas.html lines 7378-7572 (HTML shell only).",
-      "requires_layers": [
-        "scrubber_main"
-      ],
-      "requires_slots": [
-        "activeChrom"
-      ],
-      "preloads": [
-        "scrubber_main"
-      ],
-      "_was_id": "page19"
-    },
     "karyotype_tier": {
       "_label": "karyotype / tier",
       "_doc": "Karyotype/Tier candidate-level review page. Two sub-views toggleable via #candKaryoSubviewBar: (1) Karyotype — per-sample regime breakdown, each row a fish showing its locked K=3 label (HOMO_1/HET/HOMO_2 in operational H-system, ordered by median PC1), with two-track candidates getting extra track-membership pills per active_band; sortable, filterable, band-filterable. (2) Tier — 14-axis classification view, renders an empty-state card until the cluster-side R-pipeline ships final_classification.json (cross-refs SCHEMA_V2.md §19). Left side is the candidate list pane (#candListPane) with import/export/registry/manuscript-bundle/clear actions. DOM contract: #karyotype_tier (page wrapper) + #page4Inner (flex container) + #candListPane (left) + #candKaryoPane (right) containing #candKaryoEmpty + #candKaryoSubviewBar (with #candSubviewKaryoBtn + #candSubviewTierBtn + #candTierLayerStatus) + #candKaryoContent + #candTierContent. Reads state.candidate (cross_atlas slot) for the active candidate's id/chrom/start_bp/end_bp/K, and state.data.final_classification (sub-field of state.data, NOT a top-level slot) keyed by candidate_id for the Tier view. Round-5-step-21 status: pattern 2 ('single file with _state.js') applied. **First real review-stage migration.** All 4 chat-33 exports preserved verbatim (renderCandidateKaryotype, _refreshSubviewButtonStyles, renderCandidateTier, setKaryoSubview) plus the page-private karyoState const. Manual AST shim `const state = _pageState;` inserted into the 2 of 4 helpers that read bare state. State-aware wrapper refreshPage4 + mount/unmount lifecycle added. mount-time render wrapped in try/catch (matching cross_species_breakpoints/multi_species_cockpit) because the populated path hits two TODO_MISSING helpers (_renderCandidateKaryotypeBody, _renderTierAxesGrid) which throw ReferenceError until a follow-up extraction round lands them. Registry mismatch FLAGGED for Quentin (third instance, distinct shape from popstats/ancestry_per_window): the requires_layers below (candidate_sv_counts + candidate_boundaries) look misplaced — candidate_sv_counts is sv_evidence's territory and candidate_boundaries looks like it belongs on boundary_refinement (boundaries). What karyotype_tier actually consumes is state.data.final_classification + state.data.classification (§9 cluster-emit layer) + the candidate's own completion/characterization blocks. NB the activeCandidate slot IS correct (karyotype_tier IS candidate-level). This is a NEW shape of mismatch — distinct from popstats/ancestry_per_window (chromosome-level pages with candidate-* fields); here karyotype_tier is candidate-level with WRONG candidate-* layer references. Round 21 does NOT change requires_* (architectural-discipline rule established step 17). Quentin's decision: change requires_layers to e.g. [`final_classification`, `classification`] matching the page's actual consumption, OR confirm the candidate_sv_counts + candidate_boundaries entries are intended (karyotype_tier supposed to be repurposed?). Recommendation: defer to renumbering round (Option C, same as popstats + ancestry_per_window). Source: legacy/Inversion_atlas.html lines 7573-7645 (HTML shell) + 62800-62836 (renderCandidateKaryotype) + 62840-62861 (_refreshSubviewButtonStyles) + 63411-63492 (renderCandidateTier) + 62508-62526 (karyoState) + 63547 (_wireCandSubviewButtons reference).",
@@ -190,38 +176,6 @@
         "note": "Preserved for audit trail. ancestry_per_window is a chromosome-level ancestry view; the candidate-* declarations were a registry-content mismatch flagged at round-5-step-17."
       }
     },
-    "boundary_refinement": {
-      "_label": "boundaries",
-      "_doc": "Boundaries refinement page. Refines a promoted candidate's [start_bp, end_bp] into approximate left/right boundary zones using multiple evidence tracks. Auto-propose runs the BOUNDARY_TRACK_WEIGHTS-weighted algorithm (`_bndAutoPropose`); manual override at the scrubber cursor via E (left) / F (right) hotkeys. Save (B) persists the boundary annotation onto the candidate; Reset (R) clears. Terminology contract: `boundary_zone` is the default verdict (what auto ever produces); `exact_breakpoint` is reserved for junction-level evidence only. Scan radius is selectable across nine fixed steps (1 kb / 5 kb / 10 kb / 25 kb / 100 kb / 1 Mb / 1.5 Mb / 2 Mb / 5 Mb) — the smaller four match the MODULE_3 win5000.step1000 and win10000.step2000 θπ scales; the upper four kick in automatically beyond CANDIDATE_HUGE_BP via `_boundaryScanRange`. DOM contract: #boundary_refinement (page wrapper) + #page11Header + #page11Content (toolbar slot) + #bndCandSelect (candidate dropdown) + nine #bnd-radius-btn buttons + #bndAutoProposeBtn / #bndOverrideLBtn / #bndOverrideRBtn / #bndResetBtn / #bndSaveBtn + #bndStatusSel (boundary_zone_only / SV_supported / junction_supported) + #bndInfo + #bndTracks + #bndSummary + #bndClassSummary (auto-scan summary, v4 turn 25) + #bndRepeatDensity (TE density panel, v4 turn 18) + #bndNcRNADensity (rRNA / tRNA / ncRNA-other panel, turn 116) + #bndFocalVsBg (focal-vs-background widget, turn 117). Reads (per the trailing comment block in boundary_refinement.js): state.candidate (cross_atlas slot) for the active candidate's id/chrom/start_bp/end_bp/K, state.candidateList (cross_atlas array) for the candidate dropdown, state.data (transient sub-fields), state.repeatDensity (per-chrom TE density layer, lazily created by data IO), state.ncRNADensity (per-chrom ncRNA layer). Round-5-step-22 status: pattern 2 ('single file with _state.js') applied. **THE FINAL MIGRATION** (review group: 4 of 5 → 5 of 5; **MIGRATION COMPLETE 21/21**). All 4 chat-33 exports preserved verbatim (renderBoundariesPage, _bndKeyHandler, _bndAttachHotkeys, _bndDetachHotkeys). **Zero AST shims needed** — none of the 4 chat-33 functions read bare `state.X`. They operate exclusively on DOM and on the closure-scoped `bs` object returned by `_ensureBoundariesState()` (TODO_MISSING). Stronger statement than karyotype_tier (which needed shims into 2 of 4 helpers). State-aware wrapper refreshPage11 + mount/unmount lifecycle added. mount-time render wrapped in try/catch (matching cross_species_breakpoints/multi_species_cockpit/karyotype_tier) because the populated path hits 31 TODO_MISSING `_bnd*` helpers which throw ReferenceError until a follow-up extraction round lands them. mount() also installs the document-level keydown hotkey listener (E/F/B/R/A) via _bndAttachHotkeys; unmount() removes it via _bndDetachHotkeys. Cross-page guard-resolution audit performed step 22: NONE of the 31 TODO_MISSING markers are already exported in the migrated tree (no fold-in opportunities like step 12's stats_profile → cross_species_breakpoints, or step 21's karyotype_tier → candidate_focus). Confirms these are genuinely boundary_refinement-private helpers awaiting a Batch-2 extraction round. Registry mismatch FLAGGED for Quentin (FOURTH instance, NEW shape): the requires_layers below (candidate_final_class + candidate_breeding_card) look misplaced — `candidate_final_class` looks like karyotype_tier's territory (karyotype_tier reads state.data.final_classification, the 14-axis classification), and `candidate_breeding_card` does not appear anywhere in boundary_refinement's source at all. **Notable correlate**: karyotype_tier (step 21 flag) declared `candidate_boundaries` which the karyotype_tier handoff said 'looks like boundary_refinement's territory' — yet boundary_refinement declares neither `candidate_boundaries` nor anything boundary-related. This is consistent with a SWAP pattern: karyotype_tier's declared candidate_sv_counts + candidate_boundaries may have been swapped with boundary_refinement's declared candidate_final_class + candidate_breeding_card. NB the activeCandidate slot IS correct (boundary_refinement IS candidate-level). NEW shape — distinct from popstats/ancestry_per_window (chromosome-level pages with candidate-* fields) and karyotype_tier (candidate-level page with WRONG candidate-* layer references); here boundary_refinement is candidate-level with candidate-* layer references that look like ANOTHER candidate-level page's territory, suggesting a possible swap. Round 22 does NOT change requires_* (architectural-discipline rule established step 17, applied steps 18–22). Quentin's decision: confirm or reject the swap hypothesis at the renumbering round; if confirmed, exchange karyotype_tier's and boundary_refinement's requires_layers / preloads. If rejected, decide what boundary_refinement's actual requires_layers should be (likely a `candidate_boundaries` declaration matching what the page name says it does). Recommendation: defer to renumbering round (Option C, same as karyotype_tier + popstats + ancestry_per_window). Source: legacy/Inversion_atlas.html lines 7906–7921 (HTML shell) + 30175–30314 (renderBoundariesPage) + 30318–30345 (_bndKeyHandler / _bndAttachHotkeys / _bndDetachHotkeys) + 17763–20941 (the 31 TODO_MISSING `_bnd*` + `_wireRepeatDensity*` helpers, awaiting Batch-2 extraction).",
-      "requires_layers": [
-        "candidate_boundaries",
-        "scrubber_main"
-      ],
-      "requires_slots": [
-        "activeCandidate",
-        "activeChrom"
-      ],
-      "preloads": [
-        "candidate_boundaries",
-        "scrubber_main"
-      ],
-      "_was_id": "page11",
-      "_doc_2026-05-20": "Boundary refinement (candidate-level). Reads state.candidate (activeCandidate) and state.data (scrubber_main); writes back boundary zones into the candidate_boundaries layer (its own territory). Also lazily reads state.repeatDensity + state.ncRNADensity for the TE / rRNA / tRNA panels (page-private slots, not in the layer registry yet). requires_layers updated 2026-05-20 to match — was candidate_final_class + candidate_breeding_card (those belong to karyotype_tier and the post-classification panel respectively, flagged 2026-05-07 at round-5-step-22).",
-      "_old_entry_2026-05-20": {
-        "requires_layers": [
-          "candidate_final_class",
-          "candidate_breeding_card"
-        ],
-        "requires_slots": [
-          "activeCandidate"
-        ],
-        "preloads": [
-          "candidate_final_class",
-          "candidate_breeding_card"
-        ],
-        "note": "Preserved for audit trail. boundary_refinement IS candidate-level (activeCandidate is correct) but the layer declarations candidate_final_class + candidate_breeding_card belong to karyotype_tier and the post-classification panel respectively. The page emits boundary annotations into the candidate_boundaries layer (its actual territory). Flagged at round-5-step-22."
-      }
-    },
     "fish_ancestry_scroller": {
       "_label": "Fish Ancestry Scroller",
       "_doc": "Review-stage page that renders three numbered layers + brick metrics + cohort summary for one selected inversion candidate (one chromosome viewport). Layer 1: PC1 Band per fish. Layer 2: Ancestry Bricks per fish (six color modes; derived simplification of RFs merged into bricks with multi-metric labels RARE_ANCESTRY / HIGH_HET / REGIME_DISCORDANT etc. — NOT a discovery system; 'we discovered N bricks' is forbidden phrasing per SPEC). Layer 3: Brick summary cohort view. Plus a 5-row brick-metrics heatmap + tab strip (Overview / Candidates / Ancestry / Pop Stats / Regimes / Markers / Breakpoints) + right panel (3 blocks: Context explainer / View-mode + overlay controls / 3rd block). Headline metric: mean |ΔQ| (global vs local). Critical: F-based label-switching alignment pipeline (Q-fallback only in flanks, regime-aware smoothing, FAIL = grey not coloured). Page does NOT compute alignment or bricks; the caller supplies a fully prepared `model` to mount(); shared producers: ancestry_alignment.js + ancestry_bricks.js + cluster-side instant_q (Engine B). Subdir: _state.js, layers.js (3 numbered layers + brick-metrics block), right_panel.js (3-block right side panel), selection.js (Layer 2 brick hit-test). Registered 2026-05-15 — was on-disk but not in manifest.json; spec at specs_todo/SPEC_fish_ancestry_scroller.md.",
@@ -232,21 +186,6 @@
       ],
       "preloads": [],
       "_was_id": "page_ancestry_scroller"
-    },
-    "sv_evidence": {
-      "_label": "SV evidence",
-      "_doc": "Read-only candidate-level view of SV calls clustered around a candidate's boundaries, scored against the karyotype groups. Loads json/sv_genotype_counts/<cid>.json per candidate (the renderer reads state.candidate.id and fetches that file). Renders three things stacked top-to-bottom: SV table (caller, type, chrom, pos, len, support, gt-counts), UpSet plot of caller intersections, and a dosage heatmap (step-6 spec). DOM contract: #sv_evidence (page wrapper) + #sv_evidence_root (single inner mount slot owned by AtlasSVEvidence). sv_evidence is a thin loader stub: the renderer is window.AtlasSVEvidence (an OBJECT with .init / .loadCandidate / .destroy methods, distinct from popstats's + ancestry_per_window's single-function renderers), defined externally in js/atlas_sv_evidence.js (NOT inlined in legacy Inversion_atlas.html). sv_evidence.js's showSvEvidencePage(state) tries window.AtlasSVEvidence and falls back to a missing-module empty-state message in #sv_evidence_root (guarded by .__svInitFailed) if absent. On the present path init() is guarded by mod.__pageInitDone (called once) and loadCandidate(cid) is guarded by mod.__lastCid (re-fired only when the active candidate id changes). hideSvEvidencePage() calls mod.destroy() if available. Round-5-step-19 status: thin-loader-stub migration — pattern 4 ('stub-preserving + one wired entry') applied as a direct twin of popstats + ancestry_per_window (shipped steps 17 + 18). Both chat-33 exports preserved verbatim (showSvEvidencePage, hideSvEvidencePage); state-aware wrapper refreshPageSvEvidence + mount/unmount lifecycle added. mount() calls refreshPageSvEvidence(legacyState) so the fallback empty-state renders at mount time even if window.AtlasSVEvidence is absent. unmount() now also calls hideSvEvidencePage so the external module's destroy() runs. **Third (and final) review tier-1 thin-loader-stub migration** — after this round, review tier-1 is closed (only karyotype_tier, boundary_refinement, multi_species_cockpit remain across the whole project). NB on registry alignment: unlike popstats (step 18) + ancestry_per_window (step 17), the requires_layers / requires_slots / preloads fields below MATCH what the page actually does — sv_evidence is genuinely a candidate-level view (reads state.candidate.id, fetches json/sv_genotype_counts/<cid>.json per candidate). No registry mismatch flag needed for this entry. Source: legacy/Inversion_atlas.html lines 9329-9331 (HTML shell) + line 54981 (script-tag inventory entry for js/atlas_sv_evidence.js). Pre-migration registry note (preserved): Previous version listed split_read_aggregate operation, which doesn't exist in popstats_server.py. SV evidence comes from data/candidates/<id>/sv_genotype_counts.json (precomputed file), not from a server compute call. If we ever want live SV evidence aggregation, an endpoint must be added to popstats_server.py first.",
-      "requires_layers": [
-        "candidate_sv_counts"
-      ],
-      "requires_operations": [],
-      "requires_slots": [
-        "activeCandidate"
-      ],
-      "preloads": [
-        "candidate_sv_counts"
-      ],
-      "_was_id": "page_sv_evidence"
     },
     "catalogue": {
       "_label": "5 catalogue",
@@ -261,84 +200,6 @@
         "scrubber_main"
       ],
       "_was_id": "page3"
-    },
-    "confirmed_carousel": {
-      "_label": "confirmed carousel",
-      "_doc": "Carousel walk-through of all candidates marked confirmed on page 2 (state.candidateList.filter(c => c.confirmed === true)). Prev/next buttons cycle through the confirmed set. The HTML shell is wired with IDs (#confirmedNavBar, #confirmedNavPrev, #confirmedNavNext, #confirmedNavInfo, #confirmedCandidateMeta, #confirmedEmpty) but the carousel JS does NOT exist in legacy/Inversion_atlas.html — confirmed by `grep confirmedNav legacy/`. Page is effectively a stub even in the legacy build (empty-state placeholder shown). Round-5-step-7 status: stub preserved verbatim; full carousel + candidate_focus candidate-focus reuse is TODO_MISSING(_renderConfirmedCarousel + _wireConfirmedCarouselNav). Source: legacy/Inversion_atlas.html lines 7782-7812 (HTML shell only) + tab tooltip line 5076.",
-      "requires_layers": [
-        "scrubber_main"
-      ],
-      "requires_slots": [
-        "activeChrom"
-      ],
-      "preloads": [
-        "scrubber_main"
-      ],
-      "_was_id": "page9"
-    },
-    "marker_panels": {
-      "_label": "marker panels",
-      "_doc": "Diagnostic PCR marker panel cards for each candidate inversion regime. Reproduces the genome-based regime call (g0/g1/g2 from fish_regime_calls.tsv) using 3-10 markers per candidate. Activates when marker_panel_summary is present in state.data._layers_present; renders empty state with drag-in instructions otherwise. Emits one card per panel summary entry: candidate id + coords, regime counts, tier badge (HIGH/MEDIUM/LOW colored), expected accuracy, n markers, panel class, per-regime marker counts (g0/g1/g2 diagnostic), Tm range + multiplex spread (≤4°C = safe, otherwise tight), warning tags, and (when marker_catalogue + marker_primers layers also loaded) a per-marker table with marker_id, position, variant_type, target_regime, specificity_score, freq_g0/g1/g2, family_spread_score, amplicon size, Tm forward/reverse. Final block: textual interpretation (which markers support which regime + combined-panel accuracy on the calibration cohort). Source: legacy/Inversion_atlas.html lines 57837-58043 (verbatim helper _markerPanelCardHtml + renderMarkerPage). See SCHEMA §10 for column contracts.",
-      "requires_layers": [
-        "scrubber_main"
-      ],
-      "requires_slots": [
-        "activeChrom"
-      ],
-      "preloads": [
-        "scrubber_main"
-      ],
-      "_was_id": "page10"
-    },
-    "stats_profile": {
-      "_label": "14 stats profile",
-      "_doc": "Statistical profile of inversion-associated genomic features. Comparative summary of breakpoint context, genomic composition, functional cargo, population variation, and breeding-relevant burden across parental catfish genomes. Auto-derives rows from cs_breakpoints + candidate list; accepts stats_profile JSON/TSV overlay for rows requiring annotation (gene density, GO/KEGG, ROH, deleterious burden, FST). One synthesis figure for the manuscript: 'what is statistically special about inversion regions?'. (Legacy line ~5125.)",
-      "requires_layers": [
-        "scrubber_main"
-      ],
-      "requires_slots": [
-        "activeChrom"
-      ],
-      "preloads": [
-        "scrubber_main"
-      ],
-      "_was_id": "page17"
-    },
-    "marker_readiness": {
-      "_label": "15 marker panel",
-      "_doc": "Marker readiness panel — private-indel architecture. Tier 1 = clean dosage AF + controls + bighead specificity; Tier 2 = multi-marker or strong tag; Tier 3 = breakpoint PCR candidate (DEMOTED, breakpoint precision uncertain); Tier 4 = exploratory. Atlas computes private_score / dosage_score / gel-visibility live from variant_afs.json. Auto-suggests positive/negative control samples from candidate karyotype state. Includes the 5-step pilot validation checklist with cross-species controls. (Legacy line 5128.)",
-      "requires_layers": [
-        "scrubber_main"
-      ],
-      "requires_slots": [
-        "activeChrom"
-      ],
-      "preloads": [
-        "scrubber_main"
-      ],
-      "_was_id": "page18"
-    },
-    "annotation_cockpit": {
-      "_label": "annotation cockpit",
-      "_doc": "Per-sample-lines canvas with cursor-driven candidate selection. The chromosome-wide annotation cockpit: each promoted candidate appears as a faint rectangle in mb-space; per-sample PC1 trajectories drawn beneath, optionally colored by the active candidate's K-means band assignment. ←/→ steps the cursor (Shift jumps boundaries, Esc clears); digit keys 0-9 select a band of the candidate under the cursor (state.tracked → linkage shading + linkage table panel + haplotype-annotation panel). Public entry: refreshAnnotationCockpit() (legacy line 47590). Source: legacy/Inversion_atlas.html lines 46938-47616 (JS body) + 7822-7859 (HTML shell).",
-      "requires_layers": [
-        "scrubber_main"
-      ],
-      "requires_slots": [
-        "activeChrom"
-      ],
-      "preloads": [
-        "scrubber_main"
-      ],
-      "_was_id": "page21"
-    },
-    "overview": {
-      "_label": "overview",
-      "_doc": "Synthesis-stage tab declared but EMPTY in legacy/Inversion_atlas.html. Tab button at legacy line 5138 (data-page='overview' data-stage='synthesis'); HTML body at line 9322 is `<div id='overview' class='page'></div>` (empty). Zero references to renderOverview / renderPage_overview / renderPageOverview anywhere in the legacy JS — verified by grep. The module exists so the page registry has a non-throwing entry. If/when the synthesis overview is designed (high-level workflow summary, candidate counts per stage, layer-presence checklist), populate overview.html with a panel skeleton and replace the renderPageOverview() body with real render logic. Round-5-step-8 status: stub preserved verbatim; backward-compat factory wirePageOverview() retained alongside the new direct-export renderPageOverview / mount / unmount lifecycle.",
-      "requires_layers": [],
-      "requires_slots": [],
-      "preloads": [],
-      "_was_id": "page_overview"
     },
     "help": {
       "_label": "help",
