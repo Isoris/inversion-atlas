@@ -143,6 +143,25 @@ function _ghslDivergingColor(v, vmin, vmax) {
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 
+// Confidence ramp for the in-page grouping confidence track: low
+// confidence = muted slate, high = bright teal-green. Sequential so a
+// quick scan shows which samples sit near a tier boundary (dark).
+const CONFIDENCE_STOPS = Object.freeze([
+  [0.00, [ 70,  78,  92]],
+  [0.35, [120, 110,  80]],
+  [0.70, [ 90, 170, 130]],
+  [1.00, [ 80, 230, 160]],
+]);
+
+export function confidenceColor(v, vmin, vmax) {
+  if (!Number.isFinite(v)) return 'rgb(50,55,65)';
+  const lo = Number.isFinite(vmin) ? vmin : 0;
+  const hi = Number.isFinite(vmax) ? vmax : 1;
+  const t = Math.max(0, Math.min(1, (v - lo) / Math.max(1e-9, hi - lo)));
+  const c = _interpStops(CONFIDENCE_STOPS, t);
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
 function _autoMin(arr) {
   let m = Infinity;
   for (let i = 0; i < arr.length; i++) {
@@ -226,6 +245,13 @@ function _coerceKey(k, refIds) {
 export function deriveSampleOrder(mode, n_samples, src) {
   const out = new Int32Array(n_samples);
   for (let i = 0; i < n_samples; i++) out[i] = i;
+  if (mode === 'index_aware' && src && src.index_aware_order
+      && src.index_aware_order.length === n_samples) {
+    // Precomputed position-aware order (cluster asc, then distance-to-
+    // medoid). Copy verbatim — the clusterer already ordered the rows.
+    for (let i = 0; i < n_samples; i++) out[i] = src.index_aware_order[i];
+    return out;
+  }
   if (mode === 'by_group' && src && src.sample_group
       && src.sample_group.length === n_samples) {
     const g = src.sample_group;
@@ -332,12 +358,17 @@ export function paintDosageHeatmap(canvas, data, opts) {
 
   const nS = data.n_samples;
   const nM = data.n_markers;
-  const order_s = (o.sample_order instanceof Int32Array && o.sample_order.length === nS)
+  // order_s / order_m may be a SUBSET / viewport (length < nS / nM) — e.g.
+  // a variance-selected marker set or a cursor-centred zoom window. The
+  // displayed counts come from the order arrays, not the data totals.
+  const order_s = (o.sample_order instanceof Int32Array && o.sample_order.length >= 1)
     ? o.sample_order
     : deriveSampleOrder('natural', nS, data);
-  const order_m = (o.marker_order instanceof Int32Array && o.marker_order.length === nM)
+  const order_m = (o.marker_order instanceof Int32Array && o.marker_order.length >= 1)
     ? o.marker_order
     : deriveMarkerOrder('natural', nM, data);
+  const nDispS = order_s.length;
+  const nDispM = order_m.length;
 
   // Layout constants.
   const xPad = 8;
@@ -362,9 +393,28 @@ export function paintDosageHeatmap(canvas, data, opts) {
                           && regimeOverlay
                           && Number.isFinite(regimeOverlay.locus_start_marker)
                           && Number.isFinite(regimeOverlay.locus_end_marker);
+  // Multi-regime span overlay (every regime from the catalogue overlapping
+  // the window), drawn as labelled vertical bands. data.regime_spans is set
+  // by the page when the grouping source is the regime catalogue.
+  const showRegimeSpans = (o.show_regime_spans !== false)
+                          && Array.isArray(data.regime_spans) && data.regime_spans.length > 0;
+  // Group bounding rectangles: per distinct sample_group, a box spanning
+  // the regime marker extent (catalogue) or full matrix width × that
+  // group's contiguous row block. Tight karyotype/cluster boxes when rows
+  // are grouped (by_group / index-aware order).
+  const showGroupRects = (o.show_group_rects === true)
+                         && Array.isArray(data.sample_group);
+  // Collapsed-row size histogram in a right gutter: one bar per collapsed
+  // group (∝ group size) + ×N count. Aligned to the displayed rep rows.
+  const collapseRows = (o.show_collapse === true) && data.collapse_rows
+                       && data.collapse_rows.row_group_size
+                       && data.collapse_rows.row_group_size.length === order_s.length
+                     ? data.collapse_rows : null;
+  const showCollapseHist = !!collapseRows;
   const showGhsl        = (o.show_ghsl_track === true)          && !!data.sample_ghsl_mean;
   const showThetaPi     = (o.show_theta_pi_track === true)      && !!data.sample_theta_pi_mean;
   const showHetDosage   = (o.show_het_dosage_track === true)    && !!data.sample_het_dosage_mean;
+  const showConfidence  = (o.show_confidence_track === true)    && !!data.sample_confidence;
   const showPolarity    = (o.show_polarity_track !== false)     && !!data.marker_polarity;
   const showTicks       = (o.show_y_ticks !== false);
   const showGroupLabels = (o.show_group_labels !== false)       && !!data.sample_group;
@@ -382,6 +432,13 @@ export function paintDosageHeatmap(canvas, data, opts) {
   // so they're visually distinct from the group categorical track and
   // from the main matrix.
   const trackBlocks = [];
+  if (showConfidence) {
+    trackBlocks.push({
+      kind: 'continuous', label: 'conf',
+      values: data.sample_confidence,
+      colorFn: confidenceColor, vmin: 0, vmax: 1,
+    });
+  }
   if (showHetDosage) {
     trackBlocks.push({
       kind: 'continuous', label: 'het',
@@ -418,10 +475,11 @@ export function paintDosageHeatmap(canvas, data, opts) {
                   + (showRolePair ? trackPx + trackGap : 0);
   const leftGutter = (showTicks ? tickPad : 0)
                    + (showGroupLabels ? labelPad : 0);
-  const drawW = Math.max(50, W - xPad - leftGutter - leftBands - xPad);
+  const rightHist = showCollapseHist ? 66 : 0;   // right gutter for size bars
+  const drawW = Math.max(50, W - xPad - leftGutter - leftBands - rightHist - xPad);
   const drawH = Math.max(50, H - 2 * yPad - topBand);
-  const cellW = drawW / nM;
-  const cellH = drawH / nS;
+  const cellW = drawW / nDispM;
+  const cellH = drawH / nDispS;
   const matX = xPad + leftGutter + leftBands;
   const matY = yPad + topBand;
 
@@ -443,7 +501,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
     const lo = regimeOverlay.locus_start_marker | 0;
     const hi = regimeOverlay.locus_end_marker | 0;
     let xLo = Infinity, xHi = -Infinity;
-    for (let c = 0; c < nM; c++) {
+    for (let c = 0; c < nDispM; c++) {
       const mi = order_m[c];
       if (mi >= lo && mi <= hi) {
         const x = matX + c * cellW;
@@ -457,10 +515,10 @@ export function paintDosageHeatmap(canvas, data, opts) {
   }
 
   // --- Matrix cells.
-  for (let r = 0; r < nS; r++) {
+  for (let r = 0; r < nDispS; r++) {
     const si = order_s[r];
     const y  = matY + r * cellH;
-    for (let c = 0; c < nM; c++) {
+    for (let c = 0; c < nDispM; c++) {
       const mi = order_m[c];
       const v  = data.cellValue(mi, si);
       ctx.fillStyle = colorFn(v, vmin, vmax);
@@ -478,7 +536,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
     if (blk.kind === 'continuous') {
       const lo = (blk.vmin == null) ? _autoMin(blk.values) : blk.vmin;
       const hi = (blk.vmax == null) ? _autoMax(blk.values) : blk.vmax;
-      for (let r = 0; r < nS; r++) {
+      for (let r = 0; r < nDispS; r++) {
         const si = order_s[r];
         const v  = blk.values[si];
         ctx.fillStyle = blk.colorFn(v, lo, hi);
@@ -487,7 +545,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
         }
       }
     } else if (blk.kind === 'categorical_k6') {
-      for (let r = 0; r < nS; r++) {
+      for (let r = 0; r < nDispS; r++) {
         const si = order_s[r];
         const k  = data.sample_k6[si];
         ctx.fillStyle = k6Colors.get(k) || '#bbbbbb';
@@ -496,7 +554,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
         }
       }
     } else if (blk.kind === 'group') {
-      for (let r = 0; r < nS; r++) {
+      for (let r = 0; r < nDispS; r++) {
         const si = order_s[r];
         const g  = data.sample_group[si];
         ctx.fillStyle = groupColors.get(g) || '#bbbbbb';
@@ -508,7 +566,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
       // Color per regime_call vocabulary. Uncalled / out-of-locus
       // samples render as transparent so the matrix shows through.
       const calls = regimeOverlay.sample_regime_call;
-      for (let r = 0; r < nS; r++) {
+      for (let r = 0; r < nDispS; r++) {
         const si = order_s[r];
         const c  = calls[si];
         const fill = REGIME_CALL_COLORS[c] || 'rgba(0,0,0,0)';
@@ -525,7 +583,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
   // the matrix, only the marker range belonging to the active candidate).
   if (locusSpanPxRange) {
     const { x0, x1 } = locusSpanPxRange;
-    const matBottom = matY + nS * cellH;
+    const matBottom = matY + nDispS * cellH;
     if (typeof ctx.save === 'function') ctx.save();
     if (typeof ctx.fillRect === 'function') {
       ctx.fillStyle = 'rgba(245,165,36,0.10)';
@@ -540,6 +598,135 @@ export function paintDosageHeatmap(canvas, data, opts) {
     if (typeof ctx.restore === 'function') ctx.restore();
   }
 
+  // --- Multi-regime span overlay (catalogue). One labelled band per
+  // overlapping regime; canonical marker ranges resolved to x through
+  // order_m so they track the marker-order mode + zoom viewport.
+  if (showRegimeSpans) {
+    const matBottom = matY + nDispS * cellH;
+    if (typeof ctx.save === 'function') ctx.save();
+    let si = 0;
+    for (const span of data.regime_spans) {
+      const lo = span.lo | 0, hi = span.hi | 0;
+      let xLo = Infinity, xHi = -Infinity;
+      for (let c = 0; c < nDispM; c++) {
+        const mi = order_m[c];
+        if (mi >= lo && mi <= hi) {
+          const x = matX + c * cellW;
+          if (x < xLo) xLo = x;
+          if (x + cellW > xHi) xHi = x + cellW;
+        }
+      }
+      if (!Number.isFinite(xLo) || xHi <= xLo) { si++; continue; }
+      const hue = (si * 47) % 360;            // spread hues per regime
+      ctx.fillStyle   = `hsla(${hue},70%,55%,0.08)`;
+      ctx.strokeStyle = `hsla(${hue},70%,60%,0.85)`;
+      ctx.lineWidth = 1.25;
+      if (typeof ctx.fillRect === 'function') ctx.fillRect(xLo, matY, xHi - xLo, matBottom - matY);
+      if (typeof ctx.strokeRect === 'function') ctx.strokeRect(xLo + 0.5, matY + 0.5, (xHi - xLo) - 1, (matBottom - matY) - 1);
+      if (typeof ctx.fillText === 'function' && (xHi - xLo) >= 24) {
+        ctx.font = '9px ui-sans-serif, system-ui, sans-serif';
+        ctx.fillStyle = `hsla(${hue},75%,72%,0.98)`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        const lbl = String(span.label || 'regime')
+          + (Number.isFinite(span.confidence) ? ' ' + span.confidence.toFixed(2) : '');
+        ctx.fillText(lbl, xLo + 2, matY + 1);
+      }
+      si++;
+    }
+    if (typeof ctx.restore === 'function') ctx.restore();
+  }
+
+  // --- Group bounding rectangles. For each distinct sample_group value,
+  // box [min row, max row] of its members (in display order) × the marker
+  // extent. The x-extent is the union of regime spans when present
+  // (catalogue source), else the full matrix width.
+  if (showGroupRects) {
+    let gx0 = matX, gx1 = matX + nDispM * cellW;
+    if (Array.isArray(data.regime_spans) && data.regime_spans.length) {
+      let loMin = Infinity, hiMax = -Infinity;
+      for (const sp of data.regime_spans) { if (sp.lo < loMin) loMin = sp.lo; if (sp.hi > hiMax) hiMax = sp.hi; }
+      let xLo = Infinity, xHi = -Infinity;
+      for (let c = 0; c < nDispM; c++) {
+        const mi = order_m[c];
+        if (mi >= loMin && mi <= hiMax) { const x = matX + c * cellW; if (x < xLo) xLo = x; if (x + cellW > xHi) xHi = x + cellW; }
+      }
+      if (Number.isFinite(xLo) && xHi > xLo) { gx0 = xLo; gx1 = xHi; }
+    }
+    const rowMin = new Map(), rowMax = new Map();
+    for (let r = 0; r < nDispS; r++) {
+      const g = data.sample_group[order_s[r]];
+      if (g == null) continue;
+      if (!rowMin.has(g)) { rowMin.set(g, r); rowMax.set(g, r); }
+      else { if (r < rowMin.get(g)) rowMin.set(g, r); if (r > rowMax.get(g)) rowMax.set(g, r); }
+    }
+    if (typeof ctx.save === 'function') ctx.save();
+    ctx.lineWidth = 1.5;
+    for (const g of rowMin.keys()) {
+      const y0 = matY + rowMin.get(g) * cellH;
+      const y1 = matY + (rowMax.get(g) + 1) * cellH;
+      const col = (groupColors instanceof Map && groupColors.get(g)) || 'rgba(220,230,245,0.9)';
+      ctx.strokeStyle = col;
+      if (typeof ctx.strokeRect === 'function') ctx.strokeRect(gx0 + 0.5, y0 + 0.5, (gx1 - gx0) - 1, (y1 - y0) - 1);
+      if (typeof ctx.fillText === 'function' && (y1 - y0) >= 12) {
+        ctx.font = '9px ui-sans-serif, system-ui, sans-serif';
+        ctx.fillStyle = col;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(String(g), gx0 + 3, y0 + 2);
+      }
+    }
+    if (typeof ctx.restore === 'function') ctx.restore();
+  }
+
+  // --- Collapsed-row size histogram (right gutter). One bar per group,
+  // spanning that group's rep rows, width ∝ size; ×N count printed.
+  // A faint separator + medoid tick aid reading the collapsed view.
+  if (showCollapseHist) {
+    const sizes = collapseRows.row_group_size;
+    const starts = collapseRows.row_is_group_start;
+    const medoids = collapseRows.row_is_medoid;
+    let maxSize = 1;
+    for (let r = 0; r < sizes.length; r++) if (sizes[r] > maxSize) maxSize = sizes[r];
+    const hx0 = matX + drawW + 6;
+    const barMax = rightHist - 12;             // leave room for ×N text
+    if (typeof ctx.save === 'function') ctx.save();
+    for (let r = 0; r < nDispS; r++) {
+      // Group separator line across the matrix at each group start (r>0).
+      if (starts[r] && r > 0 && typeof ctx.fillRect === 'function') {
+        ctx.fillStyle = 'rgba(160,180,200,0.25)';
+        ctx.fillRect(matX, matY + r * cellH - 0.5, drawW, 1);
+      }
+      // Medoid tick in the left edge of the gutter.
+      if (medoids[r] && typeof ctx.fillRect === 'function') {
+        ctx.fillStyle = 'rgba(245,165,36,0.9)';
+        ctx.fillRect(hx0 - 4, matY + r * cellH + cellH * 0.25, 2, Math.max(1, cellH * 0.5));
+      }
+      // Bar + count once per group (on its start row), spanning rep rows.
+      if (starts[r]) {
+        let re = r + 1;
+        while (re < nDispS && !starts[re]) re++;
+        const y0 = matY + r * cellH;
+        const y1 = matY + re * cellH;
+        const size = sizes[r];
+        const w = Math.max(2, (size / maxSize) * barMax);
+        const bh = Math.max(2, Math.min(y1 - y0 - 1, cellH * (re - r) - 1));
+        if (typeof ctx.fillRect === 'function') {
+          ctx.fillStyle = 'rgba(90,150,220,0.55)';
+          ctx.fillRect(hx0, y0 + 0.5, w, bh);
+        }
+        if (typeof ctx.fillText === 'function') {
+          ctx.font = '9px ui-monospace, monospace';
+          ctx.fillStyle = 'rgba(200,215,235,0.95)';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          ctx.fillText('×' + size, hx0 + 1, y0 + 1);
+        }
+      }
+    }
+    if (typeof ctx.restore === 'function') ctx.restore();
+  }
+
   // --- Y-axis ticks: sample-index marks every ~10% of rows.
   if (showTicks && typeof ctx.fillText === 'function') {
     if (typeof ctx.save === 'function') ctx.save();
@@ -547,14 +734,14 @@ export function paintDosageHeatmap(canvas, data, opts) {
     ctx.fillStyle = 'rgba(160,180,200,0.85)';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    const tickStride = Math.max(1, Math.round(nS / 10));
-    for (let r = 0; r < nS; r += tickStride) {
+    const tickStride = Math.max(1, Math.round(nDispS / 10));
+    for (let r = 0; r < nDispS; r += tickStride) {
       const y = matY + (r + 0.5) * cellH;
       ctx.fillText('s=' + r, xPad + tickPad - 4, y);
     }
-    if ((nS - 1) % tickStride !== 0) {
+    if ((nDispS - 1) % tickStride !== 0) {
       ctx.fillText('s=' + (nS - 1), xPad + tickPad - 4,
-                   matY + (nS - 0.5) * cellH);
+                   matY + (nDispS - 0.5) * cellH);
     }
     if (typeof ctx.restore === 'function') ctx.restore();
   }
@@ -570,8 +757,8 @@ export function paintDosageHeatmap(canvas, data, opts) {
     ctx.textBaseline = 'middle';
     let runStart = 0;
     let runVal = data.sample_group[order_s[0]];
-    for (let r = 1; r <= nS; r++) {
-      const v = (r < nS) ? data.sample_group[order_s[r]] : Symbol('end');
+    for (let r = 1; r <= nDispS; r++) {
+      const v = (r < nDispS) ? data.sample_group[order_s[r]] : Symbol('end');
       if (v !== runVal) {
         const yMid = matY + ((runStart + r) / 2) * cellH;
         const runH = (r - runStart) * cellH;
@@ -603,7 +790,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
       'MINOR1_MINOR3': 'rgba(176, 124, 247, 0.85)',   // soft purple
       'MINOR2_MINOR3': 'rgba(224,  85,  92, 0.85)',   // soft red
     };
-    for (let c = 0; c < nM; c++) {
+    for (let c = 0; c < nDispM; c++) {
       const mi   = order_m[c];
       const pair = data.marker_role_pair[mi];
       const col  = pair ? (ROLE_PAIR_COLORS[pair] || 'rgba(120,120,120,0.5)')
@@ -619,7 +806,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
   // --- Top polarity stripe (one cell per displayed marker; black =
   // flipped, light grey = unflipped).
   if (showPolarity) {
-    for (let c = 0; c < nM; c++) {
+    for (let c = 0; c < nDispM; c++) {
       const mi = order_m[c];
       const f  = !!data.marker_polarity[mi];
       ctx.fillStyle = f ? 'rgba(20,20,20,0.85)' : 'rgba(220,220,220,0.85)';
@@ -633,7 +820,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
   ctx.strokeStyle = 'rgba(40, 50, 70, 0.6)';
   ctx.lineWidth = 1;
   if (typeof ctx.strokeRect === 'function') {
-    ctx.strokeRect(matX, matY, cellW * nM, cellH * nS);
+    ctx.strokeRect(matX, matY, cellW * nDispM, cellH * nDispS);
   }
 
   // --- Hover crosshair.
@@ -643,22 +830,43 @@ export function paintDosageHeatmap(canvas, data, opts) {
     ctx.lineWidth = 2;
     if (typeof ctx.strokeRect === 'function') {
       ctx.strokeRect(matX, matY + hov.row * cellH - 0.5,
-                     cellW * nM, cellH + 1);
+                     cellW * nDispM, cellH + 1);
       ctx.strokeRect(matX + hov.col * cellW - 0.5, matY,
-                     cellW + 1, cellH * nS);
+                     cellW + 1, cellH * nDispS);
     }
     ctx.lineWidth = 1;
+  }
+
+  // --- Keyboard cursor (←/→ marker column, optional ↑/↓ sample row).
+  // Drawn as a bright cyan column/row band so it reads distinctly from
+  // the orange hover crosshair. `cursor_col` / `cursor_row` are display
+  // coordinates into the current order arrays.
+  const curC = Number.isFinite(o.cursor_col) ? (o.cursor_col | 0) : -1;
+  const curR = Number.isFinite(o.cursor_row) ? (o.cursor_row | 0) : -1;
+  if (curC >= 0 && curC < nDispM && typeof ctx.fillRect === 'function') {
+    ctx.fillStyle = 'rgba(45,210,231,0.16)';
+    ctx.fillRect(matX + curC * cellW, matY, cellW, cellH * nDispS);
+    if (typeof ctx.strokeRect === 'function') {
+      ctx.strokeStyle = '#2dd2e7';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(matX + curC * cellW - 0.5, matY + 0.5, cellW + 1, cellH * nDispS - 1);
+      ctx.lineWidth = 1;
+    }
+  }
+  if (curR >= 0 && curR < nDispS && typeof ctx.fillRect === 'function') {
+    ctx.fillStyle = 'rgba(45,210,231,0.16)';
+    ctx.fillRect(matX, matY + curR * cellH, cellW * nDispM, cellH);
   }
 
   // --- Selected sample row / marker column underlays.
   if (selectedSamples && selectedSamples.size > 0) {
     ctx.strokeStyle = 'rgba(0,0,0,0.45)';
     ctx.lineWidth = 1;
-    for (let r = 0; r < nS; r++) {
+    for (let r = 0; r < nDispS; r++) {
       if (selectedSamples.has(order_s[r])) {
         if (typeof ctx.strokeRect === 'function') {
           ctx.strokeRect(matX, matY + r * cellH - 0.5,
-                         cellW * nM, cellH + 1);
+                         cellW * nDispM, cellH + 1);
         }
       }
     }
@@ -666,11 +874,11 @@ export function paintDosageHeatmap(canvas, data, opts) {
   if (selectedMarkers && selectedMarkers.size > 0) {
     ctx.strokeStyle = 'rgba(0,0,0,0.45)';
     ctx.lineWidth = 1;
-    for (let c = 0; c < nM; c++) {
+    for (let c = 0; c < nDispM; c++) {
       if (selectedMarkers.has(order_m[c])) {
         if (typeof ctx.strokeRect === 'function') {
           ctx.strokeRect(matX + c * cellW - 0.5, matY,
-                         cellW + 1, cellH * nS);
+                         cellW + 1, cellH * nDispS);
         }
       }
     }
@@ -678,10 +886,10 @@ export function paintDosageHeatmap(canvas, data, opts) {
 
   return {
     layout: {
-      matX, matY, matW: cellW * nM, matH: cellH * nS,
+      matX, matY, matW: cellW * nDispM, matH: cellH * nDispS,
       cellW, cellH,
-      n_displayed_samples: nS,
-      n_displayed_markers: nM,
+      n_displayed_samples: nDispS,
+      n_displayed_markers: nDispM,
       sample_order: order_s,
       marker_order: order_m,
     },
@@ -733,4 +941,39 @@ export function findCellAtPixel(layout, cellValue, px, py) {
   const dosage = (typeof cellValue === 'function')
     ? cellValue(marker_idx, sample_idx) : null;
   return { marker_idx, sample_idx, row, col, dosage };
+}
+
+// Height of the clickable label-header strip at the top of each regime
+// span band (must match the span overlay's label placement above).
+export const REGIME_SPAN_LABEL_H = 14;
+
+/**
+ * Hit-test the regime-span label headers. A click lands "on" a regime when
+ * it falls in the top REGIME_SPAN_LABEL_H px of the matrix within that
+ * regime's x-range, resolved through the marker order so it tracks the
+ * marker-order mode + zoom (same mapping as the span overlay).
+ *
+ * @returns {{ candidate_id, lo, hi, regime_class, confidence, label } | null}
+ */
+export function findRegimeSpanAtPixel(layout, regime_spans, px, py) {
+  if (!layout || !Array.isArray(regime_spans) || regime_spans.length === 0) return null;
+  const { matX, matY, cellW, n_displayed_markers, marker_order } = layout;
+  if (!(cellW > 0)) return null;
+  if (py < matY || py > matY + REGIME_SPAN_LABEL_H) return null;
+  // Topmost (latest-drawn) span wins when bands overlap, matching paint order.
+  for (let s = regime_spans.length - 1; s >= 0; s--) {
+    const span = regime_spans[s];
+    const lo = span.lo | 0, hi = span.hi | 0;
+    let xLo = Infinity, xHi = -Infinity;
+    for (let c = 0; c < n_displayed_markers; c++) {
+      const mi = marker_order[c];
+      if (mi >= lo && mi <= hi) {
+        const x = matX + c * cellW;
+        if (x < xLo) xLo = x;
+        if (x + cellW > xHi) xHi = x + cellW;
+      }
+    }
+    if (Number.isFinite(xLo) && xHi > xLo && px >= xLo && px <= xHi) return span;
+  }
+  return null;
 }

@@ -10,6 +10,7 @@ import * as state from '../atlases/inversion/pages/discovery/dosage_heatmap/_sta
 import {
   paintDosageHeatmap,
   findCellAtPixel,
+  findRegimeSpanAtPixel,
   deriveSampleOrder,
   deriveMarkerOrder,
   buildGroupColorMap,
@@ -17,6 +18,7 @@ import {
   dosageMagmaColor,
   dosageGenotypeColor,
   pickDosageColorFn,
+  confidenceColor,
 } from '../atlases/inversion/pages/discovery/dosage_heatmap/renderer.js';
 import {
   adaptMglHeatmapJson,
@@ -128,6 +130,7 @@ group('renderer.paintDosageHeatmap');
 class FakeContext {
   constructor() {
     this.calls = [];
+    this.texts = [];
     this.fillStyle = ''; this.strokeStyle = ''; this.lineWidth = 0; this.font = '';
   }
   clearRect() { this.calls.push('clearRect'); }
@@ -139,7 +142,7 @@ class FakeContext {
   strokeRect() { this.calls.push('strokeRect'); }
   arc()      {}
   fill()     { this.calls.push('fill'); }
-  fillText() { this.calls.push('fillText'); }
+  fillText(t) { this.calls.push('fillText'); this.texts.push(String(t)); }
 }
 class FakeCanvas {
   constructor(w, h) { this.width = w || 600; this.height = h || 400; this._ctx = new FakeContext(); }
@@ -500,6 +503,176 @@ check('GHSL mean: s0 = 0.4',                     Math.abs(gh[0] - 0.4) < 1e-6);
 check('GHSL mean: s1 ignores NaN',               Math.abs(gh[1] - 0.5) < 1e-6);
 check('GHSL mean: s2 = 1.0',                     Math.abs(gh[2] - 1.0) < 1e-6);
 check('GHSL mean: null when panel missing',      computeSampleGhslMean({}) === null);
+
+// =====================================================================
+group('renderer.confidenceColor + confidence track');
+
+check('confidenceColor returns rgb',             /^rgb\(/.test(confidenceColor(0.5, 0, 1)));
+check('confidenceColor NaN → muted slate',       confidenceColor(NaN) === 'rgb(50,55,65)');
+check('confidenceColor low ≠ high',              confidenceColor(0.05, 0, 1) !== confidenceColor(0.95, 0, 1));
+
+// Paint with a confidence track present → one extra fillRect per sample.
+const hcConf = new FakeCanvas(600, 400);
+const dataConf = Object.assign({}, data, {
+  sample_confidence: Float64Array.from([0.9, 0.8, 0.4, 0.85, 0.95]),
+});
+paintDosageHeatmap(hcConf, dataConf, {
+  show_group_track: false, show_polarity_track: false, show_confidence_track: true,
+});
+check('confidence track adds n_samples fillRects',
+      hcConf._ctx.calls.filter(c => c === 'fillRect').length === (5 * 4) + 5);
+
+// Track is auto-skipped when the backing array is absent.
+const hcNoConf = new FakeCanvas(600, 400);
+paintDosageHeatmap(hcNoConf, data, {
+  show_group_track: false, show_polarity_track: false, show_confidence_track: true,
+});
+check('confidence track auto-hidden without data',
+      hcNoConf._ctx.calls.filter(c => c === 'fillRect').length === (5 * 4));
+
+// =====================================================================
+group('renderer.regime_spans overlay (catalogue)');
+
+const hcSpans = new FakeCanvas(600, 400);
+const dataSpans = Object.assign({}, data, {
+  marker_pos_bp: Float64Array.from([1.0e6, 1.1e6, 1.2e6, 1.3e6]),
+  regime_spans: [
+    { label: 'R1', lo: 0, hi: 3, regime_class: 'stable_three_band_regime', confidence: 0.8 },
+    { label: 'R2', lo: 1, hi: 2, regime_class: 'stable_two_band_regime', confidence: 0.6 },
+  ],
+});
+const beforeStroke = 0;
+paintDosageHeatmap(hcSpans, dataSpans, { show_group_track: false, show_polarity_track: false });
+check('regime spans draw band fills + outlines', (() => {
+  // 5×4 = 20 matrix cells + 2 span fills = 22 fillRects; ≥ 3 strokeRects (2 outlines + matrix).
+  const fills = hcSpans._ctx.calls.filter(c => c === 'fillRect').length;
+  const strokes = hcSpans._ctx.calls.filter(c => c === 'strokeRect').length;
+  return fills === (5 * 4) + 2 && strokes >= 3;
+})());
+check('regime spans auto-hidden without data', (() => {
+  const hc2 = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc2, data, { show_group_track: false, show_polarity_track: false });
+  return hc2._ctx.calls.filter(c => c === 'fillRect').length === (5 * 4);
+})());
+check('show_regime_spans:false suppresses overlay', (() => {
+  const hc3 = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc3, dataSpans, {
+    show_group_track: false, show_polarity_track: false, show_regime_spans: false,
+  });
+  return hc3._ctx.calls.filter(c => c === 'fillRect').length === (5 * 4);
+})());
+
+// =====================================================================
+group('renderer.group rects overlay + index_aware order');
+
+const dataGr = Object.assign({}, data, {
+  sample_group: ['hap 0 (homA)', 'hap 0 (homA)', 'hap 1 (homB)', 'hap 1 (homB)', 'hap 1 (homB)'],
+});
+check('show_group_rects draws one outline per group', (() => {
+  const hc = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc, dataGr, {
+    show_group_track: false, show_polarity_track: false,
+    sample_order: Int32Array.from([0, 1, 2, 3, 4]),   // already grouped
+    show_group_rects: true,
+  });
+  const base = new FakeCanvas(600, 400);
+  paintDosageHeatmap(base, dataGr, {
+    show_group_track: false, show_polarity_track: false,
+    sample_order: Int32Array.from([0, 1, 2, 3, 4]), show_group_rects: false,
+  });
+  const extra = hc._ctx.calls.filter(c => c === 'strokeRect').length
+              - base._ctx.calls.filter(c => c === 'strokeRect').length;
+  return extra === 2;   // two distinct groups → two boxes
+})());
+check('group rects off by default', (() => {
+  const hc = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc, dataGr, { show_group_track: false, show_polarity_track: false });
+  const base = new FakeCanvas(600, 400);
+  paintDosageHeatmap(base, dataGr, {
+    show_group_track: false, show_polarity_track: false, show_group_rects: true,
+  });
+  return hc._ctx.calls.filter(c => c === 'strokeRect').length
+       < base._ctx.calls.filter(c => c === 'strokeRect').length;
+})());
+check('deriveSampleOrder index_aware uses precomputed order', (() => {
+  const src = { index_aware_order: Int32Array.from([4, 3, 2, 1, 0]) };
+  const ord = deriveSampleOrder('index_aware', 5, src);
+  return ord.length === 5 && ord[0] === 4 && ord[4] === 0;
+})());
+check('index_aware falls back to natural without an order', (() => {
+  const ord = deriveSampleOrder('index_aware', 5, { sample_group: ['a', 'a', 'b', 'b', 'b'] });
+  return ord[0] === 0 && ord[4] === 4;
+})());
+
+// =====================================================================
+group('renderer.collapse size histogram (right gutter)');
+
+const dataCol = Object.assign({}, data, {
+  collapse_rows: {
+    row_group:          Int32Array.from([0, 0, 1]),
+    row_group_size:     Int32Array.from([5, 5, 2]),
+    row_is_group_start: Uint8Array.from([1, 0, 1]),
+    row_is_medoid:      Uint8Array.from([1, 0, 1]),
+  },
+});
+check('collapse histogram draws ×N labels per group', (() => {
+  const hc = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc, dataCol, {
+    show_group_track: false, show_polarity_track: false,
+    sample_order: Int32Array.from([0, 1, 2]),
+    show_collapse: true,
+  });
+  const texts = hc._ctx.texts ? hc._ctx.texts.filter(t => /^×\d/.test(t)) : [];
+  return texts.includes('×5') && texts.includes('×2');
+})());
+check('collapse histogram only when show_collapse + aligned rows', (() => {
+  const hc = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc, dataCol, {
+    show_group_track: false, show_polarity_track: false,
+    sample_order: Int32Array.from([0, 1, 2]),
+    show_collapse: false,
+  });
+  const texts = hc._ctx.texts ? hc._ctx.texts.filter(t => /^×\d/.test(t)) : [];
+  return texts.length === 0;
+})());
+check('mismatched collapse_rows length is ignored (no throw)', (() => {
+  const hc = new FakeCanvas(600, 400);
+  const bad = Object.assign({}, data, { collapse_rows: { row_group_size: Int32Array.from([5]) } });
+  paintDosageHeatmap(hc, bad, {
+    show_group_track: false, show_polarity_track: false,
+    sample_order: Int32Array.from([0, 1, 2, 3, 4]), show_collapse: true,
+  });
+  return true;   // reaching here = no exception
+})());
+
+// =====================================================================
+group('findRegimeSpanAtPixel (click-to-focus)');
+
+const hcHit = new FakeCanvas(600, 400);
+const paintHit = paintDosageHeatmap(hcHit, dataSpans, {
+  show_group_track: false, show_polarity_track: false,
+});
+const L = paintHit.layout;
+check('layout exposes matX/matY/cellW/marker_order', !!L
+  && Number.isFinite(L.matX) && Number.isFinite(L.cellW) && !!L.marker_order);
+// Click in the label header strip over the LAST marker column → R1 (lo0..hi3)
+// covers it; R2 (lo1..hi2) does not at the rightmost column.
+const xLast = L.matX + (L.n_displayed_markers - 0.5) * L.cellW;
+const yHdr  = L.matY + 3;
+check('header click over last column hits R1 only', (() => {
+  const s = findRegimeSpanAtPixel(L, dataSpans.regime_spans, xLast, yHdr);
+  return s && s.label === 'R1';
+})());
+check('overlapping bands → topmost (R2) wins in shared column', (() => {
+  const xMid = L.matX + 1.5 * L.cellW;   // column 1, inside both R1 and R2
+  const s = findRegimeSpanAtPixel(L, dataSpans.regime_spans, xMid, yHdr);
+  return s && s.label === 'R2';
+})());
+check('click below the header strip → no hit', (() => {
+  const s = findRegimeSpanAtPixel(L, dataSpans.regime_spans, xLast, L.matY + 60);
+  return s === null;
+})());
+check('empty spans → null', findRegimeSpanAtPixel(L, [], xLast, yHdr) === null);
 
 // =====================================================================
 console.log('\n=================');

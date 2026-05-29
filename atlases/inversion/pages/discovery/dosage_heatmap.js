@@ -40,6 +40,7 @@ import { _pageState, _setActiveState } from './dosage_heatmap/_state.js';
 import {
   paintDosageHeatmap,
   findCellAtPixel,
+  findRegimeSpanAtPixel,
   deriveSampleOrder,
   deriveMarkerOrder,
   buildGroupColorMap,
@@ -59,6 +60,11 @@ import {
   computeSampleThetaPiMean,
   computeSampleGhslMean,
 } from './dosage_heatmap/sample_means.js';
+import { detectGroups } from './dosage_heatmap/dosage_detect.js';
+import { clusterIndexAware } from './dosage_heatmap/index_aware_cluster.js';
+import { collapseSimilar } from './dosage_heatmap/collapse_similar.js';
+import { selectMarkers, markerViewport } from './dosage_heatmap/marker_select.js';
+import { buildRegistryOverlay } from './dosage_heatmap/regime_registry_overlay.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   sample_order_mode:     'by_group',
@@ -75,6 +81,38 @@ const DEFAULT_VIEW_STATE = Object.freeze({
   // 2026-05-27: regime overlays (active candidate scope).
   show_regime_call_track:  false,
   show_locus_span_overlay: false,
+  // Bounding rectangle per group (marker extent × that group's contiguous
+  // row block). Tight karyotype/cluster boxes when rows are grouped.
+  show_group_rects:        false,
+  // Collapse near-identical samples (Hamming distance over tier-quantized
+  // genomic bins) into a few representative rows + a right-side ×N size
+  // histogram. Reduces crowding for large cohorts.
+  collapse_similar:        false,
+  collapse_hamming:        0,        // max differing bins to still collapse
+  collapse_reps:           4,        // representative rows kept per group
+  // 2026-05-29: in-page haplotype-regime grouping. The heatmap can group
+  // samples from the loaded dosage chunk itself (no upstream pipeline
+  // needed) and score how confident each group is, OR consume the active
+  // candidate's upstream regime calls.
+  //   grouping_source:  'external'        — the upstream sample_group as supplied
+  //                     'bands'           — in-page 1-D dosage banding (homA/het/homB)
+  //                     'clusters'        — in-page 2-D (mean,het) clustering
+  //                     'upstream_regime' — active candidate's regime calls
+  grouping_source:       'external',
+  detect_k:              'auto',     // 'auto' | 2 | 3 | 4
+  show_confidence_track: false,
+  confidence_scheme:     'margin',   // 'margin' | 'silhouette'
+  // 2026-05-29: marker-axis SNP views + subsampling + cursor/zoom.
+  //   marker_view:        'all' | 'random' | 'high_var' | 'low_var'
+  //   marker_subsample_n: 0 = all markers for the view; else cap to N
+  //   zoom:               1 = whole working set; 2/4/8 = cursor-centred window
+  //   cursor_col:         ←/→ cursor position (index into the working set)
+  //   cursor_row:         ↑/↓ cursor (−1 = off)
+  marker_view:           'all',
+  marker_subsample_n:    0,
+  zoom:                  1,
+  cursor_col:            0,
+  cursor_row:            -1,
 });
 
 // =====================================================================
@@ -313,7 +351,7 @@ function _buildPageState(atlasState) {
     try { canonical.regime_overlay = _buildRegimeOverlay(canonical, atlasState); }
     catch (e) { console.warn('dosage_heatmap: regime overlay build threw —', e); }
   }
-  return {
+  const state = {
     data:                  canonical,
     candidate_label:       dh ? (dh.candidate_label || null) : null,
     view_label:            dh ? (dh.view_label || _defaultViewLabel(dh)) : null,
@@ -325,11 +363,128 @@ function _buildPageState(atlasState) {
                               : new Map(),
     layout:                null,
     last_cursor_px:        null,
+    detect:                null,    // detectGroups() result when grouping_source is in-page
+    overlay:               null,    // buildRegistryOverlay() result for the catalogue source
+    // Cross-atlas regime registry (written by the haplotype_regimes
+    // pipeline) + active chrom, captured for the 'upstream_catalogue' source.
+    _registered:           (atlasState && atlasState.shared && atlasState.shared.registeredCandidates) || null,
+    _chrom:                (atlasState && atlasState.shared && atlasState.shared.activeChrom) || null,
+    _focus_regime_id:      null,    // catalogue regime focused via click-to-focus
     view_state:            Object.assign({}, DEFAULT_VIEW_STATE,
                                           (dh && dh.view_state) || {}),
     selection:             createDosageHeatmapSelection(),
     _handlers:             {},
   };
+  // Build the initial marker working-set + grouping.
+  _recomputeMarkers(state);
+  _applyGrouping(state);
+  return state;
+}
+
+// =====================================================================
+// Marker working-set (SNP view + subsample) + cursor clamp
+// =====================================================================
+
+/**
+ * Recompute `state.markers_selected` (the working marker set the matrix
+ * and the in-page detection both operate on) from the SNP view +
+ * subsample knobs, and clamp the cursor into range.
+ */
+function _recomputeMarkers(state) {
+  const d = state && state.data;
+  if (!d) { if (state) state.markers_selected = null; return; }
+  const vs = state.view_state;
+  let sel;
+  try {
+    sel = selectMarkers(d, { view: vs.marker_view, n: vs.marker_subsample_n });
+  } catch (e) {
+    console.warn('dosage_heatmap: selectMarkers threw —', e);
+    sel = null;
+  }
+  state.markers_selected = (sel && sel.length > 0) ? sel : null;
+  const len = state.markers_selected ? state.markers_selected.length : (d.n_markers | 0);
+  if (!Number.isFinite(vs.cursor_col)) vs.cursor_col = 0;
+  vs.cursor_col = Math.max(0, Math.min(len - 1, vs.cursor_col | 0));
+}
+
+// =====================================================================
+// Grouping source — in-page detection / upstream regime / external
+// =====================================================================
+
+// Map a per-sample silhouette ([-1,1]) into [0,1] for the confidence ramp.
+function _sil01(arr) {
+  if (!arr) return null;
+  const out = new Float64Array(arr.length);
+  for (let i = 0; i < arr.length; i++) {
+    out[i] = Number.isFinite(arr[i]) ? (arr[i] + 1) / 2 : NaN;
+  }
+  return out;
+}
+
+/**
+ * Resolve `state.data.sample_group` + `sample_confidence` from the
+ * current grouping source. Caches the originally-supplied (external)
+ * grouping on first call so switching back to 'external' restores it.
+ * Recomputes `state.group_colors` for the resulting group set and
+ * stashes the full detection result on `state.detect`.
+ */
+function _applyGrouping(state) {
+  const d = state && state.data;
+  if (!d) { if (state) state.detect = null; return; }
+  const vs = state.view_state;
+  if (d._external_sample_group === undefined) {
+    d._external_sample_group = d.sample_group || null;
+  }
+  const src = (vs && vs.grouping_source) || 'external';
+  let det = null;
+  if (src === 'bands' || src === 'clusters') {
+    // Detection operates on the current SNP working-set so grouping +
+    // confidence reflect the markers actually on screen (random / high-
+    // var / low-var view), not always the full marker set.
+    try { det = detectGroups(d, { mode: src, k: vs.detect_k, markerOrder: state.markers_selected || undefined }); }
+    catch (e) { console.warn('dosage_heatmap: detectGroups threw —', e); det = null; }
+  } else if (src === 'index_aware') {
+    // Position-aware haplotype clustering on ordered-bin trajectories
+    // (respects SNP order + block continuity, not just total dosage).
+    try { det = clusterIndexAware(d, { k: vs.detect_k, markerOrder: state.markers_selected || undefined }); }
+    catch (e) { console.warn('dosage_heatmap: clusterIndexAware threw —', e); det = null; }
+  }
+  state.detect = det;
+  // Position-aware row order (index-aware source only); cleared otherwise.
+  // Mirrored onto `d` so deriveSampleOrder (which receives `data` as src)
+  // can consume it for the 'index_aware' sample-order mode.
+  state.index_aware_order = (det && src === 'index_aware' && det.order) ? det.order : null;
+  d.index_aware_order = state.index_aware_order;
+  // Regime spans (catalogue source) live on the canonical data so the
+  // renderer auto-draws them; clear them for every other source.
+  d.regime_spans = null;
+  state.overlay = null;
+  if (det) {
+    d.sample_group = det.sample_group;
+    d.sample_confidence = (vs.confidence_scheme === 'silhouette')
+      ? _sil01(det.silhouette)
+      : det.margin;
+  } else if (src === 'upstream_catalogue') {
+    let ov = null;
+    try { ov = buildRegistryOverlay(d, state._registered, { chrom: state._chrom, primary_id: state._focus_regime_id }); }
+    catch (e) { console.warn('dosage_heatmap: buildRegistryOverlay threw —', e); ov = null; }
+    state.overlay = ov;
+    if (ov && ov.n_regimes > 0) {
+      d.sample_group = ov.sample_group;
+      d.regime_spans = ov.spans;
+    } else {
+      d.sample_group = d._external_sample_group;
+    }
+    d.sample_confidence = null;
+  } else if (src === 'upstream_regime'
+             && d.regime_overlay && d.regime_overlay.sample_regime_call) {
+    d.sample_group = d.regime_overlay.sample_regime_call.map(c => c || null);
+    d.sample_confidence = null;
+  } else {
+    d.sample_group = d._external_sample_group;
+    d.sample_confidence = null;
+  }
+  state.group_colors = buildGroupColorMap(_distinctOf(d.sample_group));
 }
 
 function _defaultViewLabel(dh) {
@@ -452,12 +607,34 @@ function _renderHeader(state) {
   if (rc) rc.checked = !!state.view_state.show_regime_call_track;
   const ls = document.getElementById('dosageHeatmapShowLocusSpanOverlay');
   if (ls) ls.checked = !!state.view_state.show_locus_span_overlay;
+  const gr = document.getElementById('dosageHeatmapShowGroupRects');
+  if (gr) gr.checked = !!state.view_state.show_group_rects;
+  const csim = document.getElementById('dosageHeatmapCollapseSimilar');
+  if (csim) csim.checked = !!state.view_state.collapse_similar;
+  const cham = document.getElementById('dosageHeatmapCollapseHamming');
+  if (cham) cham.value = String(state.view_state.collapse_hamming);
+  const crep = document.getElementById('dosageHeatmapCollapseReps');
+  if (crep) crep.value = String(state.view_state.collapse_reps);
   const hg = document.getElementById('dosageHeatmapShowGhslTrack');
   if (hg) hg.checked = !!state.view_state.show_ghsl_track;
   const tp = document.getElementById('dosageHeatmapShowThetaPiTrack');
   if (tp) tp.checked = !!state.view_state.show_theta_pi_track;
   const hd = document.getElementById('dosageHeatmapShowHetDosageTrack');
   if (hd) hd.checked = !!state.view_state.show_het_dosage_track;
+  const gs = document.getElementById('dosageHeatmapGroupingSource');
+  if (gs) gs.value = state.view_state.grouping_source;
+  const dk = document.getElementById('dosageHeatmapDetectK');
+  if (dk) dk.value = String(state.view_state.detect_k);
+  const cs = document.getElementById('dosageHeatmapConfidenceScheme');
+  if (cs) cs.value = state.view_state.confidence_scheme;
+  const ct = document.getElementById('dosageHeatmapShowConfidenceTrack');
+  if (ct) ct.checked = !!state.view_state.show_confidence_track;
+  const mv = document.getElementById('dosageHeatmapMarkerView');
+  if (mv) mv.value = state.view_state.marker_view;
+  const sn = document.getElementById('dosageHeatmapSubsampleN');
+  if (sn) sn.value = String(state.view_state.marker_subsample_n);
+  const zm = document.getElementById('dosageHeatmapZoom');
+  if (zm) zm.value = String(state.view_state.zoom);
 }
 
 // =====================================================================
@@ -486,10 +663,45 @@ function _paintHeatmap(state) {
     return;
   }
   if (empty) empty.style.display = 'none';
-  const order_s = deriveSampleOrder(state.view_state.sample_order_mode,
-                                     state.data.n_samples, state.data);
-  const order_m = deriveMarkerOrder(state.view_state.marker_order_mode,
-                                     state.data.n_markers, state.data);
+  let order_s = deriveSampleOrder(state.view_state.sample_order_mode,
+                                   state.data.n_samples, state.data);
+  // Collapse near-identical samples into representative rows. Overrides the
+  // sample-order mode (groups are ordered low→high dosage) and attaches the
+  // per-row size metadata the renderer's right-gutter histogram consumes.
+  state._collapse = null;
+  state.data.collapse_rows = null;
+  if (state.view_state.collapse_similar) {
+    let plan = null;
+    try {
+      plan = collapseSimilar(state.data, {
+        hammingThreshold: state.view_state.collapse_hamming,
+        maxReps: state.view_state.collapse_reps,
+        markerOrder: state.markers_selected || undefined,
+      });
+    } catch (e) { console.warn('dosage_heatmap: collapseSimilar threw —', e); plan = null; }
+    if (plan && plan.order && plan.order.length > 0) {
+      state._collapse = plan;
+      order_s = plan.order;
+      state.data.collapse_rows = {
+        row_group: plan.row_group,
+        row_group_size: plan.row_group_size,
+        row_is_group_start: plan.row_is_group_start,
+        row_is_medoid: plan.row_is_medoid,
+      };
+    }
+  }
+  // Marker axis: the working set (SNP view + subsample) ordered by the
+  // chosen marker-order mode, then a cursor-centred zoom window.
+  const working = state.markers_selected
+    || deriveMarkerOrder(state.view_state.marker_order_mode,
+                         state.data.n_markers, state.data);
+  const orderedWorking = _orderWorkingMarkers(working, state);
+  const vp = markerViewport(orderedWorking, state.view_state.cursor_col, state.view_state.zoom);
+  const order_m = vp.order;
+  state._viewport = vp;            // for cursor info + hit-mapping
+  state._working_markers = orderedWorking;
+  // Cursor position relative to the painted viewport.
+  const cursorColDisp = (state.view_state.cursor_col | 0) - vp.start;
   const hov = state.selection.getHoveredCell();
   const paint = paintDosageHeatmap(canvas, state.data, {
     sample_order:          order_s,
@@ -500,18 +712,36 @@ function _paintHeatmap(state) {
     show_ghsl_track:       state.view_state.show_ghsl_track,
     show_theta_pi_track:   state.view_state.show_theta_pi_track,
     show_het_dosage_track: state.view_state.show_het_dosage_track,
+    show_confidence_track: state.view_state.show_confidence_track,
     show_polarity_track:   state.view_state.show_polarity_track,
     show_y_ticks:            state.view_state.show_y_ticks,
     show_group_labels:       state.view_state.show_group_labels,
     show_regime_call_track:  state.view_state.show_regime_call_track,
     show_locus_span_overlay: state.view_state.show_locus_span_overlay,
+    show_group_rects:        state.view_state.show_group_rects,
+    show_collapse:           state.view_state.collapse_similar,
     group_colors:          state.group_colors,
     k6_colors:             state.k6_colors,
     hovered_cell:          hov ? { row: hov.row, col: hov.col } : null,
+    cursor_col:            cursorColDisp,
+    cursor_row:            state.view_state.cursor_row,
     selected_samples:      state.selection.getSelectedSamples(),
     selected_markers:      state.selection.getSelectedMarkers(),
   });
   state.layout = paint.layout;
+}
+
+// Apply the marker-order mode (natural | by_polarity) to the working
+// marker set. by_polarity reorders the working canonical indices so
+// unflipped markers come first; natural keeps ascending order.
+function _orderWorkingMarkers(working, state) {
+  const w = (working instanceof Int32Array) ? working : Int32Array.from(working || []);
+  const mode = state.view_state.marker_order_mode;
+  const pol = state.data && state.data.marker_polarity;
+  if (mode !== 'by_polarity' || !pol) return w;
+  const arr = Array.from(w);
+  arr.sort((a, b) => (Number(pol[a] || 0) - Number(pol[b] || 0)) || (a - b));
+  return Int32Array.from(arr);
 }
 
 // =====================================================================
@@ -529,11 +759,14 @@ function _renderRightPanel(state) {
   }
   const hov = state.selection.getHoveredCell();
   if (!hov) {
-    const html =
+    let html =
       '<dt>Samples</dt><dd>' + state.data.n_samples + '</dd>'
       + '<dt>Markers</dt><dd>' + state.data.n_markers + '</dd>'
       + '<dt>Selected samples</dt><dd>' + state.selection.getSelectedSamples().size + '</dd>'
       + '<dt>Selected markers</dt><dd>' + state.selection.getSelectedMarkers().size + '</dd>';
+    html += _cursorInfoHtml(state);
+    html += _detectSummaryHtml(state);
+    html += _overlaySummaryHtml(state);
     fields.innerHTML = html;
     return;
   }
@@ -543,6 +776,80 @@ function _renderRightPanel(state) {
   html += '<dt>Dosage</dt><dd>' + (hov.dosage == null ? 'NA'
             : (Number.isFinite(hov.dosage) ? hov.dosage.toFixed(4) : hov.dosage)) + '</dd>';
   fields.innerHTML = html;
+}
+
+// Marker cursor + viewport readout for the right panel.
+function _cursorInfoHtml(state) {
+  const d = state && state.data;
+  if (!d) return '';
+  const vs = state.view_state;
+  const working = state._working_markers;
+  const len = (working && working.length) || (d.n_markers | 0);
+  const col = Math.max(0, Math.min(len - 1, vs.cursor_col | 0));
+  const mi = working ? working[col] : col;
+  const lbl = (d.marker_labels && d.marker_labels[mi]) || ('M' + mi);
+  const bp = d.marker_pos_bp && Number.isFinite(d.marker_pos_bp[mi])
+    ? (d.marker_pos_bp[mi] / 1e6).toFixed(3) + ' Mb' : null;
+  let html = '<dt class="dh2-detect-head">Cursor</dt><dd>'
+           + lbl + (bp ? ' · ' + bp : '') + ' · col ' + (col + 1) + '/' + len + '</dd>';
+  const vw = (vs.marker_view !== 'all') ? vs.marker_view : 'all SNPs';
+  html += '<dt>View · zoom</dt><dd>' + vw
+        + (vs.marker_subsample_n > 0 ? ' · n=' + vs.marker_subsample_n : '')
+        + ' · ×' + (vs.zoom || 1) + '</dd>';
+  return html;
+}
+
+// Regime-catalogue overlay summary for the right panel (one row per
+// overlapping regime). Rendered only when the catalogue source is active.
+function _overlaySummaryHtml(state) {
+  const ov = state && state.overlay;
+  if (!ov) return '';
+  if (!ov.n_regimes) {
+    return '<dt class="dh2-detect-head">Regime catalogue</dt>'
+         + '<dd>no registered regimes overlap this window'
+         + (state._registered ? '' : ' (run the regime pipeline first)') + '</dd>';
+  }
+  let html = '<dt class="dh2-detect-head">Regime catalogue</dt><dd>'
+           + ov.n_regimes + ' overlapping · primary '
+           + (ov.primary_id || '—')
+           + (state._focus_regime_id ? ' (focused)' : '')
+           + '<br><span style="opacity:.6">click a regime band header to focus / select its markers</span></dd>';
+  for (const s of ov.spans) {
+    const conf = Number.isFinite(s.confidence) ? s.confidence.toFixed(2) : '—';
+    const mark = (s.candidate_id === ov.primary_id) ? ' ◀' : '';
+    html += '<dt>' + (s.label || 'regime') + mark + '</dt>'
+         +  '<dd>' + (s.regime_class || '—') + ' · conf ' + conf
+         +  ' · markers ' + s.lo + '–' + s.hi + '</dd>';
+  }
+  return html;
+}
+
+// Per-group confidence summary for the right panel. Rendered only when
+// an in-page grouping source (bands/clusters) is active.
+function _detectSummaryHtml(state) {
+  const det = state && state.detect;
+  if (!det || !Array.isArray(det.groups) || det.groups.length === 0) return '';
+  const modeLabel = det.mode === 'index_aware' ? 'index-aware' : det.mode;
+  let html = '<dt class="dh2-detect-head">Detected ' + modeLabel
+           + ' (K=' + det.k + (Number.isFinite(det.n_bins) ? ', ' + det.n_bins + ' bins' : '') + ')</dt><dd>silhouette '
+           + (Number.isFinite(det.overall_silhouette) ? det.overall_silhouette.toFixed(2) : '—')
+           + '</dd>';
+  for (const g of det.groups) {
+    const lbl = (det.mode === 'bands')
+      ? (g.call.replace('_like', '') + ' (b' + g.label + ')')
+      : (det.mode === 'index_aware')
+        ? ('hap ' + g.label + ' (' + g.call.replace('_like', '') + ')')
+        : ('cluster ' + g.label);
+    const conf = Number.isFinite(g.confidence) ? g.confidence.toFixed(2) : '—';
+    const md   = Number.isFinite(g.mean_dosage) ? g.mean_dosage.toFixed(2) : '—';
+    const mg   = Number.isFinite(g.mean_margin) ? g.mean_margin.toFixed(2) : '—';
+    const sl   = Number.isFinite(g.mean_silhouette) ? g.mean_silhouette.toFixed(2) : '—';
+    const sep  = Number.isFinite(g.separation) ? g.separation.toFixed(1) : '—';
+    html += '<dt>' + lbl + ' · n=' + g.n + '</dt>'
+         +  '<dd>conf ' + conf + ' · d̄ ' + md
+         +  ' · margin ' + mg + ' · sil ' + sl + ' · sep ' + sep + '</dd>';
+  }
+  return html;
 }
 
 function _renderLegend(state) {
@@ -556,6 +863,23 @@ function _renderLegend(state) {
   }
   const sizes = groupSizesFromSampleGroup(state.data.sample_group);
   let html = '';
+  // Collapsed-rows summary at the top of the legend.
+  if (state._collapse) {
+    const c = state._collapse;
+    html += '<div class="dh2-legend-row" style="opacity:.9">'
+         +    '<span class="dh2-legend-id">⊟ collapsed</span> '
+         +    '<span class="dh2-legend-count">' + c.n_samples + ' samples → '
+         +    c.n_displayed + ' rows · ' + c.n_groups + ' groups</span></div>';
+  }
+  // Focused-regime readout (catalogue source) at the top of the legend.
+  if (state._focus_regime_id && state.overlay) {
+    const sp = (state.overlay.spans || []).find(s => s.candidate_id === state._focus_regime_id);
+    html += '<div class="dh2-legend-row" style="opacity:.95">'
+         +    '<span class="dh2-legend-id">▶ focus: ' + state._focus_regime_id + '</span> '
+         +    '<span class="dh2-legend-count">'
+         +    (sp ? ((sp.regime_class || '—') + (Number.isFinite(sp.confidence) ? ' · conf ' + sp.confidence.toFixed(2) : '')) : '')
+         +    '</span></div>';
+  }
   for (const [g, n] of sizes) {
     const c = state.group_colors.get(g) || '#888';
     html += '<div class="dh2-legend-row">'
@@ -620,6 +944,80 @@ function _wireToolbar(state) {
     state.view_state.show_het_dosage_track = !!(e && e.target && e.target.checked);
     repaint();
   };
+  const onGroupingSource = (e) => {
+    state.view_state.grouping_source = (e && e.target && e.target.value) || 'external';
+    state._focus_regime_id = null;   // focus is catalogue-specific; reset on source change
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onDetectK = (e) => {
+    const v = (e && e.target && e.target.value) || 'auto';
+    state.view_state.detect_k = (v === 'auto') ? 'auto' : (parseInt(v, 10) || 'auto');
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onConfidenceScheme = (e) => {
+    state.view_state.confidence_scheme = (e && e.target && e.target.value) || 'margin';
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onShowConfidenceTrack = (e) => {
+    state.view_state.show_confidence_track = !!(e && e.target && e.target.checked);
+    repaint();
+  };
+  const onMarkerView = (e) => {
+    state.view_state.marker_view = (e && e.target && e.target.value) || 'all';
+    _recomputeMarkers(state);
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onSubsampleN = (e) => {
+    const v = parseInt((e && e.target && e.target.value), 10);
+    state.view_state.marker_subsample_n = Number.isFinite(v) ? v : 0;
+    _recomputeMarkers(state);
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onZoom = (e) => {
+    const v = parseInt((e && e.target && e.target.value), 10);
+    state.view_state.zoom = Number.isFinite(v) && v >= 1 ? v : 1;
+    repaint();
+    _renderRightPanel(state);
+  };
+  // Keyboard cursor: ←/→ move the marker cursor (Shift ×10, Home/End to
+  // ends), ↑/↓ move the sample cursor, +/− zoom. Ignored while typing in
+  // a form control or when the page isn't mounted.
+  const onKeyDown = (ev) => {
+    if (!ev) return;
+    const t = ev.target;
+    if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName || '')) return;
+    if (!document.getElementById('dosageHeatmapCanvas')) return;
+    if (!state.data) return;
+    const vs = state.view_state;
+    const len = (state._working_markers && state._working_markers.length)
+      || (state.data.n_markers | 0);
+    const nS = state.data.n_samples | 0;
+    const step = ev.shiftKey ? 10 : 1;
+    let handled = true;
+    switch (ev.key) {
+      case 'ArrowLeft':  vs.cursor_col = Math.max(0, (vs.cursor_col | 0) - step); break;
+      case 'ArrowRight': vs.cursor_col = Math.min(len - 1, (vs.cursor_col | 0) + step); break;
+      case 'Home':       vs.cursor_col = 0; break;
+      case 'End':        vs.cursor_col = len - 1; break;
+      case 'ArrowUp':
+        vs.cursor_row = (vs.cursor_row < 0 ? nS - 1 : Math.max(0, vs.cursor_row - step)); break;
+      case 'ArrowDown':
+        vs.cursor_row = (vs.cursor_row < 0 ? 0 : Math.min(nS - 1, vs.cursor_row + step)); break;
+      case '+': case '=': vs.zoom = Math.min(16, (vs.zoom || 1) * 2); break;
+      case '-': case '_': vs.zoom = Math.max(1, (vs.zoom || 1) / 2); break;
+      default: handled = false;
+    }
+    if (!handled) return;
+    if (typeof ev.preventDefault === 'function') ev.preventDefault();
+    _renderHeader(state);
+    _paintHeatmap(state);
+    _renderRightPanel(state);
+  };
   const onShowRegimeCallTrack = (e) => {
     state.view_state.show_regime_call_track = !!(e && e.target && e.target.checked);
     repaint();
@@ -627,6 +1025,22 @@ function _wireToolbar(state) {
   const onShowLocusSpanOverlay = (e) => {
     state.view_state.show_locus_span_overlay = !!(e && e.target && e.target.checked);
     repaint();
+  };
+  const onShowGroupRects = (e) => {
+    state.view_state.show_group_rects = !!(e && e.target && e.target.checked);
+    repaint();
+  };
+  const onCollapseSimilar = (e) => {
+    state.view_state.collapse_similar = !!(e && e.target && e.target.checked);
+    repaintAll();
+  };
+  const onCollapseHamming = (e) => {
+    state.view_state.collapse_hamming = parseInt((e && e.target && e.target.value) || '0', 10) || 0;
+    repaintAll();
+  };
+  const onCollapseReps = (e) => {
+    state.view_state.collapse_reps = parseInt((e && e.target && e.target.value) || '4', 10) || 4;
+    repaintAll();
   };
   const onCanvasMove = (ev) => {
     const c = document.getElementById('dosageHeatmapCanvas');
@@ -652,6 +1066,22 @@ function _wireToolbar(state) {
       ? c.getBoundingClientRect() : { left: 0, top: 0 };
     const x = ((ev && ev.clientX) || 0) - (rect.left || 0);
     const y = ((ev && ev.clientY) || 0) - (rect.top  || 0);
+    // Regime focus: a click on a regime span's label header (catalogue
+    // source) focuses that regime — re-picks it as primary so the group
+    // track + per-sample labels reflect it, and selects its markers. Takes
+    // precedence over cell selection since it sits in the top label strip.
+    if (state.data.regime_spans && state.data.regime_spans.length) {
+      const span = findRegimeSpanAtPixel(state.layout, state.data.regime_spans, x, y);
+      if (span) {
+        state._focus_regime_id = (state._focus_regime_id === span.candidate_id)
+          ? null : span.candidate_id;   // click the focused regime again to clear
+        _applyGrouping(state);
+        const markers = [];
+        for (let m = span.lo | 0; m <= (span.hi | 0); m++) markers.push(m);
+        state.selection.setSelectedMarkers(markers);  // notify → repaintAll
+        return;
+      }
+    }
     const cell = findCellAtPixel(state.layout, state.data.cellValue, x, y);
     if (!cell) return;
     // Shift-click → toggle marker; plain click → toggle sample.
@@ -668,7 +1098,10 @@ function _wireToolbar(state) {
     onSampleOrder, onMarkerOrder, onColorMode,
     onShowGroupTrack, onShowPolarityTrack, onShowK6Track,
     onShowGhslTrack, onShowThetaPiTrack, onShowHetDosageTrack,
-    onShowRegimeCallTrack, onShowLocusSpanOverlay,
+    onShowRegimeCallTrack, onShowLocusSpanOverlay, onShowGroupRects,
+    onCollapseSimilar, onCollapseHamming, onCollapseReps,
+    onGroupingSource, onDetectK, onConfidenceScheme, onShowConfidenceTrack,
+    onMarkerView, onSubsampleN, onZoom, onKeyDown,
     onCanvasMove, onCanvasClick, onCanvasLeave,
     unsubSelection,
   };
@@ -682,8 +1115,22 @@ function _wireToolbar(state) {
   _addListener('dosageHeatmapShowGhslTrack',        'change',     onShowGhslTrack);
   _addListener('dosageHeatmapShowThetaPiTrack',     'change',     onShowThetaPiTrack);
   _addListener('dosageHeatmapShowHetDosageTrack',   'change',     onShowHetDosageTrack);
+  _addListener('dosageHeatmapGroupingSource',       'change',     onGroupingSource);
+  _addListener('dosageHeatmapDetectK',              'change',     onDetectK);
+  _addListener('dosageHeatmapConfidenceScheme',     'change',     onConfidenceScheme);
+  _addListener('dosageHeatmapShowConfidenceTrack',  'change',     onShowConfidenceTrack);
+  _addListener('dosageHeatmapMarkerView',           'change',     onMarkerView);
+  _addListener('dosageHeatmapSubsampleN',           'change',     onSubsampleN);
+  _addListener('dosageHeatmapZoom',                 'change',     onZoom);
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('keydown', onKeyDown);
+  }
   _addListener('dosageHeatmapShowRegimeCallTrack',  'change',     onShowRegimeCallTrack);
   _addListener('dosageHeatmapShowLocusSpanOverlay', 'change',     onShowLocusSpanOverlay);
+  _addListener('dosageHeatmapShowGroupRects',       'change',     onShowGroupRects);
+  _addListener('dosageHeatmapCollapseSimilar',      'change',     onCollapseSimilar);
+  _addListener('dosageHeatmapCollapseHamming',      'change',     onCollapseHamming);
+  _addListener('dosageHeatmapCollapseReps',         'change',     onCollapseReps);
   _addListener('dosageHeatmapCanvas',               'mousemove',  onCanvasMove);
   _addListener('dosageHeatmapCanvas',               'click',      onCanvasClick);
   _addListener('dosageHeatmapCanvas',               'mouseleave', onCanvasLeave);
@@ -701,8 +1148,22 @@ function _teardownToolbar(state) {
   if (h.onShowGhslTrack)       _removeListener('dosageHeatmapShowGhslTrack',        'change',    h.onShowGhslTrack);
   if (h.onShowThetaPiTrack)    _removeListener('dosageHeatmapShowThetaPiTrack',     'change',    h.onShowThetaPiTrack);
   if (h.onShowHetDosageTrack)  _removeListener('dosageHeatmapShowHetDosageTrack',   'change',    h.onShowHetDosageTrack);
+  if (h.onGroupingSource)      _removeListener('dosageHeatmapGroupingSource',       'change',    h.onGroupingSource);
+  if (h.onDetectK)             _removeListener('dosageHeatmapDetectK',              'change',    h.onDetectK);
+  if (h.onConfidenceScheme)    _removeListener('dosageHeatmapConfidenceScheme',     'change',    h.onConfidenceScheme);
+  if (h.onShowConfidenceTrack) _removeListener('dosageHeatmapShowConfidenceTrack',  'change',    h.onShowConfidenceTrack);
+  if (h.onMarkerView)          _removeListener('dosageHeatmapMarkerView',           'change',    h.onMarkerView);
+  if (h.onSubsampleN)          _removeListener('dosageHeatmapSubsampleN',           'change',    h.onSubsampleN);
+  if (h.onZoom)                _removeListener('dosageHeatmapZoom',                 'change',    h.onZoom);
+  if (h.onKeyDown && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+    document.removeEventListener('keydown', h.onKeyDown);
+  }
   if (h.onShowRegimeCallTrack) _removeListener('dosageHeatmapShowRegimeCallTrack',  'change',    h.onShowRegimeCallTrack);
   if (h.onShowLocusSpanOverlay) _removeListener('dosageHeatmapShowLocusSpanOverlay','change',    h.onShowLocusSpanOverlay);
+  if (h.onShowGroupRects)      _removeListener('dosageHeatmapShowGroupRects',        'change',     h.onShowGroupRects);
+  if (h.onCollapseSimilar)     _removeListener('dosageHeatmapCollapseSimilar',       'change',     h.onCollapseSimilar);
+  if (h.onCollapseHamming)     _removeListener('dosageHeatmapCollapseHamming',       'change',     h.onCollapseHamming);
+  if (h.onCollapseReps)        _removeListener('dosageHeatmapCollapseReps',          'change',     h.onCollapseReps);
   if (h.onCanvasMove)          _removeListener('dosageHeatmapCanvas',               'mousemove',  h.onCanvasMove);
   if (h.onCanvasClick)         _removeListener('dosageHeatmapCanvas',               'click',      h.onCanvasClick);
   if (h.onCanvasLeave)         _removeListener('dosageHeatmapCanvas',               'mouseleave', h.onCanvasLeave);
@@ -718,7 +1179,14 @@ function _updateTooltip(state) {
   const hov = state.selection.getHoveredCell();
   const px  = state.last_cursor_px;
   if (!hov || !px || !state.data) { slot.style.display = 'none'; return; }
-  slot.innerHTML = summariseHoverCell(hov, state.data);
+  let tip = summariseHoverCell(hov, state.data);
+  // Collapsed view: annotate the representative row with its group size.
+  const cr = state.data.collapse_rows;
+  if (cr && cr.row_group_size && hov.row >= 0 && hov.row < cr.row_group_size.length) {
+    const n = cr.row_group_size[hov.row];
+    if (n > 1) tip += ' · ×' + n + (cr.row_is_medoid && cr.row_is_medoid[hov.row] ? ' (medoid)' : '');
+  }
+  slot.innerHTML = tip;
   slot.style.display = 'block';
   // Position the tooltip 12px right + 4px below the cursor, clamped to
   // the canvas-wrap. We use offsetWidth/Height after toggling display
