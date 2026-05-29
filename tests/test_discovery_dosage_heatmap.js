@@ -562,6 +562,48 @@ check('show_regime_spans:false suppresses overlay', (() => {
 })());
 
 // =====================================================================
+group('renderer.group rects overlay + index_aware order');
+
+const dataGr = Object.assign({}, data, {
+  sample_group: ['hap 0 (homA)', 'hap 0 (homA)', 'hap 1 (homB)', 'hap 1 (homB)', 'hap 1 (homB)'],
+});
+check('show_group_rects draws one outline per group', (() => {
+  const hc = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc, dataGr, {
+    show_group_track: false, show_polarity_track: false,
+    sample_order: Int32Array.from([0, 1, 2, 3, 4]),   // already grouped
+    show_group_rects: true,
+  });
+  const base = new FakeCanvas(600, 400);
+  paintDosageHeatmap(base, dataGr, {
+    show_group_track: false, show_polarity_track: false,
+    sample_order: Int32Array.from([0, 1, 2, 3, 4]), show_group_rects: false,
+  });
+  const extra = hc._ctx.calls.filter(c => c === 'strokeRect').length
+              - base._ctx.calls.filter(c => c === 'strokeRect').length;
+  return extra === 2;   // two distinct groups → two boxes
+})());
+check('group rects off by default', (() => {
+  const hc = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc, dataGr, { show_group_track: false, show_polarity_track: false });
+  const base = new FakeCanvas(600, 400);
+  paintDosageHeatmap(base, dataGr, {
+    show_group_track: false, show_polarity_track: false, show_group_rects: true,
+  });
+  return hc._ctx.calls.filter(c => c === 'strokeRect').length
+       < base._ctx.calls.filter(c => c === 'strokeRect').length;
+})());
+check('deriveSampleOrder index_aware uses precomputed order', (() => {
+  const src = { index_aware_order: Int32Array.from([4, 3, 2, 1, 0]) };
+  const ord = deriveSampleOrder('index_aware', 5, src);
+  return ord.length === 5 && ord[0] === 4 && ord[4] === 0;
+})());
+check('index_aware falls back to natural without an order', (() => {
+  const ord = deriveSampleOrder('index_aware', 5, { sample_group: ['a', 'a', 'b', 'b', 'b'] });
+  return ord[0] === 0 && ord[4] === 4;
+})());
+
+// =====================================================================
 group('findRegimeSpanAtPixel (click-to-focus)');
 
 const hcHit = new FakeCanvas(600, 400);

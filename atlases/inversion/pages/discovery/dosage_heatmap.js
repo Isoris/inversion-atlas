@@ -61,6 +61,7 @@ import {
   computeSampleGhslMean,
 } from './dosage_heatmap/sample_means.js';
 import { detectGroups } from './dosage_heatmap/dosage_detect.js';
+import { clusterIndexAware } from './dosage_heatmap/index_aware_cluster.js';
 import { selectMarkers, markerViewport } from './dosage_heatmap/marker_select.js';
 import { buildRegistryOverlay } from './dosage_heatmap/regime_registry_overlay.js';
 
@@ -79,6 +80,9 @@ const DEFAULT_VIEW_STATE = Object.freeze({
   // 2026-05-27: regime overlays (active candidate scope).
   show_regime_call_track:  false,
   show_locus_span_overlay: false,
+  // Bounding rectangle per group (marker extent × that group's contiguous
+  // row block). Tight karyotype/cluster boxes when rows are grouped.
+  show_group_rects:        false,
   // 2026-05-29: in-page haplotype-regime grouping. The heatmap can group
   // samples from the loaded dosage chunk itself (no upstream pipeline
   // needed) and score how confident each group is, OR consume the active
@@ -432,8 +436,18 @@ function _applyGrouping(state) {
     // var / low-var view), not always the full marker set.
     try { det = detectGroups(d, { mode: src, k: vs.detect_k, markerOrder: state.markers_selected || undefined }); }
     catch (e) { console.warn('dosage_heatmap: detectGroups threw —', e); det = null; }
+  } else if (src === 'index_aware') {
+    // Position-aware haplotype clustering on ordered-bin trajectories
+    // (respects SNP order + block continuity, not just total dosage).
+    try { det = clusterIndexAware(d, { k: vs.detect_k, markerOrder: state.markers_selected || undefined }); }
+    catch (e) { console.warn('dosage_heatmap: clusterIndexAware threw —', e); det = null; }
   }
   state.detect = det;
+  // Position-aware row order (index-aware source only); cleared otherwise.
+  // Mirrored onto `d` so deriveSampleOrder (which receives `data` as src)
+  // can consume it for the 'index_aware' sample-order mode.
+  state.index_aware_order = (det && src === 'index_aware' && det.order) ? det.order : null;
+  d.index_aware_order = state.index_aware_order;
   // Regime spans (catalogue source) live on the canonical data so the
   // renderer auto-draws them; clear them for every other source.
   d.regime_spans = null;
@@ -586,6 +600,8 @@ function _renderHeader(state) {
   if (rc) rc.checked = !!state.view_state.show_regime_call_track;
   const ls = document.getElementById('dosageHeatmapShowLocusSpanOverlay');
   if (ls) ls.checked = !!state.view_state.show_locus_span_overlay;
+  const gr = document.getElementById('dosageHeatmapShowGroupRects');
+  if (gr) gr.checked = !!state.view_state.show_group_rects;
   const hg = document.getElementById('dosageHeatmapShowGhslTrack');
   if (hg) hg.checked = !!state.view_state.show_ghsl_track;
   const tp = document.getElementById('dosageHeatmapShowThetaPiTrack');
@@ -664,6 +680,7 @@ function _paintHeatmap(state) {
     show_group_labels:       state.view_state.show_group_labels,
     show_regime_call_track:  state.view_state.show_regime_call_track,
     show_locus_span_overlay: state.view_state.show_locus_span_overlay,
+    show_group_rects:        state.view_state.show_group_rects,
     group_colors:          state.group_colors,
     k6_colors:             state.k6_colors,
     hovered_cell:          hov ? { row: hov.row, col: hov.col } : null,
@@ -773,14 +790,17 @@ function _overlaySummaryHtml(state) {
 function _detectSummaryHtml(state) {
   const det = state && state.detect;
   if (!det || !Array.isArray(det.groups) || det.groups.length === 0) return '';
-  let html = '<dt class="dh2-detect-head">Detected ' + det.mode
-           + ' (K=' + det.k + ')</dt><dd>silhouette '
+  const modeLabel = det.mode === 'index_aware' ? 'index-aware' : det.mode;
+  let html = '<dt class="dh2-detect-head">Detected ' + modeLabel
+           + ' (K=' + det.k + (Number.isFinite(det.n_bins) ? ', ' + det.n_bins + ' bins' : '') + ')</dt><dd>silhouette '
            + (Number.isFinite(det.overall_silhouette) ? det.overall_silhouette.toFixed(2) : '—')
            + '</dd>';
   for (const g of det.groups) {
     const lbl = (det.mode === 'bands')
       ? (g.call.replace('_like', '') + ' (b' + g.label + ')')
-      : ('cluster ' + g.label);
+      : (det.mode === 'index_aware')
+        ? ('hap ' + g.label + ' (' + g.call.replace('_like', '') + ')')
+        : ('cluster ' + g.label);
     const conf = Number.isFinite(g.confidence) ? g.confidence.toFixed(2) : '—';
     const md   = Number.isFinite(g.mean_dosage) ? g.mean_dosage.toFixed(2) : '—';
     const mg   = Number.isFinite(g.mean_margin) ? g.mean_margin.toFixed(2) : '—';
@@ -804,6 +824,15 @@ function _renderLegend(state) {
   }
   const sizes = groupSizesFromSampleGroup(state.data.sample_group);
   let html = '';
+  // Focused-regime readout (catalogue source) at the top of the legend.
+  if (state._focus_regime_id && state.overlay) {
+    const sp = (state.overlay.spans || []).find(s => s.candidate_id === state._focus_regime_id);
+    html += '<div class="dh2-legend-row" style="opacity:.95">'
+         +    '<span class="dh2-legend-id">▶ focus: ' + state._focus_regime_id + '</span> '
+         +    '<span class="dh2-legend-count">'
+         +    (sp ? ((sp.regime_class || '—') + (Number.isFinite(sp.confidence) ? ' · conf ' + sp.confidence.toFixed(2) : '')) : '')
+         +    '</span></div>';
+  }
   for (const [g, n] of sizes) {
     const c = state.group_colors.get(g) || '#888';
     html += '<div class="dh2-legend-row">'
@@ -950,6 +979,10 @@ function _wireToolbar(state) {
     state.view_state.show_locus_span_overlay = !!(e && e.target && e.target.checked);
     repaint();
   };
+  const onShowGroupRects = (e) => {
+    state.view_state.show_group_rects = !!(e && e.target && e.target.checked);
+    repaint();
+  };
   const onCanvasMove = (ev) => {
     const c = document.getElementById('dosageHeatmapCanvas');
     if (!c) return;
@@ -1006,7 +1039,7 @@ function _wireToolbar(state) {
     onSampleOrder, onMarkerOrder, onColorMode,
     onShowGroupTrack, onShowPolarityTrack, onShowK6Track,
     onShowGhslTrack, onShowThetaPiTrack, onShowHetDosageTrack,
-    onShowRegimeCallTrack, onShowLocusSpanOverlay,
+    onShowRegimeCallTrack, onShowLocusSpanOverlay, onShowGroupRects,
     onGroupingSource, onDetectK, onConfidenceScheme, onShowConfidenceTrack,
     onMarkerView, onSubsampleN, onZoom, onKeyDown,
     onCanvasMove, onCanvasClick, onCanvasLeave,
@@ -1034,6 +1067,7 @@ function _wireToolbar(state) {
   }
   _addListener('dosageHeatmapShowRegimeCallTrack',  'change',     onShowRegimeCallTrack);
   _addListener('dosageHeatmapShowLocusSpanOverlay', 'change',     onShowLocusSpanOverlay);
+  _addListener('dosageHeatmapShowGroupRects',       'change',     onShowGroupRects);
   _addListener('dosageHeatmapCanvas',               'mousemove',  onCanvasMove);
   _addListener('dosageHeatmapCanvas',               'click',      onCanvasClick);
   _addListener('dosageHeatmapCanvas',               'mouseleave', onCanvasLeave);
@@ -1063,6 +1097,7 @@ function _teardownToolbar(state) {
   }
   if (h.onShowRegimeCallTrack) _removeListener('dosageHeatmapShowRegimeCallTrack',  'change',    h.onShowRegimeCallTrack);
   if (h.onShowLocusSpanOverlay) _removeListener('dosageHeatmapShowLocusSpanOverlay','change',    h.onShowLocusSpanOverlay);
+  if (h.onShowGroupRects)      _removeListener('dosageHeatmapShowGroupRects',        'change',     h.onShowGroupRects);
   if (h.onCanvasMove)          _removeListener('dosageHeatmapCanvas',               'mousemove',  h.onCanvasMove);
   if (h.onCanvasClick)         _removeListener('dosageHeatmapCanvas',               'click',      h.onCanvasClick);
   if (h.onCanvasLeave)         _removeListener('dosageHeatmapCanvas',               'mouseleave', h.onCanvasLeave);

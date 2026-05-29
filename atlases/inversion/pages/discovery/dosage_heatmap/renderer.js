@@ -245,6 +245,13 @@ function _coerceKey(k, refIds) {
 export function deriveSampleOrder(mode, n_samples, src) {
   const out = new Int32Array(n_samples);
   for (let i = 0; i < n_samples; i++) out[i] = i;
+  if (mode === 'index_aware' && src && src.index_aware_order
+      && src.index_aware_order.length === n_samples) {
+    // Precomputed position-aware order (cluster asc, then distance-to-
+    // medoid). Copy verbatim — the clusterer already ordered the rows.
+    for (let i = 0; i < n_samples; i++) out[i] = src.index_aware_order[i];
+    return out;
+  }
   if (mode === 'by_group' && src && src.sample_group
       && src.sample_group.length === n_samples) {
     const g = src.sample_group;
@@ -391,6 +398,12 @@ export function paintDosageHeatmap(canvas, data, opts) {
   // by the page when the grouping source is the regime catalogue.
   const showRegimeSpans = (o.show_regime_spans !== false)
                           && Array.isArray(data.regime_spans) && data.regime_spans.length > 0;
+  // Group bounding rectangles: per distinct sample_group, a box spanning
+  // the regime marker extent (catalogue) or full matrix width × that
+  // group's contiguous row block. Tight karyotype/cluster boxes when rows
+  // are grouped (by_group / index-aware order).
+  const showGroupRects = (o.show_group_rects === true)
+                         && Array.isArray(data.sample_group);
   const showGhsl        = (o.show_ghsl_track === true)          && !!data.sample_ghsl_mean;
   const showThetaPi     = (o.show_theta_pi_track === true)      && !!data.sample_theta_pi_mean;
   const showHetDosage   = (o.show_het_dosage_track === true)    && !!data.sample_het_dosage_mean;
@@ -612,6 +625,48 @@ export function paintDosageHeatmap(canvas, data, opts) {
         ctx.fillText(lbl, xLo + 2, matY + 1);
       }
       si++;
+    }
+    if (typeof ctx.restore === 'function') ctx.restore();
+  }
+
+  // --- Group bounding rectangles. For each distinct sample_group value,
+  // box [min row, max row] of its members (in display order) × the marker
+  // extent. The x-extent is the union of regime spans when present
+  // (catalogue source), else the full matrix width.
+  if (showGroupRects) {
+    let gx0 = matX, gx1 = matX + nDispM * cellW;
+    if (Array.isArray(data.regime_spans) && data.regime_spans.length) {
+      let loMin = Infinity, hiMax = -Infinity;
+      for (const sp of data.regime_spans) { if (sp.lo < loMin) loMin = sp.lo; if (sp.hi > hiMax) hiMax = sp.hi; }
+      let xLo = Infinity, xHi = -Infinity;
+      for (let c = 0; c < nDispM; c++) {
+        const mi = order_m[c];
+        if (mi >= loMin && mi <= hiMax) { const x = matX + c * cellW; if (x < xLo) xLo = x; if (x + cellW > xHi) xHi = x + cellW; }
+      }
+      if (Number.isFinite(xLo) && xHi > xLo) { gx0 = xLo; gx1 = xHi; }
+    }
+    const rowMin = new Map(), rowMax = new Map();
+    for (let r = 0; r < nDispS; r++) {
+      const g = data.sample_group[order_s[r]];
+      if (g == null) continue;
+      if (!rowMin.has(g)) { rowMin.set(g, r); rowMax.set(g, r); }
+      else { if (r < rowMin.get(g)) rowMin.set(g, r); if (r > rowMax.get(g)) rowMax.set(g, r); }
+    }
+    if (typeof ctx.save === 'function') ctx.save();
+    ctx.lineWidth = 1.5;
+    for (const g of rowMin.keys()) {
+      const y0 = matY + rowMin.get(g) * cellH;
+      const y1 = matY + (rowMax.get(g) + 1) * cellH;
+      const col = (groupColors instanceof Map && groupColors.get(g)) || 'rgba(220,230,245,0.9)';
+      ctx.strokeStyle = col;
+      if (typeof ctx.strokeRect === 'function') ctx.strokeRect(gx0 + 0.5, y0 + 0.5, (gx1 - gx0) - 1, (y1 - y0) - 1);
+      if (typeof ctx.fillText === 'function' && (y1 - y0) >= 12) {
+        ctx.font = '9px ui-sans-serif, system-ui, sans-serif';
+        ctx.fillStyle = col;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(String(g), gx0 + 3, y0 + 2);
+      }
     }
     if (typeof ctx.restore === 'function') ctx.restore();
   }

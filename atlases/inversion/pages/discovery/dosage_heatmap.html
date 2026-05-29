@@ -15,6 +15,7 @@
           <select id="dosageHeatmapSampleOrder" class="dh2-select">
             <option value="natural">natural</option>
             <option value="by_group">by group</option>
+            <option value="index_aware">index-aware</option>
             <option value="by_k6">by K6</option>
           </select>
         </label>
@@ -46,10 +47,12 @@ genotype: discrete white/blue/red for 0/0 · 0/1 · 1/1.">
                   title="external: grouping supplied by the upstream page.
 bands: in-page 1-D dosage banding (homA/het/homB).
 clusters: in-page 2-D (mean,het) clustering.
+index-aware: position-aware haplotype clustering on ordered-bin trajectories (respects SNP order + block continuity).
 regime (candidate): the active candidate's upstream regime calls.">
             <option value="external">external</option>
             <option value="bands">detect bands</option>
             <option value="clusters">detect clusters</option>
+            <option value="index_aware">detect index-aware</option>
             <option value="upstream_regime">regime (candidate)</option>
             <option value="upstream_catalogue">regime (catalogue)</option>
           </select>
@@ -158,6 +161,10 @@ low var: least variable markers (background).">
         <label class="dh2-toggle">
           <input id="dosageHeatmapShowLocusSpanOverlay" type="checkbox">
           Locus span
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowGroupRects" type="checkbox">
+          Group rects
         </label>
       </div>
     </header>
