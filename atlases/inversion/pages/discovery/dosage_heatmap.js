@@ -61,6 +61,7 @@ import {
 } from './dosage_heatmap/sample_means.js';
 import { detectGroups } from './dosage_heatmap/dosage_detect.js';
 import { selectMarkers, markerViewport } from './dosage_heatmap/marker_select.js';
+import { buildRegistryOverlay } from './dosage_heatmap/regime_registry_overlay.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   sample_order_mode:     'by_group',
@@ -351,6 +352,11 @@ function _buildPageState(atlasState) {
     layout:                null,
     last_cursor_px:        null,
     detect:                null,    // detectGroups() result when grouping_source is in-page
+    overlay:               null,    // buildRegistryOverlay() result for the catalogue source
+    // Cross-atlas regime registry (written by the haplotype_regimes
+    // pipeline) + active chrom, captured for the 'upstream_catalogue' source.
+    _registered:           (atlasState && atlasState.shared && atlasState.shared.registeredCandidates) || null,
+    _chrom:                (atlasState && atlasState.shared && atlasState.shared.activeChrom) || null,
     view_state:            Object.assign({}, DEFAULT_VIEW_STATE,
                                           (dh && dh.view_state) || {}),
     selection:             createDosageHeatmapSelection(),
@@ -426,11 +432,27 @@ function _applyGrouping(state) {
     catch (e) { console.warn('dosage_heatmap: detectGroups threw —', e); det = null; }
   }
   state.detect = det;
+  // Regime spans (catalogue source) live on the canonical data so the
+  // renderer auto-draws them; clear them for every other source.
+  d.regime_spans = null;
+  state.overlay = null;
   if (det) {
     d.sample_group = det.sample_group;
     d.sample_confidence = (vs.confidence_scheme === 'silhouette')
       ? _sil01(det.silhouette)
       : det.margin;
+  } else if (src === 'upstream_catalogue') {
+    let ov = null;
+    try { ov = buildRegistryOverlay(d, state._registered, { chrom: state._chrom }); }
+    catch (e) { console.warn('dosage_heatmap: buildRegistryOverlay threw —', e); ov = null; }
+    state.overlay = ov;
+    if (ov && ov.n_regimes > 0) {
+      d.sample_group = ov.sample_group;
+      d.regime_spans = ov.spans;
+    } else {
+      d.sample_group = d._external_sample_group;
+    }
+    d.sample_confidence = null;
   } else if (src === 'upstream_regime'
              && d.regime_overlay && d.regime_overlay.sample_regime_call) {
     d.sample_group = d.regime_overlay.sample_regime_call.map(c => c || null);
@@ -686,6 +708,7 @@ function _renderRightPanel(state) {
       + '<dt>Selected markers</dt><dd>' + state.selection.getSelectedMarkers().size + '</dd>';
     html += _cursorInfoHtml(state);
     html += _detectSummaryHtml(state);
+    html += _overlaySummaryHtml(state);
     fields.innerHTML = html;
     return;
   }
@@ -715,6 +738,28 @@ function _cursorInfoHtml(state) {
   html += '<dt>View · zoom</dt><dd>' + vw
         + (vs.marker_subsample_n > 0 ? ' · n=' + vs.marker_subsample_n : '')
         + ' · ×' + (vs.zoom || 1) + '</dd>';
+  return html;
+}
+
+// Regime-catalogue overlay summary for the right panel (one row per
+// overlapping regime). Rendered only when the catalogue source is active.
+function _overlaySummaryHtml(state) {
+  const ov = state && state.overlay;
+  if (!ov) return '';
+  if (!ov.n_regimes) {
+    return '<dt class="dh2-detect-head">Regime catalogue</dt>'
+         + '<dd>no registered regimes overlap this window'
+         + (state._registered ? '' : ' (run the regime pipeline first)') + '</dd>';
+  }
+  let html = '<dt class="dh2-detect-head">Regime catalogue</dt><dd>'
+           + ov.n_regimes + ' overlapping · primary '
+           + (ov.primary_id || '—') + '</dd>';
+  for (const s of ov.spans) {
+    const conf = Number.isFinite(s.confidence) ? s.confidence.toFixed(2) : '—';
+    html += '<dt>' + (s.label || 'regime') + '</dt>'
+         +  '<dd>' + (s.regime_class || '—') + ' · conf ' + conf
+         +  ' · markers ' + s.lo + '–' + s.hi + '</dd>';
+  }
   return html;
 }
 

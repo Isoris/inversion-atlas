@@ -529,6 +529,38 @@ check('confidence track auto-hidden without data',
       hcNoConf._ctx.calls.filter(c => c === 'fillRect').length === (5 * 4));
 
 // =====================================================================
+group('renderer.regime_spans overlay (catalogue)');
+
+const hcSpans = new FakeCanvas(600, 400);
+const dataSpans = Object.assign({}, data, {
+  marker_pos_bp: Float64Array.from([1.0e6, 1.1e6, 1.2e6, 1.3e6]),
+  regime_spans: [
+    { label: 'R1', lo: 0, hi: 3, regime_class: 'stable_three_band_regime', confidence: 0.8 },
+    { label: 'R2', lo: 1, hi: 2, regime_class: 'stable_two_band_regime', confidence: 0.6 },
+  ],
+});
+const beforeStroke = 0;
+paintDosageHeatmap(hcSpans, dataSpans, { show_group_track: false, show_polarity_track: false });
+check('regime spans draw band fills + outlines', (() => {
+  // 5×4 = 20 matrix cells + 2 span fills = 22 fillRects; ≥ 3 strokeRects (2 outlines + matrix).
+  const fills = hcSpans._ctx.calls.filter(c => c === 'fillRect').length;
+  const strokes = hcSpans._ctx.calls.filter(c => c === 'strokeRect').length;
+  return fills === (5 * 4) + 2 && strokes >= 3;
+})());
+check('regime spans auto-hidden without data', (() => {
+  const hc2 = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc2, data, { show_group_track: false, show_polarity_track: false });
+  return hc2._ctx.calls.filter(c => c === 'fillRect').length === (5 * 4);
+})());
+check('show_regime_spans:false suppresses overlay', (() => {
+  const hc3 = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc3, dataSpans, {
+    show_group_track: false, show_polarity_track: false, show_regime_spans: false,
+  });
+  return hc3._ctx.calls.filter(c => c === 'fillRect').length === (5 * 4);
+})());
+
+// =====================================================================
 console.log('\n=================');
 console.log(`pass: ${pass}   fail: ${fail}`);
 console.log('=================');

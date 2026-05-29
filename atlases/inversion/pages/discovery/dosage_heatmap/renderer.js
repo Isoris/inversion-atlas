@@ -386,6 +386,11 @@ export function paintDosageHeatmap(canvas, data, opts) {
                           && regimeOverlay
                           && Number.isFinite(regimeOverlay.locus_start_marker)
                           && Number.isFinite(regimeOverlay.locus_end_marker);
+  // Multi-regime span overlay (every regime from the catalogue overlapping
+  // the window), drawn as labelled vertical bands. data.regime_spans is set
+  // by the page when the grouping source is the regime catalogue.
+  const showRegimeSpans = (o.show_regime_spans !== false)
+                          && Array.isArray(data.regime_spans) && data.regime_spans.length > 0;
   const showGhsl        = (o.show_ghsl_track === true)          && !!data.sample_ghsl_mean;
   const showThetaPi     = (o.show_theta_pi_track === true)      && !!data.sample_theta_pi_mean;
   const showHetDosage   = (o.show_het_dosage_track === true)    && !!data.sample_het_dosage_mean;
@@ -557,7 +562,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
   // the matrix, only the marker range belonging to the active candidate).
   if (locusSpanPxRange) {
     const { x0, x1 } = locusSpanPxRange;
-    const matBottom = matY + nS * cellH;
+    const matBottom = matY + nDispS * cellH;
     if (typeof ctx.save === 'function') ctx.save();
     if (typeof ctx.fillRect === 'function') {
       ctx.fillStyle = 'rgba(245,165,36,0.10)';
@@ -568,6 +573,45 @@ export function paintDosageHeatmap(canvas, data, opts) {
       ctx.lineWidth = 1.25;
       ctx.strokeRect(x0 + 0.5, matY + 0.5,
                      (x1 - x0) - 1, (matBottom - matY) - 1);
+    }
+    if (typeof ctx.restore === 'function') ctx.restore();
+  }
+
+  // --- Multi-regime span overlay (catalogue). One labelled band per
+  // overlapping regime; canonical marker ranges resolved to x through
+  // order_m so they track the marker-order mode + zoom viewport.
+  if (showRegimeSpans) {
+    const matBottom = matY + nDispS * cellH;
+    if (typeof ctx.save === 'function') ctx.save();
+    let si = 0;
+    for (const span of data.regime_spans) {
+      const lo = span.lo | 0, hi = span.hi | 0;
+      let xLo = Infinity, xHi = -Infinity;
+      for (let c = 0; c < nDispM; c++) {
+        const mi = order_m[c];
+        if (mi >= lo && mi <= hi) {
+          const x = matX + c * cellW;
+          if (x < xLo) xLo = x;
+          if (x + cellW > xHi) xHi = x + cellW;
+        }
+      }
+      if (!Number.isFinite(xLo) || xHi <= xLo) { si++; continue; }
+      const hue = (si * 47) % 360;            // spread hues per regime
+      ctx.fillStyle   = `hsla(${hue},70%,55%,0.08)`;
+      ctx.strokeStyle = `hsla(${hue},70%,60%,0.85)`;
+      ctx.lineWidth = 1.25;
+      if (typeof ctx.fillRect === 'function') ctx.fillRect(xLo, matY, xHi - xLo, matBottom - matY);
+      if (typeof ctx.strokeRect === 'function') ctx.strokeRect(xLo + 0.5, matY + 0.5, (xHi - xLo) - 1, (matBottom - matY) - 1);
+      if (typeof ctx.fillText === 'function' && (xHi - xLo) >= 24) {
+        ctx.font = '9px ui-sans-serif, system-ui, sans-serif';
+        ctx.fillStyle = `hsla(${hue},75%,72%,0.98)`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        const lbl = String(span.label || 'regime')
+          + (Number.isFinite(span.confidence) ? ' ' + span.confidence.toFixed(2) : '');
+        ctx.fillText(lbl, xLo + 2, matY + 1);
+      }
+      si++;
     }
     if (typeof ctx.restore === 'function') ctx.restore();
   }
