@@ -102,18 +102,27 @@ export function buildRegistryOverlay(canonical, registered, opts) {
   }
   spans.sort((a, b) => a.lo - b.lo);
 
-  // Primary regime: widest marker overlap, ties broken by confidence.
+  // Primary regime. A caller-supplied primary_id (regime focus / click)
+  // wins when it overlaps the window; otherwise widest marker overlap,
+  // ties broken by confidence.
   let primary = null, primaryRec = null;
-  for (let i = 0; i < spans.length; i++) {
-    const s = spans[i];
-    const width = s.hi - s.lo;
-    const conf = Number.isFinite(s.confidence) ? s.confidence : 0;
-    if (!primary
-        || width > (primary.hi - primary.lo)
-        || (width === (primary.hi - primary.lo) && conf > (Number.isFinite(primary.confidence) ? primary.confidence : 0))) {
-      primary = s;
-      primaryRec = recs.find(r => (r.candidate_id || null) === s.candidate_id) || null;
+  if (o.primary_id != null) {
+    primary = spans.find(s => s.candidate_id === o.primary_id) || null;
+  }
+  if (!primary) {
+    for (let i = 0; i < spans.length; i++) {
+      const s = spans[i];
+      const width = s.hi - s.lo;
+      const conf = Number.isFinite(s.confidence) ? s.confidence : 0;
+      if (!primary
+          || width > (primary.hi - primary.lo)
+          || (width === (primary.hi - primary.lo) && conf > (Number.isFinite(primary.confidence) ? primary.confidence : 0))) {
+        primary = s;
+      }
     }
+  }
+  if (primary) {
+    primaryRec = recs.find(r => (r.candidate_id || null) === primary.candidate_id) || null;
   }
 
   // Per-sample labels from the primary regime's groups.

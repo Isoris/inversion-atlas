@@ -831,3 +831,38 @@ export function findCellAtPixel(layout, cellValue, px, py) {
     ? cellValue(marker_idx, sample_idx) : null;
   return { marker_idx, sample_idx, row, col, dosage };
 }
+
+// Height of the clickable label-header strip at the top of each regime
+// span band (must match the span overlay's label placement above).
+export const REGIME_SPAN_LABEL_H = 14;
+
+/**
+ * Hit-test the regime-span label headers. A click lands "on" a regime when
+ * it falls in the top REGIME_SPAN_LABEL_H px of the matrix within that
+ * regime's x-range, resolved through the marker order so it tracks the
+ * marker-order mode + zoom (same mapping as the span overlay).
+ *
+ * @returns {{ candidate_id, lo, hi, regime_class, confidence, label } | null}
+ */
+export function findRegimeSpanAtPixel(layout, regime_spans, px, py) {
+  if (!layout || !Array.isArray(regime_spans) || regime_spans.length === 0) return null;
+  const { matX, matY, cellW, n_displayed_markers, marker_order } = layout;
+  if (!(cellW > 0)) return null;
+  if (py < matY || py > matY + REGIME_SPAN_LABEL_H) return null;
+  // Topmost (latest-drawn) span wins when bands overlap, matching paint order.
+  for (let s = regime_spans.length - 1; s >= 0; s--) {
+    const span = regime_spans[s];
+    const lo = span.lo | 0, hi = span.hi | 0;
+    let xLo = Infinity, xHi = -Infinity;
+    for (let c = 0; c < n_displayed_markers; c++) {
+      const mi = marker_order[c];
+      if (mi >= lo && mi <= hi) {
+        const x = matX + c * cellW;
+        if (x < xLo) xLo = x;
+        if (x + cellW > xHi) xHi = x + cellW;
+      }
+    }
+    if (Number.isFinite(xLo) && xHi > xLo && px >= xLo && px <= xHi) return span;
+  }
+  return null;
+}

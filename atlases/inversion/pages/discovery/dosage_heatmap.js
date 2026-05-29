@@ -40,6 +40,7 @@ import { _pageState, _setActiveState } from './dosage_heatmap/_state.js';
 import {
   paintDosageHeatmap,
   findCellAtPixel,
+  findRegimeSpanAtPixel,
   deriveSampleOrder,
   deriveMarkerOrder,
   buildGroupColorMap,
@@ -357,6 +358,7 @@ function _buildPageState(atlasState) {
     // pipeline) + active chrom, captured for the 'upstream_catalogue' source.
     _registered:           (atlasState && atlasState.shared && atlasState.shared.registeredCandidates) || null,
     _chrom:                (atlasState && atlasState.shared && atlasState.shared.activeChrom) || null,
+    _focus_regime_id:      null,    // catalogue regime focused via click-to-focus
     view_state:            Object.assign({}, DEFAULT_VIEW_STATE,
                                           (dh && dh.view_state) || {}),
     selection:             createDosageHeatmapSelection(),
@@ -443,7 +445,7 @@ function _applyGrouping(state) {
       : det.margin;
   } else if (src === 'upstream_catalogue') {
     let ov = null;
-    try { ov = buildRegistryOverlay(d, state._registered, { chrom: state._chrom }); }
+    try { ov = buildRegistryOverlay(d, state._registered, { chrom: state._chrom, primary_id: state._focus_regime_id }); }
     catch (e) { console.warn('dosage_heatmap: buildRegistryOverlay threw —', e); ov = null; }
     state.overlay = ov;
     if (ov && ov.n_regimes > 0) {
@@ -753,10 +755,13 @@ function _overlaySummaryHtml(state) {
   }
   let html = '<dt class="dh2-detect-head">Regime catalogue</dt><dd>'
            + ov.n_regimes + ' overlapping · primary '
-           + (ov.primary_id || '—') + '</dd>';
+           + (ov.primary_id || '—')
+           + (state._focus_regime_id ? ' (focused)' : '')
+           + '<br><span style="opacity:.6">click a regime band header to focus / select its markers</span></dd>';
   for (const s of ov.spans) {
     const conf = Number.isFinite(s.confidence) ? s.confidence.toFixed(2) : '—';
-    html += '<dt>' + (s.label || 'regime') + '</dt>'
+    const mark = (s.candidate_id === ov.primary_id) ? ' ◀' : '';
+    html += '<dt>' + (s.label || 'regime') + mark + '</dt>'
          +  '<dd>' + (s.regime_class || '—') + ' · conf ' + conf
          +  ' · markers ' + s.lo + '–' + s.hi + '</dd>';
   }
@@ -865,6 +870,7 @@ function _wireToolbar(state) {
   };
   const onGroupingSource = (e) => {
     state.view_state.grouping_source = (e && e.target && e.target.value) || 'external';
+    state._focus_regime_id = null;   // focus is catalogue-specific; reset on source change
     _applyGrouping(state);
     repaintAll();
   };
@@ -968,6 +974,22 @@ function _wireToolbar(state) {
       ? c.getBoundingClientRect() : { left: 0, top: 0 };
     const x = ((ev && ev.clientX) || 0) - (rect.left || 0);
     const y = ((ev && ev.clientY) || 0) - (rect.top  || 0);
+    // Regime focus: a click on a regime span's label header (catalogue
+    // source) focuses that regime — re-picks it as primary so the group
+    // track + per-sample labels reflect it, and selects its markers. Takes
+    // precedence over cell selection since it sits in the top label strip.
+    if (state.data.regime_spans && state.data.regime_spans.length) {
+      const span = findRegimeSpanAtPixel(state.layout, state.data.regime_spans, x, y);
+      if (span) {
+        state._focus_regime_id = (state._focus_regime_id === span.candidate_id)
+          ? null : span.candidate_id;   // click the focused regime again to clear
+        _applyGrouping(state);
+        const markers = [];
+        for (let m = span.lo | 0; m <= (span.hi | 0); m++) markers.push(m);
+        state.selection.setSelectedMarkers(markers);  // notify → repaintAll
+        return;
+      }
+    }
     const cell = findCellAtPixel(state.layout, state.data.cellValue, x, y);
     if (!cell) return;
     // Shift-click → toggle marker; plain click → toggle sample.

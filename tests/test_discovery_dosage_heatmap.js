@@ -10,6 +10,7 @@ import * as state from '../atlases/inversion/pages/discovery/dosage_heatmap/_sta
 import {
   paintDosageHeatmap,
   findCellAtPixel,
+  findRegimeSpanAtPixel,
   deriveSampleOrder,
   deriveMarkerOrder,
   buildGroupColorMap,
@@ -559,6 +560,35 @@ check('show_regime_spans:false suppresses overlay', (() => {
   });
   return hc3._ctx.calls.filter(c => c === 'fillRect').length === (5 * 4);
 })());
+
+// =====================================================================
+group('findRegimeSpanAtPixel (click-to-focus)');
+
+const hcHit = new FakeCanvas(600, 400);
+const paintHit = paintDosageHeatmap(hcHit, dataSpans, {
+  show_group_track: false, show_polarity_track: false,
+});
+const L = paintHit.layout;
+check('layout exposes matX/matY/cellW/marker_order', !!L
+  && Number.isFinite(L.matX) && Number.isFinite(L.cellW) && !!L.marker_order);
+// Click in the label header strip over the LAST marker column → R1 (lo0..hi3)
+// covers it; R2 (lo1..hi2) does not at the rightmost column.
+const xLast = L.matX + (L.n_displayed_markers - 0.5) * L.cellW;
+const yHdr  = L.matY + 3;
+check('header click over last column hits R1 only', (() => {
+  const s = findRegimeSpanAtPixel(L, dataSpans.regime_spans, xLast, yHdr);
+  return s && s.label === 'R1';
+})());
+check('overlapping bands → topmost (R2) wins in shared column', (() => {
+  const xMid = L.matX + 1.5 * L.cellW;   // column 1, inside both R1 and R2
+  const s = findRegimeSpanAtPixel(L, dataSpans.regime_spans, xMid, yHdr);
+  return s && s.label === 'R2';
+})());
+check('click below the header strip → no hit', (() => {
+  const s = findRegimeSpanAtPixel(L, dataSpans.regime_spans, xLast, L.matY + 60);
+  return s === null;
+})());
+check('empty spans → null', findRegimeSpanAtPixel(L, [], xLast, yHdr) === null);
 
 // =====================================================================
 console.log('\n=================');

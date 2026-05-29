@@ -70,6 +70,18 @@ check('regime_call maps server→call', ov.regime_call[0] === 'homA_like'
   && ov.regime_call[2] === 'het_like' && ov.regime_call[4] === 'homB_like');
 
 // =====================================================================
+group('primary_id preference (regime focus)');
+
+const ovFocus = buildRegistryOverlay(can, registered, { chrom: 'LG28', primary_id: 'NARROW' });
+check('focus overrides widest → primary = NARROW', ovFocus.primary_id === 'NARROW');
+check('focused primary drives per-sample labels (only s0/s5 set)', (() => {
+  const set = ovFocus.sample_group.filter(v => v != null);
+  return set.length === 2 && ovFocus.sample_group[0] === 'H1/H1' && ovFocus.sample_group[5] === 'H2/H2';
+})());
+const ovBadFocus = buildRegistryOverlay(can, registered, { chrom: 'LG28', primary_id: 'NOPE' });
+check('unknown primary_id falls back to widest', ovBadFocus.primary_id === 'WIDE');
+
+// =====================================================================
 group('chrom filter + no-overlap + degenerate');
 
 check('other-chrom record excluded', !ov.spans.some(s => s.candidate_id === 'OTHERCHR'));
