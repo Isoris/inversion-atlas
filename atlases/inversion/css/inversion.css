@@ -435,7 +435,14 @@ body.light-theme .caution-banner { background: rgba(245, 165, 36, 0.10); }
         flex: 1; min-height: 0;
         transition: grid-template-columns 180ms ease; }
 .wrap[data-sidebar="collapsed"] { grid-template-columns: 28px 1fr; }
-aside { background: var(--panel); border-right: 1px solid var(--rule); padding: 14px 16px;
+/* 2026-05-29: scoped from bare `aside` to `.wrap aside`. inversion.css loads
+   across the whole assembled workspace, so a bare element selector leaked
+   onto every other atlas's <aside> — notably the atlas-core registries /
+   inventory / specs pages, whose panels broke. Every inversion <aside> lives
+   inside `.wrap` (the page fragments declare it), while core pages use
+   `.core-page` with no `.wrap`, so this scope preserves inversion behaviour
+   exactly and stops the leak. */
+.wrap aside { background: var(--panel); border-right: 1px solid var(--rule); padding: 14px 16px;
         overflow-y: auto; font-size: 13px; position: relative; }
 /* v3.51: sim minimap — sticky panel at the top of the sidebar.
    When sim panel is moved here, this element gets the .active class.
@@ -6455,8 +6462,13 @@ details.sidebar-section > summary h2 {
 
 /* Aside becomes a floating overlay pinned to the left of the content area.
    Override the legacy `position: relative` (line 426). Width matches the
-   legacy 320px column so existing controls + sliders inside don't reflow. */
-aside {
+   legacy 320px column so existing controls + sliders inside don't reflow.
+   2026-05-29: scoped from bare `aside` to `.wrap aside` — this rule's
+   `position: absolute !important` was leaking workspace-wide onto other
+   atlases' panels (atlas-core registries/inventory/specs broke). `.wrap
+   aside` matches the exact same inversion asides (all live inside `.wrap`),
+   so inversion is unchanged; core pages use `.core-page` (no `.wrap`). */
+.wrap aside {
   position: absolute !important;
   top: 0; left: 0; bottom: 0;
   width: 320px;

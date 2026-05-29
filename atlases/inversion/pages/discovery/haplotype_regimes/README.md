@@ -1,9 +1,13 @@
 # haplotype_regimes/
 
-Sibling modules for the **haplotype_regimes** discovery page and the
-**candidate_regimes** classification page. Extracted from the
-formerly 2615-LoC `pages/discovery/haplotype_regimes.js` during the
-2026-05-27 audit refactor (PR #28).
+Sibling modules shared by three pages, one per seed-discovery method:
+**haplotype_regimes** (long-range V-walker, discovery), **het_skeletons**
+(het-skeleton / Cluster 1 Path B, discovery — split out 2026-05-29), and
+**candidate_regimes** (short-range curated list, classification).
+Extracted from the formerly 2615-LoC `pages/discovery/haplotype_regimes.js`
+during the 2026-05-27 audit refactor (PR #28). Each page mounts the same
+stack with a forced `state._regimesMode` (`long` / `het` / `short`) and,
+for the two split pages, no `#rgModeBar`.
 
 The parent page files are now thin lifecycle wrappers that compose
 these modules:
@@ -45,7 +49,7 @@ their cross-mount stash slot and localStorage keys cleanly:
 | `seeds_strip.js`               | 234 | `renderSeedsStrip(root, state)`, `pushFocalSeedGroups(state)`, `wireSeedStripFocalSync(root, state)` — chip strip + focal sync + arrow-key cycle. |
 | `l3_pairs_table.js`            | 217 | `renderL3PairsTable(root, state, opts)` — adjacent-L2 Cramér's V mini-table with per-row "merge → candidate" button. Calls `opts.onAfterMerge()` after a successful promote (caller uses this to re-run the pipeline). |
 | `regimes_summary.js`           | 114 | `renderRegimesSummary(root, state)` + `applyViewToggle(root, state)` — the refined-regimes table that's the alternative view to the seeds chip strip. |
-| `promote_seed.js`              | 155 | `promoteFocalSeed(root, state, atlasState)` — Stage 3 → candidate promote. Used by haplotype_regimes only; candidate_regimes omits the button. |
+| `promote_seed.js`              | 155 | `promoteFocalSeed` (focal locus → candidate) + `promoteAllSeeds` (bulk: every Stage 3 locus → candidate, added 2026-05-29) sharing a `_locusToCandidate` helper. Wired on haplotype_regimes + het_skeletons (the ★/★★ buttons); candidate_regimes omits both. |
 | `auto_merge.js`                | 242 | `runAutoMerge(root, state, atlasState, granularity, opts)` — single Cramér's V auto-merge driver with `granularity: 'local' \| 'macrostripe'`. Replaced two 150-LoC near-duplicates. |
 | `catalogue_export.js`          | 128 | `exportCatalogue(state, atlasState)` — serialises the pipeline result to the catalogue triple (manifest + knobs + catalogue.json) and triggers 3 JSON downloads. |
 | `util.js`                      |  29 | `setStatus(root, msg)` + `escapeHtml(s)` — tiny shared helpers, no dependencies. |

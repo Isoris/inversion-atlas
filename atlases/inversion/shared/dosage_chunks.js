@@ -373,6 +373,79 @@ export function resetDosageDiagnosticsForChromChange(state) {
   // Clear stashed fetch error too — a 404 from a previous chrom isn't
   // relevant info for the new one's debug panel.
   state.__lastDosageFetchError = null;
+  // 2026-05-29: drop the PCA ramp-refine memo so the new chrom's first L2
+  // re-runs the quick-subsample-then-refine path instead of taking the
+  // cache-hit branch against a now-cleared het/dosage cache.
+  state._rampRefineDone = null;
+  state._rampRefineToken = null;
+}
+
+// =====================================================================
+// 2026-05-29 (Quentin): high-variance SNP selection + optional stride
+// subsample for the het / dosage per-sample summaries.
+//
+// WHY high-variance: averaging het / dosage over EVERY SNP in a window
+// dilutes the karyotype signal — monomorphic / near-fixed SNPs (variance
+// ≈ 0) contribute the same flat value to every sample and wash out the
+// contrast between inverted vs collinear arms. The SNPs that actually
+// separate karyotypes are the high-variance ones (balanced dosage spread
+// across the cohort, i.e. in LD with the arrangement). Restricting the
+// mean to the top-variance half sharpens the ramp without changing its
+// [0,1] / [0,2] domain.
+//
+// WHY subsample: at coarse scrub scales a window range can hold thousands
+// of markers; striding to ~maxMarkers gives a fast first paint (the
+// caller then refines over the full set in the background).
+// =====================================================================
+
+// Stride-subsample an index list down to ~cap entries (keeps endpoints).
+function _strideSubsample(indices, cap) {
+  const n = indices.length;
+  if (!Number.isFinite(cap) || cap <= 0 || n <= cap) return indices;
+  const step = n / cap;
+  const out = new Array(cap);
+  for (let i = 0; i < cap; i++) out[i] = indices[Math.min(n - 1, Math.floor(i * step))];
+  return out;
+}
+
+// Return the subset of `inRange` marker indices whose across-cohort
+// dosage variance is in the top (1 - dropFraction) fraction. Falls back
+// to the full list when there are too few markers to filter meaningfully
+// or the threshold would nuke nearly everything (degenerate window).
+//   opts.highVar       — master switch (default: only when caller opts in)
+//   opts.highVarDrop    — fraction of LOW-variance markers to drop (0.5)
+//   opts.minMarkers     — below this, don't filter (20)
+function _selectHighVarianceMarkers(chunk, inRange, opts) {
+  const o = opts || {};
+  if (!o.highVar) return inRange;
+  const minMarkers = Number.isFinite(o.minMarkers) ? o.minMarkers : 20;
+  if (inRange.length <= minMarkers) return inRange;
+  const dropFraction = Number.isFinite(o.highVarDrop) ? o.highVarDrop : 0.5;
+  const dosage = chunk.dosage;
+  const nChunkS = chunk.samples.length;
+  const variances = new Float64Array(inRange.length);
+  for (let k = 0; k < inRange.length; k++) {
+    const row = dosage[inRange[k]];
+    if (!row) { variances[k] = -1; continue; }
+    let n = 0, sum = 0, sumsq = 0;
+    for (let ci = 0; ci < nChunkS; ci++) {
+      const v = row[ci];
+      if (v == null || !Number.isFinite(v) || v < 0) continue;
+      n++; sum += v; sumsq += v * v;
+    }
+    variances[k] = (n > 1) ? (sumsq - (sum * sum) / n) / n : -1;
+  }
+  const finite = [];
+  for (let k = 0; k < variances.length; k++) if (variances[k] >= 0) finite.push(variances[k]);
+  if (finite.length === 0) return inRange;
+  finite.sort((a, b) => a - b);
+  const thresh = finite[Math.min(finite.length - 1, Math.floor(finite.length * dropFraction))];
+  const kept = [];
+  for (let k = 0; k < inRange.length; k++) {
+    if (variances[k] >= thresh) kept.push(inRange[k]);
+  }
+  // Degenerate guard: keep the full list rather than a near-empty subset.
+  return kept.length >= Math.max(5, minMarkers >> 1) ? kept : inRange;
 }
 
 /**
@@ -471,11 +544,16 @@ export function computeHetRateForRange(state, startBp, endBp, opts) {
     return out;
   }
 
+  // 2026-05-29: optional stride subsample (fast pass) then high-variance
+  // SNP selection (sharpens the karyotype signal — see _selectHighVarianceMarkers).
+  const sampled  = _strideSubsample(inRange, o.maxMarkers);
+  const useMarkers = _selectHighVarianceMarkers(chunk, sampled, o);
+
   // Count het + non-NA calls per chunk-sample
   const nChunkS = chunk.samples.length;
   const hetCounts = new Int32Array(nChunkS);
   const nonNaCounts = new Int32Array(nChunkS);
-  for (const mi of inRange) {
+  for (const mi of useMarkers) {
     const row = chunk.dosage[mi];
     if (!row) continue;
     for (let ci = 0; ci < nChunkS; ci++) {
@@ -666,11 +744,17 @@ export function computeDosageMeanForRange(state, startBp, endBp, opts) {
     return out;
   }
 
+  // 2026-05-29: same stride-subsample + high-variance SNP selection as
+  // computeHetRateForRange — the mean dosage over informative SNPs tracks
+  // the karyotype far better than the all-SNP mean.
+  const sampled  = _strideSubsample(inRange, o.maxMarkers);
+  const useMarkers = _selectHighVarianceMarkers(chunk, sampled, o);
+
   // Sum dosage + count non-NA per chunk-sample
   const nChunkS = chunk.samples.length;
   const sumDos = new Float64Array(nChunkS);
   const nNonNa = new Int32Array(nChunkS);
-  for (const mi of inRange) {
+  for (const mi of useMarkers) {
     const row = chunk.dosage[mi];
     if (!row) continue;
     for (let ci = 0; ci < nChunkS; ci++) {

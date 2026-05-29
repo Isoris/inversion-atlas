@@ -6,6 +6,28 @@
         <span id="nestedDetectorCandidateLabel" class="nested-meta">—</span>
       </div>
       <div class="nested-controls">
+        <!-- 2026-05-29: scope selector. Bounds the per-window scan to a
+             focal L2 envelope, the active candidate's window span, a
+             slab around the cursor, or the whole chromosome (capped).
+             The detector re-runs on change. -->
+        <label class="nested-meta" style="display:inline-flex; align-items:center; gap:4px;"
+               title="How to bound the per-window scan.
+focal L2: the focal L2 envelope from local PCA |z| (lock colors first).
+candidate: the active candidate's window span.
+cursor slab: a fixed window slab centred on the cursor.
+genome: whole chromosome (capped for responsiveness).">
+          scope:
+          <select id="nestedDetectorScope"
+                  style="background: var(--panel-2); color: var(--ink);
+                         border: 1px solid var(--rule); border-radius: 3px;
+                         padding: 2px 6px; font-family: var(--mono); font-size: 10.5px;">
+            <option value="focal_l2">focal L2</option>
+            <option value="candidate">candidate</option>
+            <option value="cursor">cursor slab</option>
+            <option value="genome">genome</option>
+          </select>
+        </label>
+        <span class="nested-sep"></span>
         <span id="nestedDetectorVerdictBadge"
               class="nested-verdict-badge"
               title="Verdict per HANDOFF_7">—</span>

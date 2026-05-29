@@ -128,6 +128,14 @@ export function perSampleValuesForMode(state, mode, range) {
     return _perSampleMeanByWindowPanel(panel, nS, startW, endW, d);
   }
 
+  // 2026-05-29: optional high-variance SNP selection + stride subsample,
+  // forwarded from the PCA scatter color path (range.highVar / .maxMarkers).
+  // The cache key is suffixed so a quick (subsampled) read and the full
+  // refined read don't overwrite each other in the het/dosage caches.
+  const highVar    = !!(range && range.highVar);
+  const maxMarkers = (range && Number.isFinite(range.maxMarkers)) ? (range.maxMarkers | 0) : null;
+  const qual = (highVar ? ':hv' : '') + (maxMarkers ? `:s${maxMarkers}` : '');
+
   if (mode === 'het') {
     // Het uses the dosage_chunks-backed compute. The lines panel
     // already has a getCachedChunk callback in state.dosageChunkCache;
@@ -143,7 +151,8 @@ export function perSampleValuesForMode(state, mode, range) {
     if (!Number.isFinite(startBp) || !Number.isFinite(endBp)) return null;
     return computeHetRateForRange(state, startBp, endBp, {
       getCachedChunk: state._linesPanelGetCachedChunk || null,
-      cacheKey: `lines:${startW}-${endW}`,
+      cacheKey: `lines:${startW}-${endW}${qual}`,
+      highVar, maxMarkers,
     });
   }
 
@@ -161,7 +170,8 @@ export function perSampleValuesForMode(state, mode, range) {
     if (!Number.isFinite(startBp) || !Number.isFinite(endBp)) return null;
     return computeDosageMeanForRange(state, startBp, endBp, {
       getCachedChunk: state._linesPanelGetCachedChunk || null,
-      cacheKey: `lines:dosage:${startW}-${endW}`,
+      cacheKey: `lines:dosage:${startW}-${endW}${qual}`,
+      highVar, maxMarkers,
     });
   }
 

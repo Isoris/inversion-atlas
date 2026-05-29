@@ -430,6 +430,50 @@ function _wireScreeInsetDrag(el) {
   } catch (_) {}
 }
 
+// 2026-05-29 (Quentin: "subsample then display then refine ... left/right
+// movement isn't instant"): background refinement of the het/dosage ramp.
+// drawPCA paints a quick, stride-subsampled, high-variance approximation
+// first so scrubbing stays responsive; this recomputes over the FULL
+// marker set when the browser is idle, then repaints — but only if the
+// cursor/mode hasn't moved on (token guard). The token is keyed by the
+// VALUE RANGE (not cur), so scrubbing within one L2 envelope refines once
+// and every subsequent step is a cache hit. The full result is cached in
+// the het/dosage caches, so the follow-up drawPCA takes the cache-hit
+// branch (state._rampRefineDone === token) and does NOT re-schedule —
+// that's what stops a quick→refine→quick loop.
+let _rampRefineHandle = null;
+let _rampRefineIsIdle = false;
+function _cancelRampRefine() {
+  if (_rampRefineHandle == null) return;
+  if (_rampRefineIsIdle && typeof cancelIdleCallback === 'function') cancelIdleCallback(_rampRefineHandle);
+  else clearTimeout(_rampRefineHandle);
+  _rampRefineHandle = null;
+}
+function _scheduleRampRefine(state, mode, startW, endW, token) {
+  if (typeof window === 'undefined') return;
+  state._rampRefineToken = token;
+  _cancelRampRefine();
+  const run = () => {
+    _rampRefineHandle = null;
+    if (!state || state._rampRefineToken !== token || state.colorMode !== mode) return;
+    let full;
+    try {
+      full = perSampleValuesForMode(state, mode, { startW, endW, highVar: true });
+    } catch (_) { return; }
+    if (state._rampRefineToken !== token || state.colorMode !== mode) return;  // moved on mid-compute
+    state._pcaModePsVals = full ? { mode, vals: full } : state._pcaModePsVals;
+    state._rampRefineDone = token;   // next drawPCA reads the cached full result, no reschedule
+    try { drawPCA(state); } catch (_) {}
+  };
+  if (typeof requestIdleCallback === 'function') {
+    _rampRefineIsIdle = true;
+    _rampRefineHandle = requestIdleCallback(run, { timeout: 300 });
+  } else {
+    _rampRefineIsIdle = false;
+    _rampRefineHandle = setTimeout(run, 0);
+  }
+}
+
 // --- drawPCA(state) — legacy lines 35749-35949 ---
 export function drawPCA(state) {
   _setActiveState(state);
@@ -469,7 +513,8 @@ export function drawPCA(state) {
       // ramp modes (theta_pi / ghsl / froh / confounder_alert) keep
       // the single-window range — they're point evaluators.
       let rangeStartW = cur, rangeEndW = cur;
-      if (state.colorMode === 'het' || state.colorMode === 'dosage') {
+      const isChunkMode = (state.colorMode === 'het' || state.colorMode === 'dosage');
+      if (isChunkMode) {
         const curL2 = state.windowToL2 ? state.windowToL2[cur] : -1;
         if (curL2 >= 0 && state.data.l2_envelopes
             && state.data.l2_envelopes[curL2]) {
@@ -483,9 +528,29 @@ export function drawPCA(state) {
           rangeEndW   = Math.min((d.n_windows | 0) - 1, cur + slabHalf);
         }
       }
-      const vals = perSampleValuesForMode(state, state.colorMode,
-        { startW: rangeStartW, endW: rangeEndW });
-      state._pcaModePsVals = vals ? { mode: state.colorMode, vals } : null;
+      if (isChunkMode) {
+        // Token keyed by range (not cur) so scrubbing within one L2
+        // refines once; subsequent steps hit the cache-hit branch.
+        const token = `${state.colorMode}:${rangeStartW}:${rangeEndW}`;
+        if (state._rampRefineDone === token) {
+          // Full high-variance result already computed for this range —
+          // perSampleValuesForMode returns it from cache (instant).
+          const full = perSampleValuesForMode(state, state.colorMode,
+            { startW: rangeStartW, endW: rangeEndW, highVar: true });
+          state._pcaModePsVals = full ? { mode: state.colorMode, vals: full } : null;
+        } else {
+          // Quick pass: high-variance over a ~160-marker stride subsample →
+          // instant first paint. Refine over the full set in the background.
+          const quick = perSampleValuesForMode(state, state.colorMode,
+            { startW: rangeStartW, endW: rangeEndW, highVar: true, maxMarkers: 160 });
+          state._pcaModePsVals = quick ? { mode: state.colorMode, vals: quick } : null;
+          _scheduleRampRefine(state, state.colorMode, rangeStartW, rangeEndW, token);
+        }
+      } else {
+        const vals = perSampleValuesForMode(state, state.colorMode,
+          { startW: rangeStartW, endW: rangeEndW });
+        state._pcaModePsVals = vals ? { mode: state.colorMode, vals } : null;
+      }
     } catch (e) {
       state._pcaModePsVals = null;
       console.warn('drawPCA precompute psVals failed:', e);
@@ -1253,8 +1318,14 @@ function _refreshRampLegend(state) {
     // at 0.5; _divergentBlueWhiteRed for dosage anchored at 1.0). Stops
     // #2166AC blue → #F7F7F7 white → #B2182B red.
     gradientCss = 'linear-gradient(to right, #2166AC, #F7F7F7, #B2182B)';
-    minLbl = Number.isFinite(vMin) ? vMin.toFixed(3) : '—';
-    maxLbl = Number.isFinite(vMax) ? vMax.toFixed(3) : '—';
+    // 2026-05-29 (Quentin): the legend must show the renderer's FIXED
+    // semantic domain, not the data-driven min/max — those never matched
+    // the colors (e.g. label said 0.016..1.000 while hetRateColor clamps
+    // and anchors at 0.5). het rate ∈ [0,1] anchored at 0.5 (white);
+    // mean dosage ∈ [0,2] anchored at 1.0 (white). White always sits at
+    // the gradient midpoint, so 0→max with the anchor implied at centre.
+    if (ramp === 'het') { minLbl = '0'; maxLbl = '1'; }
+    else                { minLbl = '0'; maxLbl = '2'; }
   } else if (ramp === 'theta_pi' || ramp === 'ghsl') {
     // 2026-05-26: was 2-stop blue→yellow (matched the old
     // _sequentialBlueToYellow ramp). The new 3-stop renderer routes

@@ -329,15 +329,70 @@ function _renderNotReady(slotId, opts, result) {
   `;
 }
 
+// 2026-05-29: the live popstats_groupwise.v1 response is per-WINDOW rows
+// (`data.windows`) with columns like `theta_pi_<group>` / `Fst_<a>_<b>`,
+// and `data.groups` = { name: sampleCount }. The per-candidate panels
+// want a single value per group, so we aggregate the matching column
+// across the candidate's windows (n_sites_used-weighted mean, skipping
+// empty / null windows). Earlier the extractors expected a pre-aggregated
+// `groups[name].metric` shape the server never produced — so every panel
+// fell through to the misleading "200 but body wasn't JSON" state.
+
+// Metric id (client vocabulary) → column-name prefix (engine vocabulary).
+const _METRIC_COL_PREFIX = { theta_pi: 'theta_pi', fst: 'Fst', dxy: 'dXY', da: 'dA' };
+function _metricColPrefix(metric) {
+  return _METRIC_COL_PREFIX[metric] || metric;
+}
+
+// The server sanitizes group names into column keys: '/' → '_'
+// ('H1/H1' → 'H1_H1'). Mirror that so client-side column lookups match.
+function _sanitizeGroupName(name) {
+  return String(name).replace(/\//g, '_');
+}
+
+// n_sites_used-weighted mean of `col` across windows. Skips windows whose
+// value is null/non-finite or whose weight is 0. Falls back to an
+// unweighted mean when no weights are present. Returns null when nothing
+// usable is found.
+function _weightedMeanCol(windows, col) {
+  let num = 0, den = 0, plainSum = 0, plainN = 0;
+  for (const w of windows) {
+    if (!w) continue;
+    const v = w[col];
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    const wt = Number.isFinite(w.n_sites_used) ? w.n_sites_used
+             : Number.isFinite(w.n_sites)      ? w.n_sites : 0;
+    plainSum += v; plainN++;
+    if (wt > 0) { num += v * wt; den += wt; }
+  }
+  if (den > 0) return num / den;
+  if (plainN > 0) return plainSum / plainN;
+  return null;
+}
+
 /**
- * Pull a per-group value for `metric` out of the popstats response. Shape
- * varies across server versions; try a few common layouts.
- *
- *   { groups: { name: { metric: value, ... } } }                — preferred
- *   { per_group: { name: { metric: value } } }                  — older
- *   { name: { metric: value } } (flat)                          — fallback
+ * Pull a per-group value for `metric` out of the popstats response.
+ * Primary path: aggregate the `theta_pi_<group>` column across
+ * `data.windows`. Legacy fallbacks for older pre-aggregated shapes are
+ * kept so a different server build still renders.
  */
 function _extractPerGroup(data, metric) {
+  if (!data) return null;
+  // Primary: per-window rows + `groups` keys (live popstats_groupwise.v1).
+  const windows = Array.isArray(data.windows) ? data.windows : null;
+  const groupNames = (data.groups && typeof data.groups === 'object' && !Array.isArray(data.groups))
+    ? Object.keys(data.groups) : null;
+  if (windows && windows.length && groupNames && groupNames.length) {
+    const prefix = _metricColPrefix(metric);
+    const out = {};
+    let any = false;
+    for (const name of groupNames) {
+      const agg = _weightedMeanCol(windows, `${prefix}_${name}`);
+      if (agg != null && Number.isFinite(agg)) { out[name] = agg; any = true; }
+    }
+    if (any) return out;
+  }
+  // Legacy pre-aggregated shapes.
   const containers = [
     data && data.groups,
     data && data.per_group,
@@ -369,6 +424,21 @@ function _extractPerGroup(data, metric) {
  *   { pairs:    { 'a:b': { fst } } }
  */
 function _extractPairwise(data, metric, a, b) {
+  // Primary: aggregate the `Fst_<a>_<b>` column across data.windows.
+  // The server sanitizes group names for column keys (slash → underscore,
+  // so 'H1/H1' → 'H1_H1' and the pairwise column is 'Fst_H1_H1_H2_H2').
+  // Sanitize the caller's group names the same way, and try both pair
+  // orientations (the engine emits pairs in sorted group order).
+  const windows = Array.isArray(data && data.windows) ? data.windows : null;
+  if (windows && windows.length) {
+    const prefix = _metricColPrefix(metric);
+    const sa = _sanitizeGroupName(a), sb = _sanitizeGroupName(b);
+    for (const col of [`${prefix}_${sa}_${sb}`, `${prefix}_${sb}_${sa}`]) {
+      const agg = _weightedMeanCol(windows, col);
+      if (agg != null && Number.isFinite(agg)) return agg;
+    }
+  }
+  // Legacy pre-aggregated shapes.
   const lists = [data && data.pairs, data && data.pairwise];
   for (const arr of lists) {
     if (!Array.isArray(arr)) continue;

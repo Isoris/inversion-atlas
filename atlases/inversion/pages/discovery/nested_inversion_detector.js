@@ -44,6 +44,13 @@ import { fitCanvasNoDpr } from '../../shared/page1_utils.js';
 // focal L2) stays responsive. Focal-L2 scope is almost always far
 // smaller than this.
 const NESTED_MAX_SCAN_WINDOWS = 1500;
+// Width of the "cursor slab" scope (windows, centred on the cursor).
+const NESTED_CURSOR_SLAB = 500;
+const NESTED_SCOPE_LS_KEY = 'nested_detector.scope_mode';
+
+// Mount context — root/atlasState/registry stashed so the scope selector
+// can re-run the detector without a full page remount.
+let _mountCtx = null;
 
 // =====================================================================
 // Public entry — refresh
@@ -66,16 +73,20 @@ export function initNestedDetectorToolbar() {
 // =====================================================================
 
 export async function mount(root, atlasState, registry) {
+  _mountCtx = { root, atlasState, registry };
   // 2026-05-29: invalidate a cached detector_result computed for a
-  // DIFFERENT chromosome. Without this, the auto-detect bails on
-  // `existing.detector_result` and the page keeps showing the prior
-  // chrom's result (Quentin saw LG01 data while LG27 was selected).
+  // DIFFERENT chromosome OR a different scope mode. Without this, the
+  // auto-detect bails on `existing.detector_result` and the page keeps
+  // showing the prior chrom's / scope's result (Quentin saw LG01 data
+  // while LG27 was selected).
   const activeChrom = atlasState && atlasState.shared && atlasState.shared.activeChrom;
   const inv = (atlasState && atlasState.inversion) || {};
+  const scopeMode = _readScopeMode();
   if (inv.nested_detector_state &&
-      activeChrom &&
-      inv.nested_detector_state._chrom &&
-      inv.nested_detector_state._chrom !== activeChrom) {
+      ((activeChrom && inv.nested_detector_state._chrom &&
+        inv.nested_detector_state._chrom !== activeChrom) ||
+       (inv.nested_detector_state._scope_mode &&
+        inv.nested_detector_state._scope_mode !== scopeMode))) {
     inv.nested_detector_state = null;
   }
 
@@ -102,7 +113,7 @@ export async function mount(root, atlasState, registry) {
   // first" empty state.
   if (!pageState.detector_result) {
     try {
-      await _autoDetectNested(root, atlasState, registry);
+      await _autoDetectNested(root, atlasState, registry, scopeMode);
       pageState = _buildPageState(atlasState);
       _setActiveState(pageState);
       try { refreshNestedDetector(pageState); }
@@ -121,7 +132,8 @@ export async function mount(root, atlasState, registry) {
 // resulting verdict + per-stratum inner-band candidates + contiguous
 // inner intervals land on inv.nested_detector_state. Silently returns
 // when prerequisites are missing.
-async function _autoDetectNested(root, atlasState, registry) {
+async function _autoDetectNested(root, atlasState, registry, scopeMode) {
+  scopeMode = scopeMode || 'focal_l2';
   const inv = (atlasState && atlasState.inversion) || {};
   const existing = inv.nested_detector_state || {};
   if (existing.detector_result) return;
@@ -155,12 +167,11 @@ async function _autoDetectNested(root, atlasState, registry) {
   if (nW <= 0 || nS <= 0) return;
 
   // -------------------------------------------------------------------
-  // 2026-05-29 (a)+(b): focal-L2-scoped, per-window karyotype detection.
+  // 2026-05-29 (a)+(b): scope-bounded, per-window karyotype detection.
   //
-  // (a) SCOPE: restrict the scan to the focal L2 envelope (from the
-  //     local_pca_dosage stash) where the parent karyotype is stable.
-  //     Without a focal L2, fall back to a centred genome window capped
-  //     at NESTED_MAX_SCAN_WINDOWS so the per-window K-means stays fast.
+  // (a) SCOPE: restrict the scan to a window range chosen by the user's
+  //     scope selector — focal L2 envelope / active candidate span /
+  //     cursor slab / genome (capped). See _resolveScopeRange.
   //
   // (b) PER-WINDOW KARYOTYPE: re-cluster EACH window's cohort (PC1, PC2)
   //     into 3 parent strata via 2D K-means (kmeans2D already orders
@@ -173,33 +184,8 @@ async function _autoDetectNested(root, atlasState, registry) {
   // -------------------------------------------------------------------
   const cur = (stash && Number.isFinite(stash.cur)) ? (stash.cur | 0)
             : Math.floor(nW / 2);
-  let wStart = 0, wEnd = nW - 1, scopeLabel = 'genome', scopeWarn = null;
-  // Focal L2 envelope from the stash, when available.
-  const w2l = stash && stash.windowToL2;
-  const envs = data.l2_envelopes;
-  if (w2l && Array.isArray(envs) && envs.length && Number.isFinite(cur)) {
-    const li = w2l[Math.max(0, Math.min(nW - 1, cur))] | 0;
-    const env = (li >= 0) ? envs[li] : null;
-    if (env) {
-      const s0 = Number.isFinite(env._s0) ? env._s0 : (env.start_w - 1);
-      const e0 = Number.isFinite(env._e0) ? env._e0 : (env.end_w - 1);
-      if (Number.isFinite(s0) && Number.isFinite(e0) && e0 >= s0) {
-        wStart = Math.max(0, s0 | 0);
-        wEnd   = Math.min(nW - 1, e0 | 0);
-        scopeLabel = `focal L2 (w ${wStart}-${wEnd}, window ${cur})`;
-      }
-    }
-  }
-  // Cap the genome fallback so per-window K-means stays responsive.
-  if (scopeLabel === 'genome' && (wEnd - wStart + 1) > NESTED_MAX_SCAN_WINDOWS) {
-    const half = NESTED_MAX_SCAN_WINDOWS >> 1;
-    wStart = Math.max(0, cur - half);
-    wEnd   = Math.min(nW - 1, wStart + NESTED_MAX_SCAN_WINDOWS - 1);
-    scopeLabel = `genome (capped to w ${wStart}-${wEnd} around window ${cur})`;
-    scopeWarn = `no focal L2 envelope available — scanned a ${NESTED_MAX_SCAN_WINDOWS}-window `
-              + `slab around window ${cur}. Lock colors on a focal L2 in local PCA |z| `
-              + `to scope the scan to a real envelope.`;
-  }
+  const { wStart, wEnd, scopeLabel, scopeWarn } =
+    _resolveScopeRange(scopeMode, { stash, data, cur, nW, atlasState });
 
   const strataNames = ['HOM1', 'HET', 'HOM2'];
   const per_stratum_per_window_pcs = {
@@ -290,10 +276,136 @@ async function _autoDetectNested(root, atlasState, registry) {
     // can invalidate the cache on a chrom change.
     _chrom:          (atlasState.shared && atlasState.shared.activeChrom)
                        || data.chrom || null,
+    _scope_mode:     scopeMode,
     // Render against the full chromosome so focal intervals sit at their
     // true genomic position on the track x-axis.
     n_windows:       nW,
   });
+}
+
+// =====================================================================
+// Scope resolution (2026-05-29)
+// =====================================================================
+// Map a scope mode → window range [wStart, wEnd] (0-based, inclusive)
+// plus a human label + optional warning. Supported modes:
+//   focal_l2  — the focal L2 envelope from the local_pca_dosage stash
+//   candidate — the active candidate's window span (shared.activeCandidate,
+//               else the candidateList entry containing the cursor)
+//   cursor    — a NESTED_CURSOR_SLAB-wide slab centred on the cursor
+//   genome    — whole chromosome, capped at NESTED_MAX_SCAN_WINDOWS
+// Each fall-through path degrades to a cursor slab with a warning so the
+// page always produces *something* scoped rather than the old carpet.
+function _resolveScopeRange(scopeMode, ctx) {
+  const { stash, data, cur, nW, atlasState } = ctx;
+  const clamp = (a, b) => ({
+    wStart: Math.max(0, Math.min(nW - 1, a | 0)),
+    wEnd:   Math.max(0, Math.min(nW - 1, b | 0)),
+  });
+
+  if (scopeMode === 'candidate') {
+    const cand = _resolveActiveCandidate(stash, atlasState, cur);
+    if (cand) {
+      let s = null, e = null;
+      if (Number.isFinite(cand.start_w) && Number.isFinite(cand.end_w)) {
+        s = (cand.start_w | 0) - 1; e = (cand.end_w | 0) - 1;   // 1-based → 0-based
+      } else if (Number.isFinite(cand.start_bp) && Number.isFinite(cand.end_bp)) {
+        const m = _bpRangeToWindows(data, cand.start_bp, cand.end_bp, nW);
+        if (m) { s = m.s; e = m.e; }
+      }
+      if (s != null && e != null && e >= s) {
+        const r = clamp(s, e);
+        const name = (cand.label || cand.id || 'candidate');
+        return { ...r, scopeLabel: `candidate ${name} (w ${r.wStart}-${r.wEnd})`, scopeWarn: null };
+      }
+    }
+    const r = _centeredSlab(cur, nW);
+    return { ...r, scopeLabel: `cursor slab (no candidate)`,
+             scopeWarn: 'no candidate window-range available — open a candidate (or set start_w/end_w). Scanned a cursor slab instead.' };
+  }
+
+  if (scopeMode === 'cursor') {
+    const r = _centeredSlab(cur, nW);
+    return { ...r, scopeLabel: `cursor slab (w ${r.wStart}-${r.wEnd}, around ${cur})`, scopeWarn: null };
+  }
+
+  if (scopeMode === 'genome') {
+    if (nW > NESTED_MAX_SCAN_WINDOWS) {
+      const r = _centeredSlab(cur, nW, NESTED_MAX_SCAN_WINDOWS);
+      return { ...r, scopeLabel: `genome (capped to w ${r.wStart}-${r.wEnd})`,
+               scopeWarn: `genome scope capped to ${NESTED_MAX_SCAN_WINDOWS} windows around the cursor for responsiveness.` };
+    }
+    return { wStart: 0, wEnd: nW - 1, scopeLabel: 'genome', scopeWarn: null };
+  }
+
+  // focal_l2 (default)
+  const w2l = stash && stash.windowToL2;
+  const envs = data.l2_envelopes;
+  if (w2l && Array.isArray(envs) && envs.length) {
+    const li = w2l[Math.max(0, Math.min(nW - 1, cur))] | 0;
+    const env = (li >= 0) ? envs[li] : null;
+    if (env) {
+      const s0 = Number.isFinite(env._s0) ? env._s0 : (env.start_w - 1);
+      const e0 = Number.isFinite(env._e0) ? env._e0 : (env.end_w - 1);
+      if (Number.isFinite(s0) && Number.isFinite(e0) && e0 >= s0) {
+        const r = clamp(s0, e0);
+        return { ...r, scopeLabel: `focal L2 (w ${r.wStart}-${r.wEnd}, window ${cur})`, scopeWarn: null };
+      }
+    }
+  }
+  const r = _centeredSlab(cur, nW);
+  return { ...r, scopeLabel: `cursor slab (no focal L2)`,
+           scopeWarn: 'no focal L2 envelope — lock colors on an L2 in local PCA |z|, or pick the candidate / cursor / genome scope. Scanned a cursor slab.' };
+}
+
+// Centred window slab. `width` defaults to NESTED_CURSOR_SLAB.
+function _centeredSlab(cur, nW, width) {
+  const w = Math.min(nW, Math.max(2, width || NESTED_CURSOR_SLAB));
+  const half = w >> 1;
+  let s = Math.max(0, (cur | 0) - half);
+  let e = Math.min(nW - 1, s + w - 1);
+  s = Math.max(0, e - w + 1);
+  return { wStart: s, wEnd: e };
+}
+
+// Active candidate: shared.activeCandidate, else the candidateList entry
+// whose window span contains the cursor, else the first candidate.
+function _resolveActiveCandidate(stash, atlasState, cur) {
+  const active = atlasState && atlasState.shared && atlasState.shared.activeCandidate;
+  if (active) return active;
+  const cands = (stash && Array.isArray(stash.candidateList)) ? stash.candidateList : [];
+  for (const c of cands) {
+    if (!c) continue;
+    const s = Number.isFinite(c.start_w) ? (c.start_w - 1) : null;
+    const e = Number.isFinite(c.end_w)   ? (c.end_w - 1)   : null;
+    if (s != null && e != null && cur >= s && cur <= e) return c;
+  }
+  return cands.length ? cands[0] : null;
+}
+
+// Map a [startBp, endBp] interval to inclusive window indices via each
+// window's center_mb (×1e6) or start_bp. Returns { s, e } or null.
+function _bpRangeToWindows(data, startBp, endBp, nW) {
+  const wins = data.windows;
+  let s = null, e = null;
+  for (let i = 0; i < nW; i++) {
+    const w = wins[i];
+    if (!w) continue;
+    const c = Number.isFinite(w.center_mb) ? w.center_mb * 1e6
+            : Number.isFinite(w.start_bp)  ? w.start_bp
+            : null;
+    if (c == null) continue;
+    if (c >= startBp && c <= endBp) { if (s == null) s = i; e = i; }
+  }
+  return (s != null && e != null) ? { s, e } : null;
+}
+
+// localStorage-backed scope mode (default focal_l2).
+function _readScopeMode() {
+  try {
+    const v = localStorage.getItem(NESTED_SCOPE_LS_KEY);
+    if (v === 'focal_l2' || v === 'candidate' || v === 'cursor' || v === 'genome') return v;
+  } catch (_) {}
+  return 'focal_l2';
 }
 
 function _setLoadingHint(root, msg) {
@@ -323,6 +435,7 @@ function _buildPageState(atlasState) {
     detector_result:      dr,
     candidate_label:      ns ? (ns.candidate_label || null) : null,
     warning:              ns ? (ns.warning || null) : null,
+    scope_mode:           _readScopeMode(),
     n_windows:            ns && Number.isFinite(ns.n_windows)
                             ? ns.n_windows : totalWindowCount(dr),
     band_hit_regions:     [],
@@ -341,6 +454,8 @@ function _renderHeader(state) {
   if (typeof document === 'undefined' || !document.getElementById) return;
   const lbl = document.getElementById('nestedDetectorCandidateLabel');
   if (lbl) lbl.textContent = state.candidate_label || '—';
+  const scopeSel = document.getElementById('nestedDetectorScope');
+  if (scopeSel && state.scope_mode) scopeSel.value = state.scope_mode;
   const badge = document.getElementById('nestedDetectorVerdictBadge');
   if (badge) {
     const dr = state.detector_result;
@@ -499,13 +614,39 @@ function _wireToolbar(state) {
     if (iv != null) state.selection.toggleSelectedInterval(iv);
   };
 
+  // 2026-05-29: scope selector — re-run the detector for the chosen
+  // bound (focal L2 / candidate / cursor slab / genome) and re-render.
+  const onScopeChange = (ev) => {
+    const mode = (ev && ev.target && ev.target.value) || 'focal_l2';
+    try { localStorage.setItem(NESTED_SCOPE_LS_KEY, mode); } catch (_) {}
+    if (!_mountCtx) return;
+    const { root, atlasState, registry } = _mountCtx;
+    const inv = (atlasState && atlasState.inversion) || {};
+    inv.nested_detector_state = null;   // force re-detect
+    _setLoadingHint(root, `re-scanning (${mode})…`);
+    _autoDetectNested(root, atlasState, registry, mode)
+      .then(() => {
+        const ps = _buildPageState(atlasState);
+        _setActiveState(ps);
+        refreshNestedDetector(ps);
+        if (atlasState.inversion) atlasState.inversion._page_nested_inversion_detector_state = ps;
+        // Tear down THIS (old) state's DOM listeners before re-wiring the
+        // fresh state, else listeners on the (unchanged) canvas/select
+        // elements would accumulate.
+        _teardownToolbar(state);
+        _wireToolbar(ps);
+      })
+      .catch((e) => console.warn('nested_inversion_detector: scope re-detect threw —', e));
+  };
+
   const unsubSelection = state.selection.subscribe(() => { repaintAll(); });
 
   state._handlers = {
-    onCanvasMove, onCanvasClick, unsubSelection,
+    onCanvasMove, onCanvasClick, onScopeChange, unsubSelection,
   };
   _addListener('nestedDetectorTracksCanvas', 'mousemove', onCanvasMove);
   _addListener('nestedDetectorTracksCanvas', 'click',     onCanvasClick);
+  _addListener('nestedDetectorScope',        'change',    onScopeChange);
 }
 
 function _teardownToolbar(state) {
@@ -513,6 +654,7 @@ function _teardownToolbar(state) {
   const h = state._handlers;
   if (h.onCanvasMove)   _removeListener('nestedDetectorTracksCanvas', 'mousemove', h.onCanvasMove);
   if (h.onCanvasClick)  _removeListener('nestedDetectorTracksCanvas', 'click',     h.onCanvasClick);
+  if (h.onScopeChange)  _removeListener('nestedDetectorScope',        'change',    h.onScopeChange);
   if (typeof h.unsubSelection === 'function') { try { h.unsubSelection(); } catch (_) {} }
   state._handlers = {};
 }

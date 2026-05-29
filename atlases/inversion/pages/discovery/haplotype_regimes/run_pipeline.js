@@ -205,14 +205,22 @@ export function afterPipelineRun(root, state, result, opts) {
 
   const exportBtn = root.querySelector('#rgExportCatalogueBtn');
   if (exportBtn) exportBtn.disabled = false;
+  const nLoci = (result.stage3 && Array.isArray(result.stage3.loci))
+    ? result.stage3.loci.length : 0;
   const promoteBtn = root.querySelector('#rgPromoteSeedBtn');
   if (promoteBtn) {
-    const nLoci = (result.stage3 && Array.isArray(result.stage3.loci))
-      ? result.stage3.loci.length : 0;
     promoteBtn.disabled = nLoci === 0;
     promoteBtn.title = nLoci === 0
       ? 'No seeds discovered on this chromosome — nothing to promote.'
       : `Promote the focal seed (${nLoci} discovered) to a candidate inversion. Arrow keys cycle which seed is focal.`;
+  }
+  // 2026-05-29: bulk promote-all button — same gate as focal promote.
+  const promoteAllBtn = root.querySelector('#rgPromoteAllBtn');
+  if (promoteAllBtn) {
+    promoteAllBtn.disabled = nLoci === 0;
+    promoteAllBtn.title = nLoci === 0
+      ? 'No seeds discovered on this chromosome — nothing to promote.'
+      : `Promote all ${nLoci} discovered seed${nLoci === 1 ? '' : 's'} to candidate inversions in one shot.`;
   }
   // Auto-merge V (local) — needs ≥ 2 Stage 1 seeds.
   const autoMergeBtn = root.querySelector('#rgAutoMergeBtn');

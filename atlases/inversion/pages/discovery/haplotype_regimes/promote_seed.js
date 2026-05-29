@@ -1,8 +1,11 @@
 // pages/discovery/haplotype_regimes/promote_seed.js
 //
-// Promote the focal Stage 3 locus to a candidate inversion (2026-05-20).
+// Promote Stage 3 loci to candidate inversions (2026-05-20).
 // Extracted from haplotype_regimes.js as part of the Part C file
-// split (2026-05-27).
+// split (2026-05-27). 2026-05-29: added promoteAllSeeds (bulk promote
+// every Stage 3 locus, not just the focal one) — Quentin: "it should
+// auto promote all seeds not just the focal". The locus→candidate
+// conversion is factored into _locusToCandidate so both paths share it.
 //
 // The four regime panels iterate `result.stage3.loci`, and the keyboard
 // navigation mutates `state.regimesPanel.focal.seed_index` against THAT
@@ -23,34 +26,13 @@
 
 import { setStatus } from './util.js';
 
-/**
- * @param {HTMLElement} root        the page root (for the status bar)
- * @param {Object}      state       haplotype_regimes legacy state
- * @param {Object}      atlasState  atlas-core shared bucket — pushes
- *                                  the promoted candidate through
- *                                  local_pca_dosage's candidates module
- */
-export async function promoteFocalSeed(root, state, atlasState) {
-  const result = state._regimesResult;
-  if (!result || !result.stage3 || !Array.isArray(result.stage3.loci)) {
-    setStatus(root, 'no pipeline result — run the pipeline first');
-    return;
-  }
-  const loci = result.stage3.loci;
-  const focalIdx = (state.regimesPanel && state.regimesPanel.focal
-                    && Number.isFinite(state.regimesPanel.focal.seed_index))
-    ? (state.regimesPanel.focal.seed_index | 0) : 0;
-  if (focalIdx < 0 || focalIdx >= loci.length) {
-    setStatus(root, `focal index ${focalIdx} is out of range (0..${loci.length - 1})`);
-    return;
-  }
-  const locus = loci[focalIdx];
+// ---------------------------------------------------------------------------
+// Pure conversion: one Stage 3 locus → a candidate inversion object.
+// `makeCandidateId` is injected (from the lazily-imported candidates
+// module) so this stays free of the async import.
+// ---------------------------------------------------------------------------
+function _locusToCandidate(locus, result, state, makeCandidateId) {
   const data = state.data;
-  if (!data || !data.windows) {
-    setStatus(root, 'no scrubber data loaded');
-    return;
-  }
-
   const sw = locus.s_window | 0;
   const ew = locus.e_window | 0;
   // ref_window: prefer the originating Stage 1 seed's anchor_w (so the
@@ -76,9 +58,7 @@ export async function promoteFocalSeed(root, state, atlasState) {
       const set = locus.per_band_samples[b];
       if (!set) continue;
       if (typeof set.forEach === 'function') {
-        set.forEach((si) => {
-          if (si >= 0 && si < nS) locked[si] = b;
-        });
+        set.forEach((si) => { if (si >= 0 && si < nS) locked[si] = b; });
       }
     }
   }
@@ -95,18 +75,7 @@ export async function promoteFocalSeed(root, state, atlasState) {
   }
   const l2_indices = [...l2_set].sort((a, b) => a - b);
 
-  // Lazy-import the local_pca_dosage candidates module so this page
-  // doesn't carry the import at top-level.
-  const candMod = await import('../local_pca_dosage/candidates.js')
-    .catch(() => null);
-  if (!candMod || typeof candMod.makeCandidateId !== 'function'
-      || typeof candMod.addCandidateToList !== 'function'
-      || typeof candMod.setCandidate !== 'function') {
-    setStatus(root, 'local_pca_dosage/candidates.js helpers not available');
-    return;
-  }
-
-  const cand = {
+  return {
     source:        'seed_promote',
     chrom:         data.chrom || state.activeChrom,
     l2_indices,
@@ -124,7 +93,7 @@ export async function promoteFocalSeed(root, state, atlasState) {
     }, K=${locus.K | 0}, span=${(ew - sw + 1) | 0}w, min_jaccard=${
       (locus.min_internal_jaccard != null ? locus.min_internal_jaccard.toFixed(3) : '—')
     }, stage2=${locus.stage2_verdict || '?'}).`,
-    id:            candMod.makeCandidateId(),
+    id:            makeCandidateId(),
     _from_seed: {
       anchor_w:             aw,
       seed_id:              locus.seed_id,
@@ -134,22 +103,116 @@ export async function promoteFocalSeed(root, state, atlasState) {
       n_samples_dropped:    locus.n_samples_dropped,
     },
   };
+}
 
-  // Push through the local_pca_dosage candidates module so the candidate
-  // lands in the same carousel + persistence the lock-promote path uses.
-  // Falls back to a synthetic shim when local_pca_dosage hasn't mounted yet.
+// Lazily import the local_pca_dosage candidates module so this page
+// doesn't carry the import at top-level. Returns null (after setting a
+// status message) when the expected helpers aren't present.
+async function _resolveCandMod(root) {
+  const candMod = await import('../local_pca_dosage/candidates.js').catch(() => null);
+  if (!candMod || typeof candMod.makeCandidateId !== 'function'
+      || typeof candMod.addCandidateToList !== 'function'
+      || typeof candMod.setCandidate !== 'function') {
+    setStatus(root, 'local_pca_dosage/candidates.js helpers not available');
+    return null;
+  }
+  return candMod;
+}
+
+// The page1 (local_pca_dosage) state bridge — falls back to a synthetic
+// shim when local_pca_dosage hasn't mounted this session.
+function _ensurePage1State(atlasState, data) {
   const inv = (atlasState && atlasState.inversion) || {};
-  const page1State = inv._local_pca_dosage_state || {
-    data,
-    candidate: null,
-    candidateList: [],
-  };
+  return inv._local_pca_dosage_state || { data, candidate: null, candidateList: [] };
+}
+
+/**
+ * Promote the single focal Stage 3 locus to a candidate.
+ *
+ * @param {HTMLElement} root        the page root (for the status bar)
+ * @param {Object}      state       haplotype_regimes legacy state
+ * @param {Object}      atlasState  atlas-core shared bucket
+ */
+export async function promoteFocalSeed(root, state, atlasState) {
+  const result = state._regimesResult;
+  if (!result || !result.stage3 || !Array.isArray(result.stage3.loci)) {
+    setStatus(root, 'no pipeline result — run the pipeline first');
+    return;
+  }
+  const loci = result.stage3.loci;
+  const focalIdx = (state.regimesPanel && state.regimesPanel.focal
+                    && Number.isFinite(state.regimesPanel.focal.seed_index))
+    ? (state.regimesPanel.focal.seed_index | 0) : 0;
+  if (focalIdx < 0 || focalIdx >= loci.length) {
+    setStatus(root, `focal index ${focalIdx} is out of range (0..${loci.length - 1})`);
+    return;
+  }
+  const data = state.data;
+  if (!data || !data.windows) {
+    setStatus(root, 'no scrubber data loaded');
+    return;
+  }
+  const candMod = await _resolveCandMod(root);
+  if (!candMod) return;
+
+  const cand = _locusToCandidate(loci[focalIdx], result, state, candMod.makeCandidateId);
+  const page1State = _ensurePage1State(atlasState, data);
   try { candMod.addCandidateToList(page1State, cand); }
   catch (e) { console.warn('addCandidateToList threw:', e); }
   try { candMod.setCandidate(page1State, cand); }
   catch (e) { console.warn('setCandidate threw:', e); }
-  inv._local_pca_dosage_state = page1State;
+  if (!atlasState.inversion) atlasState.inversion = {};
+  atlasState.inversion._local_pca_dosage_state = page1State;
 
-  setStatus(root, `promoted locus #${focalIdx} (seed_id=${locus.seed_id}) → candidate ${cand.id}. Opening candidate focus…`);
+  setStatus(root, `promoted locus #${focalIdx} (seed_id=${loci[focalIdx].seed_id}) → candidate ${cand.id}. Opening candidate focus…`);
   try { window.location.hash = '#/inversion/candidate_focus'; } catch (_) {}
+}
+
+/**
+ * Promote EVERY Stage 3 locus to a candidate in one shot. The first
+ * promoted candidate is set active so candidate_focus opens on it.
+ *
+ * @param {HTMLElement} root        the page root (for the status bar)
+ * @param {Object}      state       haplotype_regimes legacy state
+ * @param {Object}      atlasState  atlas-core shared bucket
+ */
+export async function promoteAllSeeds(root, state, atlasState) {
+  const result = state._regimesResult;
+  if (!result || !result.stage3 || !Array.isArray(result.stage3.loci)
+      || result.stage3.loci.length === 0) {
+    setStatus(root, 'no pipeline result / no loci — run the pipeline first');
+    return;
+  }
+  const data = state.data;
+  if (!data || !data.windows) {
+    setStatus(root, 'no scrubber data loaded');
+    return;
+  }
+  const candMod = await _resolveCandMod(root);
+  if (!candMod) return;
+
+  const loci = result.stage3.loci;
+  const page1State = _ensurePage1State(atlasState, data);
+  let n = 0;
+  let firstCand = null;
+  for (let i = 0; i < loci.length; i++) {
+    const locus = loci[i];
+    if (!locus) continue;
+    const cand = _locusToCandidate(locus, result, state, candMod.makeCandidateId);
+    try {
+      candMod.addCandidateToList(page1State, cand);
+      if (!firstCand) firstCand = cand;
+      n++;
+    } catch (e) { console.warn('addCandidateToList threw for locus', i, e); }
+  }
+  // Open candidate_focus on the first promoted candidate.
+  if (firstCand) {
+    try { candMod.setCandidate(page1State, firstCand); }
+    catch (e) { console.warn('setCandidate threw:', e); }
+  }
+  if (!atlasState.inversion) atlasState.inversion = {};
+  atlasState.inversion._local_pca_dosage_state = page1State;
+
+  setStatus(root, `promoted all ${n} seed${n === 1 ? '' : 's'} → candidates. Opening candidate focus…`);
+  if (n > 0) { try { window.location.hash = '#/inversion/candidate_focus'; } catch (_) {} }
 }

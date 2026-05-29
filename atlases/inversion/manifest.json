@@ -31,7 +31,18 @@
       "stage": "discovery",
       "fragment": "atlases/inversion/pages/discovery/haplotype_regimes.html",
       "module": "atlases/inversion/pages/discovery/haplotype_regimes.js",
-      "tooltip": "Long-range haplotype regimes (Stage 4 bruteforce projection). Run runBandingPipeline on the active chromosome and explore where each seed-band voter lands across target windows. Export the result as a regime catalogue JSON."
+      "tooltip": "Long-range haplotype regimes (Stage 4 bruteforce projection). Run runBandingPipeline on the active chromosome and explore where each seed-band voter lands across target windows. Export the result as a regime catalogue JSON.",
+      "_doc": "2026-05-29: het-skeleton mode split out to its own page (het_skeletons); short-range was split earlier to candidate_regimes. This page is now long-range (V-walker) only."
+    },
+    {
+      "id": "het_skeletons",
+      "slug": "het_skeletons",
+      "label": "het skeletons",
+      "stage": "discovery",
+      "fragment": "atlases/inversion/pages/discovery/het_skeletons.html",
+      "module": "atlases/inversion/pages/discovery/het_skeletons.js",
+      "tooltip": "Het-skeleton haplotype regimes (Cluster 1 Path B). Seeds from per-window K-means → het detect → skeleton walk → HOM anchor → Cramér's V merge, then the Cluster 2/3 refinement tail. Promote the focal seed or all seeds to candidates. Split from haplotype_regimes 2026-05-29.",
+      "_doc": "Het-skeleton method page. Shares the haplotype_regimes/ module stack; mounts with state._regimesMode='het' and no #rgModeBar."
     },
     {
       "id": "pca_comparator",
@@ -370,6 +381,11 @@
         "layer": "diversity.samples_genomewide_het",
         "from": "diversity",
         "purpose": "Per-sample H baseline for the Hobs/Hexp QC chip."
+      },
+      {
+        "layer": "diversity.samples_roh_per_sample",
+        "from": "diversity",
+        "purpose": "Genome-wide per-sample F_ROH. local_pca_dosage aligns it to data.samples by CGA id and stores it as data.sample_froh so the 'froh' colour ramp paints the PCA scatter, lines panel, and L3 contingency mini-PCAs by inbreeding."
       },
       {
         "layer": "population.ngsrelate_kinship",

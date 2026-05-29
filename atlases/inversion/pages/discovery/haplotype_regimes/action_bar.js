@@ -10,7 +10,7 @@
 
 import { runPipeline } from './run_pipeline.js';
 import { exportCatalogue } from './catalogue_export.js';
-import { promoteFocalSeed } from './promote_seed.js';
+import { promoteFocalSeed, promoteAllSeeds } from './promote_seed.js';
 import { runAutoMerge } from './auto_merge.js';
 import { renderL3PairsTable } from './l3_pairs_table.js';
 import { renderSeedsStrip } from './seeds_strip.js';
@@ -30,6 +30,7 @@ export function wireActionBar(root, state, atlasState) {
   const runBtn            = root.querySelector('#rgRunPipelineBtn');
   const exportBtn         = root.querySelector('#rgExportCatalogueBtn');
   const promoteBtn        = root.querySelector('#rgPromoteSeedBtn');
+  const promoteAllBtn     = root.querySelector('#rgPromoteAllBtn');
   const autoMergeBtn      = root.querySelector('#rgAutoMergeBtn');
   const autoMergeMacroBtn = root.querySelector('#rgAutoMergeMacroBtn');
 
@@ -47,12 +48,19 @@ export function wireActionBar(root, state, atlasState) {
   // -------------------------------------------------------------------
   const pageId = state._pageId || 'haplotype_regimes';
   const modeKey = pageId + '.mode';
-  const hasModeBar = !!root.querySelector('#rgModeBar');
+  const modeBarEl = root.querySelector('#rgModeBar');
+  const hasModeBar = !!modeBarEl;
   if (hasModeBar) {
     state._regimesMode = state._regimesMode || 'long';
     try {
       const saved = localStorage.getItem(modeKey);
-      if (saved === 'short' || saved === 'long' || saved === 'het') {
+      // 2026-05-29: only honour a saved mode that still has a button on
+      // THIS page's bar. After the het-skeleton page split, haplotype_regimes
+      // no longer exposes the 'het' pill — without this guard a stale
+      // 'het'/'short' from localStorage would silently run a mode the page
+      // can't show.
+      if ((saved === 'short' || saved === 'long' || saved === 'het')
+          && modeBarEl.querySelector(`button[data-rg-mode="${saved}"]`)) {
         state._regimesMode = saved;
       }
     } catch (_) {}
@@ -144,6 +152,15 @@ export function wireActionBar(root, state, atlasState) {
       catch (e) {
         console.error('promote-seed failed:', e);
         setStatus(root, `promote-seed failed: ${e.message}`);
+      }
+    });
+  }
+  if (promoteAllBtn) {
+    promoteAllBtn.addEventListener('click', async () => {
+      try { await promoteAllSeeds(root, state, atlasState); }
+      catch (e) {
+        console.error('promote-all failed:', e);
+        setStatus(root, `promote-all failed: ${e.message}`);
       }
     });
   }

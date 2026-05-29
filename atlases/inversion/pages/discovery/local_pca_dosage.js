@@ -533,6 +533,57 @@ export async function mount(root, atlasState, registry) {
     data.ghsl_view = ghslData;
   }
 
+  // 2026-05-26: F_ROH per-sample overlay — cross-atlas read of
+  // diversity.samples_roh_per_sample (genome-wide per-sample F_ROH, 227
+  // rows) through the atlas-core registry, aligned to data.samples by CGA
+  // id. Populates data.sample_froh so the 'froh' colour ramp resolves on
+  // the PCA scatter, the lines panel, AND the L3 contingency mini-PCAs
+  // (via state.l3RampMode='froh' → getSampleColor → perSampleValuesForMode
+  // → data.sample_froh). Genome-wide F_ROH is the same for every chrom, so
+  // we resolve once per mount with no chrom arg. Fail-soft: a missing layer
+  // / id mismatch leaves data.sample_froh unset and the ramp shows grey.
+  try {
+    if (!data.sample_froh && Array.isArray(data.samples) && data.samples.length) {
+      const rohRows = await Promise.resolve(
+        registry.resolve('diversity.samples_roh_per_sample')
+      ).catch(() => null);
+      if (Array.isArray(rohRows) && rohRows.length) {
+        const r0 = rohRows[0] || {};
+        const sKey = ['sample', 'sample_id', 'cga', 'id'].find(k => k in r0);
+        const fKey = ['froh', 'FROH', 'f_roh', 'F_ROH'].find(k => k in r0);
+        if (sKey && fKey) {
+          const byName = new Map();
+          for (const r of rohRows) {
+            const nm = r[sKey];
+            if (nm == null) continue;
+            const v = parseFloat(r[fKey]);
+            if (Number.isFinite(v)) byName.set(String(nm), v);
+          }
+          const nS = data.samples.length;
+          const arr = new Float64Array(nS);
+          let nMatched = 0;
+          for (let si = 0; si < nS; si++) {
+            const s = data.samples[si] || {};
+            const nm = String(s.cga != null ? s.cga : (s.ind != null ? s.ind : si));
+            const v = byName.has(nm) ? byName.get(nm) : NaN;
+            arr[si] = v;
+            if (Number.isFinite(v)) nMatched++;
+          }
+          if (nMatched > 0) {
+            data.sample_froh = arr;
+            console.log(`[local_pca_dosage] F_ROH overlay: matched ${nMatched}/${nS} ` +
+                        `samples to diversity.samples_roh_per_sample (col '${fKey}')`);
+          } else {
+            console.warn('[local_pca_dosage] F_ROH overlay: 0 samples matched ' +
+                         '(CGA-id mismatch between data.samples and the ROH table).');
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('local_pca_dosage.mount: F_ROH cross-atlas read failed —', e);
+  }
+
   // 2026-05-26: write a per-chrom summary into AtlasState (SPEC
   // multichrom_load_orchestrator Slice 1). Cheap (~few KB), keeps a
   // metadata footprint for every chrom the user has visited so the

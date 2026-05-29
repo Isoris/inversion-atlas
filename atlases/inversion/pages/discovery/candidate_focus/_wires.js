@@ -21,6 +21,15 @@ import { _pageState } from './_state.js';
 import { candidateHaplotypeAnnotationsHtml, _candidateL2Ids, _ensureDosageHmState } from './_html_builders.js';
 import { addCandidateToList, candidateFromJSON, candidateToJSON, isInCandidateList } from './_list.js';
 import { refreshCandidateUI } from '../candidate_focus.js';
+// 2026-05-29: the candidate dosage heatmap renderer was never ported
+// (the legacy `_redrawCandidateHeatmap` / `_buildSampleLookups` /
+// `computeStripeQuality` were called but undefined → ReferenceError →
+// blank panel). Reuse the dedicated dosage_heatmap page's canonical
+// painter + legacy-chunk adapter against a chunk fetched from the
+// /api/dosage/chunk bridge for the candidate's bp range.
+import { adaptLegacyChunk } from '../dosage_heatmap/adapters.js';
+import { paintDosageHeatmap, deriveSampleOrder } from '../dosage_heatmap/renderer.js';
+import { fitCanvasNoDpr } from '../../../shared/page1_utils.js';
 
 // --- wireCandidateButtons — extracted from legacy ---
 // 2026-05-19: navigation rewritten for atlas-core. The legacy DOM
@@ -397,4 +406,308 @@ export function _wireCandidateDosageHeatmap(c) {
   }
   // Initial draw
   _redrawCandidateHeatmap(c, canvas, infoSlot);
+}
+
+// ---------------------------------------------------------------------------
+// 2026-05-29: candidate dosage-heatmap renderer (ported).
+//
+// Fetches a dosage chunk for the candidate's bp range from the
+// /api/dosage/chunk bridge, adapts it with the dedicated dosage_heatmap
+// page's legacy-chunk adapter, and paints it with that page's canonical
+// painter (blue→white→red divergent dosage ramp). Samples are grouped by
+// the candidate's locked K-means band so the group track + by-group
+// ordering surface the karyotype structure.
+//
+// An in-flight token guards against rapid cap-button clicks (only the
+// latest fetch paints). Fail-soft: every error path writes a one-line
+// reason into the info slot instead of throwing.
+// ---------------------------------------------------------------------------
+let _candHeatmapReqId = 0;
+
+async function _redrawCandidateHeatmap(c, canvas, infoSlot) {
+  if (!c || !canvas) return;
+  const state = _pageState;
+  const hm = _ensureDosageHmState();
+  const setInfo = (msg) => { if (infoSlot) infoSlot.textContent = msg; };
+  const chrom = c.chrom || (state && state.data && state.data.chrom) || null;
+  const startBp = Number.isFinite(c.start_bp) ? (c.start_bp | 0) : null;
+  const endBp   = Number.isFinite(c.end_bp)   ? (c.end_bp   | 0) : null;
+  if (!chrom || startBp == null || endBp == null || endBp <= startBp) {
+    setInfo('candidate has no bp range');
+    return;
+  }
+  const cap = (hm.cap_n | 0) || 200;
+
+  // Prefer the synthetic dosage_chunks index template when present;
+  // else hit the canonical bridge endpoint directly.
+  const dc = state && state.data && state.data.dosage_chunks;
+  const tmpl = (dc && Array.isArray(dc.chunks) && dc.chunks[0] && (dc.chunks[0].url || dc._endpoint)) || null;
+  let url;
+  if (tmpl && tmpl.indexOf('__START__') >= 0) {
+    url = tmpl.replace('__CHROM__', encodeURIComponent(chrom))
+              .replace('__START__', String(startBp))
+              .replace('__END__',   String(endBp))
+              .replace('__CAP__',   String(cap));
+  } else {
+    url = `/api/dosage/chunk?chrom=${encodeURIComponent(chrom)}&start=${startBp}&end=${endBp}&cap=${cap}`;
+  }
+
+  setInfo('loading dosage…');
+  const myReq = ++_candHeatmapReqId;
+  let chunk = null;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) { setInfo(`dosage chunk HTTP ${r.status} — is atlas_server.py running?`); return; }
+    chunk = await r.json();
+  } catch (_) {
+    setInfo('dosage chunk fetch failed — is atlas_server.py running?');
+    return;
+  }
+  if (myReq !== _candHeatmapReqId) return;   // a newer cap click superseded us
+  if (!chunk || !Array.isArray(chunk.markers) || !Array.isArray(chunk.dosage) || chunk.markers.length === 0) {
+    setInfo('no dosage markers in this candidate range');
+    return;
+  }
+  hm.last_chunk = chunk;
+
+  const lk = _buildSampleLookups(chunk, c);
+  const sample_group = _sampleGroupArray(chunk, lk);
+  const data = adaptLegacyChunk(chunk, { sample_group });
+  if (!data) { setInfo('could not adapt dosage chunk'); return; }
+
+  fitCanvasNoDpr(canvas);
+  try {
+    const sample_order = deriveSampleOrder(
+      sample_group ? 'by_group' : 'natural', data.n_samples, data);
+    paintDosageHeatmap(canvas, data, {
+      sample_order,                            // derived order array (by band when grouped)
+      color_mode:          'dosage',           // blue→white→red divergent
+      vmin: 0, vmax: 2,
+      show_group_track:    !!sample_group,
+      show_polarity_track: false,
+    });
+  } catch (e) {
+    setInfo('heatmap paint failed: ' + (e && e.message ? e.message : 'error'));
+    return;
+  }
+  const mb = ((endBp - startBp) / 1e6).toFixed(2);
+  let info = `${chunk.markers.length} markers · ${chunk.samples.length} samples · ${mb} Mb`;
+  // Fold in the stripe-quality tier breakdown when it's been computed for
+  // THIS candidate (the "Compute stripe quality" button populates last_sq).
+  if (hm.last_sq && hm.last_sq.candidate_id === c.id && Array.isArray(hm.last_sq.rows)) {
+    const t = { core: 0, peripheral: 0, junk: 0 };
+    for (const r of hm.last_sq.rows) if (t[r.stripe_quality] != null) t[r.stripe_quality]++;
+    info += ` · stripe: ${t.core} core / ${t.peripheral} periph / ${t.junk} junk`;
+  }
+  setInfo(info);
+}
+
+// Build the per-(chunk-sample) group array (HOMO_1 / HET / HOMO_2 / null)
+// from the lookup callbacks, for the heatmap's group track + by-group
+// ordering. Returns null when no sample resolves a group.
+function _sampleGroupArray(chunk, lk) {
+  if (!chunk || !Array.isArray(chunk.samples) || !lk) return null;
+  const out = new Array(chunk.samples.length);
+  let any = false;
+  for (let i = 0; i < chunk.samples.length; i++) {
+    const g = lk._groupOfSample(i);
+    out[i] = g || null;
+    if (g) any = true;
+  }
+  return any ? out : null;
+}
+
+// 2026-05-29: ported from legacy Inversion_atlas.html (16935). Maps each
+// chunk sample index → its coarse karyotype group + a PC1-like score,
+// returned as callbacks (the shape computeStripeQuality expects).
+// Group source priority: candidate.fish_calls regime (already karyotype-
+// classified) → locked_labels band index → the L2 envelope at the cursor.
+function _buildSampleLookups(chunk, cand) {
+  const state = _pageState;
+  const cohortSamples = (state && state.data && state.data.samples) ? state.data.samples : [];
+  const NAMES3 = ['HOMO_1', 'HET', 'HOMO_2'];
+  // sample-id → cohort index.
+  const idToCohort = new Map();
+  for (let ci = 0; ci < cohortSamples.length; ci++) {
+    const s = cohortSamples[ci];
+    for (const id of [s && s.id, s && s.cga, s && s.ind, s && s.sample]) {
+      if (id != null) idToCohort.set(String(id).toUpperCase(), ci);
+    }
+  }
+  const chunkToCohort = new Array(chunk.samples.length);
+  for (let i = 0; i < chunk.samples.length; i++) {
+    const key = String(chunk.samples[i]).toUpperCase();
+    chunkToCohort[i] = idToCohort.has(key) ? idToCohort.get(key) : -1;
+  }
+
+  function _groupOfSample(chunkSi) {
+    const ci = chunkToCohort[chunkSi];
+    if (ci < 0) return null;
+    // 1. candidate.fish_calls regime (already karyotype-classified).
+    if (cand && Array.isArray(cand.fish_calls)) {
+      const fc = cand.fish_calls.find(f => f && f.sample_idx === ci);
+      if (fc && fc.regime != null) {
+        const K = cand.K || 3;
+        return (K === 3) ? (NAMES3[fc.regime] || null) : `g${fc.regime}`;
+      }
+    }
+    // 2. locked_labels band index (raw K-means band → karyotype by index).
+    const labels = cand && (cand.locked_labels || cand.labels);
+    if (Array.isArray(labels) && Number.isInteger(labels[ci]) && labels[ci] >= 0) {
+      const lab = labels[ci];
+      return NAMES3[lab] || `g${lab}`;
+    }
+    // 3. L2 envelope at the cursor (cursor-mode fallback).
+    const cur = Number.isFinite(state && state.cur) ? (state.cur | 0) : 0;
+    if (state && state.data && Array.isArray(state.data.l2_envelopes)) {
+      const env = state.data.l2_envelopes.find(e =>
+        e && e._s0 != null && cur >= e._s0 && cur <= e._e0);
+      if (env && env.labels && env.labels[ci] != null) {
+        const lbl = env.labels[ci];
+        return NAMES3[lbl] || `g${lbl}`;
+      }
+    }
+    return null;
+  }
+
+  function _pc1OfSample(chunkSi) {
+    const ci = chunkToCohort[chunkSi];
+    if (ci < 0) return 0;
+    if (cand && Array.isArray(cand.fish_calls)) {
+      const fc = cand.fish_calls.find(f => f && f.sample_idx === ci);
+      if (fc && Number.isFinite(fc.u))   return fc.u;
+      if (fc && Number.isFinite(fc.pc1)) return fc.pc1;
+    }
+    return 0;   // fallback: group ordering only
+  }
+
+  return { _groupOfSample, _pc1OfSample };
+}
+
+// 2026-05-29: ported verbatim from legacy Inversion_atlas.html (15901).
+// Per-sample stripe-quality tier (core / peripheral / junk) from the
+// dosage chunk: agreement_fraction over informative markers (those whose
+// HOMO_1↔HOMO_2 mean dosage differ most) + a centroid-z on the band's
+// PC1 distribution. STEP29 candidate-coherence pipeline.
+function computeStripeQuality(chunk, sampleGroup, samplePC1) {
+  const nSamples = chunk.samples.length;
+  const nMarkers = chunk.markers.length;
+  const grpOf = new Array(nSamples);
+  const grpIdx = { HOMO_1: [], HET: [], HOMO_2: [] };
+  for (let si = 0; si < nSamples; si++) {
+    const g = sampleGroup(si);
+    grpOf[si] = g;
+    if (grpIdx[g]) grpIdx[g].push(si);
+  }
+  const grpMean = {
+    HOMO_1: new Float64Array(nMarkers),
+    HET:    new Float64Array(nMarkers),
+    HOMO_2: new Float64Array(nMarkers),
+  };
+  for (const g of ['HOMO_1', 'HET', 'HOMO_2']) {
+    const idxs = grpIdx[g];
+    if (idxs.length < 2) {
+      for (let mi = 0; mi < nMarkers; mi++) grpMean[g][mi] = NaN;
+      continue;
+    }
+    for (let mi = 0; mi < nMarkers; mi++) {
+      const row = chunk.dosage[mi];
+      let n = 0, sum = 0;
+      for (const si of idxs) {
+        const v = row[si];
+        if (v == null || !Number.isFinite(v) || v < 0) continue;
+        n++; sum += v;
+      }
+      grpMean[g][mi] = (n > 0) ? sum / n : NaN;
+    }
+  }
+  const absDelta = new Float64Array(nMarkers);
+  for (let mi = 0; mi < nMarkers; mi++) {
+    const d = grpMean.HOMO_2[mi] - grpMean.HOMO_1[mi];
+    absDelta[mi] = Number.isFinite(d) ? Math.abs(d) : 0;
+  }
+  const sortedAbs = Array.from(absDelta).sort((a, b) => a - b);
+  const q75 = sortedAbs[Math.floor(sortedAbs.length * 0.75)];
+  const infoThresh = Math.max(q75, 0.1);
+  let infoIdx = [];
+  for (let mi = 0; mi < nMarkers; mi++) if (absDelta[mi] >= infoThresh) infoIdx.push(mi);
+  if (infoIdx.length < 10) {
+    const ranked = Array.from({ length: nMarkers }, (_, mi) => mi);
+    ranked.sort((a, b) => absDelta[b] - absDelta[a]);
+    infoIdx = ranked.slice(0, Math.min(50, nMarkers));
+  }
+  const pc1Stats = {};
+  for (const g of ['HOMO_1', 'HET', 'HOMO_2']) {
+    const vals = grpIdx[g].map(samplePC1).filter(Number.isFinite);
+    if (vals.length === 0) { pc1Stats[g] = null; continue; }
+    vals.sort((a, b) => a - b);
+    const median = vals[(vals.length - 1) >> 1];
+    const dev = vals.map(v => Math.abs(v - median));
+    dev.sort((a, b) => a - b);
+    const mad = dev[(dev.length - 1) >> 1];
+    pc1Stats[g] = { median, mad: mad > 0 ? mad : 1 };
+  }
+  const out = [];
+  for (let si = 0; si < nSamples; si++) {
+    const g = grpOf[si];
+    let agreeFrac = NaN;
+    if (g && grpMean[g] && grpIdx[g].length >= 2) {
+      const others = ['HOMO_1', 'HET', 'HOMO_2'].filter(x => x !== g);
+      let nValid = 0, nOwnCloser = 0;
+      for (const mi of infoIdx) {
+        const x = chunk.dosage[mi][si];
+        if (x == null || !Number.isFinite(x) || x < 0) continue;
+        const own = grpMean[g][mi];
+        const otherMean = (grpMean[others[0]][mi] + grpMean[others[1]][mi]) / 2;
+        if (!Number.isFinite(own) || !Number.isFinite(otherMean)) continue;
+        const dOwn = Math.abs(x - own);
+        const dOther = Math.abs(x - otherMean);
+        nValid++;
+        if (dOwn < dOther) nOwnCloser++;
+      }
+      if (nValid > 0) agreeFrac = nOwnCloser / nValid;
+    }
+    let cohClass;
+    if (Number.isNaN(agreeFrac) || agreeFrac == null) {
+      cohClass = 'insufficient';
+    } else if (g === 'HET') {
+      cohClass = (agreeFrac >= 0.55) ? 'coherent'
+               : (agreeFrac >= 0.40) ? 'intermediate'
+               : 'discordant';
+    } else {
+      cohClass = (agreeFrac >= 0.70) ? 'coherent'
+               : (agreeFrac >= 0.45) ? 'intermediate'
+               : 'discordant';
+    }
+    let centroidZ = NaN;
+    const pc1 = samplePC1(si);
+    if (g && pc1Stats[g] && Number.isFinite(pc1)) {
+      centroidZ = (pc1 - pc1Stats[g].median) / pc1Stats[g].mad;
+    }
+    let tier;
+    if (g === 'HET') {
+      tier = (cohClass === 'coherent') ? 'core'
+           : (cohClass === 'intermediate' && Number.isFinite(centroidZ) && centroidZ < 3) ? 'peripheral'
+           : (cohClass === 'discordant') ? 'junk'
+           : 'peripheral';
+    } else if (g === 'HOMO_1' || g === 'HOMO_2') {
+      tier = (cohClass === 'coherent' && Number.isFinite(centroidZ) && centroidZ < 2) ? 'core'
+           : ((cohClass === 'coherent' || cohClass === 'intermediate') &&
+              Number.isFinite(centroidZ) && centroidZ < 4) ? 'peripheral'
+           : 'junk';
+    } else {
+      tier = 'unknown';
+    }
+    out.push({
+      sample: chunk.samples[si],
+      coarse_group: g || 'unknown',
+      agreement_fraction: Number.isFinite(agreeFrac) ? agreeFrac : null,
+      coherence_class: cohClass,
+      centroid_z_score: Number.isFinite(centroidZ) ? centroidZ : null,
+      stripe_quality: tier,
+      tier_rule: `coherence=${cohClass};z=${Number.isFinite(centroidZ) ? centroidZ.toFixed(1) : 'NA'};group=${g || 'unknown'}`,
+      n_informative_markers: infoIdx.length,
+    });
+  }
+  return out;
 }
