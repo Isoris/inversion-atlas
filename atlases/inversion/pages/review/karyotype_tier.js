@@ -923,11 +923,29 @@ function _buildLegacyState(atlasState) {
   // Cross-atlas slots
   legacy.candidate = sh.activeCandidate || null;
 
-  // Transient slot — karyotype_tier reads state.data.final_classification +
-  // state.data.classification (both sub-fields of state.data, not
-  // top-level slots). Default empty object so sub-field access doesn't
-  // throw.
-  legacy.data = inv.data || {};
+  // karyotype_tier reads:
+  //   - state.data.samples            (per-sample registry — for cga / ind / family_id
+  //                                     in the karyotype-subview rows; comes from the
+  //                                     chromosome precomp loaded by local_pca_dosage)
+  //   - state.data.final_classification (optional R-pipeline layer — Tier subview only;
+  //                                     not yet produced, may be absent)
+  //   - state.data.classification     (optional cluster-emit layer; not yet produced)
+  //
+  // The old `legacy.data = inv.data || {}` always returned {} because nothing
+  // writes the top-level `inv.data` slot, so the karyotype subview rendered
+  // rows with 'Ind<si>' placeholders instead of real sample names even when
+  // local_pca_dosage had loaded a chromosome. 2026-05-27 fix: pull the
+  // chrom precomp from inv._local_pca_dosage_state.data first, fall back to
+  // the legacy inv.data slot. Tier-subview sub-fields are looked up on the
+  // same object — when absent the Tier view renders its "not loaded"
+  // empty state, which is the correct UX.
+  const chrom = sh.activeChrom;
+  const stashedData = inv._local_pca_dosage_state && inv._local_pca_dosage_state.data;
+  if (chrom && stashedData && stashedData.chrom === chrom) {
+    legacy.data = stashedData;
+  } else {
+    legacy.data = inv.data || {};
+  }
 
   return legacy;
 }

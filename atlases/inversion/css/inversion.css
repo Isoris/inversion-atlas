@@ -489,6 +489,74 @@ body[data-sim-in-minimap="1"] #simPanel {
 /* When collapsed: hide content, show only the toggle arrow */
 .wrap[data-sidebar="collapsed"] aside { padding: 0; overflow: hidden; }
 .wrap[data-sidebar="collapsed"] aside > *:not(#sidebarToggleBtn) { display: none; }
+
+/* ---------------------------------------------------------------------
+   Floating sidebar mode (2026-05-27).
+   The grid collapses to a single column (the canvas gets the full
+   width) and the <aside> becomes a fixed-positioned, draggable,
+   resizable panel that the user can park anywhere. Mode is cycled by
+   #globalSettingsBtn (expanded → collapsed → floating → expanded).
+   The drag-handle is the synthetic top-bar atlas_chrome.js injects
+   into the aside on entering floating mode.
+   --------------------------------------------------------------------- */
+.wrap[data-sidebar="floating"] {
+  /* Aside no longer takes a column. */
+  grid-template-columns: 1fr !important;
+}
+.wrap[data-sidebar="floating"] > aside {
+  position: fixed;
+  /* Saved per-aside by atlas_chrome.js; these are the bootstrap
+     defaults when no position has been persisted yet. */
+  top: 56px; left: 12px;
+  width: 320px;
+  max-height: calc(100vh - 80px);
+  min-width: 220px;
+  min-height: 160px;
+  overflow: auto;
+  resize: both;
+  border: 1px solid var(--rule-strong, var(--rule));
+  border-radius: 8px;
+  box-shadow: 0 10px 32px rgba(0,0,0,0.45),
+              0 2px 8px rgba(0,0,0,0.30);
+  z-index: 60;
+  padding-top: 30px;       /* leaves room for the drag-handle bar */
+}
+.wrap[data-sidebar="floating"] > aside .atlas-aside-handle {
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 26px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 8px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--rule);
+  border-top-left-radius: 8px; border-top-right-radius: 8px;
+  font-family: var(--mono); font-size: 10.5px;
+  color: var(--ink-dim);
+  cursor: move;
+  user-select: none;
+  z-index: 2;
+}
+.wrap[data-sidebar="floating"] > aside .atlas-aside-handle-title {
+  flex: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.wrap[data-sidebar="floating"] > aside .atlas-aside-handle-dock {
+  background: var(--panel-3); color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-family: var(--mono); font-size: 10px; line-height: 1.2;
+  cursor: pointer;
+}
+.wrap[data-sidebar="floating"] > aside .atlas-aside-handle-dock:hover {
+  background: var(--panel);
+  border-color: var(--accent, #79a3ff);
+}
+.wrap[data-sidebar="floating"] > aside:active {
+  /* Slight lift while dragging — feedback. */
+  box-shadow: 0 14px 40px rgba(0,0,0,0.55),
+              0 3px 12px rgba(0,0,0,0.40);
+}
 /* v3.53: trackedList holds the CGA tag chips. Was previously style="display:flex"
    inline, which was higher specificity than the collapse rule above and caused
    the chips to leak out when the sidebar was collapsed. Moved to CSS here so the

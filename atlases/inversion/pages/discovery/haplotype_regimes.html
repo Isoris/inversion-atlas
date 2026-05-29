@@ -397,10 +397,19 @@
           <span style="color: var(--ink-dimmer, #5a6472); padding: 0 6px 0 4px;">seeds:</span>
           <button type="button" data-rg-mode="long" class="active"
                   title="Stage 1 V-walker: anchor sweep + Cramér's V boundary detection across the whole chromosome.">long-range</button>
-          <button type="button" data-rg-mode="short"
-                  title="User-curated candidates from local_pca_dosage (lock-promote / L3-draft confirms). No automatic discovery — review what you already drafted.">short-range</button>
           <button type="button" data-rg-mode="het"
                   title="Het-skeleton: per-window K-means → het_detect_candidate_band → het_track_skeleton → hom_anchor_to_het → cramers_v_merge. No band_quality gate, no V-walker. Matches the band_tracking/index.js Layer 1 order.">het-skeleton</button>
+          <!-- 2026-05-27: short-range mode lifted out to its own page
+               (classification / candidate_regimes). The pill below is
+               just a navigation hint — click it to jump there. -->
+          <a class="rg-mode-link" href="#/inversion/candidate_regimes"
+             title="Short-range — refine the local_pca_dosage candidate list. Now its own page in the classification stage."
+             style="text-decoration: none; display: inline-block;
+                    padding: 0 8px; line-height: 22px;
+                    color: var(--accent, #f5a524);
+                    border-left: 1px solid var(--rule, #2a3242);">
+            short-range &rarr;
+          </a>
         </span>
         <!-- View toggle: independent of seed source. Switches the
              below-the-fold section between the per-seed strip

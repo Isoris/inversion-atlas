@@ -54,6 +54,13 @@ export function createDosageHeatmapSelection() {
       else                        selectedMarkers.add(k);
       notify();
     },
+    // Replace the marker selection wholesale (used by regime focus, which
+    // selects every marker belonging to a clicked regime). Samples untouched.
+    setSelectedMarkers(ids) {
+      selectedMarkers.clear();
+      if (ids) for (const v of ids) { const k = _coerce(v); if (k != null) selectedMarkers.add(k); }
+      notify();
+    },
     clearSelection() {
       if (selectedSamples.size === 0 && selectedMarkers.size === 0) return;
       selectedSamples.clear();

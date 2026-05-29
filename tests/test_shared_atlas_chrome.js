@@ -281,10 +281,13 @@ delete global.localStorage._store['atlas_chrome.sidebar'];
 const s = wireGlobalSettingsBtn(btn, wrap, { storageKey: 'atlas_chrome.sidebar' });
 check('default sidebar = expanded',  wrap.getAttribute('data-sidebar') === 'expanded');
 btn.click();
-check('click: sidebar = collapsed',  wrap.getAttribute('data-sidebar') === 'collapsed');
-check('persisted to localStorage',   global.localStorage._store['atlas_chrome.sidebar'] === 'collapsed');
+check('click 1: sidebar = collapsed',  wrap.getAttribute('data-sidebar') === 'collapsed');
+check('persisted to localStorage',     global.localStorage._store['atlas_chrome.sidebar'] === 'collapsed');
 btn.click();
-check('click again: sidebar = expanded', wrap.getAttribute('data-sidebar') === 'expanded');
+check('click 2: sidebar = floating',   wrap.getAttribute('data-sidebar') === 'floating');
+check('floating persisted',            global.localStorage._store['atlas_chrome.sidebar'] === 'floating');
+btn.click();
+check('click 3 (wrap): sidebar = expanded', wrap.getAttribute('data-sidebar') === 'expanded');
 
 // Restore from localStorage on next wire.
 global.localStorage._store['atlas_chrome.sidebar'] = 'collapsed';
@@ -320,8 +323,23 @@ const wrap5 = new FakeNode('div');
 const r5 = wireGlobalSettingsBtn(btn5, wrap5);
 r5.setSidebar('collapsed');
 check('programmatic setSidebar: collapsed', wrap5.getAttribute('data-sidebar') === 'collapsed');
+r5.setSidebar('floating');
+check('programmatic setSidebar: floating',  wrap5.getAttribute('data-sidebar') === 'floating');
+r5.setSidebar('expanded');
+check('programmatic setSidebar: expanded',  wrap5.getAttribute('data-sidebar') === 'expanded');
 r5.setSidebar('not_a_state');   // ignored
-check('invalid state: ignored',             wrap5.getAttribute('data-sidebar') === 'collapsed');
+check('invalid state: ignored',             wrap5.getAttribute('data-sidebar') === 'expanded');
+
+// Button reflects state via data-state + glyph.
+const btn6 = new FakeNode('button');
+const wrap6 = new FakeNode('div');
+delete global.localStorage._store['atlas_chrome.sidebar'];
+const r6 = wireGlobalSettingsBtn(btn6, wrap6);
+check('button data-state: expanded',         btn6.getAttribute('data-state') === 'expanded');
+btn6.click();
+check('after click: button data-state = collapsed',  btn6.getAttribute('data-state') === 'collapsed');
+btn6.click();
+check('after click: button data-state = floating',   btn6.getAttribute('data-state') === 'floating');
 
 // =====================================================================
 group('bootstrapAtlasChrome — one-call wiring');
@@ -349,6 +367,50 @@ boot.teardown();
 const dpill7 = tabBar7.querySelectorAll('.tab-stage-pill')[1];
 dpill7.click();
 check('bootstrap teardown: pill click no-op', tabBar7.getAttribute('data-active-stage') === 'discovery');
+
+// =====================================================================
+group('atlas_chrome.css covers every manifest-declared stage');
+
+// Regression guard for the "tabs are a complete mess" bug. The
+// folding rule needs ONE selector per `data-active-stage="X"` value
+// that any manifest declares; missing rules silently kept every page
+// button from every stage visible when that stage was active.
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = join(__dirname, '..');
+const CHROME_CSS = join(REPO_ROOT, 'atlases', 'inversion', 'shared', 'atlas_chrome.css');
+
+const cssText = existsSync(CHROME_CSS) ? readFileSync(CHROME_CSS, 'utf8') : '';
+
+// Collect every stage value any manifest declares.
+const ATLASES_DIR = join(REPO_ROOT, 'atlases');
+const stageSet = new Set();
+if (existsSync(ATLASES_DIR)) {
+  for (const atlas of readdirSync(ATLASES_DIR)) {
+    const mf = join(ATLASES_DIR, atlas, 'manifest.json');
+    if (!existsSync(mf)) continue;
+    try {
+      const m = JSON.parse(readFileSync(mf, 'utf8'));
+      const pages = Array.isArray(m && m.pages) ? m.pages : [];
+      for (const p of pages) {
+        if (p && typeof p.stage === 'string' && p.stage) stageSet.add(p.stage);
+      }
+    } catch (_) {}
+  }
+}
+check('discovered ≥1 stage from manifests', stageSet.size >= 1);
+
+for (const stage of stageSet) {
+  const fold   = cssText.indexOf(`#tabBar[data-active-stage="${stage}"]`)         >= 0;
+  const pillEx = cssText.indexOf(`.tab-stage-pill[data-stage="${stage}"][data-expanded="1"]`) >= 0;
+  const hue    = cssText.indexOf(`--atlas-stage-hue-${stage}:`)                    >= 0;
+  check(`stage "${stage}" has folding rule`,        fold);
+  check(`stage "${stage}" has expanded-pill rule`,  pillEx);
+  check(`stage "${stage}" has hue token`,           hue);
+}
 
 // =====================================================================
 console.log('\n=================');

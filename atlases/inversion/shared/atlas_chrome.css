@@ -38,21 +38,44 @@
    ===================================================================== */
 
 /* ---------------------------------------------------------------------
-   Stage-hue palette — override at :root in your atlas to retheme.
+   Stage-hue palette — one entry per stage name that any cartridge
+   declares in its manifest's `pages[].stage` field. Currently:
+     discovery     (inversion)
+     classification(inversion)
+     synthesis     (inversion, popstats)
+     catalogue     (inversion)
+     tooling       (inversion)
+     evolution     (evolution, popstats)
+     breakpoints   (cross-species)
+     help          (inversion)
+
+   Hues are chosen to read at a glance along the workflow path
+   (cool → warm → grey) and to stay distinct on both the dark and
+   light theme. Override at :root in your atlas to retheme.
+
+   Back-compat aliases at the bottom keep older cartridges (that
+   still reference "refinement" / "review" / "compare" / "comparative")
+   from rendering as untintled grey pills. Safe to drop once every
+   cartridge migrates to the canonical stage names above.
    --------------------------------------------------------------------- */
 :root {
-  --atlas-stage-hue-discovery:      79, 163, 255;
-  --atlas-stage-hue-classification: 60, 192, 138;
-  --atlas-stage-hue-catalogue:      245, 165, 36;
-  --atlas-stage-hue-comparative:    228, 138, 60;
-  --atlas-stage-hue-help:           138, 148, 163;
-  /* Back-compat hues for legacy stage names — only used if a cartridge
-     still references these. Safe to delete once all atlases migrate
-     to the canonical 5 names. */
-  --atlas-stage-hue-refinement:     122, 211, 219;
-  --atlas-stage-hue-synthesis:      232, 196, 76;
-  --atlas-stage-hue-review:          60, 192, 138; /* same as classification */
-  --atlas-stage-hue-compare:        228, 138, 60;  /* same as comparative */
+  /* Canonical 8 — match manifest stage values 1:1. */
+  --atlas-stage-hue-discovery:      79, 163, 255;     /* blue   */
+  --atlas-stage-hue-classification: 60, 192, 138;     /* green  */
+  --atlas-stage-hue-synthesis:      232, 196, 76;     /* amber  */
+  --atlas-stage-hue-catalogue:      245, 165, 36;     /* orange */
+  --atlas-stage-hue-tooling:        160, 96, 184;     /* purple */
+  --atlas-stage-hue-evolution:      60, 188, 195;     /* teal   */
+  --atlas-stage-hue-breakpoints:    208, 69, 89;      /* red    */
+  --atlas-stage-hue-help:           138, 148, 163;    /* grey   */
+
+  /* Back-compat aliases (no manifest currently uses these, but a few
+     legacy cartridges may still reference them). Map each to the
+     nearest canonical hue rather than introducing new colours. */
+  --atlas-stage-hue-comparative:    228, 138, 60;     /* ≈ catalogue */
+  --atlas-stage-hue-refinement:     122, 211, 219;    /* ≈ evolution */
+  --atlas-stage-hue-review:         60, 192, 138;     /* = classification */
+  --atlas-stage-hue-compare:        228, 138, 60;     /* = comparative */
 }
 
 /* The global settings gear (#globalSettingsBtn) is no longer rendered
@@ -67,8 +90,8 @@
 #tabBar .tab-stage-pill {
   background: var(--panel-2); color: var(--ink-dim);
   border: 1px solid var(--rule);
-  border-radius: 3px;
-  padding: 4px 10px;
+  border-radius: 14px;                      /* pill-shape (was 3px rect) */
+  padding: 5px 11px 5px 12px;
   font-family: var(--mono); font-size: 10.5px;
   letter-spacing: 0.04em; line-height: 1;
   cursor: pointer;
@@ -76,55 +99,126 @@
   margin: 0 2px;
   white-space: nowrap;
   flex-shrink: 0;
-  display: inline-flex; align-items: center;
-  transition: background 0.1s, border-color 0.1s, color 0.1s;
+  display: inline-flex; align-items: center; gap: 6px;
+  position: relative;
+  transition: background 0.12s, border-color 0.12s, color 0.12s,
+              box-shadow 0.12s, transform 0.06s;
 }
 #tabBar .tab-stage-pill .pill-count {
-  margin-left: 5px;
   font-size: 9.5px;
-  opacity: 0.65;
+  opacity: 0.55;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
 }
 #tabBar .tab-stage-pill .pill-arrow {
-  margin-left: 5px;
-  font-size: 9px;
-  opacity: 0.55;
-  transition: transform 0.12s;
+  font-size: 8.5px;
+  opacity: 0.45;
+  transition: transform 0.14s;
 }
 #tabBar .tab-stage-pill:hover {
   background: var(--panel-3);
   color: var(--ink);
   border-color: var(--rule-strong, var(--rule));
+  box-shadow: 0 1px 0 rgba(0,0,0,0.25);
+}
+#tabBar .tab-stage-pill:active { transform: translateY(1px); }
+#tabBar .tab-stage-pill:focus-visible {
+  outline: 2px solid var(--accent, #79a3ff);
+  outline-offset: 1px;
 }
 
-/* Stage-coloured left edge for each pill. Reads its hue from the
-   --atlas-stage-hue-<stage> custom property. */
-#tabBar .tab-stage-pill[data-stage="discovery"]      { border-left: 3px solid rgba(var(--atlas-stage-hue-discovery),      0.55); }
-#tabBar .tab-stage-pill[data-stage="classification"] { border-left: 3px solid rgba(var(--atlas-stage-hue-classification), 0.55); }
-#tabBar .tab-stage-pill[data-stage="catalogue"]      { border-left: 3px solid rgba(var(--atlas-stage-hue-catalogue),      0.55); }
-#tabBar .tab-stage-pill[data-stage="comparative"]    { border-left: 3px solid rgba(var(--atlas-stage-hue-comparative),    0.55); }
-#tabBar .tab-stage-pill[data-stage="help"]           { border-left: 3px solid rgba(var(--atlas-stage-hue-help),           0.55); }
+/* Stage-coloured underline. Subtler than the old left-edge stripe —
+   the active pill carries the hue, idle pills get a faint accent on
+   hover only. */
+#tabBar .tab-stage-pill::after {
+  content: '';
+  position: absolute;
+  left: 9px; right: 9px; bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.14s;
+}
+/* Hover underline. One rule per known stage — covers every value
+   that any manifest currently declares plus the `comparative`
+   back-compat name. Pills with a stage value we don't recognise
+   still get the default base styles; they just don't gain the
+   stage-tinted underline. */
+#tabBar .tab-stage-pill[data-stage="discovery"]:hover::after      { background: rgba(var(--atlas-stage-hue-discovery),      0.50); }
+#tabBar .tab-stage-pill[data-stage="classification"]:hover::after { background: rgba(var(--atlas-stage-hue-classification), 0.50); }
+#tabBar .tab-stage-pill[data-stage="synthesis"]:hover::after      { background: rgba(var(--atlas-stage-hue-synthesis),      0.50); }
+#tabBar .tab-stage-pill[data-stage="catalogue"]:hover::after      { background: rgba(var(--atlas-stage-hue-catalogue),      0.50); }
+#tabBar .tab-stage-pill[data-stage="tooling"]:hover::after        { background: rgba(var(--atlas-stage-hue-tooling),        0.50); }
+#tabBar .tab-stage-pill[data-stage="evolution"]:hover::after      { background: rgba(var(--atlas-stage-hue-evolution),      0.50); }
+#tabBar .tab-stage-pill[data-stage="breakpoints"]:hover::after    { background: rgba(var(--atlas-stage-hue-breakpoints),    0.50); }
+#tabBar .tab-stage-pill[data-stage="help"]:hover::after           { background: rgba(var(--atlas-stage-hue-help),           0.45); }
+#tabBar .tab-stage-pill[data-stage="comparative"]:hover::after    { background: rgba(var(--atlas-stage-hue-comparative),    0.50); }
 
-/* Active-pill background (filled with the stage hue). Driven by
-   data-expanded="1" — set by shared/atlas_chrome.js. */
+/* Active-pill: stage-hue tinted background + full-strength underline.
+   Driven by data-expanded="1" — set by shared/atlas_chrome.js. */
 #tabBar .tab-stage-pill[data-stage="discovery"][data-expanded="1"] {
-  background: rgba(var(--atlas-stage-hue-discovery),      0.20); color: var(--ink);
-  border-color: rgba(var(--atlas-stage-hue-discovery),      0.65);
+  background: rgba(var(--atlas-stage-hue-discovery),      0.16); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-discovery),      0.55);
+}
+#tabBar .tab-stage-pill[data-stage="discovery"][data-expanded="1"]::after {
+  background: rgba(var(--atlas-stage-hue-discovery), 0.95);
 }
 #tabBar .tab-stage-pill[data-stage="classification"][data-expanded="1"] {
-  background: rgba(var(--atlas-stage-hue-classification), 0.20); color: var(--ink);
-  border-color: rgba(var(--atlas-stage-hue-classification), 0.65);
+  background: rgba(var(--atlas-stage-hue-classification), 0.16); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-classification), 0.55);
+}
+#tabBar .tab-stage-pill[data-stage="classification"][data-expanded="1"]::after {
+  background: rgba(var(--atlas-stage-hue-classification), 0.95);
+}
+#tabBar .tab-stage-pill[data-stage="synthesis"][data-expanded="1"] {
+  background: rgba(var(--atlas-stage-hue-synthesis),      0.18); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-synthesis),      0.60);
+}
+#tabBar .tab-stage-pill[data-stage="synthesis"][data-expanded="1"]::after {
+  background: rgba(var(--atlas-stage-hue-synthesis), 0.95);
 }
 #tabBar .tab-stage-pill[data-stage="catalogue"][data-expanded="1"] {
-  background: rgba(var(--atlas-stage-hue-catalogue),      0.22); color: var(--ink);
-  border-color: rgba(var(--atlas-stage-hue-catalogue),      0.70);
+  background: rgba(var(--atlas-stage-hue-catalogue),      0.18); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-catalogue),      0.60);
 }
-#tabBar .tab-stage-pill[data-stage="comparative"][data-expanded="1"] {
-  background: rgba(var(--atlas-stage-hue-comparative),    0.22); color: var(--ink);
-  border-color: rgba(var(--atlas-stage-hue-comparative),    0.70);
+#tabBar .tab-stage-pill[data-stage="catalogue"][data-expanded="1"]::after {
+  background: rgba(var(--atlas-stage-hue-catalogue), 0.95);
+}
+#tabBar .tab-stage-pill[data-stage="tooling"][data-expanded="1"] {
+  background: rgba(var(--atlas-stage-hue-tooling),        0.16); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-tooling),        0.55);
+}
+#tabBar .tab-stage-pill[data-stage="tooling"][data-expanded="1"]::after {
+  background: rgba(var(--atlas-stage-hue-tooling), 0.95);
+}
+#tabBar .tab-stage-pill[data-stage="evolution"][data-expanded="1"] {
+  background: rgba(var(--atlas-stage-hue-evolution),      0.16); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-evolution),      0.55);
+}
+#tabBar .tab-stage-pill[data-stage="evolution"][data-expanded="1"]::after {
+  background: rgba(var(--atlas-stage-hue-evolution), 0.95);
+}
+#tabBar .tab-stage-pill[data-stage="breakpoints"][data-expanded="1"] {
+  background: rgba(var(--atlas-stage-hue-breakpoints),    0.16); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-breakpoints),    0.55);
+}
+#tabBar .tab-stage-pill[data-stage="breakpoints"][data-expanded="1"]::after {
+  background: rgba(var(--atlas-stage-hue-breakpoints), 0.95);
 }
 #tabBar .tab-stage-pill[data-stage="help"][data-expanded="1"] {
-  background: rgba(var(--atlas-stage-hue-help),           0.18); color: var(--ink);
-  border-color: rgba(var(--atlas-stage-hue-help),           0.55);
+  background: rgba(var(--atlas-stage-hue-help),           0.14); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-help),           0.50);
+}
+#tabBar .tab-stage-pill[data-stage="help"][data-expanded="1"]::after {
+  background: rgba(var(--atlas-stage-hue-help), 0.85);
+}
+#tabBar .tab-stage-pill[data-stage="comparative"][data-expanded="1"] {
+  background: rgba(var(--atlas-stage-hue-comparative),    0.18); color: var(--ink);
+  border-color: rgba(var(--atlas-stage-hue-comparative),    0.60);
+}
+#tabBar .tab-stage-pill[data-stage="comparative"][data-expanded="1"]::after {
+  background: rgba(var(--atlas-stage-hue-comparative), 0.95);
 }
 
 /* Arrow rotates 180° when expanded. */
@@ -132,25 +226,136 @@
   transform: rotate(180deg); opacity: 0.85;
 }
 
-/* When a stage has exactly one child page (e.g. 'help' usually only
-   has one page), hide the count + arrow chips — the pill IS the
-   page button visually. */
+/* When a stage has exactly one child page, hide the count + arrow
+   chips — the pill IS the page button visually. */
 #tabBar .tab-stage-pill[data-single-child="1"] .pill-count,
 #tabBar .tab-stage-pill[data-single-child="1"] .pill-arrow {
   display: none;
 }
 
 /* ---------------------------------------------------------------------
+   Page buttons inside the tab bar — give them the same clean
+   treatment as the pills so the banner reads as a single typographic
+   row instead of two competing button styles. The atlas shell ships
+   a baseline style for `button[data-page]`; these overrides only
+   tighten it inside `#tabBar`.
+   --------------------------------------------------------------------- */
+#tabBar button[data-page] {
+  background: transparent; color: var(--ink-dim);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 4px 10px;
+  font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: 0.03em; line-height: 1;
+  cursor: pointer;
+  margin: 0 1px;
+  white-space: nowrap;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+#tabBar button[data-page]:hover {
+  background: var(--panel-2);
+  color: var(--ink);
+  border-color: var(--rule);
+}
+#tabBar button[data-page].active {
+  background: var(--panel-3);
+  color: var(--ink);
+  border-color: var(--rule-strong, var(--rule));
+  font-weight: 600;
+}
+#tabBar button[data-page]:focus-visible {
+  outline: 2px solid var(--accent, #79a3ff);
+  outline-offset: 1px;
+}
+
+/* Stage-tinted active page button — pulls the row into one visual
+   unit with its parent stage pill. The non-active page buttons stay
+   neutral so the active one pops. */
+#tabBar[data-active-stage="discovery"]      button[data-page].active {
+  background: rgba(var(--atlas-stage-hue-discovery),      0.16);
+  border-color: rgba(var(--atlas-stage-hue-discovery),      0.55);
+}
+#tabBar[data-active-stage="classification"] button[data-page].active {
+  background: rgba(var(--atlas-stage-hue-classification), 0.16);
+  border-color: rgba(var(--atlas-stage-hue-classification), 0.55);
+}
+#tabBar[data-active-stage="synthesis"]      button[data-page].active {
+  background: rgba(var(--atlas-stage-hue-synthesis),      0.18);
+  border-color: rgba(var(--atlas-stage-hue-synthesis),      0.60);
+}
+#tabBar[data-active-stage="catalogue"]      button[data-page].active {
+  background: rgba(var(--atlas-stage-hue-catalogue),      0.18);
+  border-color: rgba(var(--atlas-stage-hue-catalogue),      0.60);
+}
+#tabBar[data-active-stage="tooling"]        button[data-page].active {
+  background: rgba(var(--atlas-stage-hue-tooling),        0.16);
+  border-color: rgba(var(--atlas-stage-hue-tooling),        0.55);
+}
+#tabBar[data-active-stage="evolution"]      button[data-page].active {
+  background: rgba(var(--atlas-stage-hue-evolution),      0.16);
+  border-color: rgba(var(--atlas-stage-hue-evolution),      0.55);
+}
+#tabBar[data-active-stage="breakpoints"]    button[data-page].active {
+  background: rgba(var(--atlas-stage-hue-breakpoints),    0.16);
+  border-color: rgba(var(--atlas-stage-hue-breakpoints),    0.55);
+}
+#tabBar[data-active-stage="help"]           button[data-page].active {
+  background: rgba(var(--atlas-stage-hue-help),           0.14);
+  border-color: rgba(var(--atlas-stage-hue-help),           0.50);
+}
+
+/* ---------------------------------------------------------------------
+   Global settings (sidebar mode) button — 3-state cycle:
+     ⌘    expanded   (sidebar docked, full width)
+     »    collapsed  (sidebar docked, rail width)
+     ⤢    floating   (sidebar detached, draggable)
+   The icon glyph is set by atlas_chrome.js via data-state.
+   --------------------------------------------------------------------- */
+#globalSettingsBtn {
+  background: var(--panel-2);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  width: 28px; height: 24px;
+  padding: 0;
+  font-family: var(--mono); font-size: 12px; line-height: 1;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-right: 8px;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+#globalSettingsBtn:hover {
+  background: var(--panel-3);
+  border-color: var(--accent, #79a3ff);
+}
+#globalSettingsBtn:active { transform: translateY(1px); }
+#globalSettingsBtn:focus-visible {
+  outline: 2px solid var(--accent, #79a3ff);
+  outline-offset: 1px;
+}
+#globalSettingsBtn[data-state="floating"] {
+  background: rgba(var(--atlas-stage-hue-discovery), 0.18);
+  border-color: rgba(var(--atlas-stage-hue-discovery), 0.55);
+}
+
+/* ---------------------------------------------------------------------
    Active-stage folding — hide every page button whose data-stage
    doesn't match the tab bar's data-active-stage. This is what
    creates the "expand the active stage's pages, fold the others"
-   behaviour.
+   behaviour. ONE RULE PER STAGE the manifests declare; missing
+   rules silently broke folding for that stage (every page button
+   from every stage stayed visible). The 8 canonical stages plus
+   `comparative` as a back-compat alias are listed below.
    --------------------------------------------------------------------- */
 #tabBar[data-active-stage="discovery"]      button[data-page]:not([data-stage="discovery"])      { display: none !important; }
 #tabBar[data-active-stage="classification"] button[data-page]:not([data-stage="classification"]) { display: none !important; }
+#tabBar[data-active-stage="synthesis"]      button[data-page]:not([data-stage="synthesis"])      { display: none !important; }
 #tabBar[data-active-stage="catalogue"]      button[data-page]:not([data-stage="catalogue"])      { display: none !important; }
-#tabBar[data-active-stage="comparative"]    button[data-page]:not([data-stage="comparative"])    { display: none !important; }
+#tabBar[data-active-stage="tooling"]        button[data-page]:not([data-stage="tooling"])        { display: none !important; }
+#tabBar[data-active-stage="evolution"]      button[data-page]:not([data-stage="evolution"])      { display: none !important; }
+#tabBar[data-active-stage="breakpoints"]    button[data-page]:not([data-stage="breakpoints"])    { display: none !important; }
 #tabBar[data-active-stage="help"]           button[data-page]:not([data-stage="help"])           { display: none !important; }
+#tabBar[data-active-stage="comparative"]    button[data-page]:not([data-stage="comparative"])    { display: none !important; }
 
 /* Click-twice-to-collapse: when the active stage pill is re-clicked,
    wireTabStagePills sets data-collapsed="1" on the tab bar so every

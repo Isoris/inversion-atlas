@@ -13,6 +13,7 @@ import {
   filterKaryoRows,
   sortKaryoRows,
   isKaryoTwoTrack,
+  _isLabelsArray,
 } from './karyo_rows.js';
 
 function _escape(s) {
@@ -68,7 +69,7 @@ function _getKaryoRowsMemo(state) {
  */
 export function renderKaryotypeBodyHtml(state) {
   const c = state && state.candidate;
-  if (!c || !Array.isArray(c.locked_labels) || !Number.isFinite(c.K)) return '';
+  if (!c || !_isLabelsArray(c.locked_labels) || !Number.isFinite(c.K)) return '';
 
   const sigSpread = _sigmaSpread(state);
   // 2026-05-21 perf: rows pulled from the memo so re-renders on the
@@ -430,7 +431,7 @@ export function renderKaryotypeBody(state, opts) {
   // rows from the memo (populated during the renderKaryotypeBodyHtml
   // call above) instead of re-running buildKaryotypeRows.
   const c = state && state.candidate;
-  if (c && Array.isArray(c.locked_labels)) {
+  if (c && _isLabelsArray(c.locked_labels)) {
     const allRows = _getKaryoRowsMemo(state);
     const filtered = filterKaryoRows(allRows, state.karyoUi);
     const info = document.getElementById('ckInfo');

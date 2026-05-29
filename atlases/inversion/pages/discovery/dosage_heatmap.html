@@ -15,6 +15,7 @@
           <select id="dosageHeatmapSampleOrder" class="dh2-select">
             <option value="natural">natural</option>
             <option value="by_group">by group</option>
+            <option value="index_aware">index-aware</option>
             <option value="by_k6">by K6</option>
           </select>
         </label>
@@ -26,8 +27,115 @@
           </select>
         </label>
         <label class="dh2-toggle">
+          Colour
+          <select id="dosageHeatmapColorMode" class="dh2-select"
+                  title="magma: continuous dosage ramp (default).
+genotype: discrete white/blue/red for 0/0 · 0/1 · 1/1.">
+            <option value="magma">magma (continuous)</option>
+            <option value="genotype">genotype (0/0 · 0/1 · 1/1)</option>
+          </select>
+        </label>
+        <span class="dh2-sep"></span>
+        <!-- 2026-05-29: in-page haplotype-regime grouping. Detect bands /
+             clusters from the loaded dosage chunk itself (no upstream
+             pipeline run), or consume the active candidate's regime calls.
+             The detected grouping feeds the group track / ordering /
+             labels / legend exactly like an external grouping. -->
+        <label class="dh2-toggle">
+          Grouping
+          <select id="dosageHeatmapGroupingSource" class="dh2-select"
+                  title="external: grouping supplied by the upstream page.
+bands: in-page 1-D dosage banding (homA/het/homB).
+clusters: in-page 2-D (mean,het) clustering.
+index-aware: position-aware haplotype clustering on ordered-bin trajectories (respects SNP order + block continuity).
+regime (candidate): the active candidate's upstream regime calls.">
+            <option value="external">external</option>
+            <option value="bands">detect bands</option>
+            <option value="clusters">detect clusters</option>
+            <option value="index_aware">detect index-aware</option>
+            <option value="upstream_regime">regime (candidate)</option>
+            <option value="upstream_catalogue">regime (catalogue)</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          K
+          <select id="dosageHeatmapDetectK" class="dh2-select"
+                  title="Number of detected groups. auto = silhouette-maximising over K=2..4.">
+            <option value="auto">auto</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          Confidence
+          <select id="dosageHeatmapConfidenceScheme" class="dh2-select"
+                  title="margin: distance from each sample's mean dosage to the nearest tier boundary.
+silhouette: per-sample 1-D silhouette within the detected groups.">
+            <option value="margin">margin</option>
+            <option value="silhouette">silhouette</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowConfidenceTrack" type="checkbox">
+          Confidence track
+        </label>
+        <span class="dh2-sep"></span>
+        <!-- 2026-05-29: SNP-axis views + subsample + cursor/zoom. The
+             marker view chooses WHICH snps; subsample caps how many; zoom
+             opens a cursor-centred window (←/→ move the cursor, ↑/↓ the
+             sample cursor, +/- zoom). -->
+        <label class="dh2-toggle">
+          SNPs
+          <select id="dosageHeatmapMarkerView" class="dh2-select"
+                  title="all: every marker.
+random: a reproducible random subsample.
+high var: most variable markers (strongest structure).
+low var: least variable markers (background).">
+            <option value="all">all</option>
+            <option value="random">random</option>
+            <option value="high_var">high variance</option>
+            <option value="low_var">low variance</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          Subsample
+          <select id="dosageHeatmapSubsampleN" class="dh2-select"
+                  title="Cap the number of displayed markers (0 = all for the view).">
+            <option value="0">all</option>
+            <option value="100">100</option>
+            <option value="250">250</option>
+            <option value="500">500</option>
+            <option value="1000">1000</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          Zoom
+          <select id="dosageHeatmapZoom" class="dh2-select"
+                  title="Cursor-centred viewport (←/→ to pan, ↑/↓ sample cursor, +/- zoom).">
+            <option value="1">×1</option>
+            <option value="2">×2</option>
+            <option value="4">×4</option>
+            <option value="8">×8</option>
+            <option value="16">×16</option>
+          </select>
+        </label>
+        <span class="dh2-sep"></span>
+        <label class="dh2-toggle">
           <input id="dosageHeatmapShowGroupTrack" type="checkbox" checked>
-          Group track
+          Group
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowHetDosageTrack" type="checkbox">
+          Het (dosage) mean
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowThetaPiTrack" type="checkbox">
+          θπ mean
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowGhslTrack" type="checkbox">
+          GHSL mean
         </label>
         <label class="dh2-toggle">
           <input id="dosageHeatmapShowPolarityTrack" type="checkbox" checked>
@@ -40,6 +148,52 @@
         <label class="dh2-toggle">
           <input id="dosageHeatmapShowK6Track" type="checkbox">
           K=6 cluster track
+        </label>
+        <!-- 2026-05-27: regime overlays (active candidate scope). The
+             regime-call ribbon paints each sample by its homA_like /
+             het_like / homB_like / uncertain call; the locus span
+             overlay draws a semi-transparent vertical band over the
+             matrix marking the active candidate's marker range. -->
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowRegimeCallTrack" type="checkbox">
+          Regime call
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowLocusSpanOverlay" type="checkbox">
+          Locus span
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowGroupRects" type="checkbox">
+          Group rects
+        </label>
+        <span class="dh2-sep"></span>
+        <!-- Collapse near-identical samples (Hamming distance over tier-
+             quantized genomic bins) into a few representative rows + a
+             right-side ×N size histogram. Cuts crowding for large cohorts. -->
+        <label class="dh2-toggle"
+               title="Merge samples with near-identical genomic-bin signatures into a few representative rows; a right-gutter bar shows each group's size (×N).">
+          <input id="dosageHeatmapCollapseSimilar" type="checkbox">
+          Collapse similar
+        </label>
+        <label class="dh2-toggle">
+          Tol
+          <select id="dosageHeatmapCollapseHamming" class="dh2-select"
+                  title="Hamming tolerance: max number of differing bins for two samples to still collapse. 0 = identical signatures only.">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          Reps
+          <select id="dosageHeatmapCollapseReps" class="dh2-select"
+                  title="Representative rows shown per collapsed group.">
+            <option value="1">1</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
         </label>
         <!-- 2026-05-26: free-scroll mode. When on, ←/→ shifts the active
              bp range by ½ window (Shift = whole window) and refetches
@@ -78,8 +232,12 @@
     </div>
 
     <footer id="dosageHeatmapFooter" class="dh2-footer">
-      ⓘ Sample × marker dosage matrix. Sequential cream→deep-red ramp;
-      side tracks show K=3 group / K=6 cluster annotation; top stripe
+      ⓘ Sample × marker dosage matrix. Two colour modes: <b>magma</b>
+      (continuous, default — purple → magenta → orange → yellow) and
+      <b>genotype</b> (discrete white / blue / red for 0/0 · 0/1 · 1/1).
+      Left side tracks (outermost first): mean het-dosage, mean θπ,
+      mean GHSL, K=6 cluster, sample group. Y-axis ticks every ~10 %
+      of rows; group-run labels next to the group track. Top stripe
       marks polarity-flipped markers (HANDOFF_2 / SPEC_0 §11).
     </footer>
 

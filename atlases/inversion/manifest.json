@@ -195,6 +195,15 @@
       "_was_id": "page21"
     },
     {
+      "id": "candidate_regimes",
+      "slug": "candidate_regimes",
+      "label": "candidate regimes",
+      "stage": "classification",
+      "fragment": "atlases/inversion/pages/classification/candidate_regimes.html",
+      "module": "atlases/inversion/pages/classification/candidate_regimes.js",
+      "_doc": "Refine the user-curated local_pca_dosage candidate list into haplotype regimes (Cluster 2 + 3). Short-mode-only counterpart to haplotype_regimes — no V-walker, no het-skeleton. Extracted from haplotype_regimes 2026-05-27 (Part A of the audit)."
+    },
+    {
       "id": "karyotype_tier",
       "slug": "karyotype_tier",
       "label": "karyotype / tier",
@@ -211,6 +220,15 @@
       "fragment": "atlases/inversion/pages/catalogue/marker_readiness.html",
       "module": "atlases/inversion/pages/catalogue/marker_readiness.js",
       "_was_id": "page18"
+    },
+    {
+      "id": "popstats_demo",
+      "slug": "popstats_demo",
+      "label": "popstats (per regime group)",
+      "stage": "classification",
+      "fragment": "atlases/inversion/pages/review/popstats_demo.html",
+      "module": "atlases/inversion/pages/review/popstats_demo.js",
+      "tooltip": "Integration proof for the regime → popstats loop. Reads atlasState.shared.registeredCandidates (written by the haplotype-regimes pipeline on run-complete) and POSTs each candidate's regime_groups to /api/popstats/groupwise, rendering θπ per regime group + pairwise FST/dXY. Honest server-down / endpoint-unwired / group-too-small states."
     },
     {
       "id": "stats_profile",

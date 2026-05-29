@@ -20,22 +20,29 @@ export const PC_AXES = Object.freeze(['pc1', 'pc2', 'pc3', 'pc4']);
 
 /**
  * Resolve a window's canonical (pc1, pc2, sign) bundle. Used by every
- * analytics path that needs PC1-as-canonical-axis. The sign flips per
- * window when state.flipPC1 + state.pc1Sign[winIdx] are set.
+ * analytics path that needs PC1-as-canonical-axis. The `sign` field
+ * stays the legacy PC1-only flip (analytics consumers downstream
+ * already encode "multiply pc1 by sign" semantics). The new `sign2`
+ * field carries the same per-window flip for PC2 — added 2026-05-27;
+ * the legacy callers that destructure {pc1, pc2, sign} keep working
+ * unchanged.
  *
  * Returns null when the window is missing.
  *
  * @param {Object} state
  * @param {number} winIdx
- * @returns {{pc1:ArrayLike<number>, pc2:ArrayLike<number>, sign:number}|null}
+ * @returns {{pc1:ArrayLike<number>, pc2:ArrayLike<number>,
+ *            sign:number, sign2:number}|null}
  */
 export function getPC(state, winIdx) {
   if (!state || !state.data || !Array.isArray(state.data.windows)) return null;
   const w = state.data.windows[winIdx];
   if (!w) return null;
-  const sign = (state.flipPC1 && state.pc1Sign && Number.isInteger(winIdx))
+  const sign  = (state.flipPC1 && state.pc1Sign && Number.isInteger(winIdx))
     ? (state.pc1Sign[winIdx] || 1) : 1;
-  return { pc1: w.pc1, pc2: w.pc2, sign };
+  const sign2 = (state.flipPC2 && state.pc2Sign && Number.isInteger(winIdx))
+    ? (state.pc2Sign[winIdx] || 1) : 1;
+  return { pc1: w.pc1, pc2: w.pc2, sign, sign2 };
 }
 
 // =====================================================================
@@ -88,8 +95,11 @@ export function getPCByAxis(state, winIdx, axis) {
 
 /**
  * Render-path accessor: returns `{ x, y, signX, signY, axisX, axisY }`
- * for the PCA scatter plot. Sign-flip rule applies ONLY to PC1
- * (legacy convention — PC2/3/4 lack a canonical orientation rule).
+ * for the PCA scatter plot. 2026-05-27: now applies the per-window
+ * sign-flip to **both** PC1 and PC2 (was PC1-only). PC2's eigenvector
+ * sign is just as arbitrary as PC1's; without the parallel align,
+ * PC2-as-Y in the scatter and PC2-on-lines-panel both X-braided
+ * independently of PC1.
  *
  * @param {Object} state
  * @param {number} winIdx
@@ -102,11 +112,22 @@ export function getPCRender(state, winIdx, axisX, axisY) {
   const aY = axisY || 'pc2';
   const x = getPCByAxis(state, winIdx, aX);
   const y = getPCByAxis(state, winIdx, aY);
-  const sign = (state && state.flipPC1 && state.pc1Sign && Number.isInteger(winIdx))
-    ? (state.pc1Sign[winIdx] || 1) : 1;
-  const signX = (aX === 'pc1') ? sign : 1;
-  const signY = (aY === 'pc1') ? sign : 1;
-  return { x, y, signX, signY, axisX: aX, axisY: aY };
+  const signFor = (axis) => {
+    if (!state || !Number.isInteger(winIdx)) return 1;
+    if (axis === 'pc1') {
+      return (state.flipPC1 && state.pc1Sign) ? (state.pc1Sign[winIdx] || 1) : 1;
+    }
+    if (axis === 'pc2') {
+      return (state.flipPC2 && state.pc2Sign) ? (state.pc2Sign[winIdx] || 1) : 1;
+    }
+    return 1;
+  };
+  return {
+    x, y,
+    signX: signFor(aX),
+    signY: signFor(aY),
+    axisX: aX, axisY: aY,
+  };
 }
 
 // =====================================================================

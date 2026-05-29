@@ -1,0 +1,527 @@
+  <div id="candidate_regimes" class="page">
+    <div class="rg-content" style="display: flex; flex-direction: column; height: 100%; min-height: 0; position: relative;">
+
+      <!-- Header bar -->
+      <div id="regimesPageHeader" class="rg-header" style="
+        flex: 0 0 auto;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--rule, #2a3242);
+        background: var(--panel-2, #181d27);
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        color: var(--ink, #e6edf6);
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      ">
+        <span style="color: var(--ink-dim, #8895a8);">Candidate regimes — refine local_pca_dosage candidates into multi-arrangement regimes.</span>
+      </div>
+
+      <!-- Caution / orientation banner -->
+      <div class="caution-banner" role="note" style="margin: 8px 12px;">
+        <div class="caution-banner-icon" aria-hidden="true">&#9888;</div>
+        <div class="caution-banner-body">
+          <div class="caution-banner-title">Refine the user-curated candidate list, not the whole-chromosome scan</div>
+          <div>
+            This page consumes the <b>candidates</b> you promoted in
+            <code>local_pca_dosage</code> (lock&nbsp;colors&nbsp;→&nbsp;★&nbsp;promote
+            or L3-draft confirm) and runs Cluster&nbsp;2&nbsp;+&nbsp;3
+            (breadth voting, refineRegimesFromIntervals, topology chains,
+            annotations) against them. No V-walker. No auto-discovery.
+            Use the <i>adjacent-L2 V table</i> below to spot boundary
+            merges, and <i>auto-merge V</i> to fuse chains of related
+            candidates.
+            <br/>
+            For long-range chromosome-wide discovery, go to the
+            <b>haplotype_regimes</b> page (V-walker / het-skeleton).
+          </div>
+        </div>
+      </div>
+
+      <!-- Interpretation drawer (collapsed ? icon) -->
+      <details id="rgInterpretDrawer" style="
+        position: absolute;
+        top: 14px;
+        right: 16px;
+        z-index: 50;
+        padding: 0;
+        background: transparent;
+        border: 0;
+        display: none;
+        font-family: ui-monospace, monospace;
+        font-size: 10.5px;
+        color: var(--ink, #e6edf6);
+      ">
+        <summary id="rgInterpretSummary"
+                 title="How to read these results — what to do next"
+                 style="
+                   list-style: none;
+                   display: inline-flex;
+                   align-items: center; justify-content: center;
+                   width: 22px; height: 22px;
+                   border-radius: 50%;
+                   background: var(--panel-2, #181d27);
+                   border: 1px solid var(--accent, #f5a524);
+                   color: var(--accent, #f5a524);
+                   cursor: pointer;
+                   font-size: 12px; font-weight: 700;
+                   user-select: none;
+                ">?</summary>
+        <div style="
+          position: absolute; top: 28px; right: 0;
+          width: min(620px, 80vw);
+          padding: 8px 14px 12px;
+          background: var(--panel-2, #181d27);
+          border: 1px solid var(--rule, #2a3242);
+          border-radius: 4px;
+          box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+          line-height: 1.5;
+        ">
+          <div style="margin-bottom: 6px;">
+            <b style="color: var(--accent, #f5a524);">Each chip in the seeds strip below</b>
+            is one <b>candidate</b> you promoted in local_pca_dosage,
+            wrapped as a pipeline pseudo-locus so the Cluster&nbsp;2&nbsp;+&nbsp;3
+            tail can refine it. Use <code>←</code>/<code>→</code> or
+            click a chip to set the <b>focal&nbsp;candidate</b>.
+          </div>
+          <div style="margin-bottom: 6px;">
+            <b style="color: var(--accent, #f5a524);">L3 adjacent-pair Cramér's V table:</b>
+            high V = the two L2 envelopes see the same haplotype
+            structure across their boundary. Click <i>merge</i> on a
+            high-V row to fuse them into a single candidate.
+          </div>
+          <div style="margin-bottom: 4px;">
+            <b style="color: var(--accent, #f5a524);">Action menu:</b>
+          </div>
+          <ul style="margin: 0 0 0 18px; padding: 0;">
+            <li><b>build regimes</b> — run Cluster&nbsp;2&nbsp;+&nbsp;3
+              against your candidate list. Output: refined regimes +
+              topology chains + annotations.</li>
+            <li><b>↻ auto-merge V</b> — walk adjacent candidate seeds,
+              auto-promote consecutive-MERGE chains as new candidates.</li>
+            <li><b>export catalogue…</b> — serialize the in-memory result
+              (manifest + knobs + catalogue.json triple).</li>
+          </ul>
+        </div>
+      </details>
+
+      <!-- Seeds inspector strip (one chip per candidate) -->
+      <div id="rgSeedsStripWrap" style="
+        flex: 0 0 auto;
+        margin: 0 12px 8px 12px;
+        padding: 4px 6px;
+        background: var(--panel-2, #181d27);
+        border: 1px solid var(--rule, #2a3242);
+        border-radius: 4px;
+        display: none;
+        gap: 6px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        white-space: nowrap;
+      ">
+        <span style="
+          flex: 0 0 auto;
+          padding: 3px 6px 3px 2px;
+          color: var(--ink-dimmer, #5a6472);
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+        ">candidates:</span>
+        <div id="rgSeedsStripList" style="display: inline-flex; gap: 4px; align-items: center;"></div>
+      </div>
+
+      <!-- Refined regimes summary table -->
+      <div id="rgRegimesWrap" style="
+        flex: 0 0 auto;
+        margin: 0 12px 8px 12px;
+        padding: 4px 6px;
+        background: var(--panel-2, #181d27);
+        border: 1px solid var(--rule, #2a3242);
+        border-radius: 4px;
+        display: none;
+        flex-direction: column;
+        gap: 4px;
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        max-height: 180px;
+        overflow-y: auto;
+      ">
+        <div style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 2px 4px;
+          color: var(--ink-dimmer, #5a6472);
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+        ">
+          <span>regimes</span>
+          <span id="rgRegimesCount" style="font-weight: 600; text-transform: none;"></span>
+          <span style="margin-left: auto; font-weight: 400; text-transform: none; color: var(--ink-dim, #8895a8);"
+                title="Refined regimes from haplotype_regime.refineRegimesFromIntervals. Each row is one regime; columns are: id, bp span, n_intervals, HOM_A / HOM_B / HET core sizes, chain id.">columns: id / chrom / bp span / n_intervals / hom_a / hom_b / het / chain</span>
+        </div>
+        <table id="rgRegimesTable" style="
+          width: 100%;
+          border-collapse: collapse;
+          font-family: ui-monospace, monospace;
+          font-size: 10px;
+        ">
+          <tbody id="rgRegimesBody"></tbody>
+        </table>
+      </div>
+
+      <!-- 2x2 panel grid -->
+      <div class="regimes-grid" style="
+        flex: 1 1 0;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: 1px;
+        background: var(--rule, #2a3242);
+        margin: 0 12px 12px 12px;
+        border: 1px solid var(--rule, #2a3242);
+      ">
+        <div id="regimesPanel" style="
+          background: var(--panel-1, #0f141d);
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        ">
+          <div class="rg-panel-title" style="
+            flex: 0 0 auto; padding: 4px 8px;
+            font: 10px ui-monospace, monospace;
+            color: var(--ink-dim, #8895a8);
+            border-bottom: 1px solid var(--rule, #2a3242);
+          ">chrom &middot; target-band lanes</div>
+          <div id="regimesCanvasContainer" style="flex: 1 1 0; min-height: 0; position: relative;"></div>
+        </div>
+
+        <div id="regimesGenomePanel" style="
+          background: var(--panel-1, #0f141d);
+          display: none;
+          flex-direction: column;
+          min-height: 0;
+        ">
+          <div class="rg-panel-title" style="
+            flex: 0 0 auto; padding: 4px 8px;
+            font: 10px ui-monospace, monospace;
+            color: var(--ink-dim, #8895a8);
+            border-bottom: 1px solid var(--rule, #2a3242);
+          ">genome &middot; target-band lanes</div>
+          <div id="regimesGenomeCanvasContainer" style="flex: 1 1 0; min-height: 0; position: relative;"></div>
+        </div>
+
+        <div id="regimesPC1Panel" style="
+          background: var(--panel-1, #0f141d);
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        ">
+          <div class="rg-panel-title" style="
+            flex: 0 0 auto; padding: 4px 8px;
+            font: 10px ui-monospace, monospace;
+            color: var(--ink-dim, #8895a8);
+            border-bottom: 1px solid var(--rule, #2a3242);
+          ">chrom &middot; PC1 lines</div>
+          <div id="regimesPC1CanvasContainer" style="flex: 1 1 0; min-height: 0; position: relative;"></div>
+        </div>
+
+        <div id="regimesPC1GenomePanel" style="
+          background: var(--panel-1, #0f141d);
+          display: none;
+          flex-direction: column;
+          min-height: 0;
+        ">
+          <div class="rg-panel-title" style="
+            flex: 0 0 auto; padding: 4px 8px;
+            font: 10px ui-monospace, monospace;
+            color: var(--ink-dim, #8895a8);
+            border-bottom: 1px solid var(--rule, #2a3242);
+          ">genome &middot; PC1 lines</div>
+          <div id="regimesPC1GenomeCanvasContainer" style="flex: 1 1 0; min-height: 0; position: relative;"></div>
+        </div>
+      </div>
+
+      <!-- L3 adjacent-pair Cramér's V mini-table — visible in short mode -->
+      <div id="rgL3PairsWrap" style="
+        flex: 0 0 auto;
+        margin: 0 12px 12px 12px;
+        padding: 0;
+        background: var(--panel-2, #181d27);
+        border: 1px solid var(--rule, #2a3242);
+        border-radius: 4px;
+        display: none;
+        flex-direction: column;
+        max-height: 200px;
+        overflow: hidden;
+      ">
+        <div style="
+          flex: 0 0 auto;
+          padding: 6px 10px;
+          border-bottom: 1px solid var(--rule, #2a3242);
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font: 10px ui-monospace, monospace;
+          color: var(--ink-dim, #8895a8);
+        ">
+          <b style="color: var(--ink, #e6edf6);">L3 adjacent-L2 Cramér's V</b>
+          <span style="color: var(--ink-dimmer, #5a6472);">
+            high V = same haplotype structure across the boundary → candidate merge
+          </span>
+          <span style="flex: 1 1 auto"></span>
+          <span id="rgL3PairsCount" style="color: var(--ink-dimmer, #5a6472);"></span>
+        </div>
+        <div style="flex: 1 1 auto; overflow-y: auto;">
+          <table id="rgL3PairsTable" style="
+            width: 100%;
+            border-collapse: collapse;
+            font: 10.5px ui-monospace, monospace;
+            color: var(--ink, #e6edf6);
+          ">
+            <thead>
+              <tr style="
+                background: var(--panel-3, #232a36);
+                color: var(--ink-dim, #8895a8);
+                font-size: 9.5px;
+                text-align: left;
+                position: sticky; top: 0;
+              ">
+                <th style="padding: 4px 8px;">L2 pair</th>
+                <th style="padding: 4px 8px;">span</th>
+                <th style="padding: 4px 8px;">V</th>
+                <th style="padding: 4px 8px;">n samples</th>
+                <th style="padding: 4px 8px;">action</th>
+              </tr>
+            </thead>
+            <tbody id="rgL3PairsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Regime summary tables (per-candidate / per-sample / per-window /
+           QC) — populated by buildRegimeTables after the pipeline runs.
+           Hidden until results land. Each header has a "download TSV"
+           button that serialises that table via rowsToTsv. -->
+      <div id="rgSummaryTablesWrap" style="
+        display: none;
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px 16px;
+        border-top: 1px solid var(--rule, #2a3242);
+        background: var(--panel-1, #0f141d);
+        max-height: 50vh;
+        overflow: auto;
+      ">
+        <div style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--ink-dim, #8895a8);
+          font-family: ui-monospace, monospace;
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        ">
+          <span>regime summary tables</span>
+          <span id="rgSummaryTablesCount" style="font-weight: 600; text-transform: none; color: var(--ink, #d4dae2);"></span>
+          <span style="margin-left: auto; font-style: italic; color: var(--ink-dimmer, #5a6472);">
+            long-range co-segregation patterns · not Mendelian validation
+          </span>
+        </div>
+
+        <!-- candidate_regime_summary -->
+        <details open style="border: 1px solid var(--rule, #2a3242); border-radius: 4px;">
+          <summary style="
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            background: var(--panel-2, #181d27);
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--ink, #d4dae2);
+          ">
+            <span>candidate_regime_summary</span>
+            <span id="rgSummaryCandCount" style="color: var(--ink-dim, #8895a8);"></span>
+            <button type="button" id="rgSummaryDownloadCand" class="rg-tb-btn"
+              style="margin-left: auto;"
+              title="Download as TSV">⬇ TSV</button>
+          </summary>
+          <div id="rgSummaryCandTable" style="overflow-x: auto; padding: 6px 10px;"></div>
+        </details>
+
+        <!-- sample_regime_calls -->
+        <details style="border: 1px solid var(--rule, #2a3242); border-radius: 4px;">
+          <summary style="
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            background: var(--panel-2, #181d27);
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--ink, #d4dae2);
+          ">
+            <span>sample_regime_calls</span>
+            <span id="rgSummarySampleCount" style="color: var(--ink-dim, #8895a8);"></span>
+            <button type="button" id="rgSummaryDownloadSample" class="rg-tb-btn"
+              style="margin-left: auto;"
+              title="Download as TSV">⬇ TSV</button>
+          </summary>
+          <div id="rgSummarySampleTable" style="overflow-x: auto; padding: 6px 10px; max-height: 280px; overflow-y: auto;"></div>
+        </details>
+
+        <!-- window_regime_support -->
+        <details style="border: 1px solid var(--rule, #2a3242); border-radius: 4px;">
+          <summary style="
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            background: var(--panel-2, #181d27);
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--ink, #d4dae2);
+          ">
+            <span>window_regime_support</span>
+            <span id="rgSummaryWindowCount" style="color: var(--ink-dim, #8895a8);"></span>
+            <button type="button" id="rgSummaryDownloadWindow" class="rg-tb-btn"
+              style="margin-left: auto;"
+              title="Download as TSV">⬇ TSV</button>
+          </summary>
+          <div id="rgSummaryWindowTable" style="overflow-x: auto; padding: 6px 10px; max-height: 280px; overflow-y: auto;"></div>
+        </details>
+
+        <!-- regime_qc_summary -->
+        <details style="border: 1px solid var(--rule, #2a3242); border-radius: 4px;">
+          <summary style="
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            background: var(--panel-2, #181d27);
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--ink, #d4dae2);
+          ">
+            <span>regime_qc_summary</span>
+            <span id="rgSummaryQcCount" style="color: var(--ink-dim, #8895a8);"></span>
+            <button type="button" id="rgSummaryDownloadQc" class="rg-tb-btn"
+              style="margin-left: auto;"
+              title="Download as TSV">⬇ TSV</button>
+          </summary>
+          <div id="rgSummaryQcTable" style="overflow-x: auto; padding: 6px 10px;"></div>
+        </details>
+
+        <!-- length-binned aggregate -->
+        <details style="border: 1px solid var(--rule, #2a3242); border-radius: 4px;">
+          <summary style="
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            background: var(--panel-2, #181d27);
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--ink, #d4dae2);
+          ">
+            <span>length_binned_aggregate</span>
+            <span id="rgSummaryLenCount" style="color: var(--ink-dim, #8895a8);"></span>
+            <button type="button" id="rgSummaryDownloadLen" class="rg-tb-btn"
+              style="margin-left: auto;"
+              title="Download as TSV">⬇ TSV</button>
+          </summary>
+          <div id="rgSummaryLenTable" style="overflow-x: auto; padding: 6px 10px;"></div>
+        </details>
+      </div>
+
+      <!-- Action bar — no mode-toggle bar (this page is always short mode) -->
+      <div class="rg-actionbar" style="
+        flex: 0 0 auto;
+        padding: 8px 12px;
+        border-top: 1px solid var(--rule, #2a3242);
+        background: var(--panel-2, #181d27);
+        font-family: ui-monospace, monospace;
+        font-size: 10px;
+        color: var(--ink-dim, #8895a8);
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      ">
+        <!-- View toggle (independent of mode). -->
+        <span id="rgViewBar" title="What to show below the 4 panels."
+              style="display: inline-flex; align-items: center; gap: 2px;
+                     background: var(--panel-2, #181d27);
+                     border: 1px solid var(--rule, #2a3242);
+                     border-radius: 3px; padding: 1px 2px;
+                     font: 10px ui-monospace, monospace;">
+          <span style="color: var(--ink-dimmer, #5a6472); padding: 0 6px 0 4px;">view:</span>
+          <button type="button" data-rg-view="seeds" class="active"
+                  title="Show the per-candidate chip strip.">seeds</button>
+          <button type="button" data-rg-view="regimes"
+                  title="Show the refined regimes table.">regimes</button>
+        </span>
+        <button id="rgExportCatalogueBtn" class="rg-tb-btn" disabled
+          title="Serialize the in-memory pipeline result to a regime catalogue JSON. Disabled until 'build regimes' has run."
+          style="
+            background: var(--panel-3, #232a36);
+            color: var(--ink, #e6edf6);
+            border: 1px solid var(--rule, #2a3242);
+            padding: 4px 10px;
+            font: inherit;
+            cursor: pointer;
+          ">export catalogue&hellip;</button>
+        <button id="rgRunPipelineBtn" class="rg-tb-btn"
+          title="Run Cluster 2 + 3 against your local_pca_dosage candidate list. Builds refined regimes + topology + annotations."
+          style="
+            background: var(--panel-3, #232a36);
+            color: var(--ink, #e6edf6);
+            border: 1px solid var(--rule, #2a3242);
+            padding: 4px 10px;
+            font: inherit;
+            cursor: pointer;
+          ">build regimes</button>
+        <!-- 2026-05-27: no #rgPromoteSeedBtn on this page. The user
+             is already operating on the local_pca_dosage candidate
+             list — re-promoting via the shared promoteFocalSeed
+             handler would duplicate the source candidate (new id,
+             source='seed_promote'). If we want a "focal → set active"
+             action later, it should be a different handler that
+             only calls sh.setActiveCandidate on the existing object;
+             skipped here until the use case is clearer. -->
+        <button id="rgAutoMergeBtn" class="rg-tb-btn" disabled
+          title="Walk adjacent candidates, run the Cramér's V contingency test, and auto-promote each consecutive-MERGE chain as a new candidate. Disabled until 'build regimes' produces ≥ 2 candidates."
+          style="
+            background: var(--panel-3, #232a36);
+            color: var(--ink, #e6edf6);
+            border: 1px solid var(--rule, #2a3242);
+            padding: 4px 10px;
+            font: inherit;
+            cursor: pointer;
+          ">&#8634; auto-merge V&hellip;</button>
+        <button id="rgAutoMergeMacroBtn" class="rg-tb-btn" disabled
+          title="Walk adjacent candidates WITHIN each macrostripe, run the Cramér's V test, and auto-promote MERGE chains. Disabled until 'build regimes' produces ≥ 1 macrostripe with ≥ 2 candidates inside."
+          style="
+            background: var(--panel-3, #232a36);
+            color: var(--ink, #e6edf6);
+            border: 1px solid var(--rule, #2a3242);
+            padding: 4px 10px;
+            font: inherit;
+            cursor: pointer;
+          ">&#8634; auto-merge V<sub style="font-size: 8px;">macro</sub>&hellip;</button>
+        <span id="rgStatus" style="margin-left: auto; color: var(--ink-dim, #8895a8);">
+          idle &middot; build regimes from your candidates
+        </span>
+      </div>
+
+    </div>
+  </div>
