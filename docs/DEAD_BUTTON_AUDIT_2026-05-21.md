@@ -16,7 +16,7 @@ Disposition recorded here so the rationale + rescue path for each is preserved, 
 
 ## Group 1 — self-admitted TODO stubs (8 buttons, all `local_pca_dosage.html`)
 
-These already had `[TODO — not implemented]` in their own `title` attribute. **Not yet swept** as of 2026-05-21; left in place because hiding them was queued behind the rest of the audit work. If/when swept, recommended action is `style="display:none"` with a comment pointing here.
+These already had `[TODO — not implemented]` in their own `title` attribute. **Status: ✅ swept 2026-05-26** — both parent rows (`#l3ActionRow` and `#candidateEditRow`) now carry `style="display: none;"` so the row labels (`draft:` / `edit:`) don't dangle next to nothing. The button stubs themselves are preserved inside the hidden rows; un-hiding the row will restore the whole cluster verbatim when the underlying state machines ship.
 
 | ID | Label | Line | Title says |
 |---|---|---|---|
@@ -132,4 +132,9 @@ For each `<button id="X" style="display:none">` in the page HTML, search this fi
   - Miss: newly orphaned — audit individually.
 ```
 
-The 5 currently-hidden-with-reason are: `l3DetailedBtn`, `dhCursorToggleBtn`, plus the 3 disabled (`candListRegistryBtn`, `loadRegistryBtn`, `enrichmentImportBtn`). The deleted one (`l3PromoteCandBtn`) is gone from HTML — only this doc records it ever existed.
+The currently-hidden-with-reason set is:
+- Single buttons: `l3DetailedBtn`, `dhCursorToggleBtn`
+- Three disabled: `candListRegistryBtn`, `loadRegistryBtn`, `enrichmentImportBtn`
+- Two hidden parent rows containing 8 stubs: `#l3ActionRow` (`l3ActMergeBtn`, `l3ActSeparateBtn`, `l3ActConfirmBtn`), `#candidateEditRow` (`cmFlipBtn`, `cmBoundaryBtn`, `cmCutBtn`, `cmTrack1Btn`, `cmTrack2Btn`)
+
+The deleted one (`l3PromoteCandBtn`) is gone from HTML — only this doc records it ever existed.

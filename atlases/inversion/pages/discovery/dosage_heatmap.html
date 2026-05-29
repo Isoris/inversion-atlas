@@ -41,6 +41,17 @@
           <input id="dosageHeatmapShowK6Track" type="checkbox">
           K=6 cluster track
         </label>
+        <!-- 2026-05-26: free-scroll mode. When on, ←/→ shifts the active
+             bp range by ½ window (Shift = whole window) and refetches
+             the chunk so the user can scrub the genome instead of being
+             pinned to the candidate. Off by default — candidate context
+             stays the default behavior. -->
+        <span class="dh2-sep"></span>
+        <label class="dh2-toggle" title="Toggle free-scroll mode. ←/→ shifts the visible bp range; Shift+←/→ steps a full window; Home/End jumps to chrom start/end.">
+          <input id="dosageHeatmapFreeScroll" type="checkbox">
+          Free scroll
+        </label>
+        <span id="dosageHeatmapFreeRangeLabel" class="dh2-meta" style="display:none;">—</span>
       </div>
     </header>
 

@@ -121,6 +121,13 @@ export async function mount(root, atlasState, registry) {
       _setActiveState(pageState);
       try { refreshDosageHeatmap(pageState); }
       catch (e) { console.warn('dosage_heatmap.mount: post-autoload refresh threw —', e); }
+      // 2026-05-26: re-wire the toolbar so its selection subscribe + key
+      // handlers bind to the NEW pageState. Without this the original
+      // wire references the abandoned pre-load pageState and dropdowns
+      // appear to do nothing because the selection.subscribe was on the
+      // dead state. _wireToolbar is idempotent (calls _teardownToolbar).
+      try { initDosageHeatmapToolbar(); }
+      catch (e) { console.warn('dosage_heatmap.mount: post-autoload toolbar re-wire threw —', e); }
       if (atlasState.inversion) {
         atlasState.inversion._page_dosage_heatmap_state = pageState;
       }
@@ -271,7 +278,12 @@ function _buildPageState(atlasState) {
     }
   }
   return {
+    atlasState:            atlasState || null,
     data:                  canonical,
+    // 2026-05-26: stash the raw legacy chunk so the free-scroll handler
+    // can read (chrom, start_bp, end_bp) without depending on
+    // local_pca_dosage's stash being populated.
+    _raw_legacy_chunk:     (dh && dh.legacy_chunk) || null,
     candidate_label:       dh ? (dh.candidate_label || null) : null,
     view_label:            dh ? (dh.view_label || _defaultViewLabel(dh)) : null,
     group_colors:          canonical
@@ -284,6 +296,7 @@ function _buildPageState(atlasState) {
     last_cursor_px:        null,
     view_state:            Object.assign({}, DEFAULT_VIEW_STATE,
                                           (dh && dh.view_state) || {}),
+    free_scroll:           false,
     selection:             createDosageHeatmapSelection(),
     _handlers:             {},
   };
@@ -332,6 +345,10 @@ function _renderHeader(state) {
   // 2026-05-26: K6-track checkbox added to HTML; mirror existing pattern.
   const k6 = document.getElementById('dosageHeatmapShowK6Track');
   if (k6) k6.checked = !!state.view_state.show_k6_track;
+  // Free-scroll toggle + range label.
+  const fs = document.getElementById('dosageHeatmapFreeScroll');
+  if (fs) fs.checked = !!state.free_scroll;
+  _updateFreeRangeLabel();
 }
 
 // =====================================================================
@@ -442,33 +459,76 @@ function _wireToolbar(state) {
   if (typeof document === 'undefined' || !document.getElementById) return;
   _teardownToolbar(state);
 
-  const repaint = () => { _paintHeatmap(state); };
+  // 2026-05-26: handlers read the LIVE _pageState via the module-level
+  // reference (refreshed by _setActiveState on every mount / auto-load
+  // remount). The old pattern closed over the initial `state` param,
+  // which became stale after the auto-load created a new pageState —
+  // reorder dropdowns mutated the abandoned object → repaint painted
+  // the still-empty initial state → "nothing happens".
+  const live = () => _pageState || state;
+  const repaint = () => { _paintHeatmap(live()); };
   const repaintAll = () => {
-    _renderHeader(state);
-    _paintHeatmap(state);
-    _renderRightPanel(state);
-    _renderLegend(state);
+    const s = live();
+    _renderHeader(s);
+    _paintHeatmap(s);
+    _renderRightPanel(s);
+    _renderLegend(s);
   };
 
   const onSampleOrder = (e) => {
-    state.view_state.sample_order_mode = (e && e.target && e.target.value) || 'natural';
+    const s = live();
+    if (!s) return;
+    s.view_state.sample_order_mode = (e && e.target && e.target.value) || 'natural';
     repaint();
   };
   const onMarkerOrder = (e) => {
-    state.view_state.marker_order_mode = (e && e.target && e.target.value) || 'natural';
+    const s = live();
+    if (!s) return;
+    s.view_state.marker_order_mode = (e && e.target && e.target.value) || 'natural';
     repaint();
   };
   const onShowGroupTrack = (e) => {
-    state.view_state.show_group_track = !!(e && e.target && e.target.checked);
+    const s = live();
+    if (!s) return;
+    s.view_state.show_group_track = !!(e && e.target && e.target.checked);
     repaint();
   };
   const onShowPolarityTrack = (e) => {
-    state.view_state.show_polarity_track = !!(e && e.target && e.target.checked);
+    const s = live();
+    if (!s) return;
+    s.view_state.show_polarity_track = !!(e && e.target && e.target.checked);
     repaint();
   };
   const onShowK6Track = (e) => {
-    state.view_state.show_k6_track = !!(e && e.target && e.target.checked);
+    const s = live();
+    if (!s) return;
+    s.view_state.show_k6_track = !!(e && e.target && e.target.checked);
     repaint();
+  };
+  // 2026-05-26: free-scroll mode — toggle + arrow-key handler. Untracks
+  // the page from the active candidate; ←/→ shifts the active bp range
+  // by half a window (Shift = full window) and refetches the chunk.
+  const onFreeScrollToggle = (e) => {
+    const s = live();
+    if (!s) return;
+    const on = !!(e && e.target && e.target.checked);
+    s.free_scroll = on;
+    _updateFreeRangeLabel();
+  };
+  const onKey = (ev) => {
+    const s = live();
+    if (!s || !s.free_scroll) return;
+    if (typeof document !== 'undefined') {
+      const pageEl = document.getElementById('dosage_heatmap');
+      if (!pageEl) return;
+    }
+    const key = ev && ev.key;
+    if (key !== 'ArrowLeft' && key !== 'ArrowRight' &&
+        key !== 'Home'      && key !== 'End') return;
+    const tag = (ev.target && ev.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    ev.preventDefault();
+    _scrubFree(s, key, !!ev.shiftKey);
   };
   const onCanvasMove = (ev) => {
     const c = document.getElementById('dosageHeatmapCanvas');
@@ -509,6 +569,7 @@ function _wireToolbar(state) {
   state._handlers = {
     onSampleOrder, onMarkerOrder,
     onShowGroupTrack, onShowPolarityTrack, onShowK6Track,
+    onFreeScrollToggle, onKey,
     onCanvasMove, onCanvasClick, onCanvasLeave,
     unsubSelection,
   };
@@ -518,9 +579,13 @@ function _wireToolbar(state) {
   _addListener('dosageHeatmapShowGroupTrack',     'change',     onShowGroupTrack);
   _addListener('dosageHeatmapShowPolarityTrack',  'change',     onShowPolarityTrack);
   _addListener('dosageHeatmapShowK6Track',        'change',     onShowK6Track);
+  _addListener('dosageHeatmapFreeScroll',         'change',     onFreeScrollToggle);
   _addListener('dosageHeatmapCanvas',             'mousemove',  onCanvasMove);
   _addListener('dosageHeatmapCanvas',             'click',      onCanvasClick);
   _addListener('dosageHeatmapCanvas',             'mouseleave', onCanvasLeave);
+  if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('keydown', onKey);
+  }
 }
 
 function _teardownToolbar(state) {
@@ -531,11 +596,117 @@ function _teardownToolbar(state) {
   if (h.onShowGroupTrack)     _removeListener('dosageHeatmapShowGroupTrack',     'change',    h.onShowGroupTrack);
   if (h.onShowPolarityTrack)  _removeListener('dosageHeatmapShowPolarityTrack',  'change',    h.onShowPolarityTrack);
   if (h.onShowK6Track)        _removeListener('dosageHeatmapShowK6Track',        'change',    h.onShowK6Track);
+  if (h.onFreeScrollToggle)   _removeListener('dosageHeatmapFreeScroll',         'change',    h.onFreeScrollToggle);
   if (h.onCanvasMove)         _removeListener('dosageHeatmapCanvas',             'mousemove',  h.onCanvasMove);
   if (h.onCanvasClick)        _removeListener('dosageHeatmapCanvas',             'click',      h.onCanvasClick);
   if (h.onCanvasLeave)        _removeListener('dosageHeatmapCanvas',             'mouseleave', h.onCanvasLeave);
+  if (h.onKey && typeof document !== 'undefined' && document.removeEventListener) {
+    document.removeEventListener('keydown', h.onKey);
+  }
   if (typeof h.unsubSelection === 'function') { try { h.unsubSelection(); } catch (_) {} }
   state._handlers = {};
+}
+
+// 2026-05-26: free-scroll bp-range scrubber. Reads the current chunk's
+// (chrom, start_bp, end_bp), shifts by ½ or full window, clamps to the
+// chromosome size when known, then refetches via the same /api/dosage/chunk
+// pipe _autoLoadDefaultChunk uses. Tracks an in-flight token so rapid
+// key-mashing doesn't race; only the latest request wins.
+let _scrubReqId = 0;
+async function _scrubFree(state, key, shiftKey) {
+  const chunk = state && state._raw_legacy_chunk;
+  const chrom = (chunk && chunk.chrom)
+             || (state && state.atlasState && state.atlasState.shared
+                  && state.atlasState.shared.activeChrom);
+  if (!chrom) return;
+  let startBp = chunk && Number.isFinite(chunk.start_bp) ? chunk.start_bp | 0 : null;
+  let endBp   = chunk && Number.isFinite(chunk.end_bp)   ? chunk.end_bp   | 0 : null;
+  if (startBp == null || endBp == null || endBp <= startBp) return;
+  const width = endBp - startBp;
+  const step = shiftKey ? width : Math.max(1, width >> 1);
+  // Chrom size lookup — only used to clamp End/End-key. Falls back to
+  // letting the server's region check trim if size is unknown.
+  const inv = state.atlasState && state.atlasState.inversion;
+  const stash = inv && inv._local_pca_dosage_state;
+  const dataWindows = stash && stash.data && stash.data.windows;
+  const chromSize = dataWindows && dataWindows.length
+    ? (dataWindows[dataWindows.length - 1].end_bp | 0)
+    : null;
+  let newStart, newEnd;
+  if (key === 'Home') {
+    newStart = 1; newEnd = 1 + width;
+  } else if (key === 'End' && chromSize) {
+    newEnd = chromSize; newStart = Math.max(1, newEnd - width);
+  } else if (key === 'ArrowLeft') {
+    newStart = Math.max(1, startBp - step);
+    newEnd   = newStart + width;
+  } else if (key === 'ArrowRight') {
+    newStart = startBp + step;
+    if (chromSize && newStart + width > chromSize) {
+      newEnd = chromSize; newStart = Math.max(1, newEnd - width);
+    } else {
+      newEnd = newStart + width;
+    }
+  } else {
+    return;
+  }
+  const myReq = ++_scrubReqId;
+  await _fetchFreeRange(state, chrom, newStart, newEnd, myReq);
+}
+
+async function _fetchFreeRange(state, chrom, startBp, endBp, reqId) {
+  const inv = state.atlasState && state.atlasState.inversion;
+  const stash = inv && inv._local_pca_dosage_state;
+  const data = stash && stash.data;
+  const dc = data && data.dosage_chunks;
+  const template =
+       (dc && Array.isArray(dc.chunks) && dc.chunks[0] && (dc.chunks[0].url || dc._endpoint))
+    || '/api/dosage/chunk?chrom=__CHROM__&start=__START__&end=__END__&cap=__CAP__';
+  const cap = (dc && (dc.cap_default | 0)) || 1000;
+  const url = template
+    .replace('__CHROM__', encodeURIComponent(chrom))
+    .replace('__START__', String(startBp | 0))
+    .replace('__END__',   String(endBp | 0))
+    .replace('__CAP__',   String(cap));
+  let chunk = null;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return;
+    chunk = await r.json();
+  } catch (_) { return; }
+  if (reqId !== _scrubReqId) return;   // a newer request superseded us
+  if (!chunk || typeof chunk !== 'object') return;
+  inv.dosage_heatmap_state = Object.assign({}, inv.dosage_heatmap_state || {}, {
+    legacy_chunk:    chunk,
+    candidate_label: `free · ${chrom} ${(startBp / 1e6).toFixed(2)}-${(endBp / 1e6).toFixed(2)} Mb`,
+    view_label:      `free scroll · ${chrom} ${(startBp / 1e6).toFixed(2)}-${(endBp / 1e6).toFixed(2)} Mb`,
+  });
+  // Rebuild + repaint via the exported refresh path so all panels sync.
+  try {
+    const newPageState = _buildPageState(state.atlasState);
+    newPageState.free_scroll = true;   // preserve mode across remount
+    _setActiveState(newPageState);
+    refreshDosageHeatmap(newPageState);
+    if (inv) inv._page_dosage_heatmap_state = newPageState;
+  } catch (e) {
+    console.warn('dosage_heatmap free-scroll: refresh threw —', e);
+  }
+  _updateFreeRangeLabel();
+}
+
+function _updateFreeRangeLabel() {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById('dosageHeatmapFreeRangeLabel');
+  if (!el) return;
+  const s = _pageState;
+  if (!s || !s.free_scroll) { el.style.display = 'none'; return; }
+  const chunk = s._raw_legacy_chunk;
+  if (!chunk || !Number.isFinite(chunk.start_bp) || !Number.isFinite(chunk.end_bp)) {
+    el.style.display = 'inline'; el.textContent = '· free scroll on';
+    return;
+  }
+  el.style.display = 'inline';
+  el.textContent = `· ${chunk.chrom || ''} ${(chunk.start_bp / 1e6).toFixed(2)}-${(chunk.end_bp / 1e6).toFixed(2)} Mb (←/→)`;
 }
 
 function _updateTooltip(state) {

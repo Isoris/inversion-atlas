@@ -1247,18 +1247,14 @@ function _refreshRampLegend(state) {
   }
   // Mode-specific gradient + label format.
   let gradientCss = null, minLbl = '', maxLbl = '';
-  if (ramp === 'het') {
-    // 2026-05-26: ramp is cohort-adaptive (median-anchored divergent),
-    // so the labels show the actual cohort min/max instead of the
-    // theoretical [0, 1] range. Falls back to '—' before chunk lands.
-    gradientCss = 'linear-gradient(to right, #4a90ff, #cccccc, #d94f4f)';
-    minLbl = Number.isFinite(vMin) ? vMin.toFixed(3) : '—';
-    maxLbl = Number.isFinite(vMax) ? vMax.toFixed(3) : '—';
-  } else if (ramp === 'dosage') {
-    // 2026-05-26: ramp is cohort-adaptive (median-anchored divergent),
-    // so the labels show the actual cohort min/max instead of the
-    // theoretical diploid range [0, 2].
-    gradientCss = 'linear-gradient(to right, #2c8fa1, #9aa1a8, #d94f4f)';
+  if (ramp === 'het' || ramp === 'dosage') {
+    // 2026-05-26 (revised): legacy `simColor` viridis-ish ramp
+    // (color_helpers.js#simColor). Three-stop CSS gradient picked to
+    // match the renderer at t=0 / 0.5 / 1:
+    //   t=0   → rgb( 30,  50, 120)
+    //   t=0.5 → rgb( 70, 120, 220)
+    //   t=1   → rgb(255, 220,  40)
+    gradientCss = 'linear-gradient(to right, rgb(30,50,120), rgb(70,120,220), rgb(255,220,40))';
     minLbl = Number.isFinite(vMin) ? vMin.toFixed(3) : '—';
     maxLbl = Number.isFinite(vMax) ? vMax.toFixed(3) : '—';
   } else if (ramp === 'theta_pi' || ramp === 'ghsl') {

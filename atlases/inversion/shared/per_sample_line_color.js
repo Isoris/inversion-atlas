@@ -27,6 +27,7 @@
 
 import { computeHetRateForRange, computeDosageMeanForRange } from './dosage_chunks.js';
 import { hetRateColor } from './het_rate.js';
+import { simColor } from './color_helpers.js';
 
 const CONFOUNDER_FROH_THRESHOLD = 0.05;
 
@@ -435,25 +436,17 @@ export function perSampleColorFor(mode, value, valuesArr) {
   if (!Number.isFinite(value)) return null;
 
   if (mode === 'het') {
-    // 2026-05-26: was `_sequentialBlueToYellow` which has a desaturated
-    // olive midpoint (rgb(141,150,121)) at t=0.5. Real per-sample het
-    // rates over a typical L2 envelope cluster tightly around the cohort
-    // median, so most samples landed near t=0.5 → all painted in the
-    // muddy olive → read as "uniform grey/dim". Also disagreed with the
-    // legend strip, which shows a blue→grey→red divergent ramp.
-    //
-    // Fix: divergent blue→light-grey→red ramp matching the legend, with
-    // the neutral anchored at the cohort MEDIAN (not the midpoint of
-    // [vMin, vMax]). Anchoring at the median guarantees roughly half
-    // the points fall on each saturated half regardless of distribution
-    // shape; midpoint-anchoring collapses to one half when the
-    // distribution is skewed (which het distributions usually are).
-    const stats = _cohortRangeAndMedian(valuesArr);
-    if (stats && stats.vMin !== stats.vMax) {
-      const t = _twoSidedT(value, stats.vMin, stats.vMed, stats.vMax);
-      return _legendBlueGreyRed(t);
-    }
-    return hetRateColor(value);
+    // 2026-05-26 (revised): legacy `simColor` viridis-ish ramp (deep
+    // blue → light blue → yellow). Sequential, perceptually uniform,
+    // no olive midpoint collapse. Quentin: "use the same color ramp as
+    // in legacy was some sort of viridis but not magma".
+    // Range scaled to the cohort [vMin, vMax] so the visible spread is
+    // always full-range regardless of how tight the distribution is.
+    const r = _cohortRange(valuesArr);
+    if (!r || r.vMin === r.vMax) return hetRateColor(value);
+    const t = (value - r.vMin) / (r.vMax - r.vMin);
+    const [cr, cg, cb] = simColor(t);
+    return `rgb(${cr},${cg},${cb})`;
   }
 
   if (mode === 'froh') {
@@ -479,20 +472,19 @@ export function perSampleColorFor(mode, value, valuesArr) {
   }
 
   if (mode === 'dosage') {
-    // 2026-05-26: was midpoint-rescaled to [vMin, vMax]. Same olive/grey
-    // midpoint collapse as het had when the cohort's mean dosages cluster
-    // tightly (skewed distributions land most samples on the desaturated
-    // grey middle of the teal→grey→red ramp). Switch to median-anchored
-    // divergent so half the cohort sits on each saturated side regardless
-    // of skew. Falls back to the fixed [0, 2] mapping when no valuesArr
-    // is supplied or the cohort range collapses.
-    const stats = _cohortRangeAndMedian(valuesArr);
-    if (stats && stats.vMin !== stats.vMax) {
-      const t = _twoSidedT(value, stats.vMin, stats.vMed, stats.vMax);
-      return _divergentTealRedThroughGrey(t);
+    // 2026-05-26 (revised): legacy `simColor` viridis-ish ramp, same as
+    // het. Cohort-rescaled to [vMin, vMax] so a tightly-clustered
+    // cohort still shows the full color spread; falls back to a fixed
+    // [0, 2] mapping when no valuesArr is supplied.
+    const r = _cohortRange(valuesArr);
+    let t;
+    if (r && r.vMin !== r.vMax) {
+      t = (value - r.vMin) / (r.vMax - r.vMin);
+    } else {
+      t = Math.max(0, Math.min(1, value / 2));
     }
-    const t = Math.max(0, Math.min(1, value / 2));
-    return _divergentTealRedThroughGrey(t);
+    const [cr, cg, cb] = simColor(t);
+    return `rgb(${cr},${cg},${cb})`;
   }
 
   return null;

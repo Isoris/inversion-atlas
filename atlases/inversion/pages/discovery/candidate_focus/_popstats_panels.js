@@ -21,101 +21,48 @@
 // callers don't have to know which band is which arrangement direction.
 // =============================================================================
 
+import { candidateGroupsFromLabels } from '../../../shared/candidate_groups.js';
+
 const POPSTATS_URL = '/api/popstats/groupwise';
 const HOBS_URL     = '/api/popstats/hobs_groupwise';
 
+// Server label vocabulary for K=3 (per shared/candidate_groups.js).
+// All four panels key off these names — the server returns metric values
+// under exactly these keys, so any deviation breaks _extractPerGroup.
+const G_HOM1 = 'H1/H1';
+const G_HET  = 'H1/H2';
+const G_HOM2 = 'H2/H2';
+
 /**
  * Entry point — call after the candidate page's HTML is in the DOM.
- * Reads the active candidate + chrom-level samples from `state`, builds
- * the group composition, and kicks off the four panel fetches in parallel.
- * Non-blocking: returns immediately. Each panel resolves independently.
+ * Builds the group composition through the canonical shared helper
+ * (so the labels match the server's vocabulary AND we don't duplicate
+ * the K-means → sample-id projection that popstats.js already uses),
+ * then fires the four panel fetches in parallel.
  */
 export function activatePopstatsPanels(state) {
   if (typeof document === 'undefined') return;
   const c = state && state.candidate;
   if (!c) return;
-  const groups = _buildBandGroups(state);
-  if (!groups || !groups.byBand) {
-    // No per-band sample IDs available — leave stubs alone.
-    return;
-  }
-  const region = { start_bp: c.start_bp | 0, end_bp: c.end_bp | 0 };
+  const built = candidateGroupsFromLabels(c, state && state.data, { labelStyle: 'server' });
+  if (!built || !built.groups) return;
   const chrom = c.chrom || (state.data && state.data.chrom) || null;
   if (!chrom) return;
+  const region = { start_bp: c.start_bp | 0, end_bp: c.end_bp | 0 };
 
-  // Fire all four panels in parallel; each handles its own DOM slot.
-  _activateThetaPerBand(chrom, region, groups);
-  _activateHetPerBand(chrom, region, groups);
-  _activateFstHomVsHom(chrom, region, groups);
-  _activateThetaPiIVGT(chrom, region, groups);
+  _activateThetaPerBand(chrom, region, built);
+  _activateHetPerBand(chrom, region, built);
+  _activateFstHomVsHom(chrom, region, built);
+  _activateThetaPiIVGT(chrom, region, built);
 }
 
-// ---------------------------------------------------------------------------
-// Group composition — derive per-K-band sample-ID arrays from the candidate.
-//
-// Inputs from state:
-//   state.candidate.locked_labels — Int8Array (or array) of length n_samples;
-//     each entry is the K-band index this sample sits in (0..K-1) OR -1 for
-//     ambiguous/unassigned.
-//   state.data.samples            — chrom-level samples array; canonical IDs
-//                                   live under `.cga`, `.ind`, or `.sample_id`.
-//
-// Returns:
-//   { byBand: { 0: [sid, sid, ...], 1: [...], 2: [...] }, K }
-//   OR null when either input is missing.
-// ---------------------------------------------------------------------------
-function _buildBandGroups(state) {
-  const c = state && state.candidate;
-  if (!c || !c.locked_labels) return null;
-  const samples = state && state.data && state.data.samples;
-  if (!Array.isArray(samples) || samples.length === 0) return null;
-  const labels = c.locked_labels;
-  if (labels.length !== samples.length) return null;   // shape mismatch — bail
-
-  const K = c.K || 3;
-  const byBand = {};
-  for (let i = 0; i < labels.length; i++) {
-    const k = labels[i];
-    if (k < 0 || k >= K) continue;
-    const sid = _sampleId(samples[i]);
-    if (!sid) continue;
-    (byBand[k] ||= []).push(sid);
+/** Filter the canonical groups dict to a name subset, dropping empty groups. */
+function _pickGroups(built, names) {
+  const out = {};
+  for (const n of names) {
+    const arr = built.groups[n];
+    if (Array.isArray(arr) && arr.length > 0) out[n] = arr;
   }
-  return { byBand, K };
-}
-
-function _sampleId(s) {
-  if (!s) return null;
-  return s.cga || s.ind || s.sample_id || s.id || null;
-}
-
-/** Group-name builder for the per-band panels — band_0 / band_1 / band_2. */
-function _bandGroupNames(groups) {
-  const out = {};
-  for (const [k, ids] of Object.entries(groups.byBand)) {
-    if (ids.length === 0) continue;
-    out[`band_${k}`] = ids;
-  }
-  return out;
-}
-
-/** Group-name builder for Hom1/Hom2 (K=3): band 0 = Hom1, band 2 = Hom2. */
-function _homGroupNames(groups) {
-  const out = {};
-  const h1 = groups.byBand[0] || [];
-  const h2 = groups.byBand[2] || [];
-  if (h1.length > 0) out.Hom1 = h1;
-  if (h2.length > 0) out.Hom2 = h2;
-  return out;
-}
-
-/** Group-name builder for INV/STD (K=3): same band convention, renamed. */
-function _ivgtGroupNames(groups) {
-  const out = {};
-  const std = groups.byBand[0] || [];
-  const inv = groups.byBand[2] || [];
-  if (std.length > 0) out.STD = std;
-  if (inv.length > 0) out.INV = inv;
   return out;
 }
 
@@ -124,14 +71,15 @@ function _ivgtGroupNames(groups) {
 // panel's stub body on success. On any failure the stub is left in place.
 // ---------------------------------------------------------------------------
 
-async function _activateThetaPerBand(chrom, region, groups) {
+async function _activateThetaPerBand(chrom, region, built) {
   const opts = { label: 'θ per band',
-                 sublabel: 'nucleotide diversity per K-means cluster',
+                 sublabel: 'nucleotide diversity per K-means cluster (H1/H1 · H1/H2 · H2/H2)',
                  valueFmt: _fmtSci };
-  const grpMap = _bandGroupNames(groups);
+  // All three groups — the per-band view wants the full K=3 split including het.
+  const grpMap = _pickGroups(built, [G_HOM1, G_HET, G_HOM2]);
   if (Object.keys(grpMap).length === 0) return;
   const body = { chrom, region, groups: grpMap, metrics: ['theta_pi'] };
-  const r = await _postJson(POPSTATS_URL, body);
+  const r = await _postPopstats(POPSTATS_URL, body);
   if (!r.ok) { _renderNotReady('cp-theta', opts, r); return; }
   const perGroup = _extractPerGroup(r.data, 'theta_pi');
   if (!perGroup) { _renderNotReady('cp-theta', opts,
@@ -139,14 +87,14 @@ async function _activateThetaPerBand(chrom, region, groups) {
   _renderPerBandBars('cp-theta', perGroup, opts);
 }
 
-async function _activateHetPerBand(chrom, region, groups) {
+async function _activateHetPerBand(chrom, region, built) {
   const opts = { label: 'heterozygosity per band',
-                 sublabel: 'mean per-sample H grouped by band',
+                 sublabel: 'mean per-sample H grouped by band (H1/H1 · H1/H2 · H2/H2)',
                  valueFmt: _fmtFloat };
-  const grpMap = _bandGroupNames(groups);
+  const grpMap = _pickGroups(built, [G_HOM1, G_HET, G_HOM2]);
   if (Object.keys(grpMap).length === 0) return;
   const body = { chrom, region, groups: grpMap, scales: ['10kb'] };
-  const r = await _postJson(HOBS_URL, body);
+  const r = await _postPopstats(HOBS_URL, body);
   if (!r.ok) { _renderNotReady('cp-het', opts, r); return; }
   const perGroup = _extractPerGroup(r.data, 'Hobs') ||
                    _extractPerGroup(r.data, 'hobs');
@@ -155,30 +103,35 @@ async function _activateHetPerBand(chrom, region, groups) {
   _renderPerBandBars('cp-het', perGroup, opts);
 }
 
-async function _activateFstHomVsHom(chrom, region, groups) {
+async function _activateFstHomVsHom(chrom, region, built) {
   const opts = { label: 'Fst Hom1 vs Hom2',
-                 sublabel: 'between-arrangement Fst (excludes het band)',
+                 sublabel: 'between-arrangement Fst — H1/H1 vs H2/H2 (excludes het H1/H2)',
                  valueFmt: _fmtFloat,
-                 valueLabel: 'Fst(Hom1, Hom2)' };
-  const grpMap = _homGroupNames(groups);
+                 valueLabel: 'Fst(H1/H1, H2/H2)' };
+  // Two homozygous groups only — the panel title's "Hom1/Hom2" maps to
+  // H1/H1 + H2/H2 in server vocab; the heterozygous band is excluded.
+  const grpMap = _pickGroups(built, [G_HOM1, G_HOM2]);
   if (Object.keys(grpMap).length < 2) return;
   const body = { chrom, region, groups: grpMap, metrics: ['fst'] };
-  const r = await _postJson(POPSTATS_URL, body);
+  const r = await _postPopstats(POPSTATS_URL, body);
   if (!r.ok) { _renderNotReady('cp-fst', opts, r); return; }
-  const fst = _extractPairwise(r.data, 'fst', 'Hom1', 'Hom2');
+  const fst = _extractPairwise(r.data, 'fst', G_HOM1, G_HOM2);
   if (fst == null) { _renderNotReady('cp-fst', opts,
                                      { error: 'parse', status: r.status }); return; }
   _renderSingleValue('cp-fst', { ...opts, value: fst });
 }
 
-async function _activateThetaPiIVGT(chrom, region, groups) {
+async function _activateThetaPiIVGT(chrom, region, built) {
   const opts = { label: 'θπ IVGT',
-                 sublabel: 'pairwise diversity for inverted vs standard arrangements',
+                 sublabel: 'pairwise θπ for inverted (H2/H2) vs standard (H1/H1)',
                  valueFmt: _fmtSci };
-  const grpMap = _ivgtGroupNames(groups);
+  // Same two homozygous groups as Fst — IVGT = "Inverted vs Standard"
+  // interpretation, identical sample partition just with arrangement
+  // semantics added in the labels.
+  const grpMap = _pickGroups(built, [G_HOM1, G_HOM2]);
   if (Object.keys(grpMap).length < 2) return;
   const body = { chrom, region, groups: grpMap, metrics: ['theta_pi'] };
-  const r = await _postJson(POPSTATS_URL, body);
+  const r = await _postPopstats(POPSTATS_URL, body);
   if (!r.ok) { _renderNotReady('cp-thetapi', opts, r); return; }
   const perGroup = _extractPerGroup(r.data, 'theta_pi');
   if (!perGroup) { _renderNotReady('cp-thetapi', opts,
@@ -189,6 +142,72 @@ async function _activateThetaPiIVGT(chrom, region, groups) {
 // ---------------------------------------------------------------------------
 // HTTP + payload extraction
 // ---------------------------------------------------------------------------
+
+// The popstats server validates group names against [A-Za-z0-9_], but our
+// canonical karyotype labels contain '/' (H1/H1, H1/H2, H2/H2). Rename on
+// send, undo on receive — extractors downstream keep working in canonical
+// vocabulary.
+function _toWire(name)   { return String(name).replace(/\//g, '_'); }
+
+/**
+ * POST helper that rewrites group keys to the server's allowed alphabet
+ * and renames them back in the response. Wraps _postJson.
+ */
+async function _postPopstats(url, body) {
+  let canonicalNames = null;
+  let wireBody = body;
+  if (body && body.groups && typeof body.groups === 'object') {
+    canonicalNames = Object.keys(body.groups);
+    const wireGroups = {};
+    for (const n of canonicalNames) wireGroups[_toWire(n)] = body.groups[n];
+    wireBody = { ...body, groups: wireGroups };
+  }
+  const r = await _postJson(url, wireBody);
+  if (r.ok && canonicalNames) _restoreCanonicalKeys(r.data, canonicalNames);
+  return r;
+}
+
+function _restoreCanonicalKeys(data, canonicalNames) {
+  if (!data || typeof data !== 'object') return;
+  const wireToCanonical = {};
+  for (const c of canonicalNames) wireToCanonical[_toWire(c)] = c;
+  const unwire = (k) => (k in wireToCanonical ? wireToCanonical[k] : k);
+
+  for (const containerKey of ['groups', 'per_group']) {
+    const c = data[containerKey];
+    if (c && typeof c === 'object' && !Array.isArray(c)) {
+      const renamed = {};
+      for (const [k, v] of Object.entries(c)) renamed[unwire(k)] = v;
+      data[containerKey] = renamed;
+    }
+  }
+  for (const listKey of ['pairs', 'pairwise']) {
+    const arr = data[listKey];
+    if (!Array.isArray(arr)) continue;
+    for (const row of arr) {
+      if (!row || typeof row !== 'object') continue;
+      for (const k of ['a', 'b', 'group_a', 'group_b', 'i', 'j']) {
+        if (typeof row[k] === 'string') row[k] = unwire(row[k]);
+      }
+    }
+  }
+  const pairsMap = data.pairs;
+  if (pairsMap && typeof pairsMap === 'object' && !Array.isArray(pairsMap)) {
+    for (const a of canonicalNames) {
+      for (const b of canonicalNames) {
+        if (a === b) continue;
+        for (const sep of [':', '__']) {
+          const wireKey = `${_toWire(a)}${sep}${_toWire(b)}`;
+          const canonKey = `${a}${sep}${b}`;
+          if (wireKey !== canonKey && wireKey in pairsMap) {
+            pairsMap[canonKey] = pairsMap[wireKey];
+            delete pairsMap[wireKey];
+          }
+        }
+      }
+    }
+  }
+}
 
 /**
  * POST helper. Returns { ok, data, status, error } so callers can paint

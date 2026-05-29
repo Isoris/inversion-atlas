@@ -109,6 +109,13 @@ export async function mount(root, atlasState, registry) {
       _setActiveState(pageState);
       try { refreshSimilarityPanel(pageState); }
       catch (e) { console.warn('similarity_matrix.mount: post-autoload refresh threw —', e); }
+      // 2026-05-26: re-wire toolbar so its handlers bind to the new
+      // pageState (initSimilarityPanelToolbar is idempotent — _wireToolbar
+      // tears down first). Without this the order dropdown / overlay
+      // checkboxes appeared to do nothing because their closures still
+      // pointed at the abandoned pre-compute pageState.
+      try { initSimilarityPanelToolbar(); }
+      catch (e) { console.warn('similarity_matrix.mount: post-autoload toolbar re-wire threw —', e); }
       if (atlasState.inversion) {
         atlasState.inversion._page_similarity_matrix_state = pageState;
       }

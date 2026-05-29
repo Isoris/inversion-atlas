@@ -1968,7 +1968,12 @@
                local_pca_dosage/hotkeys.js:130-181 is typeof-guarded so it
                silent-no-ops. Buttons stay HTML-disabled until the L3 draft
                state machine ships. -->
+          <!-- 2026-05-26 Group 1 cleanup (DEAD_BUTTON_AUDIT_2026-05-21):
+               row hidden in addition to `disabled` so the TODO stubs no
+               longer take screen space. Restore `style="display:none"` ->
+               removed when the L3 draft state machine ships. -->
           <div class="l3-act-row" id="l3ActionRow"
+               style="display: none;"
                data-todo="candidate-mode-l3-draft-not-implemented"
                title="[TODO] Candidate-draft action buttons — UI is in place but the underlying L3 draft state machine (extendL3DraftRight / commitL3Draft / etc.) was never implemented. Buttons remain disabled until the feature ships.">
             <span class="l3-act-row-label">draft:</span>
@@ -2001,7 +2006,12 @@
                `disabled` here to match the same affordance signal (clicks
                would otherwise silently do nothing). Restore `disabled`-off
                when the candidate-edit state machine ships. -->
-          <div id="candidateEditRow" data-todo="candidate-mode-edit-cluster-not-implemented">
+          <!-- 2026-05-26 Group 1 cleanup (DEAD_BUTTON_AUDIT_2026-05-21):
+               row hidden alongside the disabled state. Restore display
+               when the candidate-edit state machine ships. -->
+          <div id="candidateEditRow"
+               style="display: none;"
+               data-todo="candidate-mode-edit-cluster-not-implemented">
             <span class="cm-edit-row-label">edit:</span>
             <button id="cmFlipBtn" class="cm-edit-btn cm-edit-flip" disabled
                     data-todo="cm-flip-not-implemented"
