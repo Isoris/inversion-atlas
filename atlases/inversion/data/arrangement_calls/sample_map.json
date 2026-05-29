@@ -1,0 +1,906 @@
+[
+ {
+  "cga": "CGA009",
+  "ind": "Ind0"
+ },
+ {
+  "cga": "CGA010",
+  "ind": "Ind1"
+ },
+ {
+  "cga": "CGA021",
+  "ind": "Ind2"
+ },
+ {
+  "cga": "CGA022",
+  "ind": "Ind3"
+ },
+ {
+  "cga": "CGA033",
+  "ind": "Ind4"
+ },
+ {
+  "cga": "CGA034",
+  "ind": "Ind5"
+ },
+ {
+  "cga": "CGA045",
+  "ind": "Ind6"
+ },
+ {
+  "cga": "CGA046",
+  "ind": "Ind7"
+ },
+ {
+  "cga": "CGA057",
+  "ind": "Ind8"
+ },
+ {
+  "cga": "CGA058",
+  "ind": "Ind9"
+ },
+ {
+  "cga": "CGA070",
+  "ind": "Ind10"
+ },
+ {
+  "cga": "CGA072",
+  "ind": "Ind11"
+ },
+ {
+  "cga": "CGA073",
+  "ind": "Ind12"
+ },
+ {
+  "cga": "CGA074",
+  "ind": "Ind13"
+ },
+ {
+  "cga": "CGA079",
+  "ind": "Ind14"
+ },
+ {
+  "cga": "CGA080",
+  "ind": "Ind15"
+ },
+ {
+  "cga": "CGA083",
+  "ind": "Ind16"
+ },
+ {
+  "cga": "CGA084",
+  "ind": "Ind17"
+ },
+ {
+  "cga": "CGA085",
+  "ind": "Ind18"
+ },
+ {
+  "cga": "CGA086",
+  "ind": "Ind19"
+ },
+ {
+  "cga": "CGA091",
+  "ind": "Ind20"
+ },
+ {
+  "cga": "CGA092",
+  "ind": "Ind21"
+ },
+ {
+  "cga": "CGA095",
+  "ind": "Ind22"
+ },
+ {
+  "cga": "CGA096",
+  "ind": "Ind23"
+ },
+ {
+  "cga": "CGA097",
+  "ind": "Ind24"
+ },
+ {
+  "cga": "CGA098",
+  "ind": "Ind25"
+ },
+ {
+  "cga": "CGA107",
+  "ind": "Ind26"
+ },
+ {
+  "cga": "CGA108",
+  "ind": "Ind27"
+ },
+ {
+  "cga": "CGA109",
+  "ind": "Ind28"
+ },
+ {
+  "cga": "CGA119",
+  "ind": "Ind29"
+ },
+ {
+  "cga": "CGA120",
+  "ind": "Ind30"
+ },
+ {
+  "cga": "CGA121",
+  "ind": "Ind31"
+ },
+ {
+  "cga": "CGA122",
+  "ind": "Ind32"
+ },
+ {
+  "cga": "CGA131",
+  "ind": "Ind33"
+ },
+ {
+  "cga": "CGA141",
+  "ind": "Ind34"
+ },
+ {
+  "cga": "CGA143",
+  "ind": "Ind35"
+ },
+ {
+  "cga": "CGA153",
+  "ind": "Ind36"
+ },
+ {
+  "cga": "CGA154",
+  "ind": "Ind37"
+ },
+ {
+  "cga": "CGA155",
+  "ind": "Ind38"
+ },
+ {
+  "cga": "CGA162",
+  "ind": "Ind39"
+ },
+ {
+  "cga": "CGA163",
+  "ind": "Ind40"
+ },
+ {
+  "cga": "CGA164",
+  "ind": "Ind41"
+ },
+ {
+  "cga": "CGA165",
+  "ind": "Ind42"
+ },
+ {
+  "cga": "CGA166",
+  "ind": "Ind43"
+ },
+ {
+  "cga": "CGA167",
+  "ind": "Ind44"
+ },
+ {
+  "cga": "CGA174",
+  "ind": "Ind45"
+ },
+ {
+  "cga": "CGA175",
+  "ind": "Ind46"
+ },
+ {
+  "cga": "CGA176",
+  "ind": "Ind47"
+ },
+ {
+  "cga": "CGA177",
+  "ind": "Ind48"
+ },
+ {
+  "cga": "CGA178",
+  "ind": "Ind49"
+ },
+ {
+  "cga": "CGA179",
+  "ind": "Ind50"
+ },
+ {
+  "cga": "CGA186",
+  "ind": "Ind51"
+ },
+ {
+  "cga": "CGA187",
+  "ind": "Ind52"
+ },
+ {
+  "cga": "CGA188",
+  "ind": "Ind53"
+ },
+ {
+  "cga": "CGA189",
+  "ind": "Ind54"
+ },
+ {
+  "cga": "CGA190",
+  "ind": "Ind55"
+ },
+ {
+  "cga": "CGA191",
+  "ind": "Ind56"
+ },
+ {
+  "cga": "CGA199",
+  "ind": "Ind57"
+ },
+ {
+  "cga": "CGA200",
+  "ind": "Ind58"
+ },
+ {
+  "cga": "CGA201",
+  "ind": "Ind59"
+ },
+ {
+  "cga": "CGA202",
+  "ind": "Ind60"
+ },
+ {
+  "cga": "CGA203",
+  "ind": "Ind61"
+ },
+ {
+  "cga": "CGA210",
+  "ind": "Ind62"
+ },
+ {
+  "cga": "CGA211",
+  "ind": "Ind63"
+ },
+ {
+  "cga": "CGA212",
+  "ind": "Ind64"
+ },
+ {
+  "cga": "CGA213",
+  "ind": "Ind65"
+ },
+ {
+  "cga": "CGA214",
+  "ind": "Ind66"
+ },
+ {
+  "cga": "CGA215",
+  "ind": "Ind67"
+ },
+ {
+  "cga": "CGA222",
+  "ind": "Ind68"
+ },
+ {
+  "cga": "CGA223",
+  "ind": "Ind69"
+ },
+ {
+  "cga": "CGA224",
+  "ind": "Ind70"
+ },
+ {
+  "cga": "CGA225",
+  "ind": "Ind71"
+ },
+ {
+  "cga": "CGA226",
+  "ind": "Ind72"
+ },
+ {
+  "cga": "CGA227",
+  "ind": "Ind73"
+ },
+ {
+  "cga": "CGA228",
+  "ind": "Ind74"
+ },
+ {
+  "cga": "CGA229",
+  "ind": "Ind75"
+ },
+ {
+  "cga": "CGA230",
+  "ind": "Ind76"
+ },
+ {
+  "cga": "CGA231",
+  "ind": "Ind77"
+ },
+ {
+  "cga": "CGA232",
+  "ind": "Ind78"
+ },
+ {
+  "cga": "CGA233",
+  "ind": "Ind79"
+ },
+ {
+  "cga": "CGA234",
+  "ind": "Ind80"
+ },
+ {
+  "cga": "CGA235",
+  "ind": "Ind81"
+ },
+ {
+  "cga": "CGA236",
+  "ind": "Ind82"
+ },
+ {
+  "cga": "CGA237",
+  "ind": "Ind83"
+ },
+ {
+  "cga": "CGA238",
+  "ind": "Ind84"
+ },
+ {
+  "cga": "CGA239",
+  "ind": "Ind85"
+ },
+ {
+  "cga": "CGA240",
+  "ind": "Ind86"
+ },
+ {
+  "cga": "CGA241",
+  "ind": "Ind87"
+ },
+ {
+  "cga": "CGA242",
+  "ind": "Ind88"
+ },
+ {
+  "cga": "CGA243",
+  "ind": "Ind89"
+ },
+ {
+  "cga": "CGA244",
+  "ind": "Ind90"
+ },
+ {
+  "cga": "CGA245",
+  "ind": "Ind91"
+ },
+ {
+  "cga": "CGA247",
+  "ind": "Ind92"
+ },
+ {
+  "cga": "CGA248",
+  "ind": "Ind93"
+ },
+ {
+  "cga": "CGA249",
+  "ind": "Ind94"
+ },
+ {
+  "cga": "CGA250",
+  "ind": "Ind95"
+ },
+ {
+  "cga": "CGA251",
+  "ind": "Ind96"
+ },
+ {
+  "cga": "CGA252",
+  "ind": "Ind97"
+ },
+ {
+  "cga": "CGA253",
+  "ind": "Ind98"
+ },
+ {
+  "cga": "CGA254",
+  "ind": "Ind99"
+ },
+ {
+  "cga": "CGA255",
+  "ind": "Ind100"
+ },
+ {
+  "cga": "CGA256",
+  "ind": "Ind101"
+ },
+ {
+  "cga": "CGA257",
+  "ind": "Ind102"
+ },
+ {
+  "cga": "CGA259",
+  "ind": "Ind103"
+ },
+ {
+  "cga": "CGA260",
+  "ind": "Ind104"
+ },
+ {
+  "cga": "CGA261",
+  "ind": "Ind105"
+ },
+ {
+  "cga": "CGA262",
+  "ind": "Ind106"
+ },
+ {
+  "cga": "CGA263",
+  "ind": "Ind107"
+ },
+ {
+  "cga": "CGA264",
+  "ind": "Ind108"
+ },
+ {
+  "cga": "CGA265",
+  "ind": "Ind109"
+ },
+ {
+  "cga": "CGA266",
+  "ind": "Ind110"
+ },
+ {
+  "cga": "CGA267",
+  "ind": "Ind111"
+ },
+ {
+  "cga": "CGA268",
+  "ind": "Ind112"
+ },
+ {
+  "cga": "CGA269",
+  "ind": "Ind113"
+ },
+ {
+  "cga": "CGA272",
+  "ind": "Ind114"
+ },
+ {
+  "cga": "CGA273",
+  "ind": "Ind115"
+ },
+ {
+  "cga": "CGA274",
+  "ind": "Ind116"
+ },
+ {
+  "cga": "CGA275",
+  "ind": "Ind117"
+ },
+ {
+  "cga": "CGA276",
+  "ind": "Ind118"
+ },
+ {
+  "cga": "CGA277",
+  "ind": "Ind119"
+ },
+ {
+  "cga": "CGA278",
+  "ind": "Ind120"
+ },
+ {
+  "cga": "CGA279",
+  "ind": "Ind121"
+ },
+ {
+  "cga": "CGA280",
+  "ind": "Ind122"
+ },
+ {
+  "cga": "CGA281",
+  "ind": "Ind123"
+ },
+ {
+  "cga": "CGA283",
+  "ind": "Ind124"
+ },
+ {
+  "cga": "CGA284",
+  "ind": "Ind125"
+ },
+ {
+  "cga": "CGA285",
+  "ind": "Ind126"
+ },
+ {
+  "cga": "CGA286",
+  "ind": "Ind127"
+ },
+ {
+  "cga": "CGA287",
+  "ind": "Ind128"
+ },
+ {
+  "cga": "CGA288",
+  "ind": "Ind129"
+ },
+ {
+  "cga": "CGA289",
+  "ind": "Ind130"
+ },
+ {
+  "cga": "CGA290",
+  "ind": "Ind131"
+ },
+ {
+  "cga": "CGA291",
+  "ind": "Ind132"
+ },
+ {
+  "cga": "CGA292",
+  "ind": "Ind133"
+ },
+ {
+  "cga": "CGA293",
+  "ind": "Ind134"
+ },
+ {
+  "cga": "CGA294",
+  "ind": "Ind135"
+ },
+ {
+  "cga": "CGA295",
+  "ind": "Ind136"
+ },
+ {
+  "cga": "CGA296",
+  "ind": "Ind137"
+ },
+ {
+  "cga": "CGA297",
+  "ind": "Ind138"
+ },
+ {
+  "cga": "CGA298",
+  "ind": "Ind139"
+ },
+ {
+  "cga": "CGA299",
+  "ind": "Ind140"
+ },
+ {
+  "cga": "CGA302",
+  "ind": "Ind141"
+ },
+ {
+  "cga": "CGA303",
+  "ind": "Ind142"
+ },
+ {
+  "cga": "CGA304",
+  "ind": "Ind143"
+ },
+ {
+  "cga": "CGA305",
+  "ind": "Ind144"
+ },
+ {
+  "cga": "CGA306",
+  "ind": "Ind145"
+ },
+ {
+  "cga": "CGA307",
+  "ind": "Ind146"
+ },
+ {
+  "cga": "CGA308",
+  "ind": "Ind147"
+ },
+ {
+  "cga": "CGA309",
+  "ind": "Ind148"
+ },
+ {
+  "cga": "CGA310",
+  "ind": "Ind149"
+ },
+ {
+  "cga": "CGA311",
+  "ind": "Ind150"
+ },
+ {
+  "cga": "CGA312",
+  "ind": "Ind151"
+ },
+ {
+  "cga": "CGA313",
+  "ind": "Ind152"
+ },
+ {
+  "cga": "CGA314",
+  "ind": "Ind153"
+ },
+ {
+  "cga": "CGA315",
+  "ind": "Ind154"
+ },
+ {
+  "cga": "CGA316",
+  "ind": "Ind155"
+ },
+ {
+  "cga": "CGA317",
+  "ind": "Ind156"
+ },
+ {
+  "cga": "CGA318",
+  "ind": "Ind157"
+ },
+ {
+  "cga": "CGA319",
+  "ind": "Ind158"
+ },
+ {
+  "cga": "CGA320",
+  "ind": "Ind159"
+ },
+ {
+  "cga": "CGA321",
+  "ind": "Ind160"
+ },
+ {
+  "cga": "CGA322",
+  "ind": "Ind161"
+ },
+ {
+  "cga": "CGA323",
+  "ind": "Ind162"
+ },
+ {
+  "cga": "CGA324",
+  "ind": "Ind163"
+ },
+ {
+  "cga": "CGA325",
+  "ind": "Ind164"
+ },
+ {
+  "cga": "CGA326",
+  "ind": "Ind165"
+ },
+ {
+  "cga": "CGA327",
+  "ind": "Ind166"
+ },
+ {
+  "cga": "CGA328",
+  "ind": "Ind167"
+ },
+ {
+  "cga": "CGA329",
+  "ind": "Ind168"
+ },
+ {
+  "cga": "CGA331",
+  "ind": "Ind169"
+ },
+ {
+  "cga": "CGA332",
+  "ind": "Ind170"
+ },
+ {
+  "cga": "CGA333",
+  "ind": "Ind171"
+ },
+ {
+  "cga": "CGA334",
+  "ind": "Ind172"
+ },
+ {
+  "cga": "CGA335",
+  "ind": "Ind173"
+ },
+ {
+  "cga": "CGA336",
+  "ind": "Ind174"
+ },
+ {
+  "cga": "CGA337",
+  "ind": "Ind175"
+ },
+ {
+  "cga": "CGA338",
+  "ind": "Ind176"
+ },
+ {
+  "cga": "CGA339",
+  "ind": "Ind177"
+ },
+ {
+  "cga": "CGA340",
+  "ind": "Ind178"
+ },
+ {
+  "cga": "CGA341",
+  "ind": "Ind179"
+ },
+ {
+  "cga": "CGA342",
+  "ind": "Ind180"
+ },
+ {
+  "cga": "CGA343",
+  "ind": "Ind181"
+ },
+ {
+  "cga": "CGA344",
+  "ind": "Ind182"
+ },
+ {
+  "cga": "CGA345",
+  "ind": "Ind183"
+ },
+ {
+  "cga": "CGA346",
+  "ind": "Ind184"
+ },
+ {
+  "cga": "CGA347",
+  "ind": "Ind185"
+ },
+ {
+  "cga": "CGA348",
+  "ind": "Ind186"
+ },
+ {
+  "cga": "CGA349",
+  "ind": "Ind187"
+ },
+ {
+  "cga": "CGA350",
+  "ind": "Ind188"
+ },
+ {
+  "cga": "CGA351",
+  "ind": "Ind189"
+ },
+ {
+  "cga": "CGA353",
+  "ind": "Ind190"
+ },
+ {
+  "cga": "CGA354",
+  "ind": "Ind191"
+ },
+ {
+  "cga": "CGA355",
+  "ind": "Ind192"
+ },
+ {
+  "cga": "CGA356",
+  "ind": "Ind193"
+ },
+ {
+  "cga": "CGA357",
+  "ind": "Ind194"
+ },
+ {
+  "cga": "CGA358",
+  "ind": "Ind195"
+ },
+ {
+  "cga": "CGA359",
+  "ind": "Ind196"
+ },
+ {
+  "cga": "CGA362",
+  "ind": "Ind197"
+ },
+ {
+  "cga": "CGA371",
+  "ind": "Ind198"
+ },
+ {
+  "cga": "CGA373",
+  "ind": "Ind199"
+ },
+ {
+  "cga": "CGA374",
+  "ind": "Ind200"
+ },
+ {
+  "cga": "CGA383",
+  "ind": "Ind201"
+ },
+ {
+  "cga": "CGA385",
+  "ind": "Ind202"
+ },
+ {
+  "cga": "CGA386",
+  "ind": "Ind203"
+ },
+ {
+  "cga": "CGA395",
+  "ind": "Ind204"
+ },
+ {
+  "cga": "CGA397",
+  "ind": "Ind205"
+ },
+ {
+  "cga": "CGA398",
+  "ind": "Ind206"
+ },
+ {
+  "cga": "CGA407",
+  "ind": "Ind207"
+ },
+ {
+  "cga": "CGA409",
+  "ind": "Ind208"
+ },
+ {
+  "cga": "CGA410",
+  "ind": "Ind209"
+ },
+ {
+  "cga": "CGA419",
+  "ind": "Ind210"
+ },
+ {
+  "cga": "CGA421",
+  "ind": "Ind211"
+ },
+ {
+  "cga": "CGA422",
+  "ind": "Ind212"
+ },
+ {
+  "cga": "CGA431",
+  "ind": "Ind213"
+ },
+ {
+  "cga": "CGA434",
+  "ind": "Ind214"
+ },
+ {
+  "cga": "CGA436",
+  "ind": "Ind215"
+ },
+ {
+  "cga": "CGA437",
+  "ind": "Ind216"
+ },
+ {
+  "cga": "CGA443",
+  "ind": "Ind217"
+ },
+ {
+  "cga": "CGA445",
+  "ind": "Ind218"
+ },
+ {
+  "cga": "CGA446",
+  "ind": "Ind219"
+ },
+ {
+  "cga": "CGA448",
+  "ind": "Ind220"
+ },
+ {
+  "cga": "CGA449",
+  "ind": "Ind221"
+ },
+ {
+  "cga": "CGA457",
+  "ind": "Ind222"
+ },
+ {
+  "cga": "CGA460",
+  "ind": "Ind223"
+ },
+ {
+  "cga": "CGA461",
+  "ind": "Ind224"
+ },
+ {
+  "cga": "CGA69",
+  "ind": "Ind225"
+ }
+]
