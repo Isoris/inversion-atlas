@@ -62,6 +62,7 @@ import {
 } from './dosage_heatmap/sample_means.js';
 import { detectGroups } from './dosage_heatmap/dosage_detect.js';
 import { clusterIndexAware } from './dosage_heatmap/index_aware_cluster.js';
+import { collapseSimilar } from './dosage_heatmap/collapse_similar.js';
 import { selectMarkers, markerViewport } from './dosage_heatmap/marker_select.js';
 import { buildRegistryOverlay } from './dosage_heatmap/regime_registry_overlay.js';
 
@@ -83,6 +84,12 @@ const DEFAULT_VIEW_STATE = Object.freeze({
   // Bounding rectangle per group (marker extent × that group's contiguous
   // row block). Tight karyotype/cluster boxes when rows are grouped.
   show_group_rects:        false,
+  // Collapse near-identical samples (Hamming distance over tier-quantized
+  // genomic bins) into a few representative rows + a right-side ×N size
+  // histogram. Reduces crowding for large cohorts.
+  collapse_similar:        false,
+  collapse_hamming:        0,        // max differing bins to still collapse
+  collapse_reps:           4,        // representative rows kept per group
   // 2026-05-29: in-page haplotype-regime grouping. The heatmap can group
   // samples from the loaded dosage chunk itself (no upstream pipeline
   // needed) and score how confident each group is, OR consume the active
@@ -602,6 +609,12 @@ function _renderHeader(state) {
   if (ls) ls.checked = !!state.view_state.show_locus_span_overlay;
   const gr = document.getElementById('dosageHeatmapShowGroupRects');
   if (gr) gr.checked = !!state.view_state.show_group_rects;
+  const csim = document.getElementById('dosageHeatmapCollapseSimilar');
+  if (csim) csim.checked = !!state.view_state.collapse_similar;
+  const cham = document.getElementById('dosageHeatmapCollapseHamming');
+  if (cham) cham.value = String(state.view_state.collapse_hamming);
+  const crep = document.getElementById('dosageHeatmapCollapseReps');
+  if (crep) crep.value = String(state.view_state.collapse_reps);
   const hg = document.getElementById('dosageHeatmapShowGhslTrack');
   if (hg) hg.checked = !!state.view_state.show_ghsl_track;
   const tp = document.getElementById('dosageHeatmapShowThetaPiTrack');
@@ -650,8 +663,33 @@ function _paintHeatmap(state) {
     return;
   }
   if (empty) empty.style.display = 'none';
-  const order_s = deriveSampleOrder(state.view_state.sample_order_mode,
-                                     state.data.n_samples, state.data);
+  let order_s = deriveSampleOrder(state.view_state.sample_order_mode,
+                                   state.data.n_samples, state.data);
+  // Collapse near-identical samples into representative rows. Overrides the
+  // sample-order mode (groups are ordered low→high dosage) and attaches the
+  // per-row size metadata the renderer's right-gutter histogram consumes.
+  state._collapse = null;
+  state.data.collapse_rows = null;
+  if (state.view_state.collapse_similar) {
+    let plan = null;
+    try {
+      plan = collapseSimilar(state.data, {
+        hammingThreshold: state.view_state.collapse_hamming,
+        maxReps: state.view_state.collapse_reps,
+        markerOrder: state.markers_selected || undefined,
+      });
+    } catch (e) { console.warn('dosage_heatmap: collapseSimilar threw —', e); plan = null; }
+    if (plan && plan.order && plan.order.length > 0) {
+      state._collapse = plan;
+      order_s = plan.order;
+      state.data.collapse_rows = {
+        row_group: plan.row_group,
+        row_group_size: plan.row_group_size,
+        row_is_group_start: plan.row_is_group_start,
+        row_is_medoid: plan.row_is_medoid,
+      };
+    }
+  }
   // Marker axis: the working set (SNP view + subsample) ordered by the
   // chosen marker-order mode, then a cursor-centred zoom window.
   const working = state.markers_selected
@@ -681,6 +719,7 @@ function _paintHeatmap(state) {
     show_regime_call_track:  state.view_state.show_regime_call_track,
     show_locus_span_overlay: state.view_state.show_locus_span_overlay,
     show_group_rects:        state.view_state.show_group_rects,
+    show_collapse:           state.view_state.collapse_similar,
     group_colors:          state.group_colors,
     k6_colors:             state.k6_colors,
     hovered_cell:          hov ? { row: hov.row, col: hov.col } : null,
@@ -824,6 +863,14 @@ function _renderLegend(state) {
   }
   const sizes = groupSizesFromSampleGroup(state.data.sample_group);
   let html = '';
+  // Collapsed-rows summary at the top of the legend.
+  if (state._collapse) {
+    const c = state._collapse;
+    html += '<div class="dh2-legend-row" style="opacity:.9">'
+         +    '<span class="dh2-legend-id">⊟ collapsed</span> '
+         +    '<span class="dh2-legend-count">' + c.n_samples + ' samples → '
+         +    c.n_displayed + ' rows · ' + c.n_groups + ' groups</span></div>';
+  }
   // Focused-regime readout (catalogue source) at the top of the legend.
   if (state._focus_regime_id && state.overlay) {
     const sp = (state.overlay.spans || []).find(s => s.candidate_id === state._focus_regime_id);
@@ -983,6 +1030,18 @@ function _wireToolbar(state) {
     state.view_state.show_group_rects = !!(e && e.target && e.target.checked);
     repaint();
   };
+  const onCollapseSimilar = (e) => {
+    state.view_state.collapse_similar = !!(e && e.target && e.target.checked);
+    repaintAll();
+  };
+  const onCollapseHamming = (e) => {
+    state.view_state.collapse_hamming = parseInt((e && e.target && e.target.value) || '0', 10) || 0;
+    repaintAll();
+  };
+  const onCollapseReps = (e) => {
+    state.view_state.collapse_reps = parseInt((e && e.target && e.target.value) || '4', 10) || 4;
+    repaintAll();
+  };
   const onCanvasMove = (ev) => {
     const c = document.getElementById('dosageHeatmapCanvas');
     if (!c) return;
@@ -1040,6 +1099,7 @@ function _wireToolbar(state) {
     onShowGroupTrack, onShowPolarityTrack, onShowK6Track,
     onShowGhslTrack, onShowThetaPiTrack, onShowHetDosageTrack,
     onShowRegimeCallTrack, onShowLocusSpanOverlay, onShowGroupRects,
+    onCollapseSimilar, onCollapseHamming, onCollapseReps,
     onGroupingSource, onDetectK, onConfidenceScheme, onShowConfidenceTrack,
     onMarkerView, onSubsampleN, onZoom, onKeyDown,
     onCanvasMove, onCanvasClick, onCanvasLeave,
@@ -1068,6 +1128,9 @@ function _wireToolbar(state) {
   _addListener('dosageHeatmapShowRegimeCallTrack',  'change',     onShowRegimeCallTrack);
   _addListener('dosageHeatmapShowLocusSpanOverlay', 'change',     onShowLocusSpanOverlay);
   _addListener('dosageHeatmapShowGroupRects',       'change',     onShowGroupRects);
+  _addListener('dosageHeatmapCollapseSimilar',      'change',     onCollapseSimilar);
+  _addListener('dosageHeatmapCollapseHamming',      'change',     onCollapseHamming);
+  _addListener('dosageHeatmapCollapseReps',         'change',     onCollapseReps);
   _addListener('dosageHeatmapCanvas',               'mousemove',  onCanvasMove);
   _addListener('dosageHeatmapCanvas',               'click',      onCanvasClick);
   _addListener('dosageHeatmapCanvas',               'mouseleave', onCanvasLeave);
@@ -1098,6 +1161,9 @@ function _teardownToolbar(state) {
   if (h.onShowRegimeCallTrack) _removeListener('dosageHeatmapShowRegimeCallTrack',  'change',    h.onShowRegimeCallTrack);
   if (h.onShowLocusSpanOverlay) _removeListener('dosageHeatmapShowLocusSpanOverlay','change',    h.onShowLocusSpanOverlay);
   if (h.onShowGroupRects)      _removeListener('dosageHeatmapShowGroupRects',        'change',     h.onShowGroupRects);
+  if (h.onCollapseSimilar)     _removeListener('dosageHeatmapCollapseSimilar',       'change',     h.onCollapseSimilar);
+  if (h.onCollapseHamming)     _removeListener('dosageHeatmapCollapseHamming',       'change',     h.onCollapseHamming);
+  if (h.onCollapseReps)        _removeListener('dosageHeatmapCollapseReps',          'change',     h.onCollapseReps);
   if (h.onCanvasMove)          _removeListener('dosageHeatmapCanvas',               'mousemove',  h.onCanvasMove);
   if (h.onCanvasClick)         _removeListener('dosageHeatmapCanvas',               'click',      h.onCanvasClick);
   if (h.onCanvasLeave)         _removeListener('dosageHeatmapCanvas',               'mouseleave', h.onCanvasLeave);
@@ -1113,7 +1179,14 @@ function _updateTooltip(state) {
   const hov = state.selection.getHoveredCell();
   const px  = state.last_cursor_px;
   if (!hov || !px || !state.data) { slot.style.display = 'none'; return; }
-  slot.innerHTML = summariseHoverCell(hov, state.data);
+  let tip = summariseHoverCell(hov, state.data);
+  // Collapsed view: annotate the representative row with its group size.
+  const cr = state.data.collapse_rows;
+  if (cr && cr.row_group_size && hov.row >= 0 && hov.row < cr.row_group_size.length) {
+    const n = cr.row_group_size[hov.row];
+    if (n > 1) tip += ' · ×' + n + (cr.row_is_medoid && cr.row_is_medoid[hov.row] ? ' (medoid)' : '');
+  }
+  slot.innerHTML = tip;
   slot.style.display = 'block';
   // Position the tooltip 12px right + 4px below the cursor, clamped to
   // the canvas-wrap. We use offsetWidth/Height after toggling display

@@ -166,6 +166,35 @@ low var: least variable markers (background).">
           <input id="dosageHeatmapShowGroupRects" type="checkbox">
           Group rects
         </label>
+        <span class="dh2-sep"></span>
+        <!-- Collapse near-identical samples (Hamming distance over tier-
+             quantized genomic bins) into a few representative rows + a
+             right-side ×N size histogram. Cuts crowding for large cohorts. -->
+        <label class="dh2-toggle"
+               title="Merge samples with near-identical genomic-bin signatures into a few representative rows; a right-gutter bar shows each group's size (×N).">
+          <input id="dosageHeatmapCollapseSimilar" type="checkbox">
+          Collapse similar
+        </label>
+        <label class="dh2-toggle">
+          Tol
+          <select id="dosageHeatmapCollapseHamming" class="dh2-select"
+                  title="Hamming tolerance: max number of differing bins for two samples to still collapse. 0 = identical signatures only.">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          Reps
+          <select id="dosageHeatmapCollapseReps" class="dh2-select"
+                  title="Representative rows shown per collapsed group.">
+            <option value="1">1</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+          </select>
+        </label>
       </div>
     </header>
 

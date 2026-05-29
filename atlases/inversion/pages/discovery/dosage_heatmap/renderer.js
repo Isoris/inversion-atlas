@@ -404,6 +404,13 @@ export function paintDosageHeatmap(canvas, data, opts) {
   // are grouped (by_group / index-aware order).
   const showGroupRects = (o.show_group_rects === true)
                          && Array.isArray(data.sample_group);
+  // Collapsed-row size histogram in a right gutter: one bar per collapsed
+  // group (∝ group size) + ×N count. Aligned to the displayed rep rows.
+  const collapseRows = (o.show_collapse === true) && data.collapse_rows
+                       && data.collapse_rows.row_group_size
+                       && data.collapse_rows.row_group_size.length === order_s.length
+                     ? data.collapse_rows : null;
+  const showCollapseHist = !!collapseRows;
   const showGhsl        = (o.show_ghsl_track === true)          && !!data.sample_ghsl_mean;
   const showThetaPi     = (o.show_theta_pi_track === true)      && !!data.sample_theta_pi_mean;
   const showHetDosage   = (o.show_het_dosage_track === true)    && !!data.sample_het_dosage_mean;
@@ -468,7 +475,8 @@ export function paintDosageHeatmap(canvas, data, opts) {
                   + (showRolePair ? trackPx + trackGap : 0);
   const leftGutter = (showTicks ? tickPad : 0)
                    + (showGroupLabels ? labelPad : 0);
-  const drawW = Math.max(50, W - xPad - leftGutter - leftBands - xPad);
+  const rightHist = showCollapseHist ? 66 : 0;   // right gutter for size bars
+  const drawW = Math.max(50, W - xPad - leftGutter - leftBands - rightHist - xPad);
   const drawH = Math.max(50, H - 2 * yPad - topBand);
   const cellW = drawW / nDispM;
   const cellH = drawH / nDispS;
@@ -666,6 +674,54 @@ export function paintDosageHeatmap(canvas, data, opts) {
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
         ctx.fillText(String(g), gx0 + 3, y0 + 2);
+      }
+    }
+    if (typeof ctx.restore === 'function') ctx.restore();
+  }
+
+  // --- Collapsed-row size histogram (right gutter). One bar per group,
+  // spanning that group's rep rows, width ∝ size; ×N count printed.
+  // A faint separator + medoid tick aid reading the collapsed view.
+  if (showCollapseHist) {
+    const sizes = collapseRows.row_group_size;
+    const starts = collapseRows.row_is_group_start;
+    const medoids = collapseRows.row_is_medoid;
+    let maxSize = 1;
+    for (let r = 0; r < sizes.length; r++) if (sizes[r] > maxSize) maxSize = sizes[r];
+    const hx0 = matX + drawW + 6;
+    const barMax = rightHist - 12;             // leave room for ×N text
+    if (typeof ctx.save === 'function') ctx.save();
+    for (let r = 0; r < nDispS; r++) {
+      // Group separator line across the matrix at each group start (r>0).
+      if (starts[r] && r > 0 && typeof ctx.fillRect === 'function') {
+        ctx.fillStyle = 'rgba(160,180,200,0.25)';
+        ctx.fillRect(matX, matY + r * cellH - 0.5, drawW, 1);
+      }
+      // Medoid tick in the left edge of the gutter.
+      if (medoids[r] && typeof ctx.fillRect === 'function') {
+        ctx.fillStyle = 'rgba(245,165,36,0.9)';
+        ctx.fillRect(hx0 - 4, matY + r * cellH + cellH * 0.25, 2, Math.max(1, cellH * 0.5));
+      }
+      // Bar + count once per group (on its start row), spanning rep rows.
+      if (starts[r]) {
+        let re = r + 1;
+        while (re < nDispS && !starts[re]) re++;
+        const y0 = matY + r * cellH;
+        const y1 = matY + re * cellH;
+        const size = sizes[r];
+        const w = Math.max(2, (size / maxSize) * barMax);
+        const bh = Math.max(2, Math.min(y1 - y0 - 1, cellH * (re - r) - 1));
+        if (typeof ctx.fillRect === 'function') {
+          ctx.fillStyle = 'rgba(90,150,220,0.55)';
+          ctx.fillRect(hx0, y0 + 0.5, w, bh);
+        }
+        if (typeof ctx.fillText === 'function') {
+          ctx.font = '9px ui-monospace, monospace';
+          ctx.fillStyle = 'rgba(200,215,235,0.95)';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          ctx.fillText('×' + size, hx0 + 1, y0 + 1);
+        }
       }
     }
     if (typeof ctx.restore === 'function') ctx.restore();

@@ -130,6 +130,7 @@ group('renderer.paintDosageHeatmap');
 class FakeContext {
   constructor() {
     this.calls = [];
+    this.texts = [];
     this.fillStyle = ''; this.strokeStyle = ''; this.lineWidth = 0; this.font = '';
   }
   clearRect() { this.calls.push('clearRect'); }
@@ -141,7 +142,7 @@ class FakeContext {
   strokeRect() { this.calls.push('strokeRect'); }
   arc()      {}
   fill()     { this.calls.push('fill'); }
-  fillText() { this.calls.push('fillText'); }
+  fillText(t) { this.calls.push('fillText'); this.texts.push(String(t)); }
 }
 class FakeCanvas {
   constructor(w, h) { this.width = w || 600; this.height = h || 400; this._ctx = new FakeContext(); }
@@ -601,6 +602,47 @@ check('deriveSampleOrder index_aware uses precomputed order', (() => {
 check('index_aware falls back to natural without an order', (() => {
   const ord = deriveSampleOrder('index_aware', 5, { sample_group: ['a', 'a', 'b', 'b', 'b'] });
   return ord[0] === 0 && ord[4] === 4;
+})());
+
+// =====================================================================
+group('renderer.collapse size histogram (right gutter)');
+
+const dataCol = Object.assign({}, data, {
+  collapse_rows: {
+    row_group:          Int32Array.from([0, 0, 1]),
+    row_group_size:     Int32Array.from([5, 5, 2]),
+    row_is_group_start: Uint8Array.from([1, 0, 1]),
+    row_is_medoid:      Uint8Array.from([1, 0, 1]),
+  },
+});
+check('collapse histogram draws ×N labels per group', (() => {
+  const hc = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc, dataCol, {
+    show_group_track: false, show_polarity_track: false,
+    sample_order: Int32Array.from([0, 1, 2]),
+    show_collapse: true,
+  });
+  const texts = hc._ctx.texts ? hc._ctx.texts.filter(t => /^×\d/.test(t)) : [];
+  return texts.includes('×5') && texts.includes('×2');
+})());
+check('collapse histogram only when show_collapse + aligned rows', (() => {
+  const hc = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc, dataCol, {
+    show_group_track: false, show_polarity_track: false,
+    sample_order: Int32Array.from([0, 1, 2]),
+    show_collapse: false,
+  });
+  const texts = hc._ctx.texts ? hc._ctx.texts.filter(t => /^×\d/.test(t)) : [];
+  return texts.length === 0;
+})());
+check('mismatched collapse_rows length is ignored (no throw)', (() => {
+  const hc = new FakeCanvas(600, 400);
+  const bad = Object.assign({}, data, { collapse_rows: { row_group_size: Int32Array.from([5]) } });
+  paintDosageHeatmap(hc, bad, {
+    show_group_track: false, show_polarity_track: false,
+    sample_order: Int32Array.from([0, 1, 2, 3, 4]), show_collapse: true,
+  });
+  return true;   // reaching here = no exception
 })());
 
 // =====================================================================
