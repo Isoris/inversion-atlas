@@ -270,6 +270,42 @@
         </div>
       </div>
 
+      <!-- 2026-05-29: het-specific panel — per-sample PC1 lines coloured by
+           the page-1 dosage/het ramp (blue=0 → white → red), same scale.
+           Focal-independent (chrom-wide mean dosage per sample). -->
+      <div id="hetDosagePanel" style="
+        flex: 0 0 220px;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        margin: 0 12px 12px 12px;
+        background: var(--panel-1, #0f141d);
+        border: 1px solid var(--rule, #2a3242);
+        border-radius: 4px;
+      ">
+        <div class="rg-panel-title" style="
+          flex: 0 0 auto; padding: 4px 8px;
+          font: 10px ui-monospace, monospace;
+          color: var(--ink-dim, #8895a8);
+          border-bottom: 1px solid var(--rule, #2a3242);
+          display: flex; align-items: center; gap: 8px;
+        ">
+          <span style="flex: 0 0 auto;">PC1 lines &middot; coloured by dosage / het (page-1 ramp)</span>
+          <span id="hetDosageModeBar"
+                title="Colour the PC1 lines by per-sample mean dosage [0,2] or het rate [0,1] — same ramp + scale as the local_pca_dosage page."
+                style="display: inline-flex; align-items: center; gap: 2px;
+                       background: var(--panel-2, #181d27);
+                       border: 1px solid var(--rule, #2a3242);
+                       border-radius: 3px; padding: 1px 2px;">
+            <button type="button" data-het-color="dosage" class="active"
+                    title="Per-sample mean dosage [0,2]: blue=0 hom-ref, white=1 het, red=2 hom-alt.">dosage</button>
+            <button type="button" data-het-color="het"
+                    title="Per-sample het rate [0,1]: blue=0, white=0.5 (expected), red=1 (pure het).">het</button>
+          </span>
+        </div>
+        <div id="hetDosageCanvasContainer" style="flex: 1 1 0; min-height: 0; position: relative;"></div>
+      </div>
+
       <!-- L3 adjacent-pair Cramér's V mini-table -->
       <div id="rgL3PairsWrap" style="
         flex: 0 0 auto;

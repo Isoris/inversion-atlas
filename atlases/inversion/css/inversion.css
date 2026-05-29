@@ -6201,6 +6201,29 @@ body:not([data-l3-layout="dual"]) #cusumPanel #cusumPaneRight {
   font-weight: 600;
 }
 
+/* 2026-05-29: het_skeletons dosage/het colour toggle — same pills as
+   #rgViewBar so the het page's PC1-dosage panel header matches. */
+#hetDosageModeBar button[data-het-color] {
+  background: transparent;
+  color: var(--ink-dim);
+  border: 0;
+  border-radius: 2px;
+  padding: 2px 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 80ms ease, color 80ms ease;
+}
+#hetDosageModeBar button[data-het-color]:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--ink);
+}
+#hetDosageModeBar button[data-het-color].active {
+  background: var(--accent);
+  color: #0b0e13;
+  font-weight: 600;
+}
+
 /* 2026-05-20: haplotype_regimes toolbar buttons (.rg-tb-btn). Run
    pipeline / promote / auto-merge / export catalogue all carry this
    class — but no CSS rule existed, so each button leaned on inline

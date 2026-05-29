@@ -30,6 +30,12 @@ import {
   applyViewToggle,
   renderRegimesSummary,
 } from './haplotype_regimes/regimes_summary.js';
+import { installDosageChunkFetcher } from '../../shared/dosage_chunks.js';
+import {
+  buildHetDosagePanel,
+  drawHetDosagePanel,
+  wireHetDosageToggle,
+} from './haplotype_regimes/het_dosage_pc1_panel.js';
 
 let _pageState = null;
 
@@ -68,6 +74,21 @@ export async function mount(root, atlasState, registry) {
 
   try { wireRegimeFigureExportButtons(root, state); }
   catch (e) { console.warn('[mount] wireRegimeFigureExportButtons threw —', e); }
+
+  // 2026-05-29: het-specific PC1-dosage panel. The regimes pages don't wire
+  // the dosage-chunk fetcher (it lives on local_pca_dosage), so install it
+  // here against this page's scrubber_main data (which carries the same
+  // dosage_chunks layer). The fetcher is lazy: the first
+  // perSampleValuesForMode('dosage') call inside drawHetDosagePanel triggers
+  // a chrom-span fetch and returns NaN (grey lines); onLoad re-draws with the
+  // page-1 ramp colours filled in. Focal-independent, so it runs once here
+  // and survives the stash-restore early-returns below.
+  try {
+    buildHetDosagePanel(state);
+    wireHetDosageToggle(root, state, { onChange: () => { try { drawHetDosagePanel(state); } catch (_) {} } });
+    installDosageChunkFetcher(state, { onLoad: () => { try { drawHetDosagePanel(state); } catch (_) {} } });
+    drawHetDosagePanel(state);
+  } catch (e) { console.warn('[mount] het dosage panel wiring threw —', e); }
 
   // Cross-mount restore (namespaced slot).
   const stash = atlasState.inversion && atlasState.inversion._het_skeletons_stash;
