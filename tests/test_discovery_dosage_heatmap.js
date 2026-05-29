@@ -17,6 +17,7 @@ import {
   dosageMagmaColor,
   dosageGenotypeColor,
   pickDosageColorFn,
+  confidenceColor,
 } from '../atlases/inversion/pages/discovery/dosage_heatmap/renderer.js';
 import {
   adaptMglHeatmapJson,
@@ -500,6 +501,32 @@ check('GHSL mean: s0 = 0.4',                     Math.abs(gh[0] - 0.4) < 1e-6);
 check('GHSL mean: s1 ignores NaN',               Math.abs(gh[1] - 0.5) < 1e-6);
 check('GHSL mean: s2 = 1.0',                     Math.abs(gh[2] - 1.0) < 1e-6);
 check('GHSL mean: null when panel missing',      computeSampleGhslMean({}) === null);
+
+// =====================================================================
+group('renderer.confidenceColor + confidence track');
+
+check('confidenceColor returns rgb',             /^rgb\(/.test(confidenceColor(0.5, 0, 1)));
+check('confidenceColor NaN → muted slate',       confidenceColor(NaN) === 'rgb(50,55,65)');
+check('confidenceColor low ≠ high',              confidenceColor(0.05, 0, 1) !== confidenceColor(0.95, 0, 1));
+
+// Paint with a confidence track present → one extra fillRect per sample.
+const hcConf = new FakeCanvas(600, 400);
+const dataConf = Object.assign({}, data, {
+  sample_confidence: Float64Array.from([0.9, 0.8, 0.4, 0.85, 0.95]),
+});
+paintDosageHeatmap(hcConf, dataConf, {
+  show_group_track: false, show_polarity_track: false, show_confidence_track: true,
+});
+check('confidence track adds n_samples fillRects',
+      hcConf._ctx.calls.filter(c => c === 'fillRect').length === (5 * 4) + 5);
+
+// Track is auto-skipped when the backing array is absent.
+const hcNoConf = new FakeCanvas(600, 400);
+paintDosageHeatmap(hcNoConf, data, {
+  show_group_track: false, show_polarity_track: false, show_confidence_track: true,
+});
+check('confidence track auto-hidden without data',
+      hcNoConf._ctx.calls.filter(c => c === 'fillRect').length === (5 * 4));
 
 // =====================================================================
 console.log('\n=================');

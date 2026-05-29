@@ -143,6 +143,25 @@ function _ghslDivergingColor(v, vmin, vmax) {
   return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 
+// Confidence ramp for the in-page grouping confidence track: low
+// confidence = muted slate, high = bright teal-green. Sequential so a
+// quick scan shows which samples sit near a tier boundary (dark).
+const CONFIDENCE_STOPS = Object.freeze([
+  [0.00, [ 70,  78,  92]],
+  [0.35, [120, 110,  80]],
+  [0.70, [ 90, 170, 130]],
+  [1.00, [ 80, 230, 160]],
+]);
+
+export function confidenceColor(v, vmin, vmax) {
+  if (!Number.isFinite(v)) return 'rgb(50,55,65)';
+  const lo = Number.isFinite(vmin) ? vmin : 0;
+  const hi = Number.isFinite(vmax) ? vmax : 1;
+  const t = Math.max(0, Math.min(1, (v - lo) / Math.max(1e-9, hi - lo)));
+  const c = _interpStops(CONFIDENCE_STOPS, t);
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
 function _autoMin(arr) {
   let m = Infinity;
   for (let i = 0; i < arr.length; i++) {
@@ -365,6 +384,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
   const showGhsl        = (o.show_ghsl_track === true)          && !!data.sample_ghsl_mean;
   const showThetaPi     = (o.show_theta_pi_track === true)      && !!data.sample_theta_pi_mean;
   const showHetDosage   = (o.show_het_dosage_track === true)    && !!data.sample_het_dosage_mean;
+  const showConfidence  = (o.show_confidence_track === true)    && !!data.sample_confidence;
   const showPolarity    = (o.show_polarity_track !== false)     && !!data.marker_polarity;
   const showTicks       = (o.show_y_ticks !== false);
   const showGroupLabels = (o.show_group_labels !== false)       && !!data.sample_group;
@@ -382,6 +402,13 @@ export function paintDosageHeatmap(canvas, data, opts) {
   // so they're visually distinct from the group categorical track and
   // from the main matrix.
   const trackBlocks = [];
+  if (showConfidence) {
+    trackBlocks.push({
+      kind: 'continuous', label: 'conf',
+      values: data.sample_confidence,
+      colorFn: confidenceColor, vmin: 0, vmax: 1,
+    });
+  }
   if (showHetDosage) {
     trackBlocks.push({
       kind: 'continuous', label: 'het',

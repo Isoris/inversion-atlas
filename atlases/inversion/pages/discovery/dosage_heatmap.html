@@ -34,6 +34,49 @@ genotype: discrete white/blue/red for 0/0 · 0/1 · 1/1.">
             <option value="genotype">genotype (0/0 · 0/1 · 1/1)</option>
           </select>
         </label>
+        <span class="dh2-sep"></span>
+        <!-- 2026-05-29: in-page haplotype-regime grouping. Detect bands /
+             clusters from the loaded dosage chunk itself (no upstream
+             pipeline run), or consume the active candidate's regime calls.
+             The detected grouping feeds the group track / ordering /
+             labels / legend exactly like an external grouping. -->
+        <label class="dh2-toggle">
+          Grouping
+          <select id="dosageHeatmapGroupingSource" class="dh2-select"
+                  title="external: grouping supplied by the upstream page.
+bands: in-page 1-D dosage banding (homA/het/homB).
+clusters: in-page 2-D (mean,het) clustering.
+regime (candidate): the active candidate's upstream regime calls.">
+            <option value="external">external</option>
+            <option value="bands">detect bands</option>
+            <option value="clusters">detect clusters</option>
+            <option value="upstream_regime">regime (candidate)</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          K
+          <select id="dosageHeatmapDetectK" class="dh2-select"
+                  title="Number of detected groups. auto = silhouette-maximising over K=2..4.">
+            <option value="auto">auto</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          Confidence
+          <select id="dosageHeatmapConfidenceScheme" class="dh2-select"
+                  title="margin: distance from each sample's mean dosage to the nearest tier boundary.
+silhouette: per-sample 1-D silhouette within the detected groups.">
+            <option value="margin">margin</option>
+            <option value="silhouette">silhouette</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          <input id="dosageHeatmapShowConfidenceTrack" type="checkbox">
+          Confidence track
+        </label>
+        <span class="dh2-sep"></span>
         <label class="dh2-toggle">
           <input id="dosageHeatmapShowGroupTrack" type="checkbox" checked>
           Group

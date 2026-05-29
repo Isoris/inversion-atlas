@@ -59,6 +59,7 @@ import {
   computeSampleThetaPiMean,
   computeSampleGhslMean,
 } from './dosage_heatmap/sample_means.js';
+import { detectGroups } from './dosage_heatmap/dosage_detect.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   sample_order_mode:     'by_group',
@@ -75,6 +76,18 @@ const DEFAULT_VIEW_STATE = Object.freeze({
   // 2026-05-27: regime overlays (active candidate scope).
   show_regime_call_track:  false,
   show_locus_span_overlay: false,
+  // 2026-05-29: in-page haplotype-regime grouping. The heatmap can group
+  // samples from the loaded dosage chunk itself (no upstream pipeline
+  // needed) and score how confident each group is, OR consume the active
+  // candidate's upstream regime calls.
+  //   grouping_source:  'external'        — the upstream sample_group as supplied
+  //                     'bands'           — in-page 1-D dosage banding (homA/het/homB)
+  //                     'clusters'        — in-page 2-D (mean,het) clustering
+  //                     'upstream_regime' — active candidate's regime calls
+  grouping_source:       'external',
+  detect_k:              'auto',     // 'auto' | 2 | 3 | 4
+  show_confidence_track: false,
+  confidence_scheme:     'margin',   // 'margin' | 'silhouette'
 });
 
 // =====================================================================
@@ -313,7 +326,7 @@ function _buildPageState(atlasState) {
     try { canonical.regime_overlay = _buildRegimeOverlay(canonical, atlasState); }
     catch (e) { console.warn('dosage_heatmap: regime overlay build threw —', e); }
   }
-  return {
+  const state = {
     data:                  canonical,
     candidate_label:       dh ? (dh.candidate_label || null) : null,
     view_label:            dh ? (dh.view_label || _defaultViewLabel(dh)) : null,
@@ -325,11 +338,66 @@ function _buildPageState(atlasState) {
                               : new Map(),
     layout:                null,
     last_cursor_px:        null,
+    detect:                null,    // detectGroups() result when grouping_source is in-page
     view_state:            Object.assign({}, DEFAULT_VIEW_STATE,
                                           (dh && dh.view_state) || {}),
     selection:             createDosageHeatmapSelection(),
     _handlers:             {},
   };
+  // Apply the initial grouping source (no-op for 'external').
+  _applyGrouping(state);
+  return state;
+}
+
+// =====================================================================
+// Grouping source — in-page detection / upstream regime / external
+// =====================================================================
+
+// Map a per-sample silhouette ([-1,1]) into [0,1] for the confidence ramp.
+function _sil01(arr) {
+  if (!arr) return null;
+  const out = new Float64Array(arr.length);
+  for (let i = 0; i < arr.length; i++) {
+    out[i] = Number.isFinite(arr[i]) ? (arr[i] + 1) / 2 : NaN;
+  }
+  return out;
+}
+
+/**
+ * Resolve `state.data.sample_group` + `sample_confidence` from the
+ * current grouping source. Caches the originally-supplied (external)
+ * grouping on first call so switching back to 'external' restores it.
+ * Recomputes `state.group_colors` for the resulting group set and
+ * stashes the full detection result on `state.detect`.
+ */
+function _applyGrouping(state) {
+  const d = state && state.data;
+  if (!d) { if (state) state.detect = null; return; }
+  const vs = state.view_state;
+  if (d._external_sample_group === undefined) {
+    d._external_sample_group = d.sample_group || null;
+  }
+  const src = (vs && vs.grouping_source) || 'external';
+  let det = null;
+  if (src === 'bands' || src === 'clusters') {
+    try { det = detectGroups(d, { mode: src, k: vs.detect_k }); }
+    catch (e) { console.warn('dosage_heatmap: detectGroups threw —', e); det = null; }
+  }
+  state.detect = det;
+  if (det) {
+    d.sample_group = det.sample_group;
+    d.sample_confidence = (vs.confidence_scheme === 'silhouette')
+      ? _sil01(det.silhouette)
+      : det.margin;
+  } else if (src === 'upstream_regime'
+             && d.regime_overlay && d.regime_overlay.sample_regime_call) {
+    d.sample_group = d.regime_overlay.sample_regime_call.map(c => c || null);
+    d.sample_confidence = null;
+  } else {
+    d.sample_group = d._external_sample_group;
+    d.sample_confidence = null;
+  }
+  state.group_colors = buildGroupColorMap(_distinctOf(d.sample_group));
 }
 
 function _defaultViewLabel(dh) {
@@ -458,6 +526,14 @@ function _renderHeader(state) {
   if (tp) tp.checked = !!state.view_state.show_theta_pi_track;
   const hd = document.getElementById('dosageHeatmapShowHetDosageTrack');
   if (hd) hd.checked = !!state.view_state.show_het_dosage_track;
+  const gs = document.getElementById('dosageHeatmapGroupingSource');
+  if (gs) gs.value = state.view_state.grouping_source;
+  const dk = document.getElementById('dosageHeatmapDetectK');
+  if (dk) dk.value = String(state.view_state.detect_k);
+  const cs = document.getElementById('dosageHeatmapConfidenceScheme');
+  if (cs) cs.value = state.view_state.confidence_scheme;
+  const ct = document.getElementById('dosageHeatmapShowConfidenceTrack');
+  if (ct) ct.checked = !!state.view_state.show_confidence_track;
 }
 
 // =====================================================================
@@ -500,6 +576,7 @@ function _paintHeatmap(state) {
     show_ghsl_track:       state.view_state.show_ghsl_track,
     show_theta_pi_track:   state.view_state.show_theta_pi_track,
     show_het_dosage_track: state.view_state.show_het_dosage_track,
+    show_confidence_track: state.view_state.show_confidence_track,
     show_polarity_track:   state.view_state.show_polarity_track,
     show_y_ticks:            state.view_state.show_y_ticks,
     show_group_labels:       state.view_state.show_group_labels,
@@ -529,11 +606,12 @@ function _renderRightPanel(state) {
   }
   const hov = state.selection.getHoveredCell();
   if (!hov) {
-    const html =
+    let html =
       '<dt>Samples</dt><dd>' + state.data.n_samples + '</dd>'
       + '<dt>Markers</dt><dd>' + state.data.n_markers + '</dd>'
       + '<dt>Selected samples</dt><dd>' + state.selection.getSelectedSamples().size + '</dd>'
       + '<dt>Selected markers</dt><dd>' + state.selection.getSelectedMarkers().size + '</dd>';
+    html += _detectSummaryHtml(state);
     fields.innerHTML = html;
     return;
   }
@@ -543,6 +621,31 @@ function _renderRightPanel(state) {
   html += '<dt>Dosage</dt><dd>' + (hov.dosage == null ? 'NA'
             : (Number.isFinite(hov.dosage) ? hov.dosage.toFixed(4) : hov.dosage)) + '</dd>';
   fields.innerHTML = html;
+}
+
+// Per-group confidence summary for the right panel. Rendered only when
+// an in-page grouping source (bands/clusters) is active.
+function _detectSummaryHtml(state) {
+  const det = state && state.detect;
+  if (!det || !Array.isArray(det.groups) || det.groups.length === 0) return '';
+  let html = '<dt class="dh2-detect-head">Detected ' + det.mode
+           + ' (K=' + det.k + ')</dt><dd>silhouette '
+           + (Number.isFinite(det.overall_silhouette) ? det.overall_silhouette.toFixed(2) : '—')
+           + '</dd>';
+  for (const g of det.groups) {
+    const lbl = (det.mode === 'bands')
+      ? (g.call.replace('_like', '') + ' (b' + g.label + ')')
+      : ('cluster ' + g.label);
+    const conf = Number.isFinite(g.confidence) ? g.confidence.toFixed(2) : '—';
+    const md   = Number.isFinite(g.mean_dosage) ? g.mean_dosage.toFixed(2) : '—';
+    const mg   = Number.isFinite(g.mean_margin) ? g.mean_margin.toFixed(2) : '—';
+    const sl   = Number.isFinite(g.mean_silhouette) ? g.mean_silhouette.toFixed(2) : '—';
+    const sep  = Number.isFinite(g.separation) ? g.separation.toFixed(1) : '—';
+    html += '<dt>' + lbl + ' · n=' + g.n + '</dt>'
+         +  '<dd>conf ' + conf + ' · d̄ ' + md
+         +  ' · margin ' + mg + ' · sil ' + sl + ' · sep ' + sep + '</dd>';
+  }
+  return html;
 }
 
 function _renderLegend(state) {
@@ -620,6 +723,26 @@ function _wireToolbar(state) {
     state.view_state.show_het_dosage_track = !!(e && e.target && e.target.checked);
     repaint();
   };
+  const onGroupingSource = (e) => {
+    state.view_state.grouping_source = (e && e.target && e.target.value) || 'external';
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onDetectK = (e) => {
+    const v = (e && e.target && e.target.value) || 'auto';
+    state.view_state.detect_k = (v === 'auto') ? 'auto' : (parseInt(v, 10) || 'auto');
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onConfidenceScheme = (e) => {
+    state.view_state.confidence_scheme = (e && e.target && e.target.value) || 'margin';
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onShowConfidenceTrack = (e) => {
+    state.view_state.show_confidence_track = !!(e && e.target && e.target.checked);
+    repaint();
+  };
   const onShowRegimeCallTrack = (e) => {
     state.view_state.show_regime_call_track = !!(e && e.target && e.target.checked);
     repaint();
@@ -669,6 +792,7 @@ function _wireToolbar(state) {
     onShowGroupTrack, onShowPolarityTrack, onShowK6Track,
     onShowGhslTrack, onShowThetaPiTrack, onShowHetDosageTrack,
     onShowRegimeCallTrack, onShowLocusSpanOverlay,
+    onGroupingSource, onDetectK, onConfidenceScheme, onShowConfidenceTrack,
     onCanvasMove, onCanvasClick, onCanvasLeave,
     unsubSelection,
   };
@@ -682,6 +806,10 @@ function _wireToolbar(state) {
   _addListener('dosageHeatmapShowGhslTrack',        'change',     onShowGhslTrack);
   _addListener('dosageHeatmapShowThetaPiTrack',     'change',     onShowThetaPiTrack);
   _addListener('dosageHeatmapShowHetDosageTrack',   'change',     onShowHetDosageTrack);
+  _addListener('dosageHeatmapGroupingSource',       'change',     onGroupingSource);
+  _addListener('dosageHeatmapDetectK',              'change',     onDetectK);
+  _addListener('dosageHeatmapConfidenceScheme',     'change',     onConfidenceScheme);
+  _addListener('dosageHeatmapShowConfidenceTrack',  'change',     onShowConfidenceTrack);
   _addListener('dosageHeatmapShowRegimeCallTrack',  'change',     onShowRegimeCallTrack);
   _addListener('dosageHeatmapShowLocusSpanOverlay', 'change',     onShowLocusSpanOverlay);
   _addListener('dosageHeatmapCanvas',               'mousemove',  onCanvasMove);
@@ -701,6 +829,10 @@ function _teardownToolbar(state) {
   if (h.onShowGhslTrack)       _removeListener('dosageHeatmapShowGhslTrack',        'change',    h.onShowGhslTrack);
   if (h.onShowThetaPiTrack)    _removeListener('dosageHeatmapShowThetaPiTrack',     'change',    h.onShowThetaPiTrack);
   if (h.onShowHetDosageTrack)  _removeListener('dosageHeatmapShowHetDosageTrack',   'change',    h.onShowHetDosageTrack);
+  if (h.onGroupingSource)      _removeListener('dosageHeatmapGroupingSource',       'change',    h.onGroupingSource);
+  if (h.onDetectK)             _removeListener('dosageHeatmapDetectK',              'change',    h.onDetectK);
+  if (h.onConfidenceScheme)    _removeListener('dosageHeatmapConfidenceScheme',     'change',    h.onConfidenceScheme);
+  if (h.onShowConfidenceTrack) _removeListener('dosageHeatmapShowConfidenceTrack',  'change',    h.onShowConfidenceTrack);
   if (h.onShowRegimeCallTrack) _removeListener('dosageHeatmapShowRegimeCallTrack',  'change',    h.onShowRegimeCallTrack);
   if (h.onShowLocusSpanOverlay) _removeListener('dosageHeatmapShowLocusSpanOverlay','change',    h.onShowLocusSpanOverlay);
   if (h.onCanvasMove)          _removeListener('dosageHeatmapCanvas',               'mousemove',  h.onCanvasMove);
