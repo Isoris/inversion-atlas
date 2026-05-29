@@ -60,6 +60,7 @@ import {
   computeSampleGhslMean,
 } from './dosage_heatmap/sample_means.js';
 import { detectGroups } from './dosage_heatmap/dosage_detect.js';
+import { selectMarkers, markerViewport } from './dosage_heatmap/marker_select.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   sample_order_mode:     'by_group',
@@ -88,6 +89,17 @@ const DEFAULT_VIEW_STATE = Object.freeze({
   detect_k:              'auto',     // 'auto' | 2 | 3 | 4
   show_confidence_track: false,
   confidence_scheme:     'margin',   // 'margin' | 'silhouette'
+  // 2026-05-29: marker-axis SNP views + subsampling + cursor/zoom.
+  //   marker_view:        'all' | 'random' | 'high_var' | 'low_var'
+  //   marker_subsample_n: 0 = all markers for the view; else cap to N
+  //   zoom:               1 = whole working set; 2/4/8 = cursor-centred window
+  //   cursor_col:         ←/→ cursor position (index into the working set)
+  //   cursor_row:         ↑/↓ cursor (−1 = off)
+  marker_view:           'all',
+  marker_subsample_n:    0,
+  zoom:                  1,
+  cursor_col:            0,
+  cursor_row:            -1,
 });
 
 // =====================================================================
@@ -344,9 +356,36 @@ function _buildPageState(atlasState) {
     selection:             createDosageHeatmapSelection(),
     _handlers:             {},
   };
-  // Apply the initial grouping source (no-op for 'external').
+  // Build the initial marker working-set + grouping.
+  _recomputeMarkers(state);
   _applyGrouping(state);
   return state;
+}
+
+// =====================================================================
+// Marker working-set (SNP view + subsample) + cursor clamp
+// =====================================================================
+
+/**
+ * Recompute `state.markers_selected` (the working marker set the matrix
+ * and the in-page detection both operate on) from the SNP view +
+ * subsample knobs, and clamp the cursor into range.
+ */
+function _recomputeMarkers(state) {
+  const d = state && state.data;
+  if (!d) { if (state) state.markers_selected = null; return; }
+  const vs = state.view_state;
+  let sel;
+  try {
+    sel = selectMarkers(d, { view: vs.marker_view, n: vs.marker_subsample_n });
+  } catch (e) {
+    console.warn('dosage_heatmap: selectMarkers threw —', e);
+    sel = null;
+  }
+  state.markers_selected = (sel && sel.length > 0) ? sel : null;
+  const len = state.markers_selected ? state.markers_selected.length : (d.n_markers | 0);
+  if (!Number.isFinite(vs.cursor_col)) vs.cursor_col = 0;
+  vs.cursor_col = Math.max(0, Math.min(len - 1, vs.cursor_col | 0));
 }
 
 // =====================================================================
@@ -380,7 +419,10 @@ function _applyGrouping(state) {
   const src = (vs && vs.grouping_source) || 'external';
   let det = null;
   if (src === 'bands' || src === 'clusters') {
-    try { det = detectGroups(d, { mode: src, k: vs.detect_k }); }
+    // Detection operates on the current SNP working-set so grouping +
+    // confidence reflect the markers actually on screen (random / high-
+    // var / low-var view), not always the full marker set.
+    try { det = detectGroups(d, { mode: src, k: vs.detect_k, markerOrder: state.markers_selected || undefined }); }
     catch (e) { console.warn('dosage_heatmap: detectGroups threw —', e); det = null; }
   }
   state.detect = det;
@@ -534,6 +576,12 @@ function _renderHeader(state) {
   if (cs) cs.value = state.view_state.confidence_scheme;
   const ct = document.getElementById('dosageHeatmapShowConfidenceTrack');
   if (ct) ct.checked = !!state.view_state.show_confidence_track;
+  const mv = document.getElementById('dosageHeatmapMarkerView');
+  if (mv) mv.value = state.view_state.marker_view;
+  const sn = document.getElementById('dosageHeatmapSubsampleN');
+  if (sn) sn.value = String(state.view_state.marker_subsample_n);
+  const zm = document.getElementById('dosageHeatmapZoom');
+  if (zm) zm.value = String(state.view_state.zoom);
 }
 
 // =====================================================================
@@ -564,8 +612,18 @@ function _paintHeatmap(state) {
   if (empty) empty.style.display = 'none';
   const order_s = deriveSampleOrder(state.view_state.sample_order_mode,
                                      state.data.n_samples, state.data);
-  const order_m = deriveMarkerOrder(state.view_state.marker_order_mode,
-                                     state.data.n_markers, state.data);
+  // Marker axis: the working set (SNP view + subsample) ordered by the
+  // chosen marker-order mode, then a cursor-centred zoom window.
+  const working = state.markers_selected
+    || deriveMarkerOrder(state.view_state.marker_order_mode,
+                         state.data.n_markers, state.data);
+  const orderedWorking = _orderWorkingMarkers(working, state);
+  const vp = markerViewport(orderedWorking, state.view_state.cursor_col, state.view_state.zoom);
+  const order_m = vp.order;
+  state._viewport = vp;            // for cursor info + hit-mapping
+  state._working_markers = orderedWorking;
+  // Cursor position relative to the painted viewport.
+  const cursorColDisp = (state.view_state.cursor_col | 0) - vp.start;
   const hov = state.selection.getHoveredCell();
   const paint = paintDosageHeatmap(canvas, state.data, {
     sample_order:          order_s,
@@ -585,10 +643,25 @@ function _paintHeatmap(state) {
     group_colors:          state.group_colors,
     k6_colors:             state.k6_colors,
     hovered_cell:          hov ? { row: hov.row, col: hov.col } : null,
+    cursor_col:            cursorColDisp,
+    cursor_row:            state.view_state.cursor_row,
     selected_samples:      state.selection.getSelectedSamples(),
     selected_markers:      state.selection.getSelectedMarkers(),
   });
   state.layout = paint.layout;
+}
+
+// Apply the marker-order mode (natural | by_polarity) to the working
+// marker set. by_polarity reorders the working canonical indices so
+// unflipped markers come first; natural keeps ascending order.
+function _orderWorkingMarkers(working, state) {
+  const w = (working instanceof Int32Array) ? working : Int32Array.from(working || []);
+  const mode = state.view_state.marker_order_mode;
+  const pol = state.data && state.data.marker_polarity;
+  if (mode !== 'by_polarity' || !pol) return w;
+  const arr = Array.from(w);
+  arr.sort((a, b) => (Number(pol[a] || 0) - Number(pol[b] || 0)) || (a - b));
+  return Int32Array.from(arr);
 }
 
 // =====================================================================
@@ -611,6 +684,7 @@ function _renderRightPanel(state) {
       + '<dt>Markers</dt><dd>' + state.data.n_markers + '</dd>'
       + '<dt>Selected samples</dt><dd>' + state.selection.getSelectedSamples().size + '</dd>'
       + '<dt>Selected markers</dt><dd>' + state.selection.getSelectedMarkers().size + '</dd>';
+    html += _cursorInfoHtml(state);
     html += _detectSummaryHtml(state);
     fields.innerHTML = html;
     return;
@@ -621,6 +695,27 @@ function _renderRightPanel(state) {
   html += '<dt>Dosage</dt><dd>' + (hov.dosage == null ? 'NA'
             : (Number.isFinite(hov.dosage) ? hov.dosage.toFixed(4) : hov.dosage)) + '</dd>';
   fields.innerHTML = html;
+}
+
+// Marker cursor + viewport readout for the right panel.
+function _cursorInfoHtml(state) {
+  const d = state && state.data;
+  if (!d) return '';
+  const vs = state.view_state;
+  const working = state._working_markers;
+  const len = (working && working.length) || (d.n_markers | 0);
+  const col = Math.max(0, Math.min(len - 1, vs.cursor_col | 0));
+  const mi = working ? working[col] : col;
+  const lbl = (d.marker_labels && d.marker_labels[mi]) || ('M' + mi);
+  const bp = d.marker_pos_bp && Number.isFinite(d.marker_pos_bp[mi])
+    ? (d.marker_pos_bp[mi] / 1e6).toFixed(3) + ' Mb' : null;
+  let html = '<dt class="dh2-detect-head">Cursor</dt><dd>'
+           + lbl + (bp ? ' · ' + bp : '') + ' · col ' + (col + 1) + '/' + len + '</dd>';
+  const vw = (vs.marker_view !== 'all') ? vs.marker_view : 'all SNPs';
+  html += '<dt>View · zoom</dt><dd>' + vw
+        + (vs.marker_subsample_n > 0 ? ' · n=' + vs.marker_subsample_n : '')
+        + ' · ×' + (vs.zoom || 1) + '</dd>';
+  return html;
 }
 
 // Per-group confidence summary for the right panel. Rendered only when
@@ -743,6 +838,59 @@ function _wireToolbar(state) {
     state.view_state.show_confidence_track = !!(e && e.target && e.target.checked);
     repaint();
   };
+  const onMarkerView = (e) => {
+    state.view_state.marker_view = (e && e.target && e.target.value) || 'all';
+    _recomputeMarkers(state);
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onSubsampleN = (e) => {
+    const v = parseInt((e && e.target && e.target.value), 10);
+    state.view_state.marker_subsample_n = Number.isFinite(v) ? v : 0;
+    _recomputeMarkers(state);
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onZoom = (e) => {
+    const v = parseInt((e && e.target && e.target.value), 10);
+    state.view_state.zoom = Number.isFinite(v) && v >= 1 ? v : 1;
+    repaint();
+    _renderRightPanel(state);
+  };
+  // Keyboard cursor: ←/→ move the marker cursor (Shift ×10, Home/End to
+  // ends), ↑/↓ move the sample cursor, +/− zoom. Ignored while typing in
+  // a form control or when the page isn't mounted.
+  const onKeyDown = (ev) => {
+    if (!ev) return;
+    const t = ev.target;
+    if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName || '')) return;
+    if (!document.getElementById('dosageHeatmapCanvas')) return;
+    if (!state.data) return;
+    const vs = state.view_state;
+    const len = (state._working_markers && state._working_markers.length)
+      || (state.data.n_markers | 0);
+    const nS = state.data.n_samples | 0;
+    const step = ev.shiftKey ? 10 : 1;
+    let handled = true;
+    switch (ev.key) {
+      case 'ArrowLeft':  vs.cursor_col = Math.max(0, (vs.cursor_col | 0) - step); break;
+      case 'ArrowRight': vs.cursor_col = Math.min(len - 1, (vs.cursor_col | 0) + step); break;
+      case 'Home':       vs.cursor_col = 0; break;
+      case 'End':        vs.cursor_col = len - 1; break;
+      case 'ArrowUp':
+        vs.cursor_row = (vs.cursor_row < 0 ? nS - 1 : Math.max(0, vs.cursor_row - step)); break;
+      case 'ArrowDown':
+        vs.cursor_row = (vs.cursor_row < 0 ? 0 : Math.min(nS - 1, vs.cursor_row + step)); break;
+      case '+': case '=': vs.zoom = Math.min(16, (vs.zoom || 1) * 2); break;
+      case '-': case '_': vs.zoom = Math.max(1, (vs.zoom || 1) / 2); break;
+      default: handled = false;
+    }
+    if (!handled) return;
+    if (typeof ev.preventDefault === 'function') ev.preventDefault();
+    _renderHeader(state);
+    _paintHeatmap(state);
+    _renderRightPanel(state);
+  };
   const onShowRegimeCallTrack = (e) => {
     state.view_state.show_regime_call_track = !!(e && e.target && e.target.checked);
     repaint();
@@ -793,6 +941,7 @@ function _wireToolbar(state) {
     onShowGhslTrack, onShowThetaPiTrack, onShowHetDosageTrack,
     onShowRegimeCallTrack, onShowLocusSpanOverlay,
     onGroupingSource, onDetectK, onConfidenceScheme, onShowConfidenceTrack,
+    onMarkerView, onSubsampleN, onZoom, onKeyDown,
     onCanvasMove, onCanvasClick, onCanvasLeave,
     unsubSelection,
   };
@@ -810,6 +959,12 @@ function _wireToolbar(state) {
   _addListener('dosageHeatmapDetectK',              'change',     onDetectK);
   _addListener('dosageHeatmapConfidenceScheme',     'change',     onConfidenceScheme);
   _addListener('dosageHeatmapShowConfidenceTrack',  'change',     onShowConfidenceTrack);
+  _addListener('dosageHeatmapMarkerView',           'change',     onMarkerView);
+  _addListener('dosageHeatmapSubsampleN',           'change',     onSubsampleN);
+  _addListener('dosageHeatmapZoom',                 'change',     onZoom);
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('keydown', onKeyDown);
+  }
   _addListener('dosageHeatmapShowRegimeCallTrack',  'change',     onShowRegimeCallTrack);
   _addListener('dosageHeatmapShowLocusSpanOverlay', 'change',     onShowLocusSpanOverlay);
   _addListener('dosageHeatmapCanvas',               'mousemove',  onCanvasMove);
@@ -833,6 +988,12 @@ function _teardownToolbar(state) {
   if (h.onDetectK)             _removeListener('dosageHeatmapDetectK',              'change',    h.onDetectK);
   if (h.onConfidenceScheme)    _removeListener('dosageHeatmapConfidenceScheme',     'change',    h.onConfidenceScheme);
   if (h.onShowConfidenceTrack) _removeListener('dosageHeatmapShowConfidenceTrack',  'change',    h.onShowConfidenceTrack);
+  if (h.onMarkerView)          _removeListener('dosageHeatmapMarkerView',           'change',    h.onMarkerView);
+  if (h.onSubsampleN)          _removeListener('dosageHeatmapSubsampleN',           'change',    h.onSubsampleN);
+  if (h.onZoom)                _removeListener('dosageHeatmapZoom',                 'change',    h.onZoom);
+  if (h.onKeyDown && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+    document.removeEventListener('keydown', h.onKeyDown);
+  }
   if (h.onShowRegimeCallTrack) _removeListener('dosageHeatmapShowRegimeCallTrack',  'change',    h.onShowRegimeCallTrack);
   if (h.onShowLocusSpanOverlay) _removeListener('dosageHeatmapShowLocusSpanOverlay','change',    h.onShowLocusSpanOverlay);
   if (h.onCanvasMove)          _removeListener('dosageHeatmapCanvas',               'mousemove',  h.onCanvasMove);

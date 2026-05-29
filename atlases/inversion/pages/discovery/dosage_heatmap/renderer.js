@@ -351,12 +351,17 @@ export function paintDosageHeatmap(canvas, data, opts) {
 
   const nS = data.n_samples;
   const nM = data.n_markers;
-  const order_s = (o.sample_order instanceof Int32Array && o.sample_order.length === nS)
+  // order_s / order_m may be a SUBSET / viewport (length < nS / nM) — e.g.
+  // a variance-selected marker set or a cursor-centred zoom window. The
+  // displayed counts come from the order arrays, not the data totals.
+  const order_s = (o.sample_order instanceof Int32Array && o.sample_order.length >= 1)
     ? o.sample_order
     : deriveSampleOrder('natural', nS, data);
-  const order_m = (o.marker_order instanceof Int32Array && o.marker_order.length === nM)
+  const order_m = (o.marker_order instanceof Int32Array && o.marker_order.length >= 1)
     ? o.marker_order
     : deriveMarkerOrder('natural', nM, data);
+  const nDispS = order_s.length;
+  const nDispM = order_m.length;
 
   // Layout constants.
   const xPad = 8;
@@ -447,8 +452,8 @@ export function paintDosageHeatmap(canvas, data, opts) {
                    + (showGroupLabels ? labelPad : 0);
   const drawW = Math.max(50, W - xPad - leftGutter - leftBands - xPad);
   const drawH = Math.max(50, H - 2 * yPad - topBand);
-  const cellW = drawW / nM;
-  const cellH = drawH / nS;
+  const cellW = drawW / nDispM;
+  const cellH = drawH / nDispS;
   const matX = xPad + leftGutter + leftBands;
   const matY = yPad + topBand;
 
@@ -470,7 +475,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
     const lo = regimeOverlay.locus_start_marker | 0;
     const hi = regimeOverlay.locus_end_marker | 0;
     let xLo = Infinity, xHi = -Infinity;
-    for (let c = 0; c < nM; c++) {
+    for (let c = 0; c < nDispM; c++) {
       const mi = order_m[c];
       if (mi >= lo && mi <= hi) {
         const x = matX + c * cellW;
@@ -484,10 +489,10 @@ export function paintDosageHeatmap(canvas, data, opts) {
   }
 
   // --- Matrix cells.
-  for (let r = 0; r < nS; r++) {
+  for (let r = 0; r < nDispS; r++) {
     const si = order_s[r];
     const y  = matY + r * cellH;
-    for (let c = 0; c < nM; c++) {
+    for (let c = 0; c < nDispM; c++) {
       const mi = order_m[c];
       const v  = data.cellValue(mi, si);
       ctx.fillStyle = colorFn(v, vmin, vmax);
@@ -505,7 +510,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
     if (blk.kind === 'continuous') {
       const lo = (blk.vmin == null) ? _autoMin(blk.values) : blk.vmin;
       const hi = (blk.vmax == null) ? _autoMax(blk.values) : blk.vmax;
-      for (let r = 0; r < nS; r++) {
+      for (let r = 0; r < nDispS; r++) {
         const si = order_s[r];
         const v  = blk.values[si];
         ctx.fillStyle = blk.colorFn(v, lo, hi);
@@ -514,7 +519,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
         }
       }
     } else if (blk.kind === 'categorical_k6') {
-      for (let r = 0; r < nS; r++) {
+      for (let r = 0; r < nDispS; r++) {
         const si = order_s[r];
         const k  = data.sample_k6[si];
         ctx.fillStyle = k6Colors.get(k) || '#bbbbbb';
@@ -523,7 +528,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
         }
       }
     } else if (blk.kind === 'group') {
-      for (let r = 0; r < nS; r++) {
+      for (let r = 0; r < nDispS; r++) {
         const si = order_s[r];
         const g  = data.sample_group[si];
         ctx.fillStyle = groupColors.get(g) || '#bbbbbb';
@@ -535,7 +540,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
       // Color per regime_call vocabulary. Uncalled / out-of-locus
       // samples render as transparent so the matrix shows through.
       const calls = regimeOverlay.sample_regime_call;
-      for (let r = 0; r < nS; r++) {
+      for (let r = 0; r < nDispS; r++) {
         const si = order_s[r];
         const c  = calls[si];
         const fill = REGIME_CALL_COLORS[c] || 'rgba(0,0,0,0)';
@@ -574,14 +579,14 @@ export function paintDosageHeatmap(canvas, data, opts) {
     ctx.fillStyle = 'rgba(160,180,200,0.85)';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    const tickStride = Math.max(1, Math.round(nS / 10));
-    for (let r = 0; r < nS; r += tickStride) {
+    const tickStride = Math.max(1, Math.round(nDispS / 10));
+    for (let r = 0; r < nDispS; r += tickStride) {
       const y = matY + (r + 0.5) * cellH;
       ctx.fillText('s=' + r, xPad + tickPad - 4, y);
     }
-    if ((nS - 1) % tickStride !== 0) {
+    if ((nDispS - 1) % tickStride !== 0) {
       ctx.fillText('s=' + (nS - 1), xPad + tickPad - 4,
-                   matY + (nS - 0.5) * cellH);
+                   matY + (nDispS - 0.5) * cellH);
     }
     if (typeof ctx.restore === 'function') ctx.restore();
   }
@@ -597,8 +602,8 @@ export function paintDosageHeatmap(canvas, data, opts) {
     ctx.textBaseline = 'middle';
     let runStart = 0;
     let runVal = data.sample_group[order_s[0]];
-    for (let r = 1; r <= nS; r++) {
-      const v = (r < nS) ? data.sample_group[order_s[r]] : Symbol('end');
+    for (let r = 1; r <= nDispS; r++) {
+      const v = (r < nDispS) ? data.sample_group[order_s[r]] : Symbol('end');
       if (v !== runVal) {
         const yMid = matY + ((runStart + r) / 2) * cellH;
         const runH = (r - runStart) * cellH;
@@ -630,7 +635,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
       'MINOR1_MINOR3': 'rgba(176, 124, 247, 0.85)',   // soft purple
       'MINOR2_MINOR3': 'rgba(224,  85,  92, 0.85)',   // soft red
     };
-    for (let c = 0; c < nM; c++) {
+    for (let c = 0; c < nDispM; c++) {
       const mi   = order_m[c];
       const pair = data.marker_role_pair[mi];
       const col  = pair ? (ROLE_PAIR_COLORS[pair] || 'rgba(120,120,120,0.5)')
@@ -646,7 +651,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
   // --- Top polarity stripe (one cell per displayed marker; black =
   // flipped, light grey = unflipped).
   if (showPolarity) {
-    for (let c = 0; c < nM; c++) {
+    for (let c = 0; c < nDispM; c++) {
       const mi = order_m[c];
       const f  = !!data.marker_polarity[mi];
       ctx.fillStyle = f ? 'rgba(20,20,20,0.85)' : 'rgba(220,220,220,0.85)';
@@ -660,7 +665,7 @@ export function paintDosageHeatmap(canvas, data, opts) {
   ctx.strokeStyle = 'rgba(40, 50, 70, 0.6)';
   ctx.lineWidth = 1;
   if (typeof ctx.strokeRect === 'function') {
-    ctx.strokeRect(matX, matY, cellW * nM, cellH * nS);
+    ctx.strokeRect(matX, matY, cellW * nDispM, cellH * nDispS);
   }
 
   // --- Hover crosshair.
@@ -670,22 +675,43 @@ export function paintDosageHeatmap(canvas, data, opts) {
     ctx.lineWidth = 2;
     if (typeof ctx.strokeRect === 'function') {
       ctx.strokeRect(matX, matY + hov.row * cellH - 0.5,
-                     cellW * nM, cellH + 1);
+                     cellW * nDispM, cellH + 1);
       ctx.strokeRect(matX + hov.col * cellW - 0.5, matY,
-                     cellW + 1, cellH * nS);
+                     cellW + 1, cellH * nDispS);
     }
     ctx.lineWidth = 1;
+  }
+
+  // --- Keyboard cursor (←/→ marker column, optional ↑/↓ sample row).
+  // Drawn as a bright cyan column/row band so it reads distinctly from
+  // the orange hover crosshair. `cursor_col` / `cursor_row` are display
+  // coordinates into the current order arrays.
+  const curC = Number.isFinite(o.cursor_col) ? (o.cursor_col | 0) : -1;
+  const curR = Number.isFinite(o.cursor_row) ? (o.cursor_row | 0) : -1;
+  if (curC >= 0 && curC < nDispM && typeof ctx.fillRect === 'function') {
+    ctx.fillStyle = 'rgba(45,210,231,0.16)';
+    ctx.fillRect(matX + curC * cellW, matY, cellW, cellH * nDispS);
+    if (typeof ctx.strokeRect === 'function') {
+      ctx.strokeStyle = '#2dd2e7';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(matX + curC * cellW - 0.5, matY + 0.5, cellW + 1, cellH * nDispS - 1);
+      ctx.lineWidth = 1;
+    }
+  }
+  if (curR >= 0 && curR < nDispS && typeof ctx.fillRect === 'function') {
+    ctx.fillStyle = 'rgba(45,210,231,0.16)';
+    ctx.fillRect(matX, matY + curR * cellH, cellW * nDispM, cellH);
   }
 
   // --- Selected sample row / marker column underlays.
   if (selectedSamples && selectedSamples.size > 0) {
     ctx.strokeStyle = 'rgba(0,0,0,0.45)';
     ctx.lineWidth = 1;
-    for (let r = 0; r < nS; r++) {
+    for (let r = 0; r < nDispS; r++) {
       if (selectedSamples.has(order_s[r])) {
         if (typeof ctx.strokeRect === 'function') {
           ctx.strokeRect(matX, matY + r * cellH - 0.5,
-                         cellW * nM, cellH + 1);
+                         cellW * nDispM, cellH + 1);
         }
       }
     }
@@ -693,11 +719,11 @@ export function paintDosageHeatmap(canvas, data, opts) {
   if (selectedMarkers && selectedMarkers.size > 0) {
     ctx.strokeStyle = 'rgba(0,0,0,0.45)';
     ctx.lineWidth = 1;
-    for (let c = 0; c < nM; c++) {
+    for (let c = 0; c < nDispM; c++) {
       if (selectedMarkers.has(order_m[c])) {
         if (typeof ctx.strokeRect === 'function') {
           ctx.strokeRect(matX + c * cellW - 0.5, matY,
-                         cellW + 1, cellH * nS);
+                         cellW + 1, cellH * nDispS);
         }
       }
     }
@@ -705,10 +731,10 @@ export function paintDosageHeatmap(canvas, data, opts) {
 
   return {
     layout: {
-      matX, matY, matW: cellW * nM, matH: cellH * nS,
+      matX, matY, matW: cellW * nDispM, matH: cellH * nDispS,
       cellW, cellH,
-      n_displayed_samples: nS,
-      n_displayed_markers: nM,
+      n_displayed_samples: nDispS,
+      n_displayed_markers: nDispM,
       sample_order: order_s,
       marker_order: order_m,
     },

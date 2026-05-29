@@ -77,6 +77,46 @@ silhouette: per-sample 1-D silhouette within the detected groups.">
           Confidence track
         </label>
         <span class="dh2-sep"></span>
+        <!-- 2026-05-29: SNP-axis views + subsample + cursor/zoom. The
+             marker view chooses WHICH snps; subsample caps how many; zoom
+             opens a cursor-centred window (←/→ move the cursor, ↑/↓ the
+             sample cursor, +/- zoom). -->
+        <label class="dh2-toggle">
+          SNPs
+          <select id="dosageHeatmapMarkerView" class="dh2-select"
+                  title="all: every marker.
+random: a reproducible random subsample.
+high var: most variable markers (strongest structure).
+low var: least variable markers (background).">
+            <option value="all">all</option>
+            <option value="random">random</option>
+            <option value="high_var">high variance</option>
+            <option value="low_var">low variance</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          Subsample
+          <select id="dosageHeatmapSubsampleN" class="dh2-select"
+                  title="Cap the number of displayed markers (0 = all for the view).">
+            <option value="0">all</option>
+            <option value="100">100</option>
+            <option value="250">250</option>
+            <option value="500">500</option>
+            <option value="1000">1000</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          Zoom
+          <select id="dosageHeatmapZoom" class="dh2-select"
+                  title="Cursor-centred viewport (←/→ to pan, ↑/↓ sample cursor, +/- zoom).">
+            <option value="1">×1</option>
+            <option value="2">×2</option>
+            <option value="4">×4</option>
+            <option value="8">×8</option>
+            <option value="16">×16</option>
+          </select>
+        </label>
+        <span class="dh2-sep"></span>
         <label class="dh2-toggle">
           <input id="dosageHeatmapShowGroupTrack" type="checkbox" checked>
           Group
