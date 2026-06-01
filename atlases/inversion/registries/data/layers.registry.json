@@ -19,6 +19,8 @@
       "_path_was": "data/precomp/{chrom}.json",
       "_root_doc": "Resolved through master_config.yaml -> roots.precomp_zblocks (currently /mnt/e/results_inversions/local_PCA_MDS_z/09_atlas_json/). To switch precomp source, edit the root entry — no layer change needed.",
       "schema": "schemas/scrubber_main.schema.json",
+      "schema_status": "validated",
+      "_schema_validator": "analysis/scrubber_main_validator.js (compute → shared/validators/json_schema_lite.js)",
       "chunked": false,
       "worker_parse": true,
       "_worker_parse_doc": "2026-05-26: precomp scrubber JSONs run 20-60 MB per chrom; main-thread JSON.parse blocks paint/scroll for ~300-800 ms. atlas-core/core/worker_json_parse.js offloads to a Web Worker so the page stays interactive during mount. Wall-clock is roughly the same (structured-clone cost mirrors the parse) but the page no longer freezes.",

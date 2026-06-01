@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "errors": [],
+  "warnings": [],
+  "summary": {
+    "n_errors": 0,
+    "n_warnings": 0,
+    "schema_id": "atlases/inversion/registries/schemas/scrubber_main.schema.json",
+    "validated_chrom": "LG28",
+    "validated_n_windows": 3,
+    "validated_n_samples": 4,
+    "schema_supplied": true
+  },
+  "params_used": {
+    "max_errors": 50,
+    "strict": false
+  },
+  "input_layer_ids": [
+    "scrubber_main:LG28"
+  ]
+}

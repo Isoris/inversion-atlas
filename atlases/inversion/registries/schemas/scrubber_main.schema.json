@@ -1,6 +1,90 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "_doc": "PLACEHOLDER schema. Accepts any object. Replace with the real schema when the data shape stabilizes. Referenced from registries/data/layers.registry.json with schema_status: pending.",
-  "_status": "pending",
-  "type": "object"
+  "$id": "atlases/inversion/registries/schemas/scrubber_main.schema.json",
+  "title": "scrubber_main precomp JSON",
+  "description": "Per-chromosome precomp shipped by the upstream R / Python pipeline. Read by page1, page2, page22 (and downstream cartridges via atlasState.data). Validated at load time by shared/validators/json_schema_lite.js.",
+  "type": "object",
+  "required": ["chrom", "n_windows", "n_samples", "samples", "windows"],
+  "properties": {
+    "chrom":      { "type": "string", "minLength": 1 },
+    "n_windows":  { "type": "integer", "minimum": 1 },
+    "n_samples":  { "type": "integer", "minimum": 1 },
+    "schema_version": { "type": ["string", "integer", "null"] },
+
+    "samples": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/sample_record" }
+    },
+
+    "windows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/window_record" }
+    },
+
+    "l2_envelopes": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/l2_envelope" }
+    },
+
+    "candidates":            { "type": ["array", "null"] },
+    "repeat_density":        { "type": ["array", "null"] },
+    "snp_density":           { "type": ["array", "null"] },
+    "permutation":           { "type": ["object", "null"] },
+    "ancestry_local_q":      { "type": ["array", "null"] },
+    "per_sample_het":        { "type": ["array", "null"] }
+  },
+  "additionalProperties": true,
+
+  "definitions": {
+    "sample_record": {
+      "description": "One row per cohort sample. Either id/cga/ind must be present; remaining fields are optional metadata.",
+      "type": "object",
+      "properties": {
+        "id":      { "type": ["string", "integer"] },
+        "ind":     { "type": ["string", "null"] },
+        "cga":     { "type": ["string", "null"] },
+        "sample":  { "type": ["string", "null"] },
+        "sex":     { "type": ["string", "null"] },
+        "group":   { "type": ["string", "null"] },
+        "family":  { "type": ["string", "null"] }
+      }
+    },
+
+    "window_record": {
+      "description": "Per-window precomp row. Fields are mostly optional — pages tolerate missing data — but band_quality + labels are the practical minimum for downstream pipelines.",
+      "type": "object",
+      "required": ["idx"],
+      "properties": {
+        "idx":          { "type": "integer", "minimum": 0 },
+        "start_bp":     { "type": ["integer", "number", "null"] },
+        "end_bp":       { "type": ["integer", "number", "null"] },
+        "band_quality": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "labels":       { "type": ["array", "null"], "items": { "type": "integer" } },
+        "K":            { "type": ["integer", "null"], "minimum": 1 },
+        "pc1":          { "type": ["array", "null"], "items": { "type": "number" } },
+        "pc2":          { "type": ["array", "null"], "items": { "type": "number" } },
+        "pca":          { "type": ["object", "array", "null"] },
+        "score_z":      { "type": ["number", "null"] },
+        "score_abs_z":  { "type": ["number", "null"] }
+      }
+    },
+
+    "l2_envelope": {
+      "description": "Promoted L2 envelope: a window range with band assignment + clustering metadata.",
+      "type": "object",
+      "required": ["idx", "start_w", "end_w"],
+      "properties": {
+        "idx":          { "type": "integer", "minimum": 0 },
+        "start_w":      { "type": "integer", "minimum": 0 },
+        "end_w":        { "type": "integer", "minimum": 0 },
+        "start_bp":     { "type": ["integer", "number", "null"] },
+        "end_bp":       { "type": ["integer", "number", "null"] },
+        "K":            { "type": ["integer", "null"], "minimum": 1 },
+        "silhouette":   { "type": ["number", "null"] },
+        "band_quality": { "type": ["number", "null"] }
+      }
+    }
+  }
 }
