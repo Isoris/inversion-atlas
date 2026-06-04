@@ -29,6 +29,7 @@
 import {
   computeSampleDosageFeatures, regimeCallsFromDosage,
   regimeCallFromMean, marginConfidence, summariseGroups,
+  karyogroupName,
 } from './dosage_detect.js';
 
 // Largest sample count we'll build an m×m trajectory-distance matrix for.
@@ -272,6 +273,37 @@ function _mean(arr) {
   return c > 0 ? s / c : NaN;
 }
 
+// Normalised between-group dosage separation in [0,1): the smallest
+// standardised gap between any two group dosage means (gap / pooled SD),
+// squashed through 1−exp(−x/1.5). 0 = groups overlap; →1 = cleanly apart.
+function _dosageSeparationNorm(meanFull, idx, labSub, k) {
+  const sum = new Float64Array(k), sq = new Float64Array(k);
+  const cnt = new Int32Array(k);
+  for (let i = 0; i < idx.length; i++) {
+    const v = meanFull[idx[i]];
+    if (!Number.isFinite(v)) continue;
+    const g = labSub[i];
+    sum[g] += v; sq[g] += v * v; cnt[g]++;
+  }
+  const mu = new Float64Array(k), sd = new Float64Array(k);
+  for (let g = 0; g < k; g++) {
+    mu[g] = cnt[g] > 0 ? sum[g] / cnt[g] : NaN;
+    const varG = cnt[g] > 0 ? Math.max(0, sq[g] / cnt[g] - mu[g] * mu[g]) : NaN;
+    sd[g] = Number.isFinite(varG) ? Math.sqrt(varG) : 0;
+  }
+  let minGap = Infinity;
+  for (let a = 0; a < k; a++) {
+    for (let b = a + 1; b < k; b++) {
+      if (cnt[a] === 0 || cnt[b] === 0) continue;
+      const pooled = Math.sqrt(((sd[a] ** 2) + (sd[b] ** 2)) / 2) || 1e-9;
+      const g = Math.abs(mu[a] - mu[b]) / pooled;
+      if (g < minGap) minGap = g;
+    }
+  }
+  if (!Number.isFinite(minGap)) return 0;
+  return 1 - Math.exp(-minGap / 1.5);
+}
+
 /**
  * Position-aware haplotype clustering. Returns a result shaped like
  * dosage_detect.detectGroups() (mode 'index_aware') plus `order`.
@@ -311,8 +343,12 @@ export function clusterIndexAware(canonical, opts) {
   const D = _distanceMatrix(Bs, nBins, idx, distOpts);
   const m = idx.length;
 
-  const kMax = Number.isFinite(o.kMax) ? (o.kMax | 0) : 4;
+  // Index-aware clustering keeps the full position-ordered trajectory, so
+  // — unlike the 1-D `bands` path — it can genuinely resolve more than 3
+  // arrangements. Auto-K therefore sweeps a wider ceiling (default 8).
+  const kMax = Number.isFinite(o.kMax) ? (o.kMax | 0) : 8;
   const minNGroup = Number.isFinite(o.minNGroup) ? (o.minNGroup | 0) : 4;
+  const sepWeight = Number.isFinite(o.sepWeight) ? o.sepWeight : 0.25;
   const wantAuto = (o.k == null || o.k === 'auto' || !Number.isFinite(o.k));
   const tryKs = wantAuto
     ? Array.from({ length: Math.max(1, kMax - kMin + 1) }, (_, i) => kMin + i)
@@ -326,7 +362,12 @@ export function clusterIndexAware(canonical, opts) {
     for (let i = 0; i < labSub.length; i++) counts[labSub[i]]++;
     if (wantAuto && k > 1 && Math.min(...counts) < minNGroup) continue;
     const sil = (k >= 2) ? _silhouetteFromMatrix(D, m, labSub, k) : null;
-    const score = sil ? _mean(sil) : 0;
+    // Auto-K score blends cluster cohesion (silhouette) with how well the
+    // groups SEPARATE on dosage — the "elevated between-arrangement" signal
+    // that defines a real inversion partition, not just tight blobs.
+    const silMean = sil ? _mean(sil) : 0;
+    const sepNorm = (k >= 2) ? _dosageSeparationNorm(feats.mean, idx, labSub, k) : 0;
+    const score = silMean + sepWeight * sepNorm;
     if (!best || score > (best.score)) best = { k, labSub, sil, score };
   }
   if (!best) {
@@ -361,14 +402,21 @@ export function clusterIndexAware(canonical, opts) {
   const regime_call = regimeCallsFromDosage(feats.mean);
   const groups = summariseGroups({ labels, mean: feats.mean, centers, margin, sil: silFull, k: Math.max(K, 1) });
 
-  // Readable labels: haplotype index + modal dosage tier.
+  // Readable labels: karyogroup identity (KG-A…) + modal dosage tier as a
+  // secondary attribute. Identity stays distinct from the 3 tiers so a
+  // richer K isn't squashed back into homA/het/homB.
   const labelName = new Array(Math.max(K, 1));
   for (let g = 0; g < labelName.length; g++) {
     const tier = regimeCallFromMean(centers[g]).replace('_like', '');
-    labelName[g] = `hap ${g} (${tier})`;
+    labelName[g] = `${karyogroupName(g)} (${tier})`;
+    if (groups[g]) groups[g].karyogroup = karyogroupName(g);
   }
   const sample_group = new Array(nS);
-  for (let s = 0; s < nS; s++) sample_group[s] = labels[s] >= 0 ? labelName[labels[s]] : null;
+  const karyogroup  = new Array(nS);
+  for (let s = 0; s < nS; s++) {
+    sample_group[s] = labels[s] >= 0 ? labelName[labels[s]] : null;
+    karyogroup[s]   = labels[s] >= 0 ? karyogroupName(labels[s]) : null;
+  }
 
   // Position-aware row order: cluster asc, then distance-to-medoid asc
   // (tight, smooth blocks); no-data samples last.
@@ -395,7 +443,7 @@ export function clusterIndexAware(canonical, opts) {
 
   return {
     mode: 'index_aware', k: K,
-    labels, sample_group, regime_call,
+    labels, sample_group, karyogroup, regime_call,
     mean: feats.mean, het: feats.het,
     margin, silhouette: silFull,
     overall_silhouette: oc > 0 ? overall / oc : NaN,

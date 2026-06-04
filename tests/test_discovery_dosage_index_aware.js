@@ -108,7 +108,8 @@ check('A-type samples share a label', res && res.labels[0] === res.labels[1] && 
 check('B-type samples share a label', res && res.labels[3] === res.labels[4] && res.labels[4] === res.labels[5]);
 check('A and B are different labels', res && res.labels[0] !== res.labels[3]);
 check('cluster 0 is lower mean dosage (relabelled ascending)', res && res.labels[0] === 0);
-check('sample_group names carry tier', res && /hap \d+ \(/.test(res.sample_group[0]));
+check('sample_group names carry karyogroup + tier', res && /^KG-[A-Z]+ \(/.test(res.sample_group[0]));
+check('karyogroup identity distinct from tier', res && /^KG-[A-Z]+$/.test(res.karyogroup[0]) && res.karyogroup[0] !== res.karyogroup[3]);
 check('order is full-length permutation', (() => {
   if (!res || !res.order || res.order.length !== 6) return false;
   const seen = new Set(Array.from(res.order));

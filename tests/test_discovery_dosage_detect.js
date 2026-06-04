@@ -118,7 +118,8 @@ check('returns a result', !!dB);
 check('auto-K finds 3 bands', dB.k === 3, 'k=' + (dB && dB.k));
 check('labels length = n_samples', dB.labels.length === 30);
 check('three labels present', new Set(Array.from(dB.labels)).size === 3);
-check('sample_group readable + tier-named', /band 0/.test(dB.sample_group[0]) && /homA|hom/.test(dB.sample_group[0]));
+check('sample_group readable: karyogroup + tier', /^KG-[A-Z]+ \(/.test(dB.sample_group[0]) && /homA|hom/.test(dB.sample_group[0]));
+check('karyogroup identity field present + distinct from tier', /^KG-[A-Z]+$/.test(dB.karyogroup[0]) && dB.karyogroup[0] !== dB.karyogroup[25]);
 check('regime_call homA/het/homB', dB.regime_call[0] === 'homA_like'
   && dB.regime_call[15] === 'het_like' && dB.regime_call[25] === 'homB_like');
 check('overall silhouette high', dB.overall_silhouette > 0.5);
@@ -132,7 +133,7 @@ check('fixed K=2 honoured', dFixed.k === 2);
 const dC = detectGroups(can, { mode: 'clusters', k: 'auto', kMin: 2, kMax: 4 });
 check('clusters mode returns result', !!dC && dC.mode === 'clusters');
 check('clusters labelled ascending by dosage', dC.labels[0] <= dC.labels[25]);
-check('clusters sample_group named "cluster N"', /cluster \d/.test(dC.sample_group[0]));
+check('clusters sample_group named "KG-X (tier)"', /^KG-[A-Z]+ \(/.test(dC.sample_group[0]));
 
 // =====================================================================
 group('detectGroups — degenerate inputs');

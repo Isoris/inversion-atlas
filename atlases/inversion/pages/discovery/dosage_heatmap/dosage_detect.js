@@ -45,6 +45,26 @@ export const DOSAGE_TIERS = Object.freeze({
 const CALL_BOUNDARY_LO = 0.5;
 const CALL_BOUNDARY_HI = 1.5;
 
+// ---------------------------------------------------------------------
+// Karyogroup identity — a detected per-sample arrangement label, kept
+// DISTINCT from the 3 dosage tiers. A single biallelic inversion has 3
+// dosage tiers (homA/het/homB), but multi-allelic / compound / multi-
+// locus structure needs more groups than tiers; naming them KG-A, KG-B…
+// (identity) with the dosage tier as a secondary attribute stops the
+// extra resolution from collapsing back into 3 tiers.
+// ---------------------------------------------------------------------
+
+/** Stable karyogroup letter for cluster id i (0→A … 25→Z, 26→AA…). */
+export function karyogroupLetter(i) {
+  if (!(i >= 0)) return '?';
+  let n = i, s = '';
+  do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1; } while (n >= 0);
+  return s;
+}
+
+/** Readable karyogroup name, e.g. 'KG-A'. */
+export function karyogroupName(i) { return 'KG-' + karyogroupLetter(i); }
+
 /**
  * Per-sample mean polarised dosage + het fraction over the displayed
  * markers. NA cells (cellValue → null) are skipped.
@@ -304,7 +324,10 @@ export function detectGroups(canonical, opts) {
   const o = opts || {};
   const mode = (o.mode === 'clusters') ? 'clusters' : 'bands';
   const kMin = Number.isFinite(o.kMin) ? (o.kMin | 0) : 2;
-  const kMax = Number.isFinite(o.kMax) ? (o.kMax | 0) : 4;
+  // Per-mode auto-K ceiling. 'bands' rests on a single mean-dosage scalar
+  // → at most 3 meaningful tiers, so 4 is already generous. 'clusters'
+  // adds het-fraction (2-D) so it can resolve a few more arrangements.
+  const kMax = Number.isFinite(o.kMax) ? (o.kMax | 0) : (mode === 'clusters' ? 6 : 4);
   const minNGroup = Number.isFinite(o.minNGroup) ? (o.minNGroup | 0) : 4;
   const feats = computeSampleDosageFeatures(canonical, o.markerOrder);
   const nS = feats.mean.length;
@@ -380,21 +403,22 @@ export function detectGroups(canonical, opts) {
   const silhouette = silhouettePerSample1D(feats.mean, labels, Math.max(K, 1));
   const regime_call = regimeCallsFromDosage(feats.mean);
 
-  // Readable per-sample group labels. Bands mode names by tier; clusters
-  // mode names generically (the tier may not be 1:1 with a cluster).
+  // Readable per-sample labels. Identity is the karyogroup (KG-A…); the
+  // dosage tier rides along as a secondary attribute so the extra groups
+  // a richer K finds don't collapse back into 3 tier names.
   const sample_group = new Array(nS);
+  const karyogroup  = new Array(nS);
   const groupSummary = summariseGroups({ labels, mean: feats.mean, centers, margin, sil: silhouette, k: Math.max(K, 1) });
   const labelName = new Array(Math.max(K, 1));
   for (let g = 0; g < labelName.length; g++) {
     const rec = groupSummary[g];
-    if (mode === 'bands') {
-      labelName[g] = rec ? `${rec.call.replace('_like', '')} (band ${g})` : `band ${g}`;
-    } else {
-      labelName[g] = `cluster ${g}`;
-    }
+    const tier = rec ? rec.call.replace('_like', '') : '?';
+    labelName[g] = `${karyogroupName(g)} (${tier})`;
+    if (rec) rec.karyogroup = karyogroupName(g);
   }
   for (let s = 0; s < nS; s++) {
     sample_group[s] = labels[s] >= 0 ? labelName[labels[s]] : null;
+    karyogroup[s]   = labels[s] >= 0 ? karyogroupName(labels[s]) : null;
   }
 
   let overall = 0, oc = 0;
@@ -404,6 +428,7 @@ export function detectGroups(canonical, opts) {
     mode, k: K,
     labels,
     sample_group,
+    karyogroup,
     regime_call,
     mean: feats.mean, het: feats.het,
     margin, silhouette,
