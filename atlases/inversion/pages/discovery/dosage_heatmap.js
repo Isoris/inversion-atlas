@@ -64,6 +64,7 @@ import { detectGroups } from './dosage_heatmap/dosage_detect.js';
 import { clusterIndexAware } from './dosage_heatmap/index_aware_cluster.js';
 import { collapseSimilar } from './dosage_heatmap/collapse_similar.js';
 import { computeKaryogroupStats } from './dosage_heatmap/karyogroup_stats.js';
+import { buildKaryogroupExport, buildPopstatsRequest } from './dosage_heatmap/karyogroup_export.js';
 import { selectMarkers, markerViewport } from './dosage_heatmap/marker_select.js';
 import { buildRegistryOverlay } from './dosage_heatmap/regime_registry_overlay.js';
 
@@ -894,6 +895,83 @@ function _detectSummaryHtml(state) {
   return html;
 }
 
+// ---------------------------------------------------------------------
+// Karyogroup export → FST (JSON artifact + in-repo popstats groupwise)
+// ---------------------------------------------------------------------
+async function _exportKaryogroups(state) {
+  const slot = (typeof document !== 'undefined' && document.getElementById)
+    ? document.getElementById('dosageHeatmapFstResult') : null;
+  const setStatus = (t) => { if (slot) slot.textContent = t; };
+  const det = state && state.detect;
+  if (!det || !det.labels) { setStatus('no in-page grouping active'); return; }
+
+  const blk = state.kgstats && state.kgstats.block;
+  const region = {
+    chrom: state._chrom || null,
+    start_bp: blk && Number.isFinite(blk.start_bp) ? blk.start_bp : null,
+    end_bp:   blk && Number.isFinite(blk.end_bp)   ? blk.end_bp   : null,
+  };
+  let exp = null;
+  try { exp = buildKaryogroupExport(state.data, det, state.kgstats, { region }); }
+  catch (e) { console.warn('dosage_heatmap: buildKaryogroupExport threw —', e); }
+  if (!exp) { setStatus('export failed'); return; }
+
+  // 1. JSON artifact download.
+  const fname = 'karyogroups_' + (region.chrom || 'region') + '.json';
+  _downloadJson(exp, fname);
+
+  // 2. Between-arrangement FST via the existing popstats groupwise endpoint.
+  const req = buildPopstatsRequest(exp, { chrom: region.chrom, metrics: ['fst'] });
+  if (!req) { setStatus('exported ' + exp.k + ' karyogroups · need ≥2 groups for FST'); return; }
+  setStatus('exported · running FST…');
+  try {
+    const r = await _postJson('/api/popstats/groupwise', req);
+    if (!r || !r.ok) { setStatus('exported JSON · FST endpoint unavailable'); return; }
+    const fst = _firstFst(r.data);
+    setStatus('exported JSON · FST ' + (fst != null ? fst.toFixed(3) : '(see console)'));
+    if (fst == null) console.info('dosage_heatmap: popstats response', r.data);
+  } catch (e) { setStatus('exported JSON · FST call failed'); }
+}
+
+// Trigger a client-side JSON download. No-op outside the browser.
+function _downloadJson(obj, filename) {
+  try {
+    if (typeof document === 'undefined' || typeof Blob === 'undefined'
+        || typeof URL === 'undefined' || !URL.createObjectURL) return;
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  } catch (e) { console.warn('dosage_heatmap: JSON download failed —', e); }
+}
+
+async function _postJson(url, body) {
+  if (typeof fetch !== 'function') return { ok: false, status: 0 };
+  const resp = await fetch(url, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  let data = null;
+  try { data = await resp.json(); } catch (e) { /* non-JSON */ }
+  return { ok: resp.ok, status: resp.status, data };
+}
+
+// Pull a representative pairwise FST out of the tolerant popstats shapes
+// (pairs[] / pairwise[] / { 'a:b': { fst } }). Returns the max found.
+function _firstFst(data) {
+  if (!data) return null;
+  let best = null;
+  const consider = (v) => { if (Number.isFinite(v) && (best == null || v > best)) best = v; };
+  const arr = data.pairs || data.pairwise;
+  if (Array.isArray(arr)) for (const p of arr) consider(p && (p.fst != null ? p.fst : p.FST));
+  else if (data.pairs && typeof data.pairs === 'object') {
+    for (const k of Object.keys(data.pairs)) { const p = data.pairs[k]; consider(p && p.fst); }
+  }
+  return best;
+}
+
 // Compact bp formatter (e.g. 1.23 Mb / 456 kb).
 function _bp(x) {
   if (!Number.isFinite(x)) return '—';
@@ -1097,6 +1175,7 @@ function _wireToolbar(state) {
     state.view_state.collapse_reps = parseInt((e && e.target && e.target.value) || '4', 10) || 4;
     repaintAll();
   };
+  const onExportKaryo = () => { _exportKaryogroups(state); };
   const onCanvasMove = (ev) => {
     const c = document.getElementById('dosageHeatmapCanvas');
     if (!c) return;
@@ -1154,7 +1233,7 @@ function _wireToolbar(state) {
     onShowGroupTrack, onShowPolarityTrack, onShowK6Track,
     onShowGhslTrack, onShowThetaPiTrack, onShowHetDosageTrack,
     onShowRegimeCallTrack, onShowLocusSpanOverlay, onShowGroupRects,
-    onCollapseSimilar, onCollapseHamming, onCollapseReps,
+    onCollapseSimilar, onCollapseHamming, onCollapseReps, onExportKaryo,
     onGroupingSource, onDetectK, onKgWindows, onConfidenceScheme, onShowConfidenceTrack,
     onMarkerView, onSubsampleN, onZoom, onKeyDown,
     onCanvasMove, onCanvasClick, onCanvasLeave,
@@ -1187,6 +1266,7 @@ function _wireToolbar(state) {
   _addListener('dosageHeatmapCollapseSimilar',      'change',     onCollapseSimilar);
   _addListener('dosageHeatmapCollapseHamming',      'change',     onCollapseHamming);
   _addListener('dosageHeatmapCollapseReps',         'change',     onCollapseReps);
+  _addListener('dosageHeatmapExportKaryo',          'click',      onExportKaryo);
   _addListener('dosageHeatmapCanvas',               'mousemove',  onCanvasMove);
   _addListener('dosageHeatmapCanvas',               'click',      onCanvasClick);
   _addListener('dosageHeatmapCanvas',               'mouseleave', onCanvasLeave);
@@ -1221,6 +1301,7 @@ function _teardownToolbar(state) {
   if (h.onCollapseSimilar)     _removeListener('dosageHeatmapCollapseSimilar',       'change',     h.onCollapseSimilar);
   if (h.onCollapseHamming)     _removeListener('dosageHeatmapCollapseHamming',       'change',     h.onCollapseHamming);
   if (h.onCollapseReps)        _removeListener('dosageHeatmapCollapseReps',          'change',     h.onCollapseReps);
+  if (h.onExportKaryo)         _removeListener('dosageHeatmapExportKaryo',           'click',      h.onExportKaryo);
   if (h.onCanvasMove)          _removeListener('dosageHeatmapCanvas',               'mousemove',  h.onCanvasMove);
   if (h.onCanvasClick)         _removeListener('dosageHeatmapCanvas',               'click',      h.onCanvasClick);
   if (h.onCanvasLeave)         _removeListener('dosageHeatmapCanvas',               'mouseleave', h.onCanvasLeave);

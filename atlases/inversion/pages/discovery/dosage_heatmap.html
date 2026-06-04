@@ -212,6 +212,16 @@ low var: least variable markers (background).">
             <option value="5">5</option>
           </select>
         </label>
+        <span class="dh2-sep"></span>
+        <!-- Export the detected karyogroups for downstream FST analysis:
+             downloads a sample→karyogroup JSON artifact AND runs the in-repo
+             /api/popstats/groupwise FST (between-arrangement) call. Needs an
+             in-page grouping (bands / clusters / index-aware) active. -->
+        <button id="dosageHeatmapExportKaryo" class="dh2-btn" type="button"
+                title="Download a sample→karyogroup JSON and run between-arrangement FST (popstats groupwise).">
+          Export karyogroups → FST
+        </button>
+        <span id="dosageHeatmapFstResult" class="dh2-hint"></span>
       </div>
     </header>
 
