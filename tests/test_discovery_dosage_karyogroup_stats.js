@@ -54,6 +54,9 @@ check('per-window arrays sized to n_windows',
   st.cramers_v.length === 6 && st.fst.length === 6 && st.separation.length === 6 && st.het_intermediacy.length === 6);
 check('windows object array aligned', Array.isArray(st.windows) && st.windows.length === 6);
 check('windows carry bp spans', Number.isFinite(st.windows[0].start_bp) && Number.isFinite(st.windows[0].end_bp));
+check('per_marker_strength sized to n_markers', st.per_marker_strength && st.per_marker_strength.length === TOTAL);
+check('per_marker_strength high inside, low outside',
+  st.per_marker_strength[0] > 0.7 && !(st.per_marker_strength[TOTAL - 1] > 0.5));
 
 // =====================================================================
 group('inside vs outside signal');

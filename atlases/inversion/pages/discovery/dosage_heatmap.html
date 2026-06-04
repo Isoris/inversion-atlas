@@ -30,9 +30,13 @@
           Colour
           <select id="dosageHeatmapColorMode" class="dh2-select"
                   title="magma: continuous dosage ramp (default).
-genotype: discrete white/blue/red for 0/0 · 0/1 · 1/1.">
+genotype: discrete white/blue/red for 0/0 · 0/1 · 1/1.
+fan: karyogroup split-strength field — solid inside the block, fans/fades at the boundary (needs an in-page grouping).
+occupancy: foreground missing / not-visited cells.">
             <option value="magma">magma (continuous)</option>
             <option value="genotype">genotype (0/0 · 0/1 · 1/1)</option>
+            <option value="fan">fan (boundary strength)</option>
+            <option value="occupancy">occupancy (not visited)</option>
           </select>
         </label>
         <span class="dh2-sep"></span>
@@ -60,11 +64,24 @@ regime (candidate): the active candidate's upstream regime calls.">
         <label class="dh2-toggle">
           K
           <select id="dosageHeatmapDetectK" class="dh2-select"
-                  title="Number of detected groups. auto = silhouette-maximising over K=2..4.">
+                  title="Number of karyogroups. auto = silhouette+separation maximising. Index-aware resolves up to 8 (bands caps at ~3 dosage tiers).">
             <option value="auto">auto</option>
             <option value="2">2</option>
             <option value="3">3</option>
             <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="8">8</option>
+          </select>
+        </label>
+        <label class="dh2-toggle">
+          Win
+          <select id="dosageHeatmapKgWindows" class="dh2-select"
+                  title="Number of genomic windows for the per-window karyogroup statistics (Cramér's V / FST / boundary). Finer = more windows.">
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="40">40</option>
+            <option value="80">80</option>
           </select>
         </label>
         <label class="dh2-toggle">

@@ -63,6 +63,7 @@ import {
 import { detectGroups } from './dosage_heatmap/dosage_detect.js';
 import { clusterIndexAware } from './dosage_heatmap/index_aware_cluster.js';
 import { collapseSimilar } from './dosage_heatmap/collapse_similar.js';
+import { computeKaryogroupStats } from './dosage_heatmap/karyogroup_stats.js';
 import { selectMarkers, markerViewport } from './dosage_heatmap/marker_select.js';
 import { buildRegistryOverlay } from './dosage_heatmap/regime_registry_overlay.js';
 
@@ -90,6 +91,9 @@ const DEFAULT_VIEW_STATE = Object.freeze({
   collapse_similar:        false,
   collapse_hamming:        0,        // max differing bins to still collapse
   collapse_reps:           4,        // representative rows kept per group
+  // Per-window karyogroup boundary statistics: window count knob (drives
+  // Cramér's V / FST-proxy resolution + the 'fan' colour mode).
+  kg_windows:              20,
   // 2026-05-29: in-page haplotype-regime grouping. The heatmap can group
   // samples from the loaded dosage chunk itself (no upstream pipeline
   // needed) and score how confident each group is, OR consume the active
@@ -485,6 +489,28 @@ function _applyGrouping(state) {
     d.sample_confidence = null;
   }
   state.group_colors = buildGroupColorMap(_distinctOf(d.sample_group));
+
+  // Per-window karyogroup boundary statistics (Cramér's V / FST proxy /
+  // separation / het-intermediacy + inside-window counts + block span).
+  // Computed whenever an in-page detection produced karyogroup labels;
+  // drives the legend window-count readout, the "fan" colour mode's
+  // per-marker strength, and the FST export. Cleared otherwise.
+  state.kgstats = null;
+  d.boundary_strength = null;
+  if (det && det.labels && Number.isFinite(det.k) && det.k >= 1) {
+    let kg = null;
+    try {
+      kg = computeKaryogroupStats(d, {
+        labels: det.labels, k: det.k,
+        markerOrder: state.markers_selected || undefined,
+        nWindows: state.view_state.kg_windows,
+      });
+    } catch (e) { console.warn('dosage_heatmap: computeKaryogroupStats threw —', e); kg = null; }
+    if (kg) {
+      state.kgstats = kg;
+      d.boundary_strength = kg.per_marker_strength;
+    }
+  }
 }
 
 function _defaultViewLabel(dh) {
@@ -625,6 +651,8 @@ function _renderHeader(state) {
   if (gs) gs.value = state.view_state.grouping_source;
   const dk = document.getElementById('dosageHeatmapDetectK');
   if (dk) dk.value = String(state.view_state.detect_k);
+  const kw = document.getElementById('dosageHeatmapKgWindows');
+  if (kw) kw.value = String(state.view_state.kg_windows);
   const cs = document.getElementById('dosageHeatmapConfidenceScheme');
   if (cs) cs.value = state.view_state.confidence_scheme;
   const ct = document.getElementById('dosageHeatmapShowConfidenceTrack');
@@ -835,11 +863,8 @@ function _detectSummaryHtml(state) {
            + (Number.isFinite(det.overall_silhouette) ? det.overall_silhouette.toFixed(2) : '—')
            + '</dd>';
   for (const g of det.groups) {
-    const lbl = (det.mode === 'bands')
-      ? (g.call.replace('_like', '') + ' (b' + g.label + ')')
-      : (det.mode === 'index_aware')
-        ? ('hap ' + g.label + ' (' + g.call.replace('_like', '') + ')')
-        : ('cluster ' + g.label);
+    const tier = (g.call || '').replace('_like', '');
+    const lbl = (g.karyogroup || ('KG-' + g.label)) + ' (' + tier + ')';
     const conf = Number.isFinite(g.confidence) ? g.confidence.toFixed(2) : '—';
     const md   = Number.isFinite(g.mean_dosage) ? g.mean_dosage.toFixed(2) : '—';
     const mg   = Number.isFinite(g.mean_margin) ? g.mean_margin.toFixed(2) : '—';
@@ -849,7 +874,32 @@ function _detectSummaryHtml(state) {
          +  '<dd>conf ' + conf + ' · d̄ ' + md
          +  ' · margin ' + mg + ' · sil ' + sl + ' · sep ' + sep + '</dd>';
   }
+  // Per-window karyogroup boundary statistics (the inside/outside signal).
+  const kg = state.kgstats;
+  if (kg) {
+    const s = kg.summary || {};
+    const vIn = Number.isFinite(s.cramers_v_mean_inside) ? s.cramers_v_mean_inside.toFixed(2) : '—';
+    const fIn = Number.isFinite(s.fst_mean_inside) ? s.fst_mean_inside.toFixed(2) : '—';
+    html += '<dt class="dh2-detect-head">Boundary (' + kg.n_windows + ' windows)</dt>'
+         +  '<dd>inside ' + kg.n_inside + ' / outside ' + kg.n_outside
+         +  ' · V̄ ' + vIn + ' · FST ' + fIn + '</dd>';
+    if (kg.block) {
+      const b = kg.block;
+      const span = (Number.isFinite(b.start_bp) && Number.isFinite(b.end_bp))
+        ? (' · ' + _bp(b.start_bp) + '–' + _bp(b.end_bp)) : '';
+      html += '<dt>block</dt><dd>windows ' + b.start_win + '–' + b.end_win
+           +  ' (' + b.n_windows + ')' + span + '</dd>';
+    }
+  }
   return html;
+}
+
+// Compact bp formatter (e.g. 1.23 Mb / 456 kb).
+function _bp(x) {
+  if (!Number.isFinite(x)) return '—';
+  if (Math.abs(x) >= 1e6) return (x / 1e6).toFixed(2) + ' Mb';
+  if (Math.abs(x) >= 1e3) return (x / 1e3).toFixed(0) + ' kb';
+  return String(Math.round(x));
 }
 
 function _renderLegend(state) {
@@ -953,6 +1003,11 @@ function _wireToolbar(state) {
   const onDetectK = (e) => {
     const v = (e && e.target && e.target.value) || 'auto';
     state.view_state.detect_k = (v === 'auto') ? 'auto' : (parseInt(v, 10) || 'auto');
+    _applyGrouping(state);
+    repaintAll();
+  };
+  const onKgWindows = (e) => {
+    state.view_state.kg_windows = parseInt((e && e.target && e.target.value) || '20', 10) || 20;
     _applyGrouping(state);
     repaintAll();
   };
@@ -1100,7 +1155,7 @@ function _wireToolbar(state) {
     onShowGhslTrack, onShowThetaPiTrack, onShowHetDosageTrack,
     onShowRegimeCallTrack, onShowLocusSpanOverlay, onShowGroupRects,
     onCollapseSimilar, onCollapseHamming, onCollapseReps,
-    onGroupingSource, onDetectK, onConfidenceScheme, onShowConfidenceTrack,
+    onGroupingSource, onDetectK, onKgWindows, onConfidenceScheme, onShowConfidenceTrack,
     onMarkerView, onSubsampleN, onZoom, onKeyDown,
     onCanvasMove, onCanvasClick, onCanvasLeave,
     unsubSelection,
@@ -1117,6 +1172,7 @@ function _wireToolbar(state) {
   _addListener('dosageHeatmapShowHetDosageTrack',   'change',     onShowHetDosageTrack);
   _addListener('dosageHeatmapGroupingSource',       'change',     onGroupingSource);
   _addListener('dosageHeatmapDetectK',              'change',     onDetectK);
+  _addListener('dosageHeatmapKgWindows',            'change',     onKgWindows);
   _addListener('dosageHeatmapConfidenceScheme',     'change',     onConfidenceScheme);
   _addListener('dosageHeatmapShowConfidenceTrack',  'change',     onShowConfidenceTrack);
   _addListener('dosageHeatmapMarkerView',           'change',     onMarkerView);
@@ -1150,6 +1206,7 @@ function _teardownToolbar(state) {
   if (h.onShowHetDosageTrack)  _removeListener('dosageHeatmapShowHetDosageTrack',   'change',    h.onShowHetDosageTrack);
   if (h.onGroupingSource)      _removeListener('dosageHeatmapGroupingSource',       'change',    h.onGroupingSource);
   if (h.onDetectK)             _removeListener('dosageHeatmapDetectK',              'change',    h.onDetectK);
+  if (h.onKgWindows)           _removeListener('dosageHeatmapKgWindows',            'change',    h.onKgWindows);
   if (h.onConfidenceScheme)    _removeListener('dosageHeatmapConfidenceScheme',     'change',    h.onConfidenceScheme);
   if (h.onShowConfidenceTrack) _removeListener('dosageHeatmapShowConfidenceTrack',  'change',    h.onShowConfidenceTrack);
   if (h.onMarkerView)          _removeListener('dosageHeatmapMarkerView',           'change',    h.onMarkerView);

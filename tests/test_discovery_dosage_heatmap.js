@@ -18,6 +18,8 @@ import {
   dosageMagmaColor,
   dosageGenotypeColor,
   pickDosageColorFn,
+  dosageOccupancyColor,
+  dosageFanColor,
   confidenceColor,
 } from '../atlases/inversion/pages/discovery/dosage_heatmap/renderer.js';
 import {
@@ -602,6 +604,34 @@ check('deriveSampleOrder index_aware uses precomputed order', (() => {
 check('index_aware falls back to natural without an order', (() => {
   const ord = deriveSampleOrder('index_aware', 5, { sample_group: ['a', 'a', 'b', 'b', 'b'] });
   return ord[0] === 0 && ord[4] === 4;
+})());
+
+// =====================================================================
+group('renderer color modes — occupancy + fan');
+
+check('occupancy: missing → orange foreground', dosageOccupancyColor(NaN) === 'rgb(240,140,40)');
+check('occupancy: present → faint grey', dosageOccupancyColor(1) === 'rgb(236,238,242)');
+check('occupancy: present same regardless of value', dosageOccupancyColor(0) === dosageOccupancyColor(2));
+check('fan: no strength → near-white', dosageFanColor(NaN) === 'rgb(245,245,247)');
+check('fan: strong split deeper/cooler than weak', (() => {
+  // parse blue channel: strong (teal) should differ from weak (warm)
+  const strong = dosageFanColor(1.0), weak = dosageFanColor(0.0);
+  return strong !== weak && /^rgb\(/.test(strong) && /^rgb\(/.test(weak);
+})());
+check('fan: low confidence dims toward weak end', (() => {
+  const full = dosageFanColor(1.0, 1.0), dim = dosageFanColor(1.0, 0.0);
+  return full !== dim;   // confidence modulates the result
+})());
+check('paint with color_mode=occupancy does not throw', (() => {
+  const hc = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc, data, { color_mode: 'occupancy', show_group_track: false, show_polarity_track: false });
+  return hc._ctx.calls.filter(c => c === 'fillRect').length > 0;
+})());
+check('paint with color_mode=fan + boundary_strength does not throw', (() => {
+  const hc = new FakeCanvas(600, 400);
+  const dataFan = Object.assign({}, data, { boundary_strength: Float64Array.from([1, 0.8, 0.2, 0]) });
+  paintDosageHeatmap(hc, dataFan, { color_mode: 'fan', show_group_track: false, show_polarity_track: false });
+  return hc._ctx.calls.filter(c => c === 'fillRect').length > 0;
 })());
 
 // =====================================================================

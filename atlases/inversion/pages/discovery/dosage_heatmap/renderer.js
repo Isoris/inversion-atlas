@@ -109,6 +109,43 @@ export function pickDosageColorFn(mode) {
   return dosageMagmaColor;
 }
 
+/**
+ * Occupancy ("not visited") cell colour. Foregrounds MISSING cells —
+ * present cells fade to a faint grey, NA cells blaze orange — so gaps in
+ * the karyogroup matrix are immediately legible.
+ *
+ * @param {number} v dosage scalar (NaN/null = missing)
+ * @returns {string}
+ */
+export function dosageOccupancyColor(v) {
+  if (v == null || !Number.isFinite(v)) return 'rgb(240,140,40)';   // not visited
+  return 'rgb(236,238,242)';                                        // visited → faint
+}
+
+const FAN_STOPS = Object.freeze([
+  [0.00, [232, 196, 160]],   // weak split  → faded warm (fans out / boundary)
+  [0.50, [150, 170, 180]],   // ambiguous   → muted slate
+  [1.00, [ 24,  92, 120]],   // strong split → deep teal (solid inside the block)
+]);
+
+/**
+ * "Fan" / boundary colour: paints the karyogroup split-STRENGTH field
+ * rather than the dosage. Strong inside the block (deep teal), fading and
+ * fanning out warm at the boundary. When a per-sample confidence is given
+ * it dims low-confidence ("fanning") samples toward grey.
+ *
+ * @param {number} strength per-marker split strength [0,1] (NaN = no data)
+ * @param {number} [conf]   per-sample assignment confidence [0,1]
+ * @returns {string}
+ */
+export function dosageFanColor(strength, conf) {
+  if (!Number.isFinite(strength)) return 'rgb(245,245,247)';        // outside working set
+  let s = Math.max(0, Math.min(1, strength));
+  if (Number.isFinite(conf)) s *= (0.45 + 0.55 * Math.max(0, Math.min(1, conf)));
+  const c = _interpStops(FAN_STOPS, s);
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
 // Viridis stops for the per-sample θπ track.
 const VIRIDIS_STOPS = Object.freeze([
   [0.00, [ 68,   1,  84]],
@@ -514,14 +551,33 @@ export function paintDosageHeatmap(canvas, data, opts) {
     }
   }
 
-  // --- Matrix cells.
+  // --- Matrix cells. The colour mode selects how a cell is painted:
+  //   magma/genotype → by dosage value (default colourFn)
+  //   occupancy      → foreground missing ("not visited") cells
+  //   fan            → karyogroup split-STRENGTH field (deep inside the
+  //                    block, fanning/fading at the boundary), optionally
+  //                    dimmed by per-sample assignment confidence
+  const cmode = o.color_mode || 'magma';
+  const boundaryStrength = (cmode === 'fan'
+      && data.boundary_strength
+      && data.boundary_strength.length >= nM) ? data.boundary_strength : null;
+  const fanConf = (cmode === 'fan' && data.sample_confidence
+      && data.sample_confidence.length >= nS) ? data.sample_confidence : null;
+  let cellColor;
+  if (cmode === 'occupancy') {
+    cellColor = (v) => dosageOccupancyColor(v);
+  } else if (cmode === 'fan' && boundaryStrength) {
+    cellColor = (v, mi, si) => dosageFanColor(boundaryStrength[mi], fanConf ? fanConf[si] : NaN);
+  } else {
+    cellColor = (v) => colorFn(v, vmin, vmax);
+  }
   for (let r = 0; r < nDispS; r++) {
     const si = order_s[r];
     const y  = matY + r * cellH;
     for (let c = 0; c < nDispM; c++) {
       const mi = order_m[c];
       const v  = data.cellValue(mi, si);
-      ctx.fillStyle = colorFn(v, vmin, vmax);
+      ctx.fillStyle = cellColor(v, mi, si);
       if (typeof ctx.fillRect === 'function') {
         ctx.fillRect(matX + c * cellW, y, cellW + 0.5, cellH + 0.5);
       }

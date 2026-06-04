@@ -74,10 +74,12 @@ export function computeKaryogroupStats(canonical, opts) {
   const W = nBins;
   const pos = canonical && canonical.marker_pos_bp;
 
+  const nM = (canonical && canonical.n_markers | 0) || 0;
   const cramers   = new Float64Array(W).fill(NaN);
   const fst       = new Float64Array(W).fill(NaN);
   const separation = new Float64Array(W).fill(NaN);
   const hetInter  = new Float64Array(W).fill(NaN);
+  const strength  = new Float64Array(W).fill(NaN);   // per-window split strength
   const nUsed     = new Int32Array(W);
   const winStartBp = new Float64Array(W).fill(NaN);
   const winEndBp   = new Float64Array(W).fill(NaN);
@@ -120,6 +122,21 @@ export function computeKaryogroupStats(canonical, opts) {
 
     separation[w] = _separationNorm(gMean, gCnt, K);
     hetInter[w]   = _hetIntermediacy(gMean, gCnt, K);
+    // Split strength = how strongly the karyogroup partition holds in this
+    // window: Cramér's V (predicts genotype) blended with the FST proxy.
+    const vv = Number.isFinite(cramers[w]) ? cramers[w] : 0;
+    const ff = Number.isFinite(fst[w]) ? Math.max(0, Math.min(1, fst[w])) : 0;
+    strength[w] = 0.5 * vv + 0.5 * ff;
+  }
+
+  // Scatter window strength back to per-marker (for the renderer's "fan"
+  // boundary colour mode). NaN for markers outside the working set.
+  const perMarkerStrength = new Float64Array(nM).fill(NaN);
+  for (let w = 0; w < W; w++) {
+    for (let c = binStart[w]; c < binStart[w + 1]; c++) {
+      const mi = cols[c];
+      if (mi >= 0 && mi < nM) perMarkerStrength[mi] = strength[w];
+    }
   }
 
   // Inside / outside classification + longest inside run = block span.
@@ -156,6 +173,7 @@ export function computeKaryogroupStats(canonical, opts) {
     k: K, n_karyogroups_present: nPresent,
     n_windows: W,
     cramers_v: cramers, fst, separation, het_intermediacy: hetInter,
+    strength, per_marker_strength: perMarkerStrength,
     n_used: nUsed, inside,
     window_start_bp: winStartBp, window_end_bp: winEndBp,
     n_inside: nInside, n_outside: W - nInside,
