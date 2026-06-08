@@ -518,18 +518,32 @@ function _applyGrouping(state) {
     }
   }
 
-  // On-chromosome GHSL curves (Track 1). Recomputed on every grouping
-  // change so the per-karyogroup trajectories track the active detection;
-  // falls back to median/P90 summaries when no grouping is present.
+  // On-chromosome GHSL curves (Track 1) are computed LAZILY — only when
+  // the "GHSL curve" toggle is on — and cached. The per-window ×
+  // per-sample reduction is too heavy to run eagerly on every grouping
+  // change for full-genome panels on a weak machine. Here we just
+  // invalidate the cache so the next paint (if enabled) rebuilds it
+  // against the current detection.
   d.ghsl_curve = null;
-  if (d.ghsl_panel) {
-    try {
-      const panelLabels = det ? _panelKaryogroupLabels(d, det) : null;
-      d.ghsl_curve = buildGhslChromCurves(d, {
-        panelLabels, k: det ? det.k : undefined,
-      });
-    } catch (e) { console.warn('dosage_heatmap: buildGhslChromCurves threw —', e); }
-  }
+  state._groupingVersion = (state._groupingVersion | 0) + 1;
+}
+
+// Build (and cache) the GHSL curve only when the Track-1 toggle is on.
+// Cheap no-op when disabled or already current for this grouping, so the
+// heavy reduction never runs unless the user opts in. Cache key folds in
+// the detection identity so re-grouping rebuilds it.
+function _ensureGhslCurve(state) {
+  const d = state && state.data;
+  if (!d || !d.ghsl_panel) { if (d) d.ghsl_curve = null; return; }
+  if (!state.view_state.show_ghsl_curve) return;   // opt-in only
+  const ver = state._groupingVersion | 0;
+  if (d.ghsl_curve && state._ghslCurveVersion === ver) return;   // cached
+  const det = state.detect || null;
+  try {
+    const panelLabels = det ? _panelKaryogroupLabels(d, det) : null;
+    d.ghsl_curve = buildGhslChromCurves(d, { panelLabels, k: det ? det.k : undefined });
+    state._ghslCurveVersion = ver;
+  } catch (e) { console.warn('dosage_heatmap: buildGhslChromCurves threw —', e); }
 }
 
 // Karyogroup id per GHSL-panel sample (panel sample order), aligned from
@@ -716,6 +730,9 @@ function _renderHeader(state) {
 function _paintHeatmap(state) {
   if (!state) return;
   if (typeof document === 'undefined' || !document.getElementById) return;
+  // Lazily build the GHSL curve here (no-op unless its toggle is on), so
+  // the heavy reduction is paid only when the overlay is actually shown.
+  _ensureGhslCurve(state);
   const canvas = document.getElementById('dosageHeatmapCanvas');
   const empty  = document.getElementById('dosageHeatmapEmpty');
   if (!canvas) return;
