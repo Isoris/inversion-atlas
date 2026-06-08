@@ -65,6 +65,8 @@ import { clusterIndexAware } from './dosage_heatmap/index_aware_cluster.js';
 import { collapseSimilar } from './dosage_heatmap/collapse_similar.js';
 import { computeKaryogroupStats } from './dosage_heatmap/karyogroup_stats.js';
 import { buildKaryogroupExport, buildPopstatsRequest } from './dosage_heatmap/karyogroup_export.js';
+import { buildGhslChromCurves } from './dosage_heatmap/ghsl_track.js';
+import { buildHweFisRequest, parseHweFisResponse } from './dosage_heatmap/hwe_fis_adapter.js';
 import { selectMarkers, markerViewport } from './dosage_heatmap/marker_select.js';
 import { buildRegistryOverlay } from './dosage_heatmap/regime_registry_overlay.js';
 
@@ -95,6 +97,9 @@ const DEFAULT_VIEW_STATE = Object.freeze({
   // Per-window karyogroup boundary statistics: window count knob (drives
   // Cramér's V / FST-proxy resolution + the 'fan' colour mode).
   kg_windows:              20,
+  // On-chromosome overlay curves (off by default).
+  show_ghsl_curve:         false,   // Track 1: GHSL divergence trajectories
+  show_fis_curve:          false,   // Track 2: imported HWE_F_IS curve
   // 2026-05-29: in-page haplotype-regime grouping. The heatmap can group
   // samples from the loaded dosage chunk itself (no upstream pipeline
   // needed) and score how confident each group is, OR consume the active
@@ -512,6 +517,40 @@ function _applyGrouping(state) {
       d.boundary_strength = kg.per_marker_strength;
     }
   }
+
+  // On-chromosome GHSL curves (Track 1). Recomputed on every grouping
+  // change so the per-karyogroup trajectories track the active detection;
+  // falls back to median/P90 summaries when no grouping is present.
+  d.ghsl_curve = null;
+  if (d.ghsl_panel) {
+    try {
+      const panelLabels = det ? _panelKaryogroupLabels(d, det) : null;
+      d.ghsl_curve = buildGhslChromCurves(d, {
+        panelLabels, k: det ? det.k : undefined,
+      });
+    } catch (e) { console.warn('dosage_heatmap: buildGhslChromCurves threw —', e); }
+  }
+}
+
+// Karyogroup id per GHSL-panel sample (panel sample order), aligned from
+// the detection's heatmap-order labels by sample id. -1 where unmatched.
+function _panelKaryogroupLabels(d, det) {
+  const panel = d.ghsl_panel;
+  if (!panel || !Array.isArray(panel.samples) || !det || !det.labels) return null;
+  const heatmapIds = Array.isArray(d.sample_labels) ? d.sample_labels : null;
+  const labOf = new Map();
+  if (heatmapIds) {
+    for (let i = 0; i < heatmapIds.length && i < det.labels.length; i++) {
+      labOf.set(String(heatmapIds[i]), det.labels[i]);
+    }
+  }
+  const out = new Int32Array(panel.samples.length).fill(-1);
+  for (let p = 0; p < panel.samples.length; p++) {
+    const id = String(panel.samples[p]);
+    out[p] = labOf.has(id) ? labOf.get(id)
+           : (p < det.labels.length ? det.labels[p] : -1);
+  }
+  return out;
 }
 
 function _defaultViewLabel(dh) {
@@ -658,6 +697,10 @@ function _renderHeader(state) {
   if (cs) cs.value = state.view_state.confidence_scheme;
   const ct = document.getElementById('dosageHeatmapShowConfidenceTrack');
   if (ct) ct.checked = !!state.view_state.show_confidence_track;
+  const gcv = document.getElementById('dosageHeatmapShowGhslCurve');
+  if (gcv) gcv.checked = !!state.view_state.show_ghsl_curve;
+  const fcv = document.getElementById('dosageHeatmapShowFisCurve');
+  if (fcv) fcv.checked = !!state.view_state.show_fis_curve;
   const mv = document.getElementById('dosageHeatmapMarkerView');
   if (mv) mv.value = state.view_state.marker_view;
   const sn = document.getElementById('dosageHeatmapSubsampleN');
@@ -742,6 +785,8 @@ function _paintHeatmap(state) {
     show_theta_pi_track:   state.view_state.show_theta_pi_track,
     show_het_dosage_track: state.view_state.show_het_dosage_track,
     show_confidence_track: state.view_state.show_confidence_track,
+    show_ghsl_curve:       state.view_state.show_ghsl_curve,
+    show_fis_curve:        state.view_state.show_fis_curve,
     show_polarity_track:   state.view_state.show_polarity_track,
     show_y_ticks:            state.view_state.show_y_ticks,
     show_group_labels:       state.view_state.show_group_labels,
@@ -931,6 +976,64 @@ async function _exportKaryogroups(state) {
     setStatus('exported JSON · FST ' + (fst != null ? fst.toFixed(3) : '(see console)'));
     if (fst == null) console.info('dosage_heatmap: popstats response', r.data);
   } catch (e) { setStatus('exported JSON · FST call failed'); }
+}
+
+// ---------------------------------------------------------------------
+// HWE_F_IS in/out JSON bridge (Track 2). OUT = download a popstats request
+// for the current region/karyogroups; IN = load the returned per-window
+// HWE_F_IS result and render it.
+// ---------------------------------------------------------------------
+function _downloadHweFisRequest(state) {
+  const slot = (typeof document !== 'undefined' && document.getElementById)
+    ? document.getElementById('dosageHeatmapFisStatus') : null;
+  const setStatus = (t) => { if (slot) slot.textContent = t; };
+  const d = state && state.data;
+  if (!d) { setStatus('no data'); return; }
+  const blk = state.kgstats && state.kgstats.block;
+  const region = {
+    start_bp: blk && Number.isFinite(blk.start_bp) ? blk.start_bp : null,
+    end_bp:   blk && Number.isFinite(blk.end_bp)   ? blk.end_bp   : null,
+  };
+  // Per-karyogroup sample groups (so popstats can stratify full vs subset).
+  let groups = null;
+  if (state.detect && state.detect.labels) {
+    try {
+      const exp = buildKaryogroupExport(d, state.detect, state.kgstats, {});
+      groups = exp ? exp.groups_map : null;
+    } catch (e) { /* optional */ }
+  }
+  const scale = d.ghsl_panel && (d.ghsl_panel.primary_scale
+    || (d.ghsl_panel.scales && d.ghsl_panel.scales[0])) || undefined;
+  const req = buildHweFisRequest({ chrom: state._chrom || null, region, scale, groups });
+  _downloadJson(req, 'hwe_fis_request_' + (state._chrom || 'region') + '.json');
+  setStatus('request downloaded — run popstats, then "HWE_F_IS load"');
+}
+
+function _loadHweFisResult(state, evt, repaintAll) {
+  const slot = (typeof document !== 'undefined' && document.getElementById)
+    ? document.getElementById('dosageHeatmapFisStatus') : null;
+  const setStatus = (t) => { if (slot) slot.textContent = t; };
+  const file = evt && evt.target && evt.target.files && evt.target.files[0];
+  if (!file || typeof FileReader === 'undefined') { setStatus('no file'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    let json = null;
+    try { json = JSON.parse(reader.result); }
+    catch (e) { setStatus('invalid JSON'); return; }
+    let curve = null;
+    try { curve = parseHweFisResponse(json); }
+    catch (e) { console.warn('dosage_heatmap: parseHweFisResponse threw —', e); }
+    if (!curve) { setStatus('unrecognised HWE_F_IS shape'); return; }
+    if (state.data) state.data.hwe_fis_curve = curve;
+    state.view_state.show_fis_curve = true;
+    const cb = (typeof document !== 'undefined') ? document.getElementById('dosageHeatmapShowFisCurve') : null;
+    if (cb) cb.checked = true;
+    setStatus('loaded ' + curve.n_windows + ' windows'
+      + (curve.group ? ' · group ' + curve.group : ''));
+    if (typeof repaintAll === 'function') repaintAll();
+  };
+  reader.onerror = () => setStatus('file read error');
+  reader.readAsText(file);
 }
 
 // Trigger a client-side JSON download. No-op outside the browser.
@@ -1176,6 +1279,16 @@ function _wireToolbar(state) {
     repaintAll();
   };
   const onExportKaryo = () => { _exportKaryogroups(state); };
+  const onShowGhslCurve = (e) => {
+    state.view_state.show_ghsl_curve = !!(e && e.target && e.target.checked);
+    repaintAll();
+  };
+  const onShowFisCurve = (e) => {
+    state.view_state.show_fis_curve = !!(e && e.target && e.target.checked);
+    repaintAll();
+  };
+  const onFisReqDownload = () => { _downloadHweFisRequest(state); };
+  const onFisLoad = (e) => { _loadHweFisResult(state, e, repaintAll); };
   const onCanvasMove = (ev) => {
     const c = document.getElementById('dosageHeatmapCanvas');
     if (!c) return;
@@ -1234,6 +1347,7 @@ function _wireToolbar(state) {
     onShowGhslTrack, onShowThetaPiTrack, onShowHetDosageTrack,
     onShowRegimeCallTrack, onShowLocusSpanOverlay, onShowGroupRects,
     onCollapseSimilar, onCollapseHamming, onCollapseReps, onExportKaryo,
+    onShowGhslCurve, onShowFisCurve, onFisReqDownload, onFisLoad,
     onGroupingSource, onDetectK, onKgWindows, onConfidenceScheme, onShowConfidenceTrack,
     onMarkerView, onSubsampleN, onZoom, onKeyDown,
     onCanvasMove, onCanvasClick, onCanvasLeave,
@@ -1267,6 +1381,10 @@ function _wireToolbar(state) {
   _addListener('dosageHeatmapCollapseHamming',      'change',     onCollapseHamming);
   _addListener('dosageHeatmapCollapseReps',         'change',     onCollapseReps);
   _addListener('dosageHeatmapExportKaryo',          'click',      onExportKaryo);
+  _addListener('dosageHeatmapShowGhslCurve',        'change',     onShowGhslCurve);
+  _addListener('dosageHeatmapShowFisCurve',         'change',     onShowFisCurve);
+  _addListener('dosageHeatmapFisReqDownload',       'click',      onFisReqDownload);
+  _addListener('dosageHeatmapFisLoad',              'change',     onFisLoad);
   _addListener('dosageHeatmapCanvas',               'mousemove',  onCanvasMove);
   _addListener('dosageHeatmapCanvas',               'click',      onCanvasClick);
   _addListener('dosageHeatmapCanvas',               'mouseleave', onCanvasLeave);
@@ -1302,6 +1420,10 @@ function _teardownToolbar(state) {
   if (h.onCollapseHamming)     _removeListener('dosageHeatmapCollapseHamming',       'change',     h.onCollapseHamming);
   if (h.onCollapseReps)        _removeListener('dosageHeatmapCollapseReps',          'change',     h.onCollapseReps);
   if (h.onExportKaryo)         _removeListener('dosageHeatmapExportKaryo',           'click',      h.onExportKaryo);
+  if (h.onShowGhslCurve)       _removeListener('dosageHeatmapShowGhslCurve',         'change',     h.onShowGhslCurve);
+  if (h.onShowFisCurve)        _removeListener('dosageHeatmapShowFisCurve',          'change',     h.onShowFisCurve);
+  if (h.onFisReqDownload)      _removeListener('dosageHeatmapFisReqDownload',        'click',      h.onFisReqDownload);
+  if (h.onFisLoad)             _removeListener('dosageHeatmapFisLoad',               'change',     h.onFisLoad);
   if (h.onCanvasMove)          _removeListener('dosageHeatmapCanvas',               'mousemove',  h.onCanvasMove);
   if (h.onCanvasClick)         _removeListener('dosageHeatmapCanvas',               'click',      h.onCanvasClick);
   if (h.onCanvasLeave)         _removeListener('dosageHeatmapCanvas',               'mouseleave', h.onCanvasLeave);

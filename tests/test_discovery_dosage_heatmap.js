@@ -635,6 +635,68 @@ check('paint with color_mode=fan + boundary_strength does not throw', (() => {
 })());
 
 // =====================================================================
+group('renderer GHSL + HWE_F_IS curve panels (top tracks)');
+
+const ghslCurve = {
+  scale: 's25k', n_windows: 4,
+  win_x: Float64Array.from([1000, 2000, 3000, 4000]),
+  per_sample: [Float32Array.from([0.2, 0.3, 0.4, 0.5])],
+  per_karyo: { 'KG-A': Float32Array.from([0.1, 0.1, 0.1, 0.1]),
+               'KG-B': Float32Array.from([0.8, 0.9, 0.8, 0.9]) },
+  median: Float32Array.from([0.45, 0.5, 0.45, 0.5]),
+  p90:    Float32Array.from([0.8, 0.9, 0.8, 0.9]),
+  mean:   Float32Array.from([0.45, 0.5, 0.45, 0.5]),
+  n_used: Int32Array.from([2, 2, 2, 2]), vmin: 0.1, vmax: 0.9,
+};
+const fisCurve = {
+  n_windows: 4, win_x: Float64Array.from([1000, 2000, 3000, 4000]),
+  hwe_f_is: Float64Array.from([-0.3, -0.1, 0.2, NaN]),
+  n_sites: Float64Array.from([100, 90, 80, 0]),
+  significant: Uint8Array.from([1, 0, 1, 0]),
+};
+
+check('GHSL curve panel strokes per-karyogroup lines', (() => {
+  const hc = new FakeCanvas(600, 400);
+  const d = Object.assign({}, data, { ghsl_curve: ghslCurve });
+  paintDosageHeatmap(hc, d, { show_ghsl_curve: true, show_polarity_track: false });
+  // 2 karyogroup polylines → ≥2 strokes beyond the matrix outline baseline
+  return hc._ctx.calls.filter(c => c === 'stroke').length >= 2;
+})());
+check('GHSL curve off by default (no extra strokes)', (() => {
+  const hcOn = new FakeCanvas(600, 400);
+  const hcOff = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hcOn, Object.assign({}, data, { ghsl_curve: ghslCurve }),
+    { show_ghsl_curve: true, show_polarity_track: false });
+  paintDosageHeatmap(hcOff, Object.assign({}, data, { ghsl_curve: ghslCurve }),
+    { show_polarity_track: false });
+  return hcOn._ctx.calls.filter(c => c === 'stroke').length
+       > hcOff._ctx.calls.filter(c => c === 'stroke').length;
+})());
+check('HWE_F_IS panel draws zero line + curve + sig marks', (() => {
+  const hc = new FakeCanvas(600, 400);
+  const d = Object.assign({}, data, { hwe_fis_curve: fisCurve });
+  paintDosageHeatmap(hc, d, { show_fis_curve: true, show_polarity_track: false });
+  const strokes = hc._ctx.calls.filter(c => c === 'stroke').length;   // zero line + curve
+  const fills = hc._ctx.calls.filter(c => c === 'fillRect').length;   // bg + 2 sig dots
+  return strokes >= 2 && fills > 20;
+})());
+check('both curves reserve top band (matrix pushed down)', (() => {
+  const base = new FakeCanvas(600, 400);
+  const both = new FakeCanvas(600, 400);
+  const pb = paintDosageHeatmap(base, data, { show_polarity_track: false });
+  const p = paintDosageHeatmap(both, Object.assign({}, data,
+    { ghsl_curve: ghslCurve, hwe_fis_curve: fisCurve }),
+    { show_ghsl_curve: true, show_fis_curve: true, show_polarity_track: false });
+  // matrix top pushed down by the two ~40px curve panels
+  return p.layout && pb.layout && p.layout.matY > pb.layout.matY + 70;
+})());
+check('missing curve object → panel silently skipped', (() => {
+  const hc = new FakeCanvas(600, 400);
+  paintDosageHeatmap(hc, data, { show_ghsl_curve: true, show_fis_curve: true, show_polarity_track: false });
+  return hc._ctx.calls.filter(c => c === 'fillRect').length > 0;   // still paints matrix
+})());
+
+// =====================================================================
 group('renderer.collapse size histogram (right gutter)');
 
 const dataCol = Object.assign({}, data, {

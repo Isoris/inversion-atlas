@@ -154,6 +154,18 @@ low var: least variable markers (background).">
           <input id="dosageHeatmapShowGhslTrack" type="checkbox">
           GHSL mean
         </label>
+        <!-- On-chromosome GHSL curve (Track 1, per-karyogroup trajectories)
+             + imported HWE_F_IS curve (Track 2, from popstats GL JSON). -->
+        <label class="dh2-toggle"
+               title="GHSL divergence curve along the chromosome (per-karyogroup trajectories when a grouping is active, else median + P90 across samples).">
+          <input id="dosageHeatmapShowGhslCurve" type="checkbox">
+          GHSL curve
+        </label>
+        <label class="dh2-toggle"
+               title="Imported windowed HWE_F_IS curve (1 − Ho/He) with the F_IS = 0 line. Below 0 = heterozygote excess. Load a popstats GL JSON via 'HWE_F_IS load'.">
+          <input id="dosageHeatmapShowFisCurve" type="checkbox">
+          HWE_F_IS curve
+        </label>
         <label class="dh2-toggle">
           <input id="dosageHeatmapShowPolarityTrack" type="checkbox" checked>
           Polarity stripe
@@ -222,6 +234,21 @@ low var: least variable markers (background).">
           Export karyogroups → FST
         </button>
         <span id="dosageHeatmapFstResult" class="dh2-hint"></span>
+        <span class="dh2-sep"></span>
+        <!-- HWE_F_IS in/out JSON bridge to the GL-based popstats path:
+             download the request (OUT) to run popstats offline, then load
+             the returned per-window HWE_F_IS JSON (IN) as Track 2. -->
+        <button id="dosageHeatmapFisReqDownload" class="dh2-btn" type="button"
+                title="Download the HWE_F_IS request JSON (region + windows + karyogroups) to run in the GL popstats pipeline.">
+          HWE_F_IS req ↓
+        </button>
+        <label class="dh2-btn" style="cursor:pointer;"
+               title="Load a popstats HWE_F_IS result JSON to render Track 2.">
+          HWE_F_IS load
+          <input id="dosageHeatmapFisLoad" type="file" accept="application/json,.json"
+                 style="display:none;">
+        </label>
+        <span id="dosageHeatmapFisStatus" class="dh2-hint"></span>
       </div>
     </header>
 

@@ -98,6 +98,26 @@ export function dosageValueToColor(v, vmin, vmax) {
   return dosageMagmaColor(v, vmin, vmax);
 }
 
+// Stroke a per-window polyline across [x0,x1], mapping value→y in the
+// panel [yTop(top)…yBot(bottom)] over [vmin,vmax]. NaN windows break the
+// line into segments (no interpolation across gaps). Windows are spaced
+// proportionally across the panel width.
+function _strokeCurve(ctx, ys, n, x0, x1, yTop, yBot, vmin, vmax, style, lineWidth) {
+  if (!ys || !(n > 0) || typeof ctx.beginPath !== 'function') return;
+  const span = (vmax > vmin) ? (vmax - vmin) : 1;
+  ctx.strokeStyle = style; ctx.lineWidth = lineWidth || 1;
+  ctx.beginPath();
+  let started = false;
+  for (let i = 0; i < n; i++) {
+    const v = ys[i];
+    if (!Number.isFinite(v)) { started = false; continue; }
+    const x = x0 + (n <= 1 ? 0 : (i / (n - 1)) * (x1 - x0));
+    const y = yBot - ((v - vmin) / span) * (yBot - yTop);
+    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+  }
+  if (typeof ctx.stroke === 'function') ctx.stroke();
+}
+
 /**
  * Pick a per-cell colourer for the given `color_mode`.
  *
@@ -412,6 +432,10 @@ export function paintDosageHeatmap(canvas, data, opts) {
   const yPad = 8;
   const trackPx = 8;
   const trackGap = 1;
+  // GHSL / HWE_F_IS curve panels (taller than the stripe tracks) sit at
+  // the very top, above the role-pair / polarity stripes.
+  const curvePx = 40;
+  const curveGap = 3;
   const tickPad = 32;        // left gutter for y-axis tick labels (s=N)
   const labelPad = 44;       // left gutter for group-run text labels
 
@@ -465,6 +489,14 @@ export function paintDosageHeatmap(canvas, data, opts) {
     && data.marker_role_pair.some(p => p);
   const showRolePair = (o.show_role_pair_track !== false) && hasAnyRolePair;
 
+  // On-chromosome GHSL curve (Track 1) + imported HWE_F_IS curve (Track 2).
+  // Opt-in (default off) so existing views are unaffected; each needs its
+  // precomputed curve object on `data`.
+  const showGhslCurve = (o.show_ghsl_curve === true)
+    && data.ghsl_curve && data.ghsl_curve.n_windows > 0;
+  const showFisCurve = (o.show_fis_curve === true)
+    && data.hwe_fis_curve && data.hwe_fis_curve.n_windows > 0;
+
   // Continuous per-sample tracks are drawn with a unique palette each
   // so they're visually distinct from the group categorical track and
   // from the main matrix.
@@ -509,7 +541,9 @@ export function paintDosageHeatmap(canvas, data, opts) {
 
   const leftBands = trackBlocks.length * (trackPx + trackGap);
   const topBand   = (showPolarity ? trackPx + trackGap : 0)
-                  + (showRolePair ? trackPx + trackGap : 0);
+                  + (showRolePair ? trackPx + trackGap : 0)
+                  + (showGhslCurve ? curvePx + curveGap : 0)
+                  + (showFisCurve ? curvePx + curveGap : 0);
   const leftGutter = (showTicks ? tickPad : 0)
                    + (showGroupLabels ? labelPad : 0);
   const rightHist = showCollapseHist ? 66 : 0;   // right gutter for size bars
@@ -834,6 +868,61 @@ export function paintDosageHeatmap(canvas, data, opts) {
   // with `trackGap` between adjacent tracks. The role-pair track
   // sits at yPad; polarity follows below; the matrix starts at matY.
   let topY = yPad;
+
+  // --- GHSL curve panel (Track 1): per-karyogroup trajectories when a
+  // grouping is active, else median (bold) + P90 (light) across samples.
+  if (showGhslCurve) {
+    const g = data.ghsl_curve;
+    const x0 = matX, x1 = matX + drawW, yT = topY, yB = topY + curvePx;
+    ctx.fillStyle = 'rgba(248,249,251,0.95)';
+    if (typeof ctx.fillRect === 'function') ctx.fillRect(x0, yT, drawW, curvePx);
+    const vmn = Number.isFinite(g.vmin) ? g.vmin : 0;
+    const vmx = (Number.isFinite(g.vmax) && g.vmax > vmn) ? g.vmax : vmn + 1;
+    if (g.per_karyo && Object.keys(g.per_karyo).length) {
+      const kgColors = buildGroupColorMap(Object.keys(g.per_karyo));
+      for (const name of Object.keys(g.per_karyo)) {
+        _strokeCurve(ctx, g.per_karyo[name], g.n_windows, x0, x1, yT, yB, vmn, vmx,
+                     kgColors.get(name) || 'rgba(60,60,60,0.85)', 1.5);
+      }
+    } else {
+      _strokeCurve(ctx, g.p90, g.n_windows, x0, x1, yT, yB, vmn, vmx, 'rgba(245,170,60,0.55)', 1);
+      _strokeCurve(ctx, g.median, g.n_windows, x0, x1, yT, yB, vmn, vmx, 'rgba(40,60,90,0.9)', 1.6);
+    }
+    topY += curvePx + curveGap;
+  }
+
+  // --- HWE_F_IS curve panel (Track 2): imported popstats curve, symmetric
+  // about the F_IS = 0 reference line (below 0 = heterozygote excess).
+  if (showFisCurve) {
+    const f = data.hwe_fis_curve;
+    const x0 = matX, x1 = matX + drawW, yT = topY, yB = topY + curvePx;
+    ctx.fillStyle = 'rgba(248,249,251,0.95)';
+    if (typeof ctx.fillRect === 'function') ctx.fillRect(x0, yT, drawW, curvePx);
+    let maxAbs = 0.3;
+    for (let w = 0; w < f.n_windows; w++) { const v = f.hwe_f_is[w]; if (Number.isFinite(v)) maxAbs = Math.max(maxAbs, Math.abs(v)); }
+    const vmn = -maxAbs, vmx = maxAbs;
+    const yZero = yB - ((0 - vmn) / (vmx - vmn)) * (yB - yT);
+    // F_IS = 0 reference line.
+    if (typeof ctx.beginPath === 'function') {
+      ctx.strokeStyle = 'rgba(120,120,120,0.7)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x0, yZero); ctx.lineTo(x1, yZero);
+      if (typeof ctx.stroke === 'function') ctx.stroke();
+    }
+    _strokeCurve(ctx, f.hwe_f_is, f.n_windows, x0, x1, yT, yB, vmn, vmx, 'rgba(30,110,140,0.95)', 1.6);
+    // Mark windows with a significant HWE departure.
+    if (f.significant && typeof ctx.fillRect === 'function') {
+      ctx.fillStyle = 'rgba(200,40,80,0.9)';
+      for (let w = 0; w < f.n_windows; w++) {
+        if (!f.significant[w]) continue;
+        const v = f.hwe_f_is[w]; if (!Number.isFinite(v)) continue;
+        const x = x0 + (f.n_windows <= 1 ? 0 : (w / (f.n_windows - 1)) * (x1 - x0));
+        const y = yB - ((v - vmn) / (vmx - vmn)) * (yB - yT);
+        ctx.fillRect(x - 1, y - 1, 2.5, 2.5);
+      }
+    }
+    topY += curvePx + curveGap;
+  }
+
   if (showRolePair) {
     // Discrete palette per role-pair. MAJOR_MINOR1 (the default
     // bi-allelic pair) gets a subdued grey so multi-allelic pairs
