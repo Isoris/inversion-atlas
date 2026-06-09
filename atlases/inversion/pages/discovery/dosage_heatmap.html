@@ -106,10 +106,12 @@ silhouette: per-sample 1-D silhouette within the detected groups.">
           SNPs
           <select id="dosageHeatmapMarkerView" class="dh2-select"
                   title="all: every marker.
+even (bp): approximately equal genomic spacing across the whole interval — the whole-region figure view.
 random: a reproducible random subsample.
 high var: most variable markers (strongest structure).
 low var: least variable markers (background).">
             <option value="all">all</option>
+            <option value="even_bp">even spaced (bp)</option>
             <option value="random">random</option>
             <option value="high_var">high variance</option>
             <option value="low_var">low variance</option>
@@ -234,6 +236,29 @@ low var: least variable markers (background).">
           Export karyogroups → FST
         </button>
         <span id="dosageHeatmapFstResult" class="dh2-hint"></span>
+        <span class="dh2-sep"></span>
+        <!-- Manuscript figure group: thin samples per karyogroup, then
+             export the current view as vector SVG / print-to-PDF. Pair with
+             the "even spaced (bp)" SNP view for a whole-region figure. -->
+        <label class="dh2-toggle">
+          Samples/group
+          <select id="dosageHeatmapSamplesPerGroup" class="dh2-select"
+                  title="Cap displayed samples per karyogroup (evenly spread). Needs an in-page grouping. 0 = all.">
+            <option value="0">all</option>
+            <option value="10">10</option>
+            <option value="15">15</option>
+            <option value="20">20</option>
+            <option value="30">30</option>
+          </select>
+        </label>
+        <button id="dosageHeatmapExportSvg" class="dh2-btn" type="button"
+                title="Download the current heatmap view as a vector SVG (manuscript figure).">
+          Export SVG
+        </button>
+        <button id="dosageHeatmapExportPdf" class="dh2-btn" type="button"
+                title="Open the figure in a print window — choose 'Save as PDF'.">
+          Export PDF
+        </button>
         <span class="dh2-sep"></span>
         <!-- HWE_F_IS in/out JSON bridge to the GL-based popstats path:
              download the request (OUT) to run popstats offline, then load

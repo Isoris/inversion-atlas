@@ -78,12 +78,80 @@ export function selectMarkers(canonical, opts) {
       .filter(i => Number.isFinite(varr[i]))
       .sort((a, b) => (view === 'high_var' ? varr[b] - varr[a] : varr[a] - varr[b]));
     picked = order.slice(0, Math.min(want, order.length));
+  } else if (view === 'even_bp') {
+    // Approximately equal genomic spacing across the whole candidate
+    // interval — the "whole-region figure" view. Picks `want` markers
+    // nearest to evenly-spaced genomic targets over [minBp, maxBp].
+    picked = pickEvenlySpacedByBp(canonical && canonical.marker_pos_bp, nM, want);
   } else {
     picked = Array.from({ length: nM }, (_, i) => i);
     if (want < nM) picked = picked.slice(0, want);
   }
   picked.sort((a, b) => a - b);
   return Int32Array.from(picked);
+}
+
+/**
+ * Pick ~`want` markers at approximately equal genomic distances over the
+ * whole interval spanned by `posBp`. For each of `want` evenly-spaced
+ * genomic targets it takes the nearest not-yet-picked marker, so the
+ * result is roughly uniform in bp even when markers cluster. Falls back to
+ * even INDEX spacing when positions are missing.
+ *
+ * @param {Float64Array|number[]} posBp  per-marker genomic position (bp)
+ * @param {number} nM                    total markers
+ * @param {number} want                  target count (≥ nM → all)
+ * @returns {number[]} sorted marker indices
+ */
+export function pickEvenlySpacedByBp(posBp, nM, want) {
+  if (!(nM > 0)) return [];
+  if (!(want > 0) || want >= nM) return Array.from({ length: nM }, (_, i) => i);
+
+  // Markers with a finite position, sorted by position.
+  const withPos = [];
+  if (posBp && posBp.length) {
+    for (let i = 0; i < nM; i++) { const p = posBp[i]; if (Number.isFinite(p)) withPos.push(i); }
+  }
+  if (withPos.length < 2) {                       // no usable bp → even index
+    const out = [];
+    for (let k = 0; k < want; k++) out.push(Math.min(nM - 1, Math.round((k + 0.5) * nM / want)));
+    return Array.from(new Set(out)).sort((a, b) => a - b);
+  }
+  withPos.sort((a, b) => posBp[a] - posBp[b]);
+  const lo = posBp[withPos[0]];
+  const hi = posBp[withPos[withPos.length - 1]];
+  const span = (hi > lo) ? (hi - lo) : 1;
+
+  const used = new Set();
+  for (let k = 0; k < want; k++) {
+    const target = lo + ((k + 0.5) / want) * span;
+    // Nearest marker to `target` by binary search over sorted positions.
+    let blo = 0, bhi = withPos.length - 1;
+    while (blo < bhi) {
+      const mid = (blo + bhi) >> 1;
+      if (posBp[withPos[mid]] < target) blo = mid + 1; else bhi = mid;
+    }
+    // Check the neighbour on the low side too; take whichever is closer
+    // and not yet used (walk outward to break ties / collisions).
+    let best = -1, bestD = Infinity;
+    for (let j = blo - 1; j <= blo + 1; j++) {
+      if (j < 0 || j >= withPos.length) continue;
+      const mi = withPos[j];
+      if (used.has(mi)) continue;
+      const d = Math.abs(posBp[mi] - target);
+      if (d < bestD) { bestD = d; best = j; }
+    }
+    if (best < 0) {                               // local cell exhausted → scan out
+      for (let r = 2; r < withPos.length && best < 0; r++) {
+        for (const j of [blo - r, blo + r]) {
+          if (j < 0 || j >= withPos.length) continue;
+          if (!used.has(withPos[j])) { best = j; break; }
+        }
+      }
+    }
+    if (best >= 0) used.add(withPos[best]);
+  }
+  return Array.from(used).sort((a, b) => a - b);
 }
 
 function _randomPick(nM, want, seed) {

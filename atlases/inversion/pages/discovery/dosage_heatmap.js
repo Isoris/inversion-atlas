@@ -68,12 +68,16 @@ import { buildKaryogroupExport, buildPopstatsRequest } from './dosage_heatmap/ka
 import { buildGhslChromCurves } from './dosage_heatmap/ghsl_track.js';
 import { buildHweFisRequest, parseHweFisResponse } from './dosage_heatmap/hwe_fis_adapter.js';
 import { selectMarkers, markerViewport } from './dosage_heatmap/marker_select.js';
+import { subsampleByGroup } from './dosage_heatmap/sample_subsample.js';
+import { buildHeatmapSvg } from './dosage_heatmap/svg_export.js';
 import { buildRegistryOverlay } from './dosage_heatmap/regime_registry_overlay.js';
 
 const DEFAULT_VIEW_STATE = Object.freeze({
   sample_order_mode:     'by_group',
   marker_order_mode:     'natural',
-  color_mode:            'magma',    // 'magma' | 'genotype'
+  // Default to the red/white/blue genotype palette (the manuscript-figure
+  // convention: white 0/0 · blue 0/1 · red 1/1).
+  color_mode:            'genotype', // 'genotype' | 'magma' | 'fan' | 'occupancy'
   show_group_track:      true,
   show_k6_track:         false,
   show_ghsl_track:       false,      // per-sample mean GHSL (continuous)
@@ -113,7 +117,7 @@ const DEFAULT_VIEW_STATE = Object.freeze({
   show_confidence_track: false,
   confidence_scheme:     'margin',   // 'margin' | 'silhouette'
   // 2026-05-29: marker-axis SNP views + subsampling + cursor/zoom.
-  //   marker_view:        'all' | 'random' | 'high_var' | 'low_var'
+  //   marker_view:        'all' | 'random' | 'high_var' | 'low_var' | 'even_bp'
   //   marker_subsample_n: 0 = all markers for the view; else cap to N
   //   zoom:               1 = whole working set; 2/4/8 = cursor-centred window
   //   cursor_col:         ←/→ cursor position (index into the working set)
@@ -123,6 +127,9 @@ const DEFAULT_VIEW_STATE = Object.freeze({
   zoom:                  1,
   cursor_col:            0,
   cursor_row:            -1,
+  // Figure mode: cap displayed samples per karyogroup (0 = all). With an
+  // even_bp marker view this gives a whole-region, thinned manuscript view.
+  samples_per_group:     0,
 });
 
 // =====================================================================
@@ -721,6 +728,8 @@ function _renderHeader(state) {
   if (sn) sn.value = String(state.view_state.marker_subsample_n);
   const zm = document.getElementById('dosageHeatmapZoom');
   if (zm) zm.value = String(state.view_state.zoom);
+  const spg = document.getElementById('dosageHeatmapSamplesPerGroup');
+  if (spg) spg.value = String(state.view_state.samples_per_group);
 }
 
 // =====================================================================
@@ -754,6 +763,13 @@ function _paintHeatmap(state) {
   if (empty) empty.style.display = 'none';
   let order_s = deriveSampleOrder(state.view_state.sample_order_mode,
                                    state.data.n_samples, state.data);
+  // Figure mode: keep at most N samples per karyogroup (evenly spread),
+  // using the active detection's labels. Applied before collapse (which is
+  // an alternative reduction and overrides the order entirely).
+  const spg = state.view_state.samples_per_group | 0;
+  if (spg > 0 && state.detect && state.detect.labels) {
+    order_s = subsampleByGroup(order_s, state.detect.labels, spg);
+  }
   // Collapse near-identical samples into representative rows. Overrides the
   // sample-order mode (groups are ordered low→high dosage) and attaches the
   // per-row size metadata the renderer's right-gutter histogram consumes.
@@ -791,6 +807,7 @@ function _paintHeatmap(state) {
   state._working_markers = orderedWorking;
   // Cursor position relative to the painted viewport.
   const cursorColDisp = (state.view_state.cursor_col | 0) - vp.start;
+  state._lastOrderS = order_s;     // for figure export (current view)
   const hov = state.selection.getHoveredCell();
   const paint = paintDosageHeatmap(canvas, state.data, {
     sample_order:          order_s,
@@ -1067,6 +1084,55 @@ function _downloadJson(obj, filename) {
   } catch (e) { console.warn('dosage_heatmap: JSON download failed —', e); }
 }
 
+// Download arbitrary text as a file (SVG, etc.). No-op outside the browser.
+function _downloadText(text, filename, mime) {
+  try {
+    if (typeof document === 'undefined' || typeof Blob === 'undefined'
+        || typeof URL === 'undefined' || !URL.createObjectURL) return;
+    const blob = new Blob([text], { type: mime || 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  } catch (e) { console.warn('dosage_heatmap: text download failed —', e); }
+}
+
+// Build the manuscript figure SVG for the CURRENT view (same sample/marker
+// order + colour mode), then either download it (.svg) or open a print
+// window for "Save as PDF" (kind === 'pdf').
+function _exportFigure(state, kind) {
+  if (!state || !state.data) return;
+  const order_s = (state._lastOrderS instanceof Int32Array) ? state._lastOrderS : undefined;
+  const order_m = (state._viewport && state._viewport.order instanceof Int32Array)
+    ? state._viewport.order : undefined;
+  const chrom = state._chrom || 'region';
+  let svg = '';
+  try {
+    svg = buildHeatmapSvg(state.data, {
+      sample_order: order_s, marker_order: order_m,
+      color_mode: state.view_state.color_mode,
+      show_group_track: state.view_state.show_group_track,
+      show_polarity_track: state.view_state.show_polarity_track,
+      title: 'Inversion dosage — ' + chrom,
+    });
+  } catch (e) { console.warn('dosage_heatmap: SVG build failed —', e); return; }
+  if (!svg) return;
+
+  if (kind === 'pdf') {
+    if (typeof window === 'undefined' || !window.open) { _downloadText(svg, 'dosage_' + chrom + '.svg', 'image/svg+xml'); return; }
+    const w = window.open('', '_blank');
+    if (!w) { _downloadText(svg, 'dosage_' + chrom + '.svg', 'image/svg+xml'); return; }
+    w.document.write('<!DOCTYPE html><title>Dosage figure — ' + chrom
+      + '</title><style>@page{margin:8mm}body{margin:0}</style>' + svg);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { try { w.print(); } catch (e) { /* user can print manually */ } }, 250);
+  } else {
+    _downloadText(svg, 'dosage_' + chrom + '.svg', 'image/svg+xml');
+  }
+}
+
 async function _postJson(url, body) {
   if (typeof fetch !== 'function') return { ok: false, status: 0 };
   const resp = await fetch(url, {
@@ -1237,6 +1303,13 @@ function _wireToolbar(state) {
     repaint();
     _renderRightPanel(state);
   };
+  const onSamplesPerGroup = (e) => {
+    const v = parseInt((e && e.target && e.target.value), 10);
+    state.view_state.samples_per_group = Number.isFinite(v) ? Math.max(0, v) : 0;
+    repaintAll();
+  };
+  const onExportSvg = () => { _exportFigure(state, 'svg'); };
+  const onExportPdf = () => { _exportFigure(state, 'pdf'); };
   // Keyboard cursor: ←/→ move the marker cursor (Shift ×10, Home/End to
   // ends), ↑/↓ move the sample cursor, +/− zoom. Ignored while typing in
   // a form control or when the page isn't mounted.
@@ -1367,6 +1440,7 @@ function _wireToolbar(state) {
     onShowGhslCurve, onShowFisCurve, onFisReqDownload, onFisLoad,
     onGroupingSource, onDetectK, onKgWindows, onConfidenceScheme, onShowConfidenceTrack,
     onMarkerView, onSubsampleN, onZoom, onKeyDown,
+    onSamplesPerGroup, onExportSvg, onExportPdf,
     onCanvasMove, onCanvasClick, onCanvasLeave,
     unsubSelection,
   };
@@ -1388,6 +1462,9 @@ function _wireToolbar(state) {
   _addListener('dosageHeatmapMarkerView',           'change',     onMarkerView);
   _addListener('dosageHeatmapSubsampleN',           'change',     onSubsampleN);
   _addListener('dosageHeatmapZoom',                 'change',     onZoom);
+  _addListener('dosageHeatmapSamplesPerGroup',      'change',     onSamplesPerGroup);
+  _addListener('dosageHeatmapExportSvg',            'click',      onExportSvg);
+  _addListener('dosageHeatmapExportPdf',            'click',      onExportPdf);
   if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
     document.addEventListener('keydown', onKeyDown);
   }
@@ -1427,6 +1504,9 @@ function _teardownToolbar(state) {
   if (h.onMarkerView)          _removeListener('dosageHeatmapMarkerView',           'change',    h.onMarkerView);
   if (h.onSubsampleN)          _removeListener('dosageHeatmapSubsampleN',           'change',    h.onSubsampleN);
   if (h.onZoom)                _removeListener('dosageHeatmapZoom',                 'change',    h.onZoom);
+  if (h.onSamplesPerGroup)     _removeListener('dosageHeatmapSamplesPerGroup',      'change',    h.onSamplesPerGroup);
+  if (h.onExportSvg)           _removeListener('dosageHeatmapExportSvg',            'click',     h.onExportSvg);
+  if (h.onExportPdf)           _removeListener('dosageHeatmapExportPdf',            'click',     h.onExportPdf);
   if (h.onKeyDown && typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
     document.removeEventListener('keydown', h.onKeyDown);
   }
