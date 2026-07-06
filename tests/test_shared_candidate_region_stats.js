@@ -156,6 +156,81 @@ check('LRR row without stats → empty stat cells', r1[8] === '' && r1[10] === '
 check('empty list → header only', buildCandidateStatsTSV([]).replace(/\n$/, '').split('\n').length === 1);
 
 // =====================================================================
+group('fetchRegionStats — orchestration (injected post)');
+
+const { fetchRegionStats, fetchRegionStatsForAll } =
+  await import('../atlases/inversion/shared/candidate_region_stats_fetch.js');
+
+// Fake POST router: groupwise → FIS/θπ, sift → deleterious.
+function fakePost(routes) {
+  return async (url, body) => {
+    for (const [needle, resp] of Object.entries(routes)) {
+      if (url.includes(needle)) return resp;
+    }
+    return { ok: false, status: 404 };
+  };
+}
+
+await (async () => {
+  const cand = { ...candidate, region_stats: undefined };
+  const rec = await fetchRegionStats(cand, samples, {
+    now: '2026-07-06T00:00:00Z',
+    post: fakePost({
+      groupwise: { ok: true, status: 200, data: resp },
+      sift: { ok: true, status: 200, data: sresp },
+    }),
+  });
+  check('stores region_stats on candidate', cand.region_stats === rec);
+  check('FIS from groupwise', Math.abs(rec.fis + 0.22) < 1e-9);
+  check('theta_pi from groupwise', Math.abs(rec.theta_pi - 0.0041) < 1e-12);
+  check('SIFT deleterious load merged', rec.sift && Math.abs(rec.sift.deleterious_load - 0.18) < 1e-9);
+  check('computed_at stamped', rec.computed_at === '2026-07-06T00:00:00Z');
+  check('no errors on full success', rec.errors.length === 0);
+})();
+
+await (async () => {
+  // SIFT endpoint down (inert) — FIS/θπ still land, sift stays null, non-fatal.
+  const cand = { ...candidate };
+  const rec = await fetchRegionStats(cand, samples, {
+    post: fakePost({ groupwise: { ok: true, status: 200, data: resp } }),
+  });
+  check('FIS present when only groupwise ok', Number.isFinite(rec.fis));
+  check('sift null when endpoint down', rec.sift === null);
+  check('sift error recorded (non-fatal)', rec.errors.some(e => e.startsWith('sift:')));
+})();
+
+await (async () => {
+  const recs = await fetchRegionStatsForAll(
+    [candidate, { ...candidate, id: 'c2' }], samples,
+    { skipSift: true, post: fakePost({ groupwise: { ok: true, status: 200, data: resp } }) });
+  check('batch fetch returns one record per candidate', recs.length === 2 && Number.isFinite(recs[1].fis));
+  check('skipSift → no sift request attempted', !recs[0].errors.some(e => e.startsWith('sift:')));
+})();
+
+// =====================================================================
+group('candidate_stats_display — list stats line');
+
+const { statsLineHTML } = await import('../atlases/inversion/shared/candidate_stats_display.js');
+
+const hEmpty = statsLineHTML({ id: 'x' });
+check('empty: has cli-stats-empty class', hEmpty.includes('cli-stats-empty'));
+check('empty: FIS/SIFT/θπ dashes', (hEmpty.match(/—/g) || []).length >= 3);
+check('empty: "Not computed" tip', hEmpty.includes('Not computed'));
+
+const hFull = statsLineHTML({
+  id: 'y', region_stats: { fis: -0.22, theta_pi: 0.0041, computed_at: 'T',
+    sift: { deleterious_load: 0.18 } },
+});
+check('full: negative FIS gets het-excess class', hFull.includes('cli-fis-neg') && hFull.includes('-0.220'));
+check('full: SIFT value shown', hFull.includes('0.180'));
+check('full: θπ in sci notation', /4\.1e-3/.test(hFull));
+check('full: not marked empty', !hFull.includes('cli-stats-empty'));
+
+const hPos = statsLineHTML({ id: 'z', region_stats: { fis: 0.15, theta_pi: NaN, sift: null } });
+check('positive FIS gets het-deficit class', hPos.includes('cli-fis-pos'));
+check('missing sift → dash', /SIFT<\/span> <b>—/.test(hPos));
+
+// =====================================================================
 console.log('\n=================');
 console.log('pass: ' + pass + '   fail: ' + fail);
 console.log('=================');

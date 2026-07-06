@@ -1099,6 +1099,17 @@ body[data-layout-mode="compact"] main#local_pca_dosage #linesYsourceBar {
                 margin-bottom: 2px; word-break: break-all; }
 #candListContainer .cand-list-item .cli-meta { font-family: var(--mono);
                 font-size: 9.5px; color: var(--ink-dim); line-height: 1.5; }
+/* Per-region overdominance / POD hallmark line: FIS · SIFT · θπ. Shown to
+   the right of the karyotype meta; "—" until computed on the fly. */
+#candListContainer .cand-list-item .cli-stats { font-family: var(--mono);
+                font-size: 9.5px; color: var(--ink-dim); line-height: 1.6;
+                margin-top: 2px; display: flex; flex-wrap: wrap; gap: 8px; }
+#candListContainer .cand-list-item .cli-stats.cli-stats-empty { opacity: 0.55; }
+#candListContainer .cand-list-item .cli-stats .cli-stat-k {
+                color: var(--ink-dim); opacity: 0.8; }
+#candListContainer .cand-list-item .cli-stats b { color: var(--ink); font-weight: 600; }
+#candListContainer .cand-list-item .cli-stats b.cli-fis-neg { color: #1f9d55; }  /* het excess */
+#candListContainer .cand-list-item .cli-stats b.cli-fis-pos { color: #c05050; }  /* het deficit */
 /* v3.82: K=6 substructure chip on the candidate card. Inline pill that
    shows whether K=6 sub-bands cleanly nest inside K=3 majors (NESTED,
    green) vs cut across them (CROSS_CUTTING, red) vs partial (MIXED,

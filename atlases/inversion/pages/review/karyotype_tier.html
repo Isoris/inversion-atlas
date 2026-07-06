@@ -12,6 +12,10 @@
         <div class="cand-list-actions">
           <button id="candListImportBtn" title="Load a previously-exported candidate list JSON">⬆ import JSON</button>
           <button id="candListExportBtn" title="Download all saved candidates as JSON (load anywhere)">⬇ export JSON</button>
+          <!-- Per-region overdominance / POD stats (computed on the fly via
+               popstats FIS + θπ, and the SIFT deleterious binary). -->
+          <button id="candListComputeStatsBtn" title="Compute FIS (heterozygote excess), θπ diversity and SIFT deleterious load for every saved candidate — grouped by karyotype, via popstats + the SIFT binary. Shown in each row.">Σ compute stats (FIS/θπ/SIFT)</button>
+          <button id="candListStatsExportBtn" title="Export the per-region stats table (one row per inversion / LRR) as TSV — the manuscript Table-1 view.">⬇ export stats TSV</button>
           <button id="candListRegistryBtn" title="Export the canonical candidate registry (TSV + JSON) — this is the contract input for cluster phases 6+">📋 export registry (TSV+JSON)</button>
           <!-- v3.99 t14e+ continue: registry interop. Drop a folder/multi-file
                selection of registry artifacts (sample_groups.tsv,

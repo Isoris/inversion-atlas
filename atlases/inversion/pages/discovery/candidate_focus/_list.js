@@ -19,6 +19,7 @@ import { refreshCandidateUI } from '../candidate_focus.js';
 import { persistActiveCandidateId } from '../../../shared/active_candidate.js';
 import { isAutoCandidate } from '../../../shared/candidate_predicates.js';
 import { groupColor } from '../../../shared/page1_data_helpers.js';
+import { statsLineHTML } from '../../../shared/candidate_stats_display.js';
 
 // ---------------------------------------------------------------------------
 // Module-private constants (extracted from legacy)
@@ -311,6 +312,7 @@ export function refreshCandidateListUI() {
         <div class="cli-meta">
           ${subbandChip}${c.chrom} · K=${c.K} · ${span_mb.toFixed(2)} Mb · ${nL2} L2${nL2 === 1 ? '' : 's'}
         </div>
+        ${statsLineHTML(c)}
         ${perTrackMeta}
       </div>
     `;

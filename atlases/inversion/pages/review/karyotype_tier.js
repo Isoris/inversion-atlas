@@ -109,6 +109,9 @@ import {
   candidateToJSON, candidateFromJSON,
   persistCandidateList, addCandidateToList, makeCandidateId,
 } from '../discovery/local_pca_dosage/candidates.js';
+import { fetchRegionStatsForAll } from '../../shared/candidate_region_stats_fetch.js';
+import { buildCandidateStatsTSV } from '../../shared/candidate_stats_table.js';
+import { statsLineHTML } from '../../shared/candidate_stats_display.js';
 import { renderTierAxesGrid as _renderTierAxesGrid, TIER_AXES, TIER_GROUPS, tierAxisValueColor } from './karyotype_tier/tier_axes.js';
 import {
   renderKaryotypeBody as _renderCandidateKaryotypeBody,
@@ -540,6 +543,60 @@ function _wireCandListActions(root, state, atlasState) {
       } catch (e) { console.warn('candListExportBtn:', e); }
     });
     exp.dataset.wired = '1';
+  }
+
+  // Σ compute stats — fetch per-region FIS / θπ (popstats) + SIFT
+  // deleterious load for every saved candidate, grouped by karyotype, then
+  // refresh each row's stats line in place. SIFT stays "—" until its
+  // endpoint is wired; FIS / θπ populate as soon as popstats answers.
+  const cstat = $('candListComputeStatsBtn');
+  if (cstat && cstat.dataset.wired !== '1') {
+    cstat.addEventListener('click', async () => {
+      const list = (state && state.candidateList) || [];
+      const samples = state && state.data && state.data.samples;
+      if (!list.length || !Array.isArray(samples)) {
+        console.warn('candListComputeStatsBtn: no candidates or no samples');
+        return;
+      }
+      const orig = cstat.textContent;
+      cstat.disabled = true; cstat.textContent = 'computing…';
+      try {
+        await fetchRegionStatsForAll(list, samples, {});
+        // Also stamp the active candidate (a deep copy of a list entry).
+        if (state.candidate) {
+          const src = list.find(c => c.id === state.candidate.id);
+          if (src && src.region_stats) state.candidate.region_stats = src.region_stats;
+        }
+        // In-place refresh of each row's `.cli-stats` (page-agnostic — does
+        // not assume which module rendered the list).
+        for (const c of list) {
+          const el = document.querySelector(
+            '.cand-list-item[data-cid="' + (c.id || '') + '"] .cli-stats');
+          if (el) el.outerHTML = statsLineHTML(c);
+        }
+      } catch (e) {
+        console.warn('candListComputeStatsBtn:', e);
+      } finally {
+        cstat.disabled = false; cstat.textContent = orig;
+      }
+    });
+    cstat.dataset.wired = '1';
+  }
+
+  // ⬇ export stats TSV — one row per inversion / LRR with the computed
+  // FIS / θπ / SIFT values (manuscript Table-1 view).
+  const sexp = $('candListStatsExportBtn');
+  if (sexp && sexp.dataset.wired !== '1') {
+    sexp.addEventListener('click', () => {
+      try {
+        const list = (state && state.candidateList) || [];
+        const chrom = (state && state.data && state.data.chrom) || 'unknown_chrom';
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        _downloadBlob(`candidate_region_stats_${chrom}_${stamp}.tsv`,
+                      buildCandidateStatsTSV(list), 'text/tab-separated-values');
+      } catch (e) { console.warn('candListStatsExportBtn:', e); }
+    });
+    sexp.dataset.wired = '1';
   }
 
   // ⬆ import JSON — pick file → parse → addCandidateToList for each entry
